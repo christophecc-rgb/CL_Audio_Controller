@@ -92,6 +92,8 @@ AbletonOSC doit être installé sous :
 
 Il doit être sélectionné comme surface de contrôle dans Ableton Live. Sa version ou son commit validé reste à enregistrer formellement.
 
+L'installation active contrôlée le 17 juillet 2026 ne contient pas de métadonnées Git ni de version embarquée exploitable. Le dossier porte une date de modification locale du 9 juillet 2026, mais cette date ne permet pas d'identifier un commit. Le commit actuellement utilisé est donc **inconnu**. Toute future installation devra être effectuée à partir d'un commit ou d'une version explicitement figé et consigné ici.
+
 ### Max for Live
 
 Le pont source se trouve sous :
@@ -147,7 +149,7 @@ Vérifier :
 ## Limitations connues
 
 - Le macOS exact et la version exacte des outils Xcode du build original ne sont pas prouvés.
-- Le commit exact d'AbletonOSC installé reste à figer.
+- Le commit de l'installation AbletonOSC actuelle est inconnu ; toute future installation doit utiliser une référence explicitement figée.
 - Le lien de version entre le `.maxpat` et le `.amxd` reste à confirmer.
 - Les horodatages, chemins de build, bytecodes et signatures peuvent modifier les SHA-256.
 - Le bundle est signé ad hoc et non notarisé.

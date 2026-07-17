@@ -4,6 +4,12 @@ CL Audio Controller est une application macOS de pilotage d'Ableton Live. Elle r
 
 La version de référence est **2.0.0** (build 4), identifiée par le bundle macOS `com.claudio.controller`.
 
+## État du projet
+
+CL Audio Controller constitue désormais un projet autonome : son code, ses ressources, sa configuration PyInstaller et sa documentation de reconstruction sont réunis dans ce dépôt. Le build de validation a confirmé qu'une application fonctionnellement équivalente au bundle de référence peut être reconstruite sans dépendre du workspace historique `AB_Launcher_LTC_DEV`.
+
+La reproductibilité fonctionnelle est documentée et validée. Une identité binaire stricte n'est toutefois pas garantie, notamment à cause des métadonnées de build, des signatures, des horodatages et de la version exacte des outils Apple.
+
 ## Architecture
 
 - `launcher_control.py` : point d'entrée de l'application et panneau de contrôle natif.
@@ -17,7 +23,7 @@ La version de référence est **2.0.0** (build 4), identifiée par le bundle mac
 - `CL Audio Controller.spec` : configuration PyInstaller de l'application macOS.
 - `Diagnostics/`, `Guides/` et `INSTALLER_AbletonOSC/` : outils et documentation d'exploitation.
 
-Les dossiers `build/` et `dist/` contiennent des artefacts de référence. Ils ne font pas partie du futur historique Git et ne doivent pas être supprimés avant validation d'un nouveau build.
+Les dossiers locaux `build/` et `dist/` contiennent des artefacts de référence. Ils sont exclus du suivi Git et restent uniquement disponibles comme éléments de comparaison locale.
 
 ## Prérequis
 
@@ -50,7 +56,9 @@ AbletonOSC doit être installé sous :
 ~/Music/Ableton/User Library/Remote Scripts/AbletonOSC
 ```
 
-Après installation, redémarrer Ableton Live et sélectionner AbletonOSC comme surface de contrôle. La version ou le commit validé doit être figé avant toute réinstallation. Le script fourni dans `INSTALLER_AbletonOSC/` télécharge une source distante et peut remplacer l'installation existante ; il ne doit pas être exécuté sans contrôle préalable.
+Après installation, redémarrer Ableton Live et sélectionner AbletonOSC comme surface de contrôle.
+
+L'installation active inspectée le 17 juillet 2026 est une copie de la branche `master` installée localement le 9 juillet 2026. Elle ne contient ni dossier `.git`, ni numéro de version, ni identifiant de commit vérifiable. **Son commit exact est donc inconnu et ne doit pas être déduit de sa date.** Avant toute nouvelle installation, choisir et documenter explicitement un commit ou une version d'AbletonOSC. Le script fourni dans `INSTALLER_AbletonOSC/` télécharge actuellement la branche mobile `master` et peut remplacer l'installation existante ; il ne doit pas être exécuté sans contrôle préalable.
 
 ### Max for Live
 
@@ -97,4 +105,4 @@ Pour le premier build de validation, ne pas écraser les dossiers `build/` et `d
 
 ## Licence
 
-Aucune licence de publication n'a encore été choisie. Le projet ne doit pas être publié avant mise à jour du fichier `LICENSE` et vérification des droits sur les ressources graphiques.
+Le code et la documentation propres à CL Audio Controller sont distribués sous licence MIT ; voir `LICENSE`. Les composants tiers conservent leurs licences respectives, recensées dans `THIRD_PARTY_LICENSES.md`. Les droits sur les ressources graphiques et Max for Live doivent être confirmés avant toute publication publique.
