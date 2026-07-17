@@ -1,0 +1,9 @@
+[
+  { "name": "00 - Préshow", "time": 0 },
+  { "name": "01 - Ouverture", "time": 60 },
+  { "name": "02 - Tableau 1", "time": 180 },
+  { "name": "03 - Tableau 2", "time": 300 },
+  { "name": "04 - Entracte", "time": 600 },
+  { "name": "05 - Final", "time": 900 },
+  { "name": "NOIR / Sécurité", "time": 1200 }
+]

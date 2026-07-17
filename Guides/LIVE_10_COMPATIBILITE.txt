@@ -1,0 +1,11 @@
+ABLETON LIVE 10 - POINT IMPORTANT
+
+La source officielle actuelle d'AbletonOSC indique Ableton Live 11 ou plus.
+Cela veut dire :
+- Live 11/12 : installation officielle recommandée.
+- Live 10 : possible selon version/ancien script, mais non garanti par la version officielle actuelle.
+
+L'application Ableton Web Remote ne dépend pas directement de Live 11/12.
+Elle envoie des commandes OSC et MIDI. Le point critique pour Live 10 est donc le Remote Script AbletonOSC installé dans Ableton.
+
+Pour Live 10, garde une version d'AbletonOSC déjà validée avant de partir en spectacle.

@@ -1,0 +1,1119 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Ableton Web Remote</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101215">
+
+  <style>
+    :root {
+      --bg: #101215;
+      --panel-2: #1c1f24;
+      --text: #f4f4f4;
+      --muted: #9a9a9a;
+      --border: #333942;
+      --go-1: #43a047;
+      --go-2: #2e7d32;
+      --stop-1: #9b2c2c;
+      --stop-2: #6f1d1d;
+      --pause-1: #546e7a;
+      --pause-2: #37474f;
+      --nav-1: #3f51b5;
+      --nav-2: #283593;
+      --live: #ffb74d;
+      --select-blue: #3b82f6;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overscroll-behavior: none;
+      overflow-x: hidden;
+    }
+
+    body {
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      padding: calc(env(safe-area-inset-top) + 6px) 8px calc(env(safe-area-inset-bottom) + 8px);
+    }
+
+    .wrap {
+      width: 100%;
+      max-width: 430px;
+      min-height: calc(100vh - 14px);
+      min-height: calc(100dvh - 14px);
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .status {
+      min-height: 14px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 10px;
+      font-weight: 700;
+    }
+
+    .status.connected { color: #8bc34a; }
+    .status.disconnected { color: #ef9a9a; }
+
+    .topnav {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 3px;
+    }
+
+    .topnav a {
+      text-align: center;
+      color: var(--text);
+      text-decoration: none;
+      font-weight: 900;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 8px;
+      padding: 4px 3px;
+      font-size: 9px;
+    }
+
+    .topnav a.active {
+      background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+      border-color: #60a5fa;
+      color: white;
+      box-shadow: 0 0 14px rgba(59,130,246,.45);
+    }
+
+    .scene-cards {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+
+    .card {
+      background: linear-gradient(180deg, var(--panel-2) 0%, #14161a 100%);
+      border: 2px solid var(--border);
+      border-radius: clamp(18px, 3vw, 28px);
+      padding: clamp(22px, 4.2vh, 40px);
+      text-align: center;
+      box-shadow: 0 10px 28px rgba(0,0,0,.24);
+      transition: background .18s ease, border-color .18s ease, box-shadow .18s ease, color .18s ease, transform .18s ease;
+    }
+
+    .selected-card {
+      border: 3px solid #3b82f6 !important;
+      box-shadow: 0 0 28px rgba(59,130,246,.85) !important;
+}
+
+      .selected-card.selection-pulse {
+      animation: selectedPulse .7s ease-in-out 2;
+}
+
+      @keyframes selectedPulse {
+        0%, 100% {
+          box-shadow: 0 0 28px rgba(59,130,246,.85);
+          border-color: #3b82f6;
+  }
+        50% {
+          box-shadow: 0 0 55px rgba(147,197,253,1);
+          border-color: #bfdbfe;
+  }
+}
+
+    .current-card.session-playing {
+      background: linear-gradient(180deg, #4a2f0f 0%, #221708 100%);
+      border-color: #ffb74d;
+      color: #fff3d6;
+      box-shadow:
+        0 0 40px rgba(255,183,77,.95),
+        0 0 70px rgba(255,183,77,.45),
+        inset 0 0 20px rgba(255,183,77,.20);
+      text-shadow: 0 0 14px rgba(255,183,77,.80);
+      transform: scale(1.02);
+    }
+
+    .current-card.session-playing .label::after {
+      content: " · LECTURE SESSION";
+      color: #ffb74d;
+    }
+
+    .current-card.session-paused {
+      background: linear-gradient(180deg, #33250d 0%, #18120a 100%);
+      border-color: #ffd166;
+      color: #ffe6a3;
+      animation: pausePulse 1s infinite;
+    }
+
+    .current-card.session-paused .label::after {
+      content: " · PAUSE";
+      color: #ffd166;
+    }
+
+    @keyframes pausePulse {
+      0%, 100% {
+        box-shadow: 0 0 8px rgba(255,209,102,.35), inset 0 0 10px rgba(255,209,102,.10);
+      }
+      50% {
+        box-shadow: 0 0 30px rgba(255,209,102,.85), inset 0 0 20px rgba(255,209,102,.24);
+      }
+    }
+
+    .label {
+      margin-bottom: 10px;
+      color: var(--muted);
+      font-size: 14px;
+      letter-spacing: .07em;
+      text-transform: uppercase;
+      font-weight: 800;
+    }
+
+    .current-card.session-playing .label,
+    .current-card.session-paused .label {
+      color: #ffdda8;
+    }
+
+    .title {
+      font-size: clamp(34px, 9vw, 72px);
+      font-weight: 900;
+      line-height: 1.02;
+      word-break: break-word;
+    }
+
+    .selected-title {
+      font-size: clamp(30px, 8vw, 62px);
+      font-weight: 800;
+      line-height: 1.02;
+      word-break: break-word;
+    }
+
+    .scene-countdown {
+      margin-top: 8px;
+      color: #ffd166;
+      font-size: clamp(18px, 4.8vw, 34px);
+      font-weight: 1000;
+      line-height: 1;
+      letter-spacing: .04em;
+      text-shadow: 0 0 12px rgba(255,209,102,.38);
+    }
+
+    .selected-duration {
+      margin-top: 6px;
+      color: var(--muted);
+      font-size: clamp(12px, 3vw, 18px);
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    button {
+      min-height: clamp(52px, 7vh, 68px);
+      border: 0;
+      border-radius: clamp(14px, 2.4vw, 20px);
+      color: #fff;
+      font-size: clamp(16px, 3.8vw, 20px);
+      font-weight: 900;
+      touch-action: manipulation;
+      user-select: none;
+      cursor: pointer;
+      transition: transform .12s ease, filter .12s ease, opacity .12s ease;
+    }
+
+    button:active {
+      transform: scale(.97);
+      filter: brightness(1.18);
+    }
+
+    button:disabled {
+      opacity: .55;
+      cursor: not-allowed;
+    }
+
+    .go-button {
+      grid-column: 1 / -1;
+      min-height: clamp(82px, 12vh, 112px);
+      border-radius: clamp(18px, 3vw, 28px);
+      background: linear-gradient(180deg, #00d86e 0%, #0e8c3c 100%);
+      font-size: clamp(32px, 5.5vw, 52px);
+      line-height: 1;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: 10px;
+    }
+
+    .go-button:active {
+      transform: scale(.97);
+      filter: brightness(1.12);
+    }
+    .go-button .go-main {
+      display: inline-block;
+      font-size: clamp(32px, 5.5vw, 52px);
+      font-weight: 1000;
+      line-height: 1;
+}
+
+    .go-button .go-sub {
+      display: inline-block;
+      font-size: clamp(8px, 1.2vw, 11px);
+      font-weight: 800;
+      letter-spacing: .14em;
+      line-height: 1;
+      opacity: .85;
+      text-transform: uppercase;
+      transform: none;
+}
+
+    .prev-button,
+    .next-button {
+      background: linear-gradient(180deg, #5b7fcf 0%, #344f9f 100%);
+      border: 1px solid rgba(174,197,255,.32);
+      box-shadow: 0 0 10px rgba(91,127,207,.22);
+    }
+
+    .pause-button {
+      background: linear-gradient(180deg, #d9a441 0%, #9a6a18 100%) !important;
+      border: 1px solid rgba(255,213,128,.45) !important;
+      box-shadow: 0 0 10px rgba(217,164,65,.26) !important;
+      color: #fff7df;
+    }
+
+    .pause-button.is-play {
+      background: linear-gradient(180deg, #4f8fcf 0%, #245b91 100%) !important;
+      border-color: rgba(144,202,249,.48) !important;
+      box-shadow: 0 0 12px rgba(79,143,207,.28) !important;
+      color: #eef7ff;
+    }
+
+    .stop-button {
+      background: linear-gradient(180deg, var(--stop-1) 0%, var(--stop-2) 100%);
+    }
+
+    .goto-panel {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.10);
+      border-radius: 16px;
+      padding: 7px;
+    }
+
+    .goto-input {
+      width: 100%;
+      min-height: clamp(44px, 6vh, 56px);
+      border: 2px solid rgba(147,197,253,.55);
+      border-radius: clamp(12px, 2vw, 18px);
+      background: linear-gradient(180deg, #111827 0%, #0b1018 100%);
+      color: var(--text);
+      font-size: clamp(14px, 2.8vw, 18px);
+      font-weight: 900;
+      text-align: center;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.05), 0 0 10px rgba(59,130,246,.16);
+      outline: none;
+      padding: 0 10px;
+    }
+
+    .goto-input:focus {
+      border-color: rgba(191,219,254,.9);
+      box-shadow:
+        inset 0 0 0 1px rgba(255,255,255,.08),
+        0 0 0 3px rgba(96,165,250,.18),
+        0 0 16px rgba(96,165,250,.28);
+    }
+
+    .goto-button {
+      min-height: clamp(44px, 6vh, 56px);
+      padding: 0 clamp(10px, 2vw, 16px);
+      background: linear-gradient(180deg, #7c8cff 0%, #4f5fd5 100%) !important;
+      border: 1px solid rgba(199,210,254,.55) !important;
+      box-shadow: 0 0 12px rgba(124,140,255,.28) !important;
+      font-size: clamp(11px, 2.2vw, 14px);
+      white-space: nowrap;
+    }
+
+    .small {
+      padding-bottom: 0;
+      color: var(--muted);
+      font-size: 10px;
+      line-height: 1.2;
+      text-align: center;
+    }
+
+    @media (orientation: portrait) and (max-width: 430px) {
+      .wrap {
+        justify-content: flex-start;
+      }
+
+      .scene-cards {
+        flex: 0 0 auto;
+      }
+
+      .grid {
+        flex: 0 0 auto;
+      }
+
+      .small {
+        margin-top: auto;
+      }
+    }
+
+    @media (orientation: landscape) {
+      body {
+        padding: calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 10px) calc(env(safe-area-inset-bottom) + 8px) calc(env(safe-area-inset-left) + 10px);
+      }
+
+      .wrap {
+        max-width: 980px;
+        min-height: auto;
+        gap: 8px;
+      }
+
+      .scene-cards {
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+
+      .card {
+        padding: 20px 22px;
+        border-radius: 18px;
+      }
+
+      .status {
+        min-height: 18px;
+        font-size: 12px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .label {
+        margin-bottom: 9px;
+        font-size: 13px;
+      }
+
+      .title {
+        font-size: clamp(32px, 7vw, 58px);
+      }
+
+      .selected-title {
+        font-size: clamp(28px, 6vw, 50px);
+      }
+
+      .grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+      }
+
+      button {
+        min-height: 32px;
+        font-size: 12px;
+        border-radius: 10px;
+      }
+
+      .go-button {
+        grid-column: 1 / -1;
+        min-height: 56px;
+        font-size: 30px;
+        border-radius: 16px;
+      }
+
+      .goto-panel {
+        grid-template-columns: 1fr auto;
+        padding: 7px;
+        border-radius: 16px;
+      }
+
+      .goto-input {
+        min-height: 30px;
+        font-size: 11px;
+        border-radius: 9px;
+      }
+
+      .goto-button {
+        min-height: 30px;
+        font-size: 10px;
+        border-radius: 9px;
+        padding: 0 6px;
+      }
+
+      .small {
+        display: none;
+      }
+
+      .topnav {
+        gap: 4px;
+      }
+
+      .topnav a {
+        font-size: 10px;
+        border-radius: 9px;
+        padding: 5px 4px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="wrap">
+    <div class="status disconnected" id="status">Connexion…</div>
+
+    <nav class="topnav">
+      <a href="/" class="active">Session</a>
+      <a href="/ab">A/B</a>
+      <a href="/arrangement">Arrangement</a>
+    </nav>
+
+    <div class="scene-cards">
+      <section class="card current-card" id="currentCard" aria-live="polite">
+        <div class="label">En cours</div>
+        <div class="title" id="current">—</div>
+        <div class="scene-countdown" id="currentTimer"></div>
+      </section>
+
+      <section class="card selected-card" id="selectedCard" aria-live="polite">
+        <div class="label">Prochaine scène sélectionnée</div>
+        <div class="selected-title" id="selected">—</div>
+        <div class="selected-duration" id="selectedDuration"></div>
+      </section>
+    </div>
+
+    <section class="grid" aria-label="Commandes Ableton">
+      <button class="prev-button" data-action="prev">◀ PREV</button>
+      <button class="next-button" data-action="next">NEXT ▶</button>
+      <button class="go-button" data-action="go"><span class="go-sub">PLAY</span><span class="go-main">GO</span><span class="go-sub">FIRE</span></button>
+      <button class="pause-button" id="pauseButton" data-action="pause">PAUSE</button>
+      <button class="stop-button" data-action="stop">STOP</button>
+    </section>
+
+    <section class="goto-panel" aria-label="Aller à une scène">
+      <select class="goto-input" id="gotoScene" aria-label="Choisir une scène">
+        <option value="">Choisir une scène...</option>
+      </select>
+      <button class="goto-button" id="gotoButton" type="button">ALLER À LA SCÈNE</button>
+    </section>
+
+<!-- Removed temporary test banner -->
+  </main>
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const currentEl = document.getElementById('current');
+    const currentTimerEl = document.getElementById('currentTimer');
+    const currentCardEl = document.getElementById('currentCard');
+    const selectedEl = document.getElementById('selected');
+    const selectedDurationEl = document.getElementById('selectedDuration');
+    const selectedCard = document.getElementById('selectedCard');
+    const buttons = [...document.querySelectorAll('button[data-action]')];
+    const gotoInput = document.getElementById('gotoScene');
+    const gotoButton = document.getElementById('gotoButton');
+    const pauseButton = document.getElementById('pauseButton');
+
+    let actionBusy = false;
+    let lastKnownState = null;
+    let failedStatusPolls = 0;
+    let lastSceneSelectSignature = '';
+    let suspendSceneSelectRefreshUntil = 0;
+
+    let lastSessionCurrentTitle = '—';
+    let lastSessionCurrentRaw = '';
+    let sessionWasPlaying = false;
+    let sessionStoppedByUser = false;
+    let currentSceneRawName = '';
+    let countdownDurationSeconds = null;
+    let countdownStartedAt = null;
+    let countdownPausedRemaining = null;
+    let countdownMode = 'stopped';
+
+    function parseDurationToSeconds(value) {
+      if (!value) return null;
+      const text = String(value).trim();
+      const parts = text.split(':').map(part => Number.parseInt(part.trim(), 10));
+      if (parts.length === 2 && parts.every(Number.isFinite)) {
+        return Math.max(0, parts[0] * 60 + parts[1]);
+      }
+      if (parts.length === 3 && parts.every(Number.isFinite)) {
+        return Math.max(0, parts[0] * 3600 + parts[1] * 60 + parts[2]);
+      }
+      return null;
+    }
+
+    function parseSceneInfo(value) {
+      const raw = value && value !== '—' ? String(value).trim() : '';
+      if (!raw) return { raw: '', title: '—', bpm: '', durationText: '', durationSeconds: null };
+
+      const parts = raw.split(';').map(part => part.trim()).filter(Boolean);
+      const title = parts[0] || raw;
+      const bpm = parts.length >= 2 ? parts[1] : '';
+      const durationText = parts.length >= 3 ? parts[2] : '';
+      const durationSeconds = parseDurationToSeconds(durationText);
+
+      return { raw, title, bpm, durationText, durationSeconds };
+    }
+
+    function sceneRawFromStateByIndex(state, indexValue) {
+      if (!state || !state.scenes) return '';
+      const index = Number(indexValue);
+      if (!Number.isInteger(index) || index < 0) return '';
+      return state.scenes[String(index)] || state.scenes[index] || '';
+    }
+
+    function currentRawSceneFromState(state, selectedRaw, playing) {
+      if (!state) return '';
+
+      const byPlayingIndex = sceneRawFromStateByIndex(state, state.playing_scene);
+      if (byPlayingIndex) return byPlayingIndex;
+
+      const byLastFiredIndex = sceneRawFromStateByIndex(state, state.last_fired_scene);
+      if (byLastFiredIndex) return byLastFiredIndex;
+
+      const bySelectedIndex = playing ? sceneRawFromStateByIndex(state, state.selected_scene) : '';
+      if (bySelectedIndex) return bySelectedIndex;
+
+      return (
+        state.playing_scene_name ||
+        state.last_fired_scene_name ||
+        state.current_scene_name ||
+        state.session_current_scene ||
+        (playing ? selectedRaw : '') ||
+        lastSessionCurrentRaw ||
+        lastSessionCurrentTitle ||
+        ''
+      );
+    }
+
+    function normalizeSceneName(value) {
+      return parseSceneInfo(value).title || '—';
+    }
+
+    function formatRemaining(seconds) {
+      if (!Number.isFinite(seconds)) return '';
+      const safe = Math.max(0, Math.ceil(seconds));
+      const minutes = Math.floor(safe / 60);
+      const secs = safe % 60;
+      return `${minutes}:${String(secs).padStart(2, '0')}`;
+    }
+
+    function updateCountdownDisplay() {
+      if (!currentTimerEl) return;
+      if (!countdownDurationSeconds || countdownMode === 'stopped') {
+        currentTimerEl.textContent = '';
+        return;
+      }
+
+      let remaining = countdownPausedRemaining;
+      if (countdownMode === 'playing' && countdownStartedAt !== null) {
+        remaining = countdownDurationSeconds - ((Date.now() - countdownStartedAt) / 1000);
+      }
+
+      currentTimerEl.textContent = formatRemaining(remaining);
+    }
+
+    function setCountdownForScene(rawName, mode) {
+      const info = parseSceneInfo(rawName);
+      const hasDuration = Number.isFinite(info.durationSeconds) && info.durationSeconds > 0;
+
+      if (!hasDuration) {
+        countdownDurationSeconds = null;
+        countdownStartedAt = null;
+        countdownPausedRemaining = null;
+        countdownMode = 'stopped';
+        updateCountdownDisplay();
+        return;
+      }
+
+      if (mode === 'stopped') {
+        countdownPausedRemaining = info.durationSeconds;
+        countdownStartedAt = null;
+        countdownMode = 'stopped';
+        updateCountdownDisplay();
+        return;
+      }
+
+      if (currentSceneRawName !== info.raw || countdownDurationSeconds !== info.durationSeconds) {
+        currentSceneRawName = info.raw;
+        countdownDurationSeconds = info.durationSeconds;
+        countdownPausedRemaining = info.durationSeconds;
+        countdownStartedAt = Date.now();
+      }
+
+      if (mode === 'playing') {
+        if (countdownMode === 'paused' && countdownPausedRemaining !== null) {
+          countdownStartedAt = Date.now() - ((countdownDurationSeconds - countdownPausedRemaining) * 1000);
+        }
+        countdownMode = 'playing';
+      } else if (mode === 'paused') {
+        if (countdownMode === 'playing' && countdownStartedAt !== null) {
+          countdownPausedRemaining = countdownDurationSeconds - ((Date.now() - countdownStartedAt) / 1000);
+        }
+        countdownMode = 'paused';
+      }
+
+      updateCountdownDisplay();
+    }
+
+    function isAbletonPlaying(state) {
+      return Boolean(
+        state &&
+        state.play_mode === 'session' &&
+        !state.is_paused &&
+        (
+          state.is_playing ||
+          (state.playing_scene_name && state.playing_scene_name !== '—')
+        )
+      );
+    }
+
+    function isAbletonPaused(state) {
+      return Boolean(
+        state &&
+        state.play_mode === 'session' &&
+        (
+          state.is_paused ||
+          (!state.is_playing && sessionWasPlaying)
+        )
+      );
+    }
+
+    function pulseSelectedCard() {
+      if (!selectedCard) return;
+      selectedCard.classList.add('is-prepared');
+      selectedCard.classList.remove('selection-pulse');
+      void selectedCard.offsetWidth;
+      selectedCard.classList.add('selection-pulse');
+    }
+
+    function setStatusText(text, connected) {
+      statusEl.textContent = text;
+      statusEl.classList.toggle('connected', connected);
+      statusEl.classList.toggle('disconnected', !connected);
+    }
+
+    function fillSceneSelect(state) {
+      if (!state || !state.scenes || !gotoInput || gotoInput.tagName !== 'SELECT') return;
+
+      const entries = Object.entries(state.scenes)
+        .filter(([, name]) => name && name.trim())
+        .sort((a, b) => Number(a[0]) - Number(b[0]));
+
+      const signature = JSON.stringify(entries);
+      const currentValue = gotoInput.value;
+      const isUserInteracting = document.activeElement === gotoInput || Date.now() < suspendSceneSelectRefreshUntil;
+
+      // On ne bloque le refresh que pendant une interaction réelle.
+      if (isUserInteracting) return;
+
+      gotoInput.innerHTML = '<option value="">Choisir une scène...</option>';
+
+      entries.forEach(([index, name]) => {
+        const option = document.createElement('option');
+        option.value = String(Number(index) + 1);
+        const info = parseSceneInfo(name);
+        option.dataset.rawName = name;
+        option.dataset.duration = info.durationText || '';
+        option.textContent = `${Number(index) + 1} - ${info.title}`;
+        gotoInput.appendChild(option);
+      });
+
+      if ([...gotoInput.options].some(opt => opt.value === currentValue)) {
+        gotoInput.value = currentValue;
+      }
+
+      lastSceneSelectSignature = signature;
+    }
+
+    function previewGotoSelection() {
+      if (!gotoInput || !selectedEl) return;
+
+      const value = (gotoInput.value || '').trim();
+      if (!value) return;
+
+      const option = gotoInput.options[gotoInput.selectedIndex];
+      if (!option) return;
+
+      const fullText = option.textContent || '—';
+      const rawName = option.dataset.rawName || fullText.replace(/^\d+\s*-\s*/, '') || fullText;
+      const info = parseSceneInfo(rawName);
+      const previewName = info.title;
+
+      selectedEl.textContent = previewName;
+      if (selectedDurationEl) {
+        selectedDurationEl.textContent = info.durationText ? `Durée ${info.durationText}` : '';
+      }
+      pulseSelectedCard();
+      setStatusText('● Prochaine scène : ' + previewName, true);
+    }
+
+    function setSessionUiState(mode, title) {
+      const safeTitle = normalizeSceneName(title || lastSessionCurrentTitle || selectedEl.textContent);
+
+      if (safeTitle !== '—') {
+        currentEl.textContent = safeTitle;
+        lastSessionCurrentTitle = safeTitle;
+      }
+
+      if (currentCardEl) {
+        currentCardEl.classList.remove('session-playing');
+        currentCardEl.classList.remove('session-paused');
+        currentCardEl.classList.remove('is-playing');
+        if (mode === 'playing') currentCardEl.classList.add('session-playing', 'is-playing');
+        if (mode === 'paused') currentCardEl.classList.add('session-paused');
+      }
+
+      if (pauseButton) {
+        const shouldShowPlay = mode !== 'playing';
+        pauseButton.textContent = shouldShowPlay ? 'PLAY' : 'PAUSE';
+        pauseButton.classList.toggle('is-play', shouldShowPlay);
+        pauseButton.disabled = Boolean(sessionStoppedByUser && shouldShowPlay);
+        pauseButton.title = sessionStoppedByUser && shouldShowPlay
+          ? 'Après STOP, relance avec GO.'
+          : '';
+      }
+
+      if (mode === 'playing') sessionWasPlaying = true;
+      if (mode === 'stopped') sessionWasPlaying = false;
+    }
+
+    function applyStatus(rawState) {
+      const state = rawState && rawState.state ? rawState.state : rawState;
+      fillSceneSelect(state);
+
+      const connected = Boolean(state && state.connected);
+      const message = state && state.message ? state.message : (connected ? 'Connecté' : 'Interface non connectée');
+      setStatusText((connected ? '● ' : '○ ') + message, connected);
+
+      const sessionMode = Boolean(state && state.play_mode === 'session');
+      if (!sessionMode) {
+        currentEl.textContent = '—';
+      }
+
+      const playing = isAbletonPlaying(state);
+      const paused = isAbletonPaused(state);
+
+      const selectedRaw = state && state.selected_scene_name;
+      const selectedInfo = parseSceneInfo(selectedRaw);
+      const selected = selectedInfo.title;
+      const currentRaw = sessionMode
+        ? currentRawSceneFromState(state, selectedRaw, playing)
+        : '—';
+      let current = normalizeSceneName(currentRaw);
+
+      if (sessionMode && current !== '—' && (playing || paused)) {
+        lastSessionCurrentTitle = current;
+        lastSessionCurrentRaw = currentRaw && currentRaw !== '—' ? String(currentRaw) : lastSessionCurrentRaw;
+      }
+
+      currentEl.textContent = sessionMode ? current : '—';
+      selectedEl.textContent = selected;
+
+      if (selectedDurationEl) {
+        selectedDurationEl.textContent = selectedInfo.durationText ? `Durée ${selectedInfo.durationText}` : '';
+      }
+
+      if (sessionMode && current !== '—') {
+        setCountdownForScene(currentRaw, playing ? 'playing' : paused ? 'paused' : 'stopped');
+      } else {
+        setCountdownForScene('', 'stopped');
+      }
+
+      if (pauseButton) {
+        const shouldShowPlay = !playing || paused;
+        pauseButton.textContent = shouldShowPlay ? 'PLAY' : 'PAUSE';
+        pauseButton.classList.toggle('is-play', shouldShowPlay);
+        pauseButton.disabled = Boolean(sessionStoppedByUser && shouldShowPlay);
+        pauseButton.title = sessionStoppedByUser && shouldShowPlay
+          ? 'Après STOP, relance avec GO.'
+          : '';
+      }
+
+      if (sessionMode) {
+        if (playing) {
+          sessionWasPlaying = true;
+          sessionStoppedByUser = false;
+        }
+      } else {
+        sessionWasPlaying = false;
+      }
+
+      if (currentCardEl) {
+        currentCardEl.classList.remove('session-playing');
+        currentCardEl.classList.remove('session-paused');
+        currentCardEl.classList.remove('is-playing');
+
+        if (sessionMode) {
+          if (playing && !paused) {
+            currentCardEl.classList.add('session-playing', 'is-playing');
+          } else if (paused) {
+            currentCardEl.classList.add('session-paused');
+          }
+        }
+      }
+
+      lastKnownState = state;
+      failedStatusPolls = 0;
+    }
+
+    function setActionMessage(text, disconnected = false) {
+      setStatusText(text, !disconnected);
+    }
+
+    async function fetchWithTimeout(url, options = {}, timeoutMs = 5000) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        return await fetch(url, { ...options, cache: 'no-store', signal: controller.signal });
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+
+    async function act(action) {
+      if (action === 'play_pause') {
+        action = 'pause';
+      }
+
+      if (action === 'stop') {
+        sessionStoppedByUser = true;
+        sessionWasPlaying = false;
+        lastSessionCurrentTitle = '—';
+        lastSessionCurrentRaw = '';
+        setSessionUiState('stopped', '—');
+        setCountdownForScene('', 'stopped');
+      }
+
+      if (action === 'pause' && sessionStoppedByUser) {
+        setActionMessage('● Après STOP, relance avec GO', false);
+        setSessionUiState('stopped', '—');
+        return;
+      }
+
+      if (actionBusy) return;
+
+      if (action === 'prev' || action === 'next') {
+        pulseSelectedCard();
+      }
+
+      if (action === 'go') {
+        sessionStoppedByUser = false;
+        if (selectedCard) selectedCard.classList.remove('is-prepared', 'selection-pulse');
+        const option = gotoInput && gotoInput.options ? gotoInput.options[gotoInput.selectedIndex] : null;
+        const rawFromOption = option && option.dataset && option.dataset.rawName ? option.dataset.rawName : '';
+        const rawFromState = lastKnownState
+          ? sceneRawFromStateByIndex(lastKnownState, lastKnownState.selected_scene)
+          : '';
+        const rawName = rawFromOption || rawFromState || (selectedEl && selectedEl.textContent);
+        const selectedName = normalizeSceneName(rawName);
+        if (selectedName !== '—') {
+          lastSessionCurrentTitle = selectedName;
+          lastSessionCurrentRaw = rawName || selectedName;
+          sessionWasPlaying = true;
+          currentEl.textContent = selectedName;
+          setCountdownForScene(lastSessionCurrentRaw, 'playing');
+          setSessionUiState('playing', selectedName);
+        }
+      }
+
+      if (action === 'pause') {
+        const currentlyShowingPlay = pauseButton && pauseButton.textContent.trim().toUpperCase() === 'PLAY';
+        const fallbackTitle = normalizeSceneName(currentEl.textContent) !== '—'
+          ? currentEl.textContent
+          : selectedEl.textContent;
+        setSessionUiState(currentlyShowingPlay ? 'playing' : 'paused', fallbackTitle);
+      }
+
+      actionBusy = true;
+
+      try {
+        buttons.forEach(button => { button.disabled = true; });
+        gotoButton.disabled = true;
+        setActionMessage('● Envoi commande…', false);
+
+        const response = await fetchWithTimeout('/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action })
+        }, 2500);
+
+        let data = null;
+        try {
+          data = await response.json();
+        } catch (_) {}
+
+        if (!response.ok) {
+          throw new Error((data && data.message) || 'Serveur indisponible');
+        }
+
+        if (data && data.ok === false) {
+          setActionMessage('● ' + (data.message || 'Commande ignorée'), false);
+          return;
+        }
+
+        if (data && data.state) {
+          applyStatus(data.state);
+        } else {
+          await update(true);
+        }
+      } catch (error) {
+        if (action === 'go' && selectedCard) selectedCard.classList.add('is-prepared');
+        const msg = error && error.name === 'AbortError'
+          ? '○ Commande trop lente — serveur occupé'
+          : '○ Action impossible — vérifie le serveur';
+        setActionMessage(msg, true);
+      } finally {
+        setTimeout(() => {
+          buttons.forEach(button => { button.disabled = false; });
+          if (pauseButton && sessionStoppedByUser && pauseButton.textContent.trim().toUpperCase() === 'PLAY') {
+            pauseButton.disabled = true;
+            pauseButton.title = 'Après STOP, relance avec GO.';
+          }
+          gotoButton.disabled = false;
+          actionBusy = false;
+        }, 250);
+      }
+    }
+
+    async function update(forceVisibleError = false) {
+      if (actionBusy && !forceVisibleError) return;
+
+      try {
+        const response = await fetchWithTimeout('/status', {}, 2500);
+        if (!response.ok) {
+          throw new Error('Statut indisponible');
+        }
+
+        const state = await response.json();
+        applyStatus(state);
+      } catch (error) {
+        failedStatusPolls += 1;
+
+        if (failedStatusPolls < 3 && lastKnownState && !forceVisibleError) {
+          setStatusText('● Connecté — actualisation…', true);
+          return;
+        }
+
+        setStatusText('○ Interface non connectée', false);
+        if (currentCardEl) {
+          currentCardEl.classList.remove('session-playing');
+          currentCardEl.classList.remove('session-paused');
+          currentCardEl.classList.remove('is-playing');
+        }
+      }
+    }
+
+    async function gotoScene() {
+      const value = (gotoInput.value || '').trim();
+      const sceneNumber = Number.parseInt(value, 10);
+
+      if (!Number.isInteger(sceneNumber) || sceneNumber < 1) {
+        setActionMessage('○ Choisis une scène', true);
+        gotoInput.focus();
+        return;
+      }
+
+      pulseSelectedCard();
+      previewGotoSelection();
+
+      if (actionBusy) return;
+      actionBusy = true;
+
+      try {
+        buttons.forEach(button => { button.disabled = true; });
+        gotoButton.disabled = true;
+        setActionMessage('● Sélection scène ' + sceneNumber + '…', false);
+
+        const response = await fetchWithTimeout('/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'goto', scene: sceneNumber })
+        }, 2500);
+
+        let data = null;
+        try {
+          data = await response.json();
+        } catch (_) {}
+
+        if (!response.ok || (data && data.ok === false)) {
+          throw new Error((data && data.message) || 'Commande refusée');
+        }
+
+        if (data && data.state) {
+          applyStatus(data.state);
+        } else {
+          await update(true);
+        }
+      } catch (error) {
+        setActionMessage('○ Aller à impossible', true);
+      } finally {
+        setTimeout(() => {
+          buttons.forEach(button => { button.disabled = false; });
+          gotoButton.disabled = false;
+          actionBusy = false;
+        }, 250);
+      }
+    }
+
+    buttons.forEach(button => {
+      button.addEventListener('click', () => act(button.dataset.action));
+    });
+
+    gotoButton.addEventListener('click', gotoScene);
+
+    const holdSceneSelectRefresh = () => {
+      // Safari/iPhone peut garder le menu natif ouvert sans focus DOM stable.
+      // On suspend donc temporairement les rebuilds pendant l'interaction.
+      suspendSceneSelectRefreshUntil = Date.now() + 4000;
+    };
+
+    gotoInput.addEventListener('touchstart', holdSceneSelectRefresh, { passive: true });
+    gotoInput.addEventListener('mousedown', holdSceneSelectRefresh);
+    gotoInput.addEventListener('focus', holdSceneSelectRefresh);
+    gotoInput.addEventListener('click', holdSceneSelectRefresh);
+
+gotoInput.addEventListener('change', event => {
+      previewGotoSelection();
+      // Après la sélection, on autorise de nouveau une reconstruction si la liste a changé.
+    });
+gotoInput.addEventListener('blur', () => {
+      // Une fois l'utilisateur sorti du menu, on pourra remettre la liste à jour au prochain poll.
+    });
+    gotoInput.addEventListener('keydown', event => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        gotoScene();
+      }
+    });
+
+    update();
+    window.addEventListener('DOMContentLoaded', () => {
+      window.CLRemoteEnergy.startPolling(
+        update,
+        () => Boolean(lastKnownState && isAbletonPlaying(lastKnownState)),
+        { activeMs: 1000, idleMs: 2500, hiddenMs: 15000 }
+      );
+      window.CLRemoteEnergy.startPolling(
+        updateCountdownDisplay,
+        () => countdownMode === 'playing',
+        { activeMs: 500, idleMs: 2000, hiddenMs: 15000 }
+      );
+    }, { once: true });
+  </script>
+</body>
+</html>

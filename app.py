@@ -1,0 +1,1475 @@
+#!/usr/bin/env python3
+# Ableton Web Remote - version synchro Ableton directe, sans scan de temps
+# Flask + python-osc + AbletonOSC
+#
+# Correctifs :
+# - /status ne lance aucun appel OSC bloquant.
+# - Tous les scans / calculs de temps restant sont supprimés.
+# - La scène sélectionnée et la scène en cours suivent aussi les changements
+#   faits directement dans Ableton.
+#
+# Ports AbletonOSC par défaut :
+# - AbletonOSC reçoit sur 11000
+# - ce script reçoit les réponses sur 11001
+
+import json
+import re
+import socket
+import threading
+import multiprocessing
+import time
+from typing import Any, Dict, Optional, Tuple
+from pathlib import Path
+
+from flask import Flask, jsonify, render_template, request, send_from_directory
+
+multiprocessing.freeze_support()
+
+import subprocess
+import os
+import signal
+import webbrowser
+import threading
+import multiprocessing
+import socket
+
+def free_port_5050():
+    try:
+        result = subprocess.run(
+            ["lsof", "-ti", ":5050"],
+            capture_output=True,
+            text=True
+        )
+        for pid_txt in result.stdout.splitlines():
+            try:
+                pid = int(pid_txt.strip())
+                if pid != os.getpid():
+                    os.kill(pid, signal.SIGKILL)
+                    print(f"Ancien serveur arrêté sur 5050 : PID {pid}")
+            except Exception as e:
+                print(f"Impossible d'arrêter PID {pid_txt}: {e}")
+    except Exception as e:
+        print(f"Vérification port 5050 impossible : {e}")
+
+free_port_5050()
+from pythonosc import dispatcher, osc_server, udp_client
+
+# Crossfader Ableton via Max for Live OSC, zéro MIDI.
+
+ABLETON_IP = "127.0.0.1"
+ABLETON_PORT = 11000
+LOCAL_OSC_PORT = 11001
+
+# LTC Display v1.9 → UDP 63123 → /status → ab.html
+LTC_UDP_IP = "127.0.0.1"
+LTC_UDP_PORT = 63123
+LTC_TC_RE = re.compile(r"tc,s?(\d{1,2}:\d{2}:\d{2}:\d{2})")
+
+# Max for Live Crossfader Bridge
+M4L_IP = "127.0.0.1"
+M4L_PORT = 9001
+m4l_client = udp_client.SimpleUDPClient(M4L_IP, M4L_PORT)
+
+# Compatibilité diagnostic ancienne interface — non utilisé.
+MIDI_PORT_EXACT = "M4L_OSC_9001"
+MIDI_CHANNEL = 0
+MIDI_CC = None
+mido = None
+
+
+
+# Réglages de scan pour retrouver la scène réellement en lecture.
+# Aucun scan de durée/temps de clip n’est effectué.
+MAX_TRACKS_TO_SCAN = 32
+SCAN_PLAYING_SCENE_FROM_TRACKS = True
+PLAYING_SCAN_SECONDS = 2.0
+TRACK_COUNT_CACHE_SECONDS = 10.0
+CHECK_MUTE_DURING_PLAYING_SCAN = False
+
+# Réglages anti-gel / stabilité
+GO_COOLDOWN = 0.8
+BACKGROUND_REFRESH_SECONDS = 0.25
+FULL_REFRESH_SECONDS = 1.0
+OSC_TIMEOUT = 0.06
+
+
+app = Flask(__name__)
+client = udp_client.SimpleUDPClient(ABLETON_IP, ABLETON_PORT)
+
+# -----------------------------------------------------------------------------
+# Arrangement / conduite spectacle
+# -----------------------------------------------------------------------------
+# Repères Arrangement / Cue Points
+# Priorité : lecture directe des cue points du Set Ableton via AbletonOSC.
+# Repli : arrangement_markers.json si la version AbletonOSC ne répond pas.
+ARRANGEMENT_MARKERS_FILE = "arrangement_markers.json"
+CUE_POINTS_REFRESH_SECONDS = 3.0
+DEFAULT_ARRANGEMENT_MARKERS = [
+    {"name": "00 - Préshow", "time": 0},
+    {"name": "01 - Ouverture", "time": 60},
+    {"name": "02 - Tableau 1", "time": 180},
+    {"name": "03 - Tableau 2", "time": 300},
+    {"name": "04 - Entracte", "time": 600},
+    {"name": "05 - Final", "time": 900},
+    {"name": "NOIR / Sécurité", "time": 1200},
+]
+
+
+
+
+CL_AUDIO_REMOTE_SUBTITLES = {
+    "/": "Session · Ableton Web Remote",
+    "/ab": "Télécommande AB · Ableton Web Remote",
+    "/arrangement": "Arrangement · Ableton Web Remote",
+}
+
+CL_AUDIO_REMOTE_CSS = """
+<style id="cl-audio-show-control-style">
+  .cl-audio-shell {
+    width: min(100%, 312px);
+    margin: 0 auto 0 auto;
+    padding: 1px 6px 0 6px;
+    color: #f8fafc;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+  }
+
+  .cl-audio-hero {
+    display: none;
+  }
+
+  .cl-audio-header {
+    text-align: center;
+    padding: 1px 0 0 0;
+    line-height: 1;
+  }
+
+  .cl-audio-title-line {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 3px;
+  }
+
+  .cl-audio-brand-dot {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: rgba(248,250,252,.42);
+    box-shadow: none;
+  }
+
+  .cl-audio-header h1 {
+    margin: 0;
+    font-size: 7px;
+    letter-spacing: .02em;
+    line-height: .95;
+    font-weight: 700;
+    color: rgba(248,250,252,.58);
+  }
+
+  .cl-audio-subtitle {
+    margin-top: 0;
+    color: rgba(248,250,252,.38);
+    font-size: 4px;
+    letter-spacing: .03em;
+    line-height: .9;
+    text-transform: uppercase;
+  }
+
+  @media (max-width: 430px) {
+    .cl-audio-shell {
+      padding-left: 10px;
+      padding-right: 10px;
+    }
+
+    .cl-audio-hero {
+      display: none;
+    }
+
+    .cl-audio-header h1 {
+      font-size: 7px;
+    }
+  }
+</style>
+"""
+
+
+def decorate_remote_page_html(response):
+    """Installe le shell V2 commun autour des trois modules de la télécommande."""
+    if request.path not in CL_AUDIO_REMOTE_SUBTITLES:
+        return response
+
+    content_type = response.headers.get("Content-Type", "")
+    if "text/html" not in content_type.lower():
+        return response
+
+    html = response.get_data(as_text=True)
+    if "v2-app" in html:
+        return response
+
+    module = {"/": "session", "/ab": "ab", "/arrangement": "arrangement"}[request.path]
+    module_label = {"session": "Session", "ab": "A/B", "arrangement": "Arrangement"}[module]
+    tabs = "".join(
+        f'<a href="{href}" aria-current="page">{label}</a>' if key == module
+        else f'<a href="{href}">{label}</a>'
+        for key, href, label in (
+            ("session", "/", "Session"),
+            ("ab", "/ab", "A/B"),
+            ("arrangement", "/arrangement", "Arrangement"),
+        )
+    )
+    header_html = f"""
+  <div class="v2-app" data-module="{module}">
+    <header class="v2-header">
+      <div class="v2-brand">
+        <img src="/assets/paradis%20latin.jpg" alt="Paradis Latin Cabaret">
+        <div class="v2-brand-copy">
+          <div class="v2-brand-title">CL Audio Show Control</div>
+          <div class="v2-brand-subtitle">Remote professionnelle · {module_label}</div>
+        </div>
+      </div>
+      <nav class="v2-tabs" aria-label="Modes de la télécommande">{tabs}</nav>
+      <div class="v2-health" role="status" aria-live="polite">
+        <span class="v2-health-dot" aria-hidden="true"></span>
+        <div class="v2-health-copy">
+          <div class="v2-health-label" id="v2HealthLabel">Connexion…</div>
+          <div class="v2-health-detail" id="v2HealthDetail">Initialisation du retour Ableton</div>
+        </div>
+      </div>
+    </header>
+    <div class="v2-workspace">
+"""
+    footer_html = f"""
+    </div>
+    <footer class="v2-statusbar" aria-label="CL Audio 2026">
+      <div>CL Audio · 2026</div>
+    </footer>
+  </div>
+"""
+
+    if "</head>" in html:
+        assets = (
+            '<link rel="stylesheet" href="/static/remote-v2.css?v=2.0.4">\n'
+            '<script src="/static/remote-v2.js?v=2.0.4" defer></script>\n'
+        )
+        html = html.replace("</head>", assets + "</head>", 1)
+    else:
+        html = '<link rel="stylesheet" href="/static/remote-v2.css?v=2.0.4">' + html
+
+    if "<body" in html:
+        body_end = html.find(">", html.find("<body"))
+        if body_end != -1:
+            html = html[:body_end + 1] + header_html + html[body_end + 1:]
+    else:
+        html = header_html + html
+
+    if "</body>" in html:
+        html = html.replace("</body>", footer_html + "\n</body>", 1)
+    else:
+        html += footer_html
+
+    response.set_data(html)
+    response.headers["Content-Length"] = str(len(response.get_data()))
+    return response
+
+
+@app.after_request
+def no_cache(response):
+    response = decorate_remote_page_html(response)
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    return response
+
+def parse_scene_duration_seconds(name: Any) -> Optional[float]:
+    """Lit une durée finale mm:ss dans les métadonnées d'un nom de scène."""
+    match = re.search(r"(?:^|[;|\s])(\d{1,2}):([0-5]\d)\s*$", str(name or "").strip())
+    if not match:
+        return None
+    return float(int(match.group(1)) * 60 + int(match.group(2)))
+
+
+state: Dict[str, Any] = {
+    "selected_scene": 0,
+    "selected_scene_name": "—",
+    "scenes": {},
+    "is_paused": False,
+    "play_mode": "stopped",
+    "playing_scene": -1,
+    "playing_scene_name": "—",
+    "last_fired_scene": -1,
+    "last_fired_scene_name": "—",
+    "is_playing": False,
+    "scene_duration_seconds": None,
+    "remaining_seconds": None,
+    "playback_deadline": None,
+    "connected": False,
+    "message": "Démarrage…",
+    "sync_source": "Ableton",
+    "arrangement_time": 0.0,
+    "last_arrangement_time": 0.0,
+    "arrangement_time_label": "00:00",
+    "arrangement_marker": "—",
+    "arrangement_markers": [],
+    "arrangement_markers_source": "JSON",
+    "ltc_timecode": "--:--:--:--",
+    "timecode": "--:--:--:--",
+    "ltc": "--:--:--:--",
+    "smpte": "--:--:--:--",
+}
+def start_ltc_udp_listener():
+    """Écoute LTC Display v1.9 en UDP et injecte le TC dans /status.
+
+    Formats acceptés :
+    - tc,s13:05:13:24
+    - tc\x00\x00,s\x00\x0013:05:13:24\x00
+    - plusieurs TC collés dans le même paquet UDP
+    """
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+    try:
+        sock.bind((LTC_UDP_IP, LTC_UDP_PORT))
+    except OSError as exc:
+        print(f"LTC UDP désactivé : {LTC_UDP_IP}:{LTC_UDP_PORT} déjà utilisé ({exc})", flush=True)
+        print("Ferme l'ancien bridge LTC ou libère le port 63123 si tu veux afficher le TC dans AB.", flush=True)
+        return
+
+    print(f"LTC UDP listener actif sur {LTC_UDP_IP}:{LTC_UDP_PORT}", flush=True)
+    last_tc = None
+    count = 0
+    last_print = 0.0
+
+    while True:
+        data, _ = sock.recvfrom(8192)
+        text = data.decode("utf-8", errors="ignore").replace("\x00", "")
+        matches = LTC_TC_RE.findall(text)
+
+        if not matches and "tc" in text:
+            print("LTC reçu mais non parsé :", repr(text[:200]), flush=True)
+
+        for tc in matches:
+            if tc == last_tc:
+                continue
+
+            last_tc = tc
+            count += 1
+
+            with lock:
+                state["ltc_timecode"] = tc
+                state["timecode"] = tc
+                state["ltc"] = tc
+                state["smpte"] = tc
+
+            now = time.time()
+            if count == 1 or now - last_print > 0.5:
+                print(f"LTC -> {tc} count={count}", flush=True)
+                last_print = now
+
+# -----------------------------------------------------------------------------
+# Transport state normalization helper
+# -----------------------------------------------------------------------------
+def normalize_transport_state_locked():
+    """Garde les états UI Session/Arrangement cohérents.
+
+    Règle centrale : un seul mode visuel jaune à la fois.
+    play_mode est la source de vérité UI.
+    is_playing est global à Ableton et ne doit pas décider seul du mode.
+    """
+    is_playing = bool(state.get("is_playing", False))
+    play_mode = str(state.get("play_mode", "stopped") or "stopped")
+
+    # Un seul mode visuel actif : si l'Arrangement est le mode courant,
+    # l'indicateur Session doit être éteint, même si Ableton remonte encore
+    # un ancien playing_slot_index.
+    if play_mode == "arrangement":
+        state["playing_scene"] = -1
+        state["playing_scene_name"] = "—"
+        state["last_fired_scene"] = -1
+        state["last_fired_scene_name"] = "—"
+
+    # Important : is_playing est l'état global d'Ableton.
+    # Une scène Session peut jouer avec is_playing=True, sans que l'Arrangement soit en lecture.
+    # Donc on ne force JAMAIS play_mode="arrangement" à partir de is_playing seul.
+    if is_playing and play_mode == "paused":
+        state["play_mode"] = "stopped"
+        state["is_paused"] = False
+
+    if not is_playing and play_mode == "arrangement" and not bool(state.get("is_paused", False)):
+        state["play_mode"] = "stopped"
+
+responses: Dict[str, Tuple[float, Tuple[Any, ...]]] = {}
+lock = threading.RLock()
+query_lock = threading.Lock()
+
+last_go_time = 0.0
+last_full_refresh = 0.0
+last_playing_scan = 0.0
+_track_count_cache: Tuple[float, int] = (0.0, MAX_TRACKS_TO_SCAN)
+_cue_points_cache: Tuple[float, list, str] = (0.0, [], "JSON")
+
+
+def osc_reply(address, *args):
+    with lock:
+        responses[address] = (time.time(), args)
+
+        if address == "/live/view/get/selected_scene" and args:
+            state["selected_scene"] = int(args[0])
+
+        elif address == "/live/scene/get/name" and len(args) >= 2:
+            scene_index = int(args[0])
+            name = str(args[1])
+            state["scenes"][scene_index] = name
+
+            if scene_index == state.get("selected_scene"):
+                state["selected_scene_name"] = name
+            if scene_index == state.get("playing_scene"):
+                state["playing_scene_name"] = name
+            if scene_index == state.get("last_fired_scene"):
+                state["last_fired_scene_name"] = name
+
+        elif address == "/live/track/get/playing_slot_index" and len(args) >= 2:
+            slot = int(args[1])
+            if slot >= 0:
+                state["playing_scene"] = slot
+
+        elif address == "/live/song/get/is_playing" and args:
+            raw = args[0]
+            if isinstance(raw, str):
+                playing = raw.strip().lower() not in ("0", "false", "off", "no", "")
+            else:
+                playing = bool(raw)
+
+            state["is_playing"] = playing
+
+            # is_playing est global à Ableton : une scène Session peut jouer
+            # sans que l'Arrangement soit le mode UI actif. On ne force donc
+            # jamais play_mode="arrangement" depuis is_playing seul.
+            # jamais play_mode="arrangement" depuis is_playing seul.
+            if playing:
+                state["is_paused"] = False
+            else:
+                if state.get("play_mode") == "arrangement":
+                    state["is_paused"] = True
+
+            normalize_transport_state_locked()
+
+
+def start_osc_server():
+    disp = dispatcher.Dispatcher()
+    disp.set_default_handler(osc_reply)
+    server = osc_server.ThreadingOSCUDPServer(("0.0.0.0", LOCAL_OSC_PORT), disp)
+    print(f"OSC reply server listening on 0.0.0.0:{LOCAL_OSC_PORT}")
+    server.serve_forever()
+
+
+def send(address: str, *args):
+    client.send_message(address, list(args))
+
+def show_session_view():
+    for address in (
+        "/live/application/view/show_view",
+        "/live/app/view/show_view",
+        "/live/view/show_view",
+    ):
+        send(address, "Session")
+        send(address, "Session View")
+
+def show_arrangement_view():
+    for address in (
+        "/live/application/view/show_view",
+        "/live/app/view/show_view",
+        "/live/view/show_view",
+    ):
+        send(address, "Arranger")
+        send(address, "Arrangement")
+        send(address, "Arrangement View")
+
+
+def query(address: str, *args, timeout=OSC_TIMEOUT):
+    """
+    Requête OSC protégée :
+    - une seule requête à la fois pour éviter les réponses croisées ;
+    - timeout court pour éviter de bloquer Flask.
+    """
+    with query_lock:
+        with lock:
+            responses.pop(address, None)
+
+        send(address, *args)
+
+        t0 = time.time()
+        while time.time() - t0 < timeout:
+            with lock:
+                if address in responses:
+                    return responses[address][1]
+            time.sleep(0.006)
+
+    return None
+
+
+def safe_float(value) -> Optional[float]:
+    try:
+        return float(value)
+    except Exception:
+        return None
+
+
+def get_track_count() -> int:
+    """Retourne le nombre de pistes Ableton, avec cache pour éviter de ralentir le suivi."""
+    global _track_count_cache
+
+    now = time.time()
+    cached_at, cached_value = _track_count_cache
+    if now - cached_at < TRACK_COUNT_CACHE_SECONDS and cached_value > 0:
+        return min(int(cached_value), MAX_TRACKS_TO_SCAN)
+
+    res = query("/live/song/get/num_tracks")
+    if res:
+        for item in list(res)[::-1]:
+            value = safe_float(item)
+            if value is not None and value > 0:
+                count = min(int(value), MAX_TRACKS_TO_SCAN)
+                _track_count_cache = (now, count)
+                return count
+
+    return min(int(cached_value or MAX_TRACKS_TO_SCAN), MAX_TRACKS_TO_SCAN)
+
+
+def is_track_enabled(track_index: int) -> bool:
+    """True si la piste peut servir à détecter la scène en lecture.
+
+    AbletonOSC renvoie généralement mute=True quand la piste est coupée.
+    Si la requête mute ne répond pas, on garde la piste pour ne pas rater un playback.
+    """
+    res = query("/live/track/get/mute", track_index)
+    if not res:
+        return True
+
+    value = None
+    for item in list(res)[::-1]:
+        if isinstance(item, bool):
+            value = item
+            break
+        f = safe_float(item)
+        if f is not None:
+            value = bool(int(f))
+            break
+
+    if value is None:
+        return True
+
+    muted = bool(value)
+    return not muted
+
+
+def format_time_label(seconds: float) -> str:
+    seconds = max(0, int(float(seconds or 0)))
+    minutes, secs = divmod(seconds, 60)
+    hours, minutes = divmod(minutes, 60)
+    if hours:
+        return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+    return f"{minutes:02d}:{secs:02d}"
+
+
+def parse_cue_points_response(args):
+    """Transforme la réponse AbletonOSC /live/song/get/cue_points en repères.
+
+    Documentation AbletonOSC : réponse sous forme name, time, name, time...
+    time/current_song_time sont en beats Live, pas en secondes réelles.
+    """
+    if not args:
+        return []
+    values = list(args)
+    markers = []
+    i = 0
+    cue_index = 0
+    while i < len(values):
+        name = None
+        pos = None
+
+        # Format attendu : name, time, name, time...
+        if i + 1 < len(values) and safe_float(values[i + 1]) is not None:
+            name = str(values[i]).strip() or f"Repère {cue_index + 1}"
+            pos = safe_float(values[i + 1])
+            i += 2
+        # Format alternatif défensif : index, name, time...
+        elif i + 2 < len(values) and safe_float(values[i]) is not None and safe_float(values[i + 2]) is not None:
+            name = str(values[i + 1]).strip() or f"Repère {cue_index + 1}"
+            pos = safe_float(values[i + 2])
+            i += 3
+        else:
+            i += 1
+            continue
+
+        if pos is None:
+            continue
+        markers.append({
+            "name": name,
+            "time": max(0.0, float(pos)),
+            "cue_index": cue_index,
+            "source": "ableton"
+        })
+        cue_index += 1
+
+    markers.sort(key=lambda x: x["time"])
+    for idx, marker in enumerate(markers):
+        marker["cue_index"] = idx
+        marker["label"] = format_time_label(marker["time"])
+    return markers
+
+
+def get_live_cue_points(force: bool = False):
+    """Lit les Locators/Cue Points du Set Ableton via AbletonOSC.
+
+    Si AbletonOSC ne répond pas, on garde un cache court, puis on repasse au JSON.
+    """
+    global _cue_points_cache
+    now = time.time()
+    cached_at, cached_markers, cached_source = _cue_points_cache
+    if not force and cached_markers and now - cached_at < CUE_POINTS_REFRESH_SECONDS:
+        return cached_markers, cached_source
+
+    try:
+        res = query("/live/song/get/cue_points", timeout=0.12)
+        markers = parse_cue_points_response(res)
+        if markers:
+            _cue_points_cache = (now, markers, "Ableton Set")
+            return markers, "Ableton Set"
+    except Exception as e:
+        print("Erreur lecture cue points AbletonOSC :", e, flush=True)
+
+    return [], "JSON"
+
+
+def load_arrangement_markers(force_live: bool = False):
+    # 1) Priorité aux repères réellement présents dans le Set Ableton.
+    live_markers, source = get_live_cue_points(force=force_live)
+    if live_markers:
+        with lock:
+            state["arrangement_markers_source"] = source
+        return live_markers
+
+    # 2) Repli local si AbletonOSC ne renvoie pas les cue points.
+    path = Path(__file__).with_name(ARRANGEMENT_MARKERS_FILE)
+    markers = DEFAULT_ARRANGEMENT_MARKERS
+    try:
+        if path.exists():
+            with path.open("r", encoding="utf-8") as f:
+                loaded = json.load(f)
+            if isinstance(loaded, list) and loaded:
+                markers = loaded
+    except Exception as e:
+        print("Erreur lecture arrangement_markers.json :", e, flush=True)
+
+    clean = []
+    for item in markers:
+        try:
+            name = str(item.get("name", "Repère")).strip() or "Repère"
+            t = max(0.0, float(item.get("time", 0)))
+            clean.append({"name": name, "time": t, "label": format_time_label(t), "source": "json"})
+        except Exception:
+            continue
+    clean.sort(key=lambda x: x["time"])
+    with lock:
+        state["arrangement_markers_source"] = "JSON"
+    return clean or DEFAULT_ARRANGEMENT_MARKERS
+
+
+def build_show_from_cached_scenes(spacing_beats: float = 128.0):
+    """Crée des locators Arrangement depuis les noms de scènes Session déjà scannés."""
+    global _cue_points_cache
+
+    scan_scene_names_async(limit=120, clear_before_scan=False)
+    time.sleep(0.3)
+
+    with lock:
+        cached = dict(state.get("scenes", {}))
+
+    scene_names = []
+    for idx in sorted(cached):
+        name = str(cached[idx]).strip()
+        if not name:
+            continue
+        if name.upper().startswith("CL_"):
+            continue
+        if name.startswith("Scène ") or name.startswith("Scene "):
+            continue
+        scene_names.append(name)
+
+    if not scene_names:
+        return False, "Aucun nom de scène disponible"
+
+    send("/live/song/stop_playing")
+    time.sleep(0.1)
+
+    created = 0
+    for index, name in enumerate(scene_names):
+        beat_time = float(index) * float(spacing_beats)
+        send("/live/song/set/current_song_time", beat_time)
+        time.sleep(0.08)
+
+        send("/live/song/cue_point/add_or_delete")
+        time.sleep(0.08)
+
+        send("/live/song/cue_point/set/name", index, name)
+        time.sleep(0.04)
+        created += 1
+
+    _cue_points_cache = (0.0, [], "JSON")
+
+    with lock:
+        state["message"] = f"{created} locators créés depuis les scènes"
+        state["sync_source"] = "Build Show"
+
+    return True, f"{created} locators créés depuis les scènes"
+
+def current_arrangement_marker(seconds: float) -> str:
+    with lock:
+        markers = list(state.get("arrangement_markers", []))
+    current = "—"
+    for marker in markers:
+        if float(seconds or 0) >= float(marker["time"]):
+            current = marker["name"]
+        else:
+            break
+    return current
+
+
+def refresh_arrangement_time():
+    """Suit la position de lecture Arrangement quand AbletonOSC répond."""
+    res = query("/live/song/get/current_song_time", timeout=0.035)
+    if not res:
+        return
+    value = None
+    for item in list(res)[::-1]:
+        f = safe_float(item)
+        if f is not None:
+            value = f
+            break
+    if value is None:
+        return
+    with lock:
+        previous_time = float(state.get("arrangement_time", 0.0))
+
+        state["last_arrangement_time"] = previous_time
+        state["arrangement_time"] = float(value)
+        state["arrangement_time_label"] = format_time_label(value)
+        # Ne pas recalculer les cue points ici : cela peut déclencher des appels OSC
+        # dans le thread de fond et finir par bloquer /status après quelques minutes.
+        # Les repères Arrangement sont rafraîchis uniquement sur demande depuis les actions.
+        state["arrangement_marker"] = state.get("arrangement_marker", "—")
+
+        # Si la tête Arrangement avance réellement, on considère
+        # l'Arrangement comme en lecture même si is_playing
+        # n'est pas correctement remonté par AbletonOSC.
+        if abs(float(value) - previous_time) > 0.01:
+            # Le temps Arrangement peut avancer pendant une lecture Session.
+            # On ne déclare l'Arrangement actif que si une commande Arrangement
+            # l'a explicitement mis dans ce mode.
+            if state.get("play_mode") == "arrangement":
+                state["is_playing"] = True
+                state["is_paused"] = False
+
+        normalize_transport_state_locked()
+
+
+def set_arrangement_time(seconds: float, label: str = ""):
+    seconds = max(0.0, float(seconds))
+    # Adresse standard AbletonOSC pour déplacer la tête de lecture Arrangement.
+    send("/live/song/set/current_song_time", seconds)
+    with lock:
+        state["arrangement_time"] = seconds
+        state["arrangement_time_label"] = format_time_label(seconds)
+        state["arrangement_marker"] = label or current_arrangement_marker(seconds)
+        state["message"] = f"Arrangement : {state['arrangement_marker']}"
+        state["sync_source"] = "Arrangement"
+
+
+
+def refresh_names_and_transport():
+    """
+    Refresh léger. Ne scanne pas toutes les pistes.
+    """
+    try:
+        res = query("/live/view/get/selected_scene")
+        if res:
+            selected = int(res[0])
+            with lock:
+                state["selected_scene"] = selected
+            query("/live/scene/get/name", selected)
+
+        query("/live/song/get/is_playing")
+
+        with lock:
+            playing = int(state.get("playing_scene", -1))
+            last_fired = int(state.get("last_fired_scene", -1))
+
+        # Si aucun slot actif n'a été détecté, on garde la dernière scène lancée.
+        if playing < 0 and last_fired >= 0:
+            with lock:
+                state["playing_scene"] = last_fired
+                playing = last_fired
+
+        if playing >= 0:
+            query("/live/scene/get/name", playing)
+
+        with lock:
+            state["connected"] = True
+            state["message"] = "Connecté à AbletonOSC"
+            state["sync_source"] = "Ableton"
+
+    except Exception as e:
+        with lock:
+            state["connected"] = False
+            state["message"] = f"Erreur : {e}"
+
+
+
+def refresh_scene_name_async(scene_index: int):
+    """Demande le nom d'une scène sans bloquer l'interface web.
+
+    Utilisé après NEXT / PREV / GO pour que la carte
+    “prochaine scène sélectionnée” se mette à jour rapidement.
+    """
+    try:
+        query("/live/scene/get/name", int(scene_index), timeout=0.08)
+        with lock:
+            state["connected"] = True
+            state["message"] = "Connecté à AbletonOSC"
+    except Exception as e:
+        with lock:
+            state["connected"] = False
+            state["message"] = f"Erreur : {e}"
+def scan_scene_names_async(limit: int = 120, clear_before_scan: bool = False):
+    """Demande les noms des scènes Ableton pour alimenter le menu déroulant.
+
+    clear_before_scan=True sert après changement de projet Ableton :
+    on vide l'ancienne liste pour éviter d'afficher les scènes du projet précédent.
+    """
+    if clear_before_scan:
+        with lock:
+            state["scenes"] = {}
+            state["selected_scene_name"] = "—"
+            state["playing_scene_name"] = "—"
+            state["last_fired_scene_name"] = "—"
+            state["message"] = "Rescan scènes…"
+
+    for scene_index in range(limit):
+        try:
+            query("/live/scene/get/name", scene_index, timeout=0.05)
+        except Exception:
+            pass
+
+    with lock:
+        state["message"] = "Liste des scènes actualisée"
+        state["connected"] = True
+def scan_playing_scene_from_tracks():
+    """
+    Détection rapide de la scène en lecture, même si elle a été lancée depuis Ableton.
+
+    Pour rester réactif, on évite le test mute piste par piste par défaut :
+    /live/track/get/playing_slot_index suffit généralement à savoir quel slot joue.
+    """
+    with lock:
+        current = int(state.get("playing_scene", -1))
+        selected = int(state.get("selected_scene", 0))
+        last_fired = int(state.get("last_fired_scene", -1))
+
+    # On teste d'abord la scène sélectionnée et la dernière scène lancée :
+    # c'est souvent là que le changement direct dans Ableton arrive.
+    candidate_tracks = list(range(get_track_count()))
+
+    detected_slot = -1
+    for track_index in candidate_tracks:
+        if CHECK_MUTE_DURING_PLAYING_SCAN and not is_track_enabled(track_index):
+            continue
+
+        res = query("/live/track/get/playing_slot_index", track_index)
+        if res and len(res) >= 2:
+            try:
+                slot = int(res[1])
+            except Exception:
+                continue
+            if slot >= 0:
+                detected_slot = slot
+                break
+
+    if detected_slot >= 0:
+        should_query_name = False
+        with lock:
+            # Si l'utilisateur a repris la main en Arrangement, les anciens
+            # playing_slot_index Ableton ne doivent pas rallumer Session.
+            if state.get("play_mode") != "arrangement" and detected_slot != current:
+                state["playing_scene"] = detected_slot
+                state["last_fired_scene"] = detected_slot
+                state["playing_scene_name"] = f"Scène {detected_slot + 1}"
+                state["last_fired_scene_name"] = f"Scène {detected_slot + 1}"
+                state["play_mode"] = "session"
+                state["sync_source"] = "Ableton direct"
+                should_query_name = True
+        # Nom réel demandé hors verrou.
+        if should_query_name:
+            query("/live/scene/get/name", detected_slot, timeout=0.05)
+    elif current < 0 and last_fired >= 0:
+        with lock:
+            if state.get("play_mode") != "arrangement":
+                state["playing_scene"] = last_fired
+
+
+def background_refresh():
+    global last_full_refresh
+    global last_playing_scan
+
+    while True:
+        now = time.time()
+
+        # Suit aussi les lancements faits directement dans Ableton.
+        if SCAN_PLAYING_SCENE_FROM_TRACKS and now - last_playing_scan >= PLAYING_SCAN_SECONDS:
+            scan_playing_scene_from_tracks()
+            last_playing_scan = now
+
+        # Refresh noms/transport rapide mais léger.
+        if now - last_full_refresh >= FULL_REFRESH_SECONDS:
+            refresh_names_and_transport()
+            refresh_arrangement_time()
+            last_full_refresh = now
+
+
+        time.sleep(BACKGROUND_REFRESH_SECONDS)
+
+
+
+# -----------------------------------------------------------------------------
+# Sortie Max for Live OSC pour piloter le vrai crossfader Ableton.
+# -----------------------------------------------------------------------------
+def send_crossfader_m4l(value: float):
+    """Envoie A/B/Centre ou une valeur continue au patch Max for Live sur UDP 9001."""
+    value = max(-1.0, min(1.0, float(value)))
+
+    # Boutons/presets : routes dédiées lisibles dans Max.
+    # Slider : route continue /xfader/value <float>.
+    if value <= -0.995:
+        address = "/xfader/a"
+        payload = 1
+    elif value >= 0.995:
+        address = "/xfader/b"
+        payload = 1
+    elif abs(value) <= 0.005:
+        address = "/xfader/center"
+        payload = 1
+    else:
+        address = "/xfader/value"
+        payload = value
+
+    try:
+        m4l_client.send_message(address, payload)
+        print(f"XFADE M4L OSC envoyé : {address} {payload} -> {M4L_IP}:{M4L_PORT}", flush=True)
+        return True, f"M4L OSC {address}"
+    except Exception as e:
+        print("XFADE M4L OSC erreur :", e, flush=True)
+        return False, f"M4L OSC erreur : {e}"
+
+
+
+# -----------------------------------------------------------------------------
+# Page A/B Crossfader
+# -----------------------------------------------------------------------------
+# AbletonOSC expose surtout les propriétés standard Song/Track. Le crossfader
+# Live peut varier selon les versions de script : on envoie donc plusieurs
+# adresses possibles, sans scan lourd ni boucle de fond.
+# Valeurs Live usuelles : -1 = A, 0 = centre, 1 = B.
+
+XFADE_PRESETS = {
+    "a": (-1.0, "A"),
+    "center": (0.0, "Centre"),
+    "b": (1.0, "B"),
+}
+
+def set_crossfader_value(value: float, label: str = ""):
+    value = max(-1.0, min(1.0, float(value)))
+
+    ok, midi_msg = send_crossfader_m4l(value)
+
+    with lock:
+        state["crossfader"] = value
+        state["crossfader_label"] = label or ("A" if value <= -0.95 else "B" if value >= 0.95 else "Centre")
+        state["message"] = f"Crossfader {state['crossfader_label']}" if ok else f"Crossfader non envoyé — {midi_msg}"
+        state["sync_source"] = "Max for Live OSC"
+
+    return value
+
+
+
+def open_browser_delayed():
+    try:
+        time.sleep(1.5)
+        webbrowser.open("http://127.0.0.1:5050/")
+    except Exception as e:
+        print(f"Ouverture navigateur impossible : {e}")
+
+@app.route("/info")
+def info():
+    ip = get_local_ip()
+    return f"""
+    <html>
+    <head>
+      <title>Ableton Web Remote - Infos</title>
+      <style>
+        body {{
+          background:#111827;
+          color:white;
+          font-family:-apple-system, BlinkMacSystemFont, sans-serif;
+          padding:40px;
+        }}
+        .box {{
+          background:#1f2937;
+          border-radius:20px;
+          padding:24px;
+          max-width:520px;
+        }}
+        a {{
+          color:#60a5fa;
+          font-size:22px;
+          font-weight:bold;
+        }}
+      </style>
+    </head>
+    <body>
+      <div class="box">
+        <h1>Ableton Web Remote démarré</h1>
+        <p>Sur ce Mac :</p>
+        <p><a href="http://127.0.0.1:5050">http://127.0.0.1:5050</a></p>
+        <p>Sur iPhone / iPad :</p>
+        <p><a href="http://{ip}:5050">http://{ip}:5050</a></p>
+        <p>Le téléphone doit être sur le même réseau Wi-Fi ou partage de connexion.</p>
+      </div>
+    </body>
+    </html>
+    """
+
+@app.route("/")
+def index():
+    show_session_view()
+    return render_template("index.html")
+
+
+@app.route("/assets/<path:filename>")
+def remote_asset(filename):
+    return send_from_directory(Path(__file__).resolve().parent / "assets", filename)
+
+
+@app.route("/ab")
+def ab_page():
+    return render_template("ab.html")
+
+
+@app.route("/arrangement")
+def arrangement_page():
+    show_arrangement_view()
+    try:
+        markers = load_arrangement_markers(force_live=True)
+        with lock:
+            state["arrangement_markers"] = markers
+            if markers:
+                state["arrangement_markers_source"] = markers[0].get("source", state.get("arrangement_markers_source", "CACHE"))
+            else:
+                state["arrangement_markers_source"] = "CACHE"
+    except Exception as e:
+        print("Erreur chargement repères Arrangement :", e, flush=True)
+    return render_template("arrangement.html")
+
+
+@app.route("/status")
+def status():
+    # IMPORTANT : /status doit rester non bloquant.
+    # Si un thread OSC tient le lock trop longtemps, on renvoie le dernier état connu
+    # au lieu de bloquer l'interface web jusqu'au timeout navigateur.
+    acquired = lock.acquire(timeout=0.05)
+    try:
+        if acquired:
+            normalize_transport_state_locked()
+
+            # Garde-fou final : une lecture Session ne doit pas allumer l'Arrangement.
+            # is_playing est global à Live ; play_mode reste la source de vérité UI.
+            if bool(state.get("is_playing", False)) and state.get("play_mode") == "paused":
+                state["play_mode"] = "stopped"
+                state["is_paused"] = False
+
+            deadline = state.get("playback_deadline")
+            if deadline is not None and bool(state.get("is_playing", False)) and not bool(state.get("is_paused", False)):
+                state["remaining_seconds"] = max(0.0, float(deadline) - time.time())
+
+            data = dict(state)
+        else:
+            # Ne jamais déclarer l'interface non connectée juste parce que le lock
+            # est occupé : on renvoie le dernier état connu et on signale seulement
+            # que le serveur est en actualisation.
+            data = dict(state)
+            data["server_busy"] = True
+            if data.get("connected"):
+                data["message"] = "Connecté à AbletonOSC — actualisation…"
+            else:
+                data["message"] = "Serveur occupé — actualisation…"
+    finally:
+        if acquired:
+            lock.release()
+
+
+    data["arrangement_markers"] = data.get("arrangement_markers", [])
+    data["arrangement_markers_source"] = data.get("arrangement_markers_source", "CACHE")
+    return jsonify(data)
+
+
+@app.route("/rescan-scenes", methods=["POST", "GET"])
+def rescan_scenes():
+    """Force la reconstruction de la liste des scènes après changement de projet Ableton."""
+    threading.Thread(
+        target=scan_scene_names_async,
+        kwargs={"limit": 120, "clear_before_scan": True},
+        daemon=True,
+    ).start()
+    with lock:
+        state["message"] = "Rescan scènes lancé"
+        data = dict(state)
+    return jsonify({"ok": True, "message": "Rescan scènes lancé", "state": data})
+
+
+
+@app.route("/build-show", methods=["POST", "GET"])
+def build_show():
+    try:
+        data = request.get_json(force=True, silent=True) or {}
+    except Exception:
+        data = {}
+
+    try:
+        spacing_beats = float(data.get("spacing_beats", 128.0))
+    except Exception:
+        spacing_beats = 128.0
+
+    ok, message = build_show_from_cached_scenes(spacing_beats=spacing_beats)
+
+    with lock:
+        response_state = dict(state)
+
+    return jsonify({"ok": ok, "message": message, "state": response_state})
+
+def clamp_scene_number(value: Any) -> Optional[int]:
+    """Convertit un numéro de scène utilisateur en index Ableton 0-based."""
+    try:
+        scene_number = int(str(value).strip())
+    except Exception:
+        return None
+    if scene_number < 1:
+        return None
+    return scene_number - 1
+
+
+def select_scene(scene_index: int, source: str = "Télécommande"):
+    """Sélectionne une scène sans la lancer, puis met le nom à jour en arrière-plan."""
+    scene_index = max(0, int(scene_index))
+    send("/live/view/set/selected_scene", scene_index)
+    with lock:
+        state["selected_scene"] = scene_index
+        state["selected_scene_name"] = f"Scène {scene_index + 1}"
+        state["message"] = f"Scène {scene_index + 1} sélectionnée"
+        state["sync_source"] = source
+    threading.Thread(target=refresh_scene_name_async, args=(scene_index,), daemon=True).start()
+
+
+@app.route("/action", methods=["POST"])
+def action():
+    global last_go_time
+
+    data = request.get_json(force=True, silent=True) or {}
+    action_name = data.get("action")
+    print("ACTION REÇUE :", action_name, flush=True)
+
+    with lock:
+        selected = int(state.get("selected_scene", 0))
+
+    if action_name == "go":
+        show_session_view()
+        now = time.time()
+        if now - last_go_time < GO_COOLDOWN:
+            return jsonify({"ok": False, "message": "Double GO ignoré"})
+        last_go_time = now
+
+        send("/live/scene/fire_as_selected", selected)
+
+        with lock:
+            playing_name = state.get("selected_scene_name", "—")
+            duration_seconds = parse_scene_duration_seconds(playing_name)
+            state["last_fired_scene"] = selected
+            state["playing_scene"] = selected
+            state["playing_scene_name"] = playing_name
+            state["play_mode"] = "session"
+            state["is_playing"] = True
+            state["is_paused"] = False
+            state["scene_duration_seconds"] = duration_seconds
+            state["remaining_seconds"] = duration_seconds
+            state["playback_deadline"] = (now + duration_seconds) if duration_seconds is not None else None
+            state["arrangement_marker"] = "—"
+            state["message"] = f"Scène {selected + 1} lancée"
+            state["sync_source"] = "Télécommande"
+
+
+        # Auto-next.
+        next_scene = selected + 1
+        send("/live/view/set/selected_scene", next_scene)
+
+        with lock:
+            state["selected_scene"] = next_scene
+            state["selected_scene_name"] = f"Scène {next_scene + 1}"
+        threading.Thread(target=refresh_scene_name_async, args=(next_scene,), daemon=True).start()
+    elif action_name == "arrangement_toggle":
+        # Bouton dédié Arrangement :
+        # - si l'Arrangement joue, on met en pause
+        # - sinon on reprend la lecture Arrangement à la position courante
+        with lock:
+            arrangement_is_playing = (
+                bool(state.get("is_playing", False))
+                and str(state.get("play_mode", "")) == "arrangement"
+                and not bool(state.get("is_paused", False))
+            )
+
+        if arrangement_is_playing:
+            send("/live/song/stop_playing")
+            with lock:
+                state["is_playing"] = False
+                state["is_paused"] = True
+                state["play_mode"] = "arrangement"
+                state["playing_scene"] = -1
+                state["playing_scene_name"] = "—"
+                state["last_fired_scene"] = -1
+                state["last_fired_scene_name"] = "—"
+                state["message"] = "Pause Arrangement"
+                state["sync_source"] = "Télécommande"
+        else:
+            show_arrangement_view()
+            send("/live/song/set/back_to_arranger", 0)
+            send("/live/song/continue_playing")
+            with lock:
+                state["is_playing"] = True
+                state["is_paused"] = False
+                state["play_mode"] = "arrangement"
+                state["playing_scene"] = -1
+                state["playing_scene_name"] = "—"
+                state["last_fired_scene"] = -1
+                state["last_fired_scene_name"] = "—"
+                state["message"] = "Lecture Arrangement"
+                state["sync_source"] = "Télécommande"
+
+    elif action_name == "pause":
+        with lock:
+            is_playing = bool(state.get("is_playing", False))
+            is_paused = bool(state.get("is_paused", False))
+            current_mode = str(state.get("play_mode", "stopped"))
+
+        if is_playing:
+            send("/live/song/stop_playing")
+            with lock:
+                deadline = state.get("playback_deadline")
+                if deadline is not None:
+                    state["remaining_seconds"] = max(0.0, float(deadline) - time.time())
+                state["is_playing"] = False
+                state["is_paused"] = True
+                state["play_mode"] = current_mode if current_mode in ("arrangement", "session") else "paused"
+                state["message"] = "Pause"
+                state["sync_source"] = "Télécommande"
+        else:
+            send("/live/song/continue_playing")
+            with lock:
+                remaining_seconds = state.get("remaining_seconds")
+                if remaining_seconds is not None:
+                    state["playback_deadline"] = time.time() + max(0.0, float(remaining_seconds))
+                state["is_playing"] = True
+                state["is_paused"] = False
+                state["play_mode"] = current_mode if current_mode in ("arrangement", "session") else "arrangement"
+                state["message"] = "Reprise" if is_paused else "Lecture"
+                state["sync_source"] = "Télécommande"
+
+    elif action_name == "stop":
+        send("/live/song/stop_playing")
+        with lock:
+            state["is_playing"] = False
+            state["is_paused"] = False
+            state["play_mode"] = "stopped"
+            state["message"] = "Stop"
+            state["sync_source"] = "Télécommande"
+
+    elif action_name == "back_to_arrangement":
+        send("/live/song/set/back_to_arranger", 0)
+
+    elif action_name == "arrangement_start":
+        set_arrangement_time(0, "Début")
+
+    elif action_name in ("arrangement_goto", "arrangement_play_marker"):
+        show_arrangement_view()
+        marker_name = str(data.get("name", "")).strip()
+        play_after_jump = action_name == "arrangement_play_marker"
+
+        try:
+            seconds = float(data.get("time"))
+        except Exception:
+            return jsonify({"ok": False, "message": "Position Arrangement invalide"}), 400
+
+        if not play_after_jump:
+            send("/live/song/stop_playing")
+
+        send("/live/song/set/back_to_arranger", 0)
+        set_arrangement_time(seconds, marker_name)
+
+        if play_after_jump:
+            time.sleep(0.04)
+            send("/live/song/continue_playing")
+
+        with lock:
+            state["arrangement_time"] = seconds
+            state["arrangement_time_label"] = format_time_label(seconds)
+            state["arrangement_marker"] = marker_name or format_time_label(seconds)
+            state["message"] = ("Lecture : " if play_after_jump else "Cue : ") + state["arrangement_marker"]
+            state["sync_source"] = "Arrangement time"
+            state["playing_scene"] = -1
+            state["playing_scene_name"] = "—"
+            state["last_fired_scene"] = -1
+            state["last_fired_scene_name"] = "—"
+
+            if play_after_jump:
+                state["is_playing"] = True
+                state["is_paused"] = False
+                state["play_mode"] = "arrangement"
+            else:
+                state["is_playing"] = False
+                state["is_paused"] = False
+                state["play_mode"] = "stopped"
+
+    elif action_name in ("arrangement_prev", "arrangement_next"):
+        show_arrangement_view()
+        send("/live/song/stop_playing")
+
+        with lock:
+            markers = list(state.get("arrangement_markers", []))
+            now_time = float(state.get("arrangement_time", 0.0))
+
+        if not markers:
+            markers = load_arrangement_markers(force_live=True)
+            with lock:
+                state["arrangement_markers"] = markers
+
+        if action_name == "arrangement_prev":
+            previous = [m for m in markers if float(m["time"]) < now_time - 1.0]
+            marker = previous[-1] if previous else markers[0]
+        else:
+            following = [m for m in markers if float(m["time"]) > now_time + 1.0]
+            marker = following[0] if following else markers[-1]
+
+        set_arrangement_time(float(marker["time"]), marker["name"])
+
+    elif action_name == "prev":
+        select_scene(max(0, selected - 1))
+
+    elif action_name == "next":
+        select_scene(selected + 1)
+
+    elif action_name == "goto":
+        scene_index = clamp_scene_number(data.get("scene"))
+        if scene_index is None:
+            return jsonify({"ok": False, "message": "Numéro de scène invalide"}), 400
+        select_scene(scene_index)
+
+    elif action_name == "xfade":
+        target = str(data.get("target", "")).strip().lower()
+        if target not in XFADE_PRESETS:
+            return jsonify({"ok": False, "message": "Position A/B invalide"}), 400
+        value, label = XFADE_PRESETS[target]
+        set_crossfader_value(value, label)
+
+    elif action_name == "xfade_value":
+        try:
+            value = float(data.get("value"))
+        except Exception:
+            return jsonify({"ok": False, "message": "Valeur crossfader invalide"}), 400
+        set_crossfader_value(value)
+
+    else:
+        return jsonify({"ok": False, "message": "Action inconnue"}), 400
+
+    # On ne bloque pas l'action avec un refresh complet.
+    with lock:
+        return jsonify({"ok": True, "state": dict(state)})
+
+
+
+def build_server_info():
+    ip = get_local_ip()
+    return {
+        "ip": ip,
+        "port": 5050,
+        "url": f"http://{ip}:5050",
+        "local_url": "http://127.0.0.1:5050",
+        "osc_in": ABLETON_PORT,
+        "osc_reply": LOCAL_OSC_PORT,
+        "midi_port": "M4L_OSC_9001",
+        "midi_cc": None,
+        "midi_channel": None,
+        "checklist": [
+            "Ableton Live ouvert",
+            "AbletonOSC installé et sélectionné dans les surfaces de contrôle",
+            "Ordinateur et iPhone/iPad sur le même Wi-Fi",
+            "Pour A/B : device Max for Live v8 sur MASTER, udpreceive 9001",
+            "Pour Arrangement : créer/nommer les Locators dans Ableton Live",
+            "Repli possible : arrangement_markers.json si AbletonOSC ne renvoie pas les cue points"
+        ]
+    }
+
+@app.route("/ip")
+def ip():
+    return jsonify({"ip": get_local_ip()})
+
+
+@app.route("/server_info")
+def server_info():
+    return jsonify(build_server_info())
+
+
+def get_local_ip():
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
+    except Exception:
+        return "127.0.0.1"
+    finally:
+        s.close()
+
+
+if __name__ == "__main__":
+    threading.Thread(target=start_osc_server, daemon=True).start()
+    threading.Thread(target=start_ltc_udp_listener, daemon=True).start()
+    threading.Thread(target=background_refresh, daemon=True).start()
+    threading.Thread(target=scan_scene_names_async, kwargs={"limit": 120, "clear_before_scan": True}, daemon=True).start()
+    info = build_server_info()
+    print("\n" + "=" * 68)
+    print("  ABLETON WEB REMOTE - SERVEUR DÉMARRÉ")
+    print("=" * 68)
+    print("")
+    print("  Adresse à ouvrir sur iPhone / iPad :")
+    print(f"  >>> {info['url']} <<<")
+    print("")
+    print("  Adresse locale sur cet ordinateur :")
+    print(f"  {info['local_url']}")
+    print("")
+    print("  Vérifications utiles :")
+    print("  1. Ableton Live doit être ouvert.")
+    print("  2. AbletonOSC doit être installé et actif dans Ableton.")
+    print(f"  3. AbletonOSC reçoit sur le port {ABLETON_PORT}.")
+    print(f"  4. Ce serveur reçoit les réponses OSC sur le port {LOCAL_OSC_PORT}.")
+    print(f"  5. Crossfader A/B : mapper le CC{MIDI_CC} canal {MIDI_CHANNEL + 1} au crossfader Live.")
+    print(f"  6. Port MIDI attendu : {MIDI_PORT_EXACT}")
+    print("")
+    print("  Garde cette fenêtre ouverte pendant l'utilisation.")
+    print("=" * 68 + "\n")
+
+    # threaded=True permet à Flask de répondre même si une autre requête est en cours.
+    threading.Thread(target=open_browser_delayed, daemon=True).start()
+    app.run(host="0.0.0.0", port=5050, debug=False, threaded=True)

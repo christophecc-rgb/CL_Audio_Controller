@@ -1,0 +1,14 @@
+ABLETON WEB REMOTE - INSTALLATION RAPIDE
+
+1. Dézipper le pack.
+2. Double-cliquer sur Installer_Mac.command.
+3. Ouvrir INSTALLER_AbletonOSC puis lancer Installer_AbletonOSC_Officiel.command.
+4. Redémarrer Ableton Live.
+5. Dans Ableton : Préférences > Link/Tempo/MIDI > Surface de contrôle : AbletonOSC.
+6. Double-cliquer sur Ableton Web Remote.app.
+7. Une fenêtre Mac affiche l'adresse à ouvrir sur iPhone/iPad, par exemple : http://192.168.1.25:5050
+
+Important :
+- Le Mac et l'iPhone/iPad doivent être sur le même Wi-Fi.
+- Garde Ableton Live ouvert.
+- Pour le crossfader A/B, active le Gestionnaire IAC et mappe le CC14 canal 1 au crossfader d'Ableton.

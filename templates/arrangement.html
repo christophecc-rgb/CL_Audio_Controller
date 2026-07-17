@@ -1,0 +1,956 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Ableton Web Remote - Arrangement Conduite</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101215">
+  <style>
+    :root {
+  --bg:#0d1014;
+  --panel:#171b21;
+  --text:#f3f4f6;
+  --muted:#99a1ad;
+  --border:#2c3440;
+  --go1:#34d399;
+  --go2:#15803d;
+  --stop1:#a63a3a;
+  --stop2:#6f1d1d;
+  --nav1:#334155;
+  --nav2:#1e293b;
+  --grey1:#4f8fc9;
+  --grey2:#2563eb;
+  --amber:#f6ad55;
+  --purple1:#6d28d9;
+  --purple2:#4c1d95;
+}
+    * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    html, body { margin:0; min-height:100%; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; overflow-x:hidden; }
+    body {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: calc(env(safe-area-inset-top) + 6px) 8px calc(env(safe-area-inset-bottom) + 8px);
+}
+
+.wrap {
+  width: 100%;
+  max-width: 430px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: calc(100vh - 14px);
+  min-height: calc(100dvh - 14px);
+}
+
+.status {
+  min-height: 14px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.status.connected { color: #8bc34a; }
+.status.disconnected { color: #ef9a9a; }
+
+.topnav {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 3px;
+}
+
+.topnav a {
+  text-align: center;
+  color: var(--text);
+  text-decoration: none;
+  font-weight: 900;
+  font-size: 9px;
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 8px;
+  padding: 4px 3px;
+}
+
+.topnav a.active {
+  background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+  border-color: #60a5fa;
+  color: white;
+  box-shadow: 0 0 14px rgba(59,130,246,.45);
+}
+
+.card {
+  background: linear-gradient(180deg, #1a1f27 0%, #12161c 100%);
+  border: 1.5px solid #2e3744;
+  border-radius: 18px;
+  padding: 20px 16px;
+  text-align: center;
+  box-shadow: 0 8px 18px rgba(0,0,0,.20);
+}
+
+.label {
+  color: var(--muted);
+  font-size: 13px;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  font-weight: 900;
+  margin-bottom: 8px;
+}
+
+.scene-name {
+  color: var(--text);
+  font-size: clamp(32px, 8.5vw, 66px);
+  font-weight: 1000;
+  line-height: 1.02;
+  word-break: break-word;
+  min-height: 1em;
+}
+
+.current .scene-name { color: var(--amber); }
+.next .scene-name { color: var(--text); }
+.next .scene-name {
+  font-size: clamp(28px, 7.6vw, 58px);
+  line-height: 1.02;
+}
+
+.next {
+  border-color: #3b82f6;
+  box-shadow:
+    0 0 16px rgba(59,130,246,.20),
+    0 8px 18px rgba(0,0,0,.20),
+    inset 0 0 10px rgba(59,130,246,.06);
+}
+
+.next.next-selected {
+  animation: nextCardPulse .34s ease;
+}
+
+@keyframes nextCardPulse {
+  0% {
+    transform: scale(1);
+    box-shadow:
+      0 0 16px rgba(59,130,246,.20),
+      0 8px 18px rgba(0,0,0,.20),
+      inset 0 0 10px rgba(59,130,246,.06);
+  }
+  50% {
+    transform: scale(1.02);
+    box-shadow:
+      0 0 28px rgba(59,130,246,.38),
+      0 10px 20px rgba(0,0,0,.22),
+      inset 0 0 14px rgba(96,165,250,.12);
+  }
+  100% {
+    transform: scale(1);
+    box-shadow:
+      0 0 16px rgba(59,130,246,.20),
+      0 8px 18px rgba(0,0,0,.20),
+      inset 0 0 10px rgba(59,130,246,.06);
+  }
+}
+
+.meta {
+  color: var(--muted);
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.big-go {
+  width: 100%;
+  min-height: clamp(76px, 10.5vh, 96px);
+  border-radius: 18px;
+  font-size: clamp(34px, 8vw, 46px);
+  letter-spacing: .03em;
+  text-shadow: 0 1px 0 rgba(0,0,0,.18);
+  position: relative;
+  overflow: hidden;
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.transport-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.transport-toggle {
+  min-height: clamp(58px, 7.5vh, 72px);
+  font-size: clamp(17px, 4vw, 22px);
+  letter-spacing: .02em;
+}
+
+.transport-toggle.transport-paused {
+  background: linear-gradient(180deg, #d9a441 0%, #9a6a18 100%);
+  border: 1px solid rgba(255,213,128,.42);
+  animation: arrangementTransportPausePulse 1.1s infinite;
+}
+
+@keyframes arrangementTransportPausePulse {
+  0%, 100% {
+    transform: scale(1);
+    filter: brightness(1);
+    box-shadow:
+      0 0 10px rgba(255,209,102,.28),
+      0 0 18px rgba(255,209,102,.14);
+  }
+  50% {
+    transform: scale(1.015);
+    filter: brightness(1.08);
+    box-shadow:
+      0 0 22px rgba(255,209,102,.65),
+      0 0 34px rgba(255,209,102,.28);
+  }
+}
+
+.grid3 {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+}
+
+button {
+  min-height: clamp(52px, 7vh, 68px);
+  border: 0;
+  border-radius: 15px;
+  color: white;
+  font-size: clamp(16px, 3.8vw, 20px);
+  font-weight: 1000;
+  touch-action: manipulation;
+  user-select: none;
+  cursor: pointer;
+}
+
+button:active {
+  transform: scale(.97);
+  filter: brightness(1.15);
+}
+
+button:disabled {
+  opacity: .55;
+}
+
+.go {
+  background: linear-gradient(180deg, #3ddc97 0%, #22c55e 42%, #15803d 100%);
+  box-shadow:
+    0 0 16px rgba(34,197,94,.20),
+    0 10px 22px rgba(0,0,0,.24),
+    inset 0 1px 0 rgba(255,255,255,.16);
+  border: 1px solid rgba(255,255,255,.10);
+}
+
+.stop {
+  background: linear-gradient(180deg, var(--stop1), var(--stop2));
+}
+
+.nav {
+  background: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%);
+  box-shadow:
+    0 0 14px rgba(37,99,235,.24),
+    0 8px 18px rgba(0,0,0,.18),
+    inset 0 1px 0 rgba(255,255,255,.14);
+  border: 1px solid rgba(255,255,255,.10);
+}
+
+.grey {
+  background: linear-gradient(180deg, #5b8fc4 0%, #2f5f91 100%);
+  border: 1px solid rgba(147,197,253,.35);
+  box-shadow:
+    0 0 10px rgba(91,143,196,.24),
+    0 8px 18px rgba(0,0,0,.18),
+    inset 0 1px 0 rgba(255,255,255,.12);
+}
+
+.purple {
+  background: linear-gradient(180deg, #ff9800, #ef6c00);
+  box-shadow: 0 0 18px rgba(255,152,0,.55);
+}
+
+.arrangement-btn {
+  min-height: clamp(58px, 7.5vh, 72px);
+  border: 0;
+  border-radius: 15px;
+  color: white;
+  font-size: clamp(14px, 3.4vw, 18px);
+  font-weight: 1000;
+  letter-spacing: .02em;
+  background: linear-gradient(180deg, #6d28d9 0%, #5b21b6 52%, #3b0764 100%);
+  box-shadow:
+    0 0 10px rgba(91,33,182,.18),
+    0 8px 18px rgba(0,0,0,.18),
+    inset 0 1px 0 rgba(255,255,255,.08);
+  opacity: .95;
+  transition: background .18s ease, box-shadow .18s ease, opacity .18s ease;
+}
+
+.arrangement-btn.arrangement-active {
+  background: linear-gradient(180deg, #ffb74d 0%, #ef6c00 100%);
+  color: #1b1204;
+  box-shadow: 0 0 10px rgba(255,183,77,.25);
+  opacity: .92;
+}
+
+.select-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+select {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid rgba(255,255,255,.16);
+  background: #15181d;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 900;
+  padding: 0 8px;
+}
+
+.choose {
+  min-height: 44px;
+  padding: 0 12px;
+  font-size: 13px;
+  background: linear-gradient(180deg, #f6ad55 0%, #dd7a1f 100%);
+  color: #171717;
+  box-shadow: 0 6px 14px rgba(221,122,31,.18);
+}
+
+.small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.position {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+}
+
+.position .card {
+  padding: 6px 8px;
+}
+
+.position .label {
+  font-size: 8px;
+  margin-bottom: 2px;
+  letter-spacing: .05em;
+}
+
+.position .value {
+  color: var(--amber);
+  font-size: 13px;
+  font-weight: 1000;
+}
+
+body.is-arrangement-playing .card.current {
+  background: linear-gradient(180deg, #4a2f0f 0%, #221708 100%);
+  border-color: #ffb74d;
+  color: #fff3d6;
+  box-shadow:
+    0 0 40px rgba(255,183,77,.95),
+    0 0 70px rgba(255,183,77,.45),
+    inset 0 0 20px rgba(255,183,77,.20);
+  text-shadow: 0 0 14px rgba(255,183,77,.80);
+}
+
+body.is-arrangement-playing .card.current .label,
+body.is-arrangement-playing .card.current .scene-name {
+  color: #ffdda8;
+}
+
+body.is-arrangement-playing .card.current .meta {
+  color: #ffd7a3;
+}
+
+body.is-arrangement-paused .card.current {
+  background: linear-gradient(180deg, #2b2417 0%, #17130d 100%);
+  border-color: #f6d28b;
+  color: #fce7b2;
+  animation: arrangementPausePulse 1.2s infinite;
+}
+
+@keyframes arrangementPausePulse {
+  0%, 100% {
+    box-shadow:
+      0 0 10px rgba(246,210,139,.20),
+      inset 0 0 10px rgba(246,210,139,.06);
+  }
+  50% {
+    box-shadow:
+      0 0 18px rgba(246,210,139,.38),
+      inset 0 0 14px rgba(246,210,139,.12);
+  }
+}
+
+@media (orientation:portrait) and (max-width: 430px) {
+  .main {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+  }
+
+  .wrap {
+    justify-content: flex-start;
+  }
+
+  .small {
+    margin-top: auto;
+    font-size: 10px;
+    line-height: 1.2;
+  }
+  .position {
+    margin-top: -4px;
+  }
+}
+
+@media (orientation:landscape) {
+  body { padding:calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 10px) calc(env(safe-area-inset-bottom) + 8px) calc(env(safe-area-inset-left) + 10px); }
+  .wrap { max-width:980px; gap:8px; }
+  .topnav { gap:4px; }
+  .topnav a { font-size:10px; border-radius:9px; padding:5px 4px; }
+  .main { display:grid; grid-template-columns:1fr 1fr; gap:10px; align-items:start; }
+  .card { padding:18px 20px; }
+  button { min-height:56px; font-size:18px; border-radius:18px; }
+  .big-go { min-height:96px; font-size:42px; }
+  .scene-name { font-size:clamp(30px,6vw,54px); }
+  .next .scene-name { font-size:clamp(26px,5vw,46px); }
+  .position .card { padding:6px 8px; }
+  .position .label { font-size:8px; margin-bottom:2px; }
+  .position .value { font-size:13px; }
+  .small { display:none; }
+}
+    
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="status disconnected" id="status">Connexion…</div>
+    <nav class="topnav"><a href="/">Session</a><a href="/ab">A/B</a><a href="/arrangement" class="active">Arrangement</a></nav>
+
+  <div class="main">
+  <section style="display:flex; flex-direction:column; gap:8px">
+    <section class="card current" id="currentCard" aria-live="polite">
+      <div class="label" id="currentModeLabel">MODE ARRANGEMENT</div>
+      <div class="scene-name" id="currentName">—</div>
+      <div class="meta" id="currentMeta">Aucun repère lancé</div>
+    </section>
+
+    <section class="card next" aria-live="polite">
+      <div class="label">Prochaine scène sélectionnée</div>
+      <div class="scene-name" id="nextName">—</div>
+      <div class="meta" id="nextMeta">—</div>
+    </section>
+
+    <button class="go big-go" id="goBtn" type="button">GO</button>
+
+    <div class="grid2">
+      <button class="nav" id="previewBtn" type="button">Preview</button>
+      <button class="nav" id="nextBtn" type="button">Next</button>
+    </div>
+
+    <div class="transport-row" aria-label="Transport Arrangement">
+      <button class="grey transport-toggle" id="pauseToggleBtn" data-action="arrangement_toggle">
+      </button>
+      <button class="arrangement-btn" data-action="back_to_arrangement">
+        MODE SESSION
+      </button>
+    </div>
+  </section>
+
+  <section style="display:flex; flex-direction:column; gap:10px">
+
+    <section class="card">
+      <div class="label">Scène — aller à</div>
+      <div class="select-row">
+        <select id="markerSelect" title="Choisir une scène"></select>
+        <button class="choose" id="gotoBtn" type="button">Aller</button>
+      </div>
+    </section>
+
+
+        <div class="position">
+      <section class="card">
+        <div class="label">Scène</div>
+        <div class="value" id="countLabel">— / —</div>
+      </section>
+      <section class="card">
+        <div class="label">Position</div>
+        <div class="value" id="timeLabel">00:00</div>
+      </section>
+    </div>
+  </section>
+</div>
+
+</main>
+
+
+  <script>
+    const statusEl = document.getElementById('status');
+    const currentNameEl = document.getElementById('currentName');
+    const currentMetaEl = document.getElementById('currentMeta');
+    const currentCardEl = document.getElementById('currentCard');
+    const nextNameEl = document.getElementById('nextName');
+    const nextMetaEl = document.getElementById('nextMeta');
+    const nextCardEl = document.querySelector('.card.next');
+    const countLabelEl = document.getElementById('countLabel');
+    const timeLabelEl = document.getElementById('timeLabel');
+    const markerSelectEl = document.getElementById('markerSelect');
+    const gotoBtn = document.getElementById('gotoBtn');
+    const goBtn = document.getElementById('goBtn');
+    const previewBtn = document.getElementById('previewBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const pauseToggleBtn = document.getElementById('pauseToggleBtn');
+    const transportButtons = [...document.querySelectorAll('button[data-action]')];
+
+    let busy = false;
+    let markers = [];
+    let markerSignature = '';
+    let currentIndex = -1;
+    let nextIndex = 0;
+    let nextWasManuallySelected = false;
+    let selectedMarkerIndex = null;
+    let markerSelectIsOpen = false;
+    let arrangementReturnActive = false;
+    let pendingGotoIndex = null;
+    let manualNextIndex = null;
+
+    function setStatus(text, connected) {
+      statusEl.textContent = text;
+      statusEl.classList.toggle('connected', connected);
+      statusEl.classList.toggle('disconnected', !connected);
+    }
+
+    async function fetchJSON(url, options = {}, timeoutMs = 2500) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(url, {...options, cache:'no-store', signal:controller.signal});
+        let data = null;
+        try { data = await res.json(); } catch (_) {}
+        if (!res.ok) throw new Error((data && data.message) || 'Erreur serveur');
+        return data;
+      } finally { clearTimeout(timeout); }
+    }
+
+    function cleanTitle(value) {
+      const raw = value && value !== '—' ? String(value).trim() : '';
+      if (!raw) return '—';
+      return raw.split(';')[0].trim() || raw;
+    }
+
+    function markerLabel(marker) {
+  if (!marker) return '—';
+  return cleanTitle(marker.name || 'Repère');
+}
+
+    function clampIndexes() {
+      if (!markers.length) { currentIndex = -1; nextIndex = -1; return; }
+      if (currentIndex >= markers.length) currentIndex = markers.length - 1;
+      if (nextIndex < 0) nextIndex = 0;
+      if (nextIndex >= markers.length) nextIndex = markers.length - 1;
+    }
+
+    function renderConduite() {
+  clampIndexes();
+
+  const current = currentIndex >= 0 ? markers[currentIndex] : null;
+
+  const displayNextIndex = manualNextIndex !== null
+    ? manualNextIndex
+    : (selectedMarkerIndex !== null ? selectedMarkerIndex : nextIndex);
+
+  const next = displayNextIndex >= 0 ? markers[displayNextIndex] : null;
+
+  currentNameEl.textContent = current
+    ? cleanTitle(current.name || 'Repère')
+    : '—';
+
+  nextNameEl.textContent = next
+    ? cleanTitle(next.name || 'Repère')
+    : '—';
+
+  // Plus aucune info secondaire sous les titres
+  currentMetaEl.textContent = '';
+  nextMetaEl.textContent = '';
+
+  // Plus de timecode / compteur de repères affiché
+  countLabelEl.textContent = '';
+  timeLabelEl.textContent = '';
+
+  if (!markerSelectIsOpen && markerSelectEl && markers[displayNextIndex] && pendingGotoIndex === null) {
+    markerSelectEl.value = String(displayNextIndex);
+  }
+
+  goBtn.disabled = busy || !next;
+  previewBtn.disabled = busy || !next || displayNextIndex <= 0;
+  nextBtn.disabled = busy || !next || displayNextIndex >= markers.length - 1;
+  gotoBtn.disabled = busy || !markers.length;
+    }
+
+    function findIndexFromState(state) {
+      if (!markers.length || !state) return -1;
+      const name = String(state.arrangement_marker || '').trim();
+      if (name && name !== '—') {
+        const byName = markers.findIndex(m => String(m.name || '').trim() === name);
+        if (byName >= 0) return byName;
+      }
+      const t = Number(state.arrangement_time || 0);
+      let idx = -1;
+      markers.forEach((m, i) => { if (Number(m.time || 0) <= t + 0.25) idx = i; });
+      return idx;
+    }
+
+    function setMarkers(newMarkers, state) {
+      const clean = Array.isArray(newMarkers) ? newMarkers : [];
+      const signature = JSON.stringify(clean);
+
+      if (signature !== markerSignature) {
+        markerSignature = signature;
+        markers = clean;
+        const previousSelectValue = markerSelectEl.value;
+        markerSelectEl.innerHTML = '';
+
+        markers.forEach((marker, index) => {
+          const option = document.createElement('option');
+          option.value = String(index);
+          option.textContent = markerLabel(marker);
+          markerSelectEl.appendChild(option);
+        });
+
+        if (pendingGotoIndex !== null && markers[pendingGotoIndex]) {
+          markerSelectEl.value = String(pendingGotoIndex);
+        } else if (markerSelectIsOpen && previousSelectValue !== '' && markers[Number(previousSelectValue)]) {
+          markerSelectEl.value = previousSelectValue;
+        }
+
+        if (selectedMarkerIndex !== null && selectedMarkerIndex >= markers.length) {
+        selectedMarkerIndex = null;
+        nextWasManuallySelected = false;}
+        if (pendingGotoIndex !== null && pendingGotoIndex >= markers.length) {
+          pendingGotoIndex = null;
+        }
+        if (manualNextIndex !== null && manualNextIndex >= markers.length) {
+          manualNextIndex = null;
+        }
+      }
+
+      const detected = findIndexFromState(state);
+      if (detected >= 0) {
+        currentIndex = detected;
+      }
+
+      if (!markers.length) {
+        currentIndex = -1;
+        nextIndex = -1;
+        return;
+      }
+
+      // Ne pas écraser une sélection manuelle faite dans la liste déroulante.
+      // On ne recalcule automatiquement la prochaine scène que si aucune
+      // sélection manuelle n'est active.
+      if (manualNextIndex !== null) {
+        selectedMarkerIndex = manualNextIndex;
+        nextIndex = manualNextIndex;
+        nextWasManuallySelected = true;
+      } else if (pendingGotoIndex === null && !nextWasManuallySelected && selectedMarkerIndex === null) {
+        nextIndex = currentIndex >= 0
+          ? Math.min(currentIndex + 1, markers.length - 1)
+          : 0;
+      } else if (selectedMarkerIndex !== null) {
+        nextIndex = selectedMarkerIndex;
+      }
+
+      clampIndexes();
+    }
+
+    function advanceNextWhenPlayheadPassed(state) {
+      if (!markers.length || !state) return;
+      if (markerSelectIsOpen || pendingGotoIndex !== null || manualNextIndex !== null || nextWasManuallySelected) return;
+
+      const playheadTime = Number(state.arrangement_time || 0);
+      if (!Number.isFinite(playheadTime)) return;
+
+      let displayNextIndex = selectedMarkerIndex !== null ? selectedMarkerIndex : nextIndex;
+      if (displayNextIndex < 0 || displayNextIndex >= markers.length) return;
+
+      let advanced = false;
+      const tolerance = 0.20;
+
+      while (
+        displayNextIndex < markers.length - 1 &&
+        Number(markers[displayNextIndex] && markers[displayNextIndex].time || 0) <= playheadTime + tolerance
+      ) {
+        displayNextIndex += 1;
+        advanced = true;
+      }
+
+      if (!advanced) return;
+
+      selectedMarkerIndex = displayNextIndex;
+      nextIndex = displayNextIndex;
+      nextWasManuallySelected = true;
+      renderConduite();
+    }
+
+    // Helper: Preview/select a marker for "Aller à" without transport action
+    function previewSelectedMarker(idx, animate = false, commit = true) {
+      const marker = markers[idx];
+      if (!marker) return;
+
+      if (commit) {
+        selectedMarkerIndex = idx;
+        nextIndex = idx;
+        nextWasManuallySelected = true;
+      }
+
+      nextNameEl.textContent = cleanTitle(marker.name || 'Repère');
+      nextMetaEl.textContent = '';
+      countLabelEl.textContent = '';
+
+      if (animate && nextCardEl) {
+        nextCardEl.classList.add('is-prepared');
+        nextCardEl.classList.remove('next-selected');
+        void nextCardEl.offsetWidth;
+        nextCardEl.classList.add('next-selected');
+      }
+
+      setStatus('● Sélection prête : ' + cleanTitle(marker.name || 'Repère'), true);
+    }
+
+    function applyStatus(state) {
+      const connected = Boolean(state && state.connected);
+      const arrangementMode = Boolean(state && state.play_mode === 'arrangement');
+      if (arrangementMode) arrangementReturnActive = true;
+      const playing = Boolean(state && state.is_playing && arrangementMode);
+      const paused = Boolean(state && state.is_paused && arrangementMode && !state.is_playing);
+      const returnedArrangementPlaying = Boolean(playing);
+
+      document.body.classList.toggle('is-arrangement-playing', returnedArrangementPlaying);
+      document.body.classList.toggle('is-arrangement-paused', arrangementReturnActive && paused);
+      if (currentCardEl) {
+        currentCardEl.classList.toggle('is-playing', returnedArrangementPlaying);
+        currentCardEl.classList.toggle('is-paused', arrangementReturnActive && paused);
+      }
+
+      const modeLabel = document.getElementById('currentModeLabel');
+      if (modeLabel) {
+        modeLabel.textContent = returnedArrangementPlaying
+          ? 'LECTURE ARRANGEMENT'
+          : (arrangementReturnActive && paused ? 'ARRANGEMENT EN PAUSE' : 'ARRANGEMENT ARRÊTÉ');
+      }
+      const arrangementBtn = document.querySelector('button[data-action="back_to_arrangement"]');
+      if (arrangementBtn) {
+        arrangementBtn.classList.toggle('arrangement-active', arrangementReturnActive);
+        arrangementBtn.textContent = arrangementReturnActive ? 'ARRANGEMENT ACTIF' : 'MODE SESSION';
+        arrangementBtn.title = arrangementReturnActive
+          ? 'Arrangement actif : le bouton GO lance les scènes/repères Arrangement.'
+          : 'Mode Session : appuyer ici pour revenir à la lecture Arrangement.';
+      }
+
+      if (pauseToggleBtn) {
+        pauseToggleBtn.textContent = playing ? '⏸ PAUSE' : '▶ LECTURE';
+        pauseToggleBtn.classList.toggle('transport-paused', paused);
+      }
+
+      setStatus((connected ? '● ' : '○ ') + ((state && state.message) || (connected ? 'Connecté' : 'Interface non connectée')), connected);
+      timeLabelEl.textContent = (state && state.arrangement_time_label) || '00:00';
+      setMarkers(state && state.arrangement_markers, state);
+      advanceNextWhenPlayheadPassed(state);
+      // Debug block removed
+      renderConduite();
+    }
+
+    async function update() {
+      if (busy) return;
+      try { applyStatus(await fetchJSON('/status', {}, 1800)); }
+      catch (_) { setStatus('○ Interface non connectée', false); }
+    }
+
+    function setDisabled(value) {
+      busy = value;
+      [...transportButtons, goBtn, previewBtn, nextBtn, gotoBtn]
+      .forEach(b => { if (b) b.disabled = value; });
+      if (!value) renderConduite();
+    }
+
+    async function sendAction(payload) {
+  if (busy) return;
+
+  const action = payload && payload.action;
+  if (action === 'back_to_arrangement') arrangementReturnActive = true;
+  if (action === 'arrangement_play_marker') arrangementReturnActive = true;
+  if (action === 'arrangement_toggle') arrangementReturnActive = true;
+
+  setDisabled(true);
+  try {
+    let data = null;
+
+    if (action === 'arrangement_toggle') {
+      await fetchJSON('/action', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({action:'back_to_arrangement'})
+      }, 2200);
+    }
+
+    data = await fetchJSON('/action', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload)
+    }, 2200);
+
+    if (data && data.state) applyStatus(data.state); else await update();
+  } catch (_) {
+    setStatus('○ Commande Arrangement impossible', false);
+  } finally {
+    setTimeout(() => { setDisabled(false); update(); }, 180);
+  }
+}
+
+    function payloadFor(marker, action) {
+      return {action, time:marker.time, name:marker.name, source:marker.source, cue_index:marker.cue_index};
+    }
+
+goBtn.addEventListener('click', async () => {
+  if (busy) return;
+
+  let launchIndex = manualNextIndex !== null ? manualNextIndex : selectedMarkerIndex;
+
+  if (launchIndex === null || typeof launchIndex === 'undefined') {
+    launchIndex = Number(markerSelectEl && markerSelectEl.value);
+  }
+
+  if (Number.isNaN(launchIndex) || launchIndex < 0 || launchIndex >= markers.length) {
+    launchIndex = nextIndex;
+  }
+
+  const marker = markers[launchIndex];
+  if (!marker) return;
+
+  arrangementReturnActive = true;
+  if (nextCardEl) nextCardEl.classList.remove('is-prepared', 'next-selected');
+  setDisabled(true);
+  pendingGotoIndex = null;
+  manualNextIndex = null;
+
+  try {
+    await fetchJSON('/action', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({action: 'back_to_arrangement'})
+    }, 2200);
+
+    await fetchJSON('/action', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payloadFor(marker, 'arrangement_play_marker'))
+    }, 2200);
+
+    currentIndex = launchIndex;
+    nextIndex = Math.min(launchIndex + 1, markers.length - 1);
+    selectedMarkerIndex = null;
+    manualNextIndex = null;
+    nextWasManuallySelected = false;
+    await update();
+    renderConduite();
+  } catch (_) {
+    if (nextCardEl) nextCardEl.classList.add('is-prepared');
+    setStatus('○ GO Arrangement impossible', false);
+  } finally {
+    setTimeout(() => { setDisabled(false); update(); }, 180);
+  }
+});
+
+    previewBtn.addEventListener('click', () => {
+      if (!markers.length) return;
+      const baseIndex = selectedMarkerIndex !== null ? selectedMarkerIndex : nextIndex;
+      const idx = Math.max(baseIndex - 1, 0);
+      markerSelectIsOpen = false;
+      pendingGotoIndex = null;
+      manualNextIndex = idx;
+      previewSelectedMarker(idx, true, true);
+    });
+
+    nextBtn.addEventListener('click', () => {
+      if (!markers.length) return;
+      const baseIndex = selectedMarkerIndex !== null ? selectedMarkerIndex : nextIndex;
+      const idx = Math.min(baseIndex + 1, markers.length - 1);
+      pendingGotoIndex = null;
+      manualNextIndex = idx;
+      previewSelectedMarker(idx, true, true);
+    });
+
+      markerSelectEl.addEventListener('focus', () => {
+      markerSelectIsOpen = true;
+});
+
+      markerSelectEl.addEventListener('blur', () => {
+      markerSelectIsOpen = false;
+      renderConduite();
+});
+    
+markerSelectEl.addEventListener('change', () => {
+  const idx = Number(markerSelectEl.value || 0);
+  markerSelectIsOpen = false;
+  if (!markers[idx]) return;
+  pendingGotoIndex = idx;
+  manualNextIndex = null;
+  nextWasManuallySelected = false;
+  nextNameEl.textContent = cleanTitle(markers[idx].name || 'Repère');
+  nextMetaEl.textContent = '';
+  countLabelEl.textContent = '';
+  if (nextCardEl) nextCardEl.classList.add('is-prepared');
+  setStatus('● Choix prêt — appuie sur Aller : ' + cleanTitle(markers[idx].name || 'Repère'), true);
+});
+
+    markerSelectEl.addEventListener('input', () => {
+      const idx = Number(markerSelectEl.value || 0);
+      if (!markers[idx]) return;
+      pendingGotoIndex = idx;
+      manualNextIndex = null;
+      nextWasManuallySelected = false;
+      nextNameEl.textContent = cleanTitle(markers[idx].name || 'Repère');
+      nextMetaEl.textContent = '';
+      countLabelEl.textContent = '';
+      if (nextCardEl) nextCardEl.classList.add('is-prepared');
+      setStatus('● Choix prêt — appuie sur Aller : ' + cleanTitle(markers[idx].name || 'Repère'), true);
+    });
+
+    gotoBtn.addEventListener('click', () => {
+      const idx = pendingGotoIndex !== null ? pendingGotoIndex : Number(markerSelectEl.value || 0);
+      if (!markers[idx]) return;
+      pendingGotoIndex = null;
+      manualNextIndex = idx;
+      selectedMarkerIndex = idx;
+      nextIndex = idx;
+      nextWasManuallySelected = true;
+      previewSelectedMarker(idx, true, true);
+    });
+
+    transportButtons.forEach(button => button.addEventListener('click', () => sendAction({action:button.dataset.action})));
+
+    renderConduite();
+    update();
+    window.addEventListener('DOMContentLoaded', () => {
+      window.CLRemoteEnergy.startPolling(
+        update,
+        () => document.body.classList.contains('is-arrangement-playing'),
+        { activeMs: 850, idleMs: 2500, hiddenMs: 15000 }
+      );
+    }, { once: true });
+  </script>
+</body>
+</html>

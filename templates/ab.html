@@ -1,0 +1,2164 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Ableton Web Remote - A/B</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#050505">
+  <style>
+    :root {
+      --bg: #050505;
+      --panel: #0b0b0b;
+      --text: #ffffff;
+      --border: rgba(255,255,255,0.12);
+      --session: #7CFF00;
+      --prev: #C86BFF;
+      --next: #FFB000;
+      --stop: #FF2B2B;
+    }
+    * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+    html, body {
+      margin:0;
+      min-height:100%;
+      background:var(--bg);
+      color:var(--text);
+      font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      overflow-x:hidden;
+    }
+    body {
+      min-height:100vh;
+      min-height:100dvh;
+      display:flex;
+      flex-direction:column;
+      padding:calc(env(safe-area-inset-top) + 6px) 8px calc(env(safe-area-inset-bottom) + 110px);
+    }
+    .wrap {
+      width:100%;
+      max-width:390px;
+      min-height:calc(100vh - 14px);
+      min-height:calc(100dvh - 14px);
+      margin:0 auto;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .status {
+      height:18px;
+      line-height:18px;
+      text-align:center;
+      color:var(--text);
+      font-size:12px;
+      font-weight:800;
+      border-bottom:1px solid var(--border);
+      user-select:none;
+    }
+
+    .status.connected { color: var(--session); }
+    .status.disconnected { color: var(--stop); }
+
+    .topnav {
+      display:grid;
+      grid-template-columns:1fr 1fr 1fr;
+      gap:6px;
+      user-select:none;
+    }
+
+    .topnav a {
+      text-align:center;
+      color:var(--text);
+      text-decoration:none;
+      font-weight:900;
+      font-size:11px;
+      letter-spacing:.06em;
+      text-transform:uppercase;
+      background:rgba(255,255,255,.045);
+      border:1px solid rgba(255,255,255,.12);
+      border-radius:10px;
+      padding:7px 4px;
+      box-shadow:inset 0 0 12px rgba(255,255,255,.025);
+    }
+
+    .topnav a.active {
+      color:var(--session);
+      border-color:rgba(124,255,0,.38);
+      box-shadow:0 0 12px rgba(124,255,0,.12), inset 0 0 14px rgba(124,255,0,.04);
+    }
+
+
+    .deck-screen {
+      flex: 0 1 auto;
+      min-height: 0;
+      border: 1px solid rgba(124,255,0,0.28);
+      box-shadow: 0 0 22px rgba(124,255,0,0.10), inset 0 0 34px rgba(124,255,0,0.035);
+    }
+
+    .screen-topline {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      color:#9ca3af;
+      font-size:10px;
+      font-weight:900;
+      letter-spacing:.12em;
+      text-transform:uppercase;
+    }
+
+    .screen-pill {
+      border:1px solid rgba(124,255,0,.38);
+      color:var(--session);
+      border-radius:999px;
+      padding:4px 8px;
+      box-shadow:0 0 10px rgba(124,255,0,.12);
+    }
+
+    .display-stack {
+      flex:1;
+      display:flex;
+      flex-direction:column;
+      align-items:stretch;
+      justify-content:center;
+      gap:10px;
+    }
+
+    .title-box {
+      border-radius:14px;
+      padding:12px 10px;
+      background:rgba(255,255,255,0.025);
+    }
+
+    .title-box-current {
+      border:2px solid rgba(255,149,0,.78);
+      box-shadow:0 0 16px rgba(255,149,0,.18), inset 0 0 14px rgba(255,149,0,.045);
+    }
+
+    .title-box-current.is-playing {
+      border-color:rgba(255,149,0,1);
+      box-shadow:0 0 28px rgba(255,149,0,.45), inset 0 0 20px rgba(255,149,0,.10);
+    }
+
+    .title-box-next {
+      border:2px solid rgba(66,165,245,.86);
+      box-shadow:0 0 16px rgba(66,165,245,.22), inset 0 0 14px rgba(66,165,245,.05);
+    }
+    .card {
+      background: var(--panel);
+      border:1px solid var(--border);
+      border-radius:16px;
+      padding:12px 12px;
+      text-align:center;
+      box-shadow: 0 0 12px rgba(255,255,255,0.05);
+      background: linear-gradient(180deg,#0b0b0b 0%,#050505 100%);
+      display:flex;
+      flex-direction: column;
+      justify-content: center;
+      gap:12px;
+      user-select:none;
+    }
+    .now-label {
+      font-size:11px;
+      font-weight:900;
+      letter-spacing:0.12em;
+      text-transform:uppercase;
+      opacity:0.75;
+      color:#9ca3af;
+      user-select:none;
+    }
+    .now-title {
+      font-size: clamp(22px, 7.2vw, 42px);
+      font-weight: 900;
+      line-height: 1.05;
+      color: var(--text);
+      word-break: break-word;
+      min-height: 1em;
+      user-select:text;
+      text-shadow: 0 0 18px rgba(255,255,255,0.18);
+    }
+    .arrow {
+      font-size: 26px;
+      line-height: 1;
+      color: var(--session);
+      text-shadow: 0 0 12px rgba(124,255,0,0.45);
+      user-select:none;
+    }
+    .next-title {
+      font-size: clamp(17px, 5.2vw, 28px);
+      font-weight: 800;
+      color: #d1d5db;
+      opacity: 1;
+      min-height: 1em;
+      user-select:text;
+    }
+    .counter {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--session);
+      opacity: 0.7;
+      user-select:none;
+      margin-top: auto;
+    }
+    .buttons-row {
+      display: grid;
+      grid-template-columns: 1fr 1.35fr 1fr;
+      gap: 8px;
+      user-select:none;
+      align-items:stretch;
+    }
+    .buttons-dock {
+      position:fixed;
+      left:8px;
+      right:8px;
+      bottom:calc(env(safe-area-inset-bottom) + 8px);
+      z-index:120;
+      max-width:430px;
+      margin-left:auto;
+      margin-right:auto;
+      background:rgba(11,11,11,.90);
+      border:1px solid rgba(255,255,255,.10);
+      border-radius:18px;
+      padding:8px;
+      backdrop-filter:blur(14px);
+      -webkit-backdrop-filter:blur(14px);
+      box-shadow:0 0 24px rgba(0,0,0,.45);
+    }
+    .button {
+      border: 1.5px solid transparent;
+      border-radius: 16px;
+      color: var(--text);
+      font-weight: 900;
+      font-size: 18px;
+      cursor: pointer;
+      user-select:none;
+      touch-action: manipulation;
+      transition: box-shadow 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 56px;
+      flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .button:disabled {
+      opacity: 0.5;
+      cursor: default;
+      box-shadow: none !important;
+    }
+    .button-a {
+      background-color: #2563EB;
+      flex: 1.2;
+      border-color: #60A5FA;
+      box-shadow: 0 0 10px rgba(96,165,250,.45);
+    }
+    .button-center {
+      background-color: #374151;
+      flex: 0.9;
+      border-color: #9CA3AF;
+      box-shadow: 0 0 8px rgba(156,163,175,.28);
+    }
+    .button-b {
+      background-color: #DC2626;
+      flex: 1.2;
+      border-color: #F87171;
+      box-shadow: 0 0 10px rgba(248,113,113,.45);
+    }
+
+    .selector-pad {
+      flex: 1.8;
+      min-width: 0;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      align-items:stretch;
+      justify-content:center;
+    }
+
+    .scene-select {
+      width:100%;
+      min-height:38px;
+      border-radius:12px;
+      border:1px solid rgba(124,255,0,.28);
+      background:#050505;
+      color:#ffffff;
+      font-size:13px;
+      font-weight:850;
+      padding:0 8px;
+      outline:none;
+      box-shadow:inset 0 0 12px rgba(124,255,0,.045);
+    }
+    .scene-select-panel {
+      background:linear-gradient(180deg,#0b0b0b 0%,#050505 100%);
+      border:1px solid rgba(124,255,0,.20);
+      border-radius:14px;
+      padding:8px 10px;
+      box-shadow:0 0 12px rgba(124,255,0,.06), inset 0 0 12px rgba(124,255,0,.025);
+    }
+
+    .scene-select-panel .scene-select {
+      min-height:44px;
+      font-size:14px;
+    }
+
+    .knob-button {
+    min-height:56px;
+    min-width:0;
+    width:100%;
+    border-radius:18px;
+    border:2px solid rgba(34,197,94,.92);
+    background:linear-gradient(180deg, #166534 0%, #052e16 100%);
+    color:#ffffff;
+    font-size:22px;
+    font-weight:1000;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    box-shadow:0 0 26px rgba(34,197,94,.42), inset 0 0 18px rgba(255,255,255,.08);
+    cursor:pointer;
+    touch-action:manipulation;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+}
+
+    .knob-button:active {
+      transform:scale(.97);
+      filter:brightness(1.18);
+    }
+    .button:active {
+      filter: brightness(1.15);
+      transform: scale(0.97);
+    }
+    /* Crossfader styles */
+    .crossfader-section {
+      position:relative;
+      width:100%;
+      margin:8px 0 0 0;
+      background:rgba(11,11,11,.82);
+      border:1px solid var(--border);
+      border-radius:16px;
+      padding:10px 12px;
+      user-select:none;
+      backdrop-filter:blur(14px);
+      -webkit-backdrop-filter:blur(14px);
+      box-shadow:0 0 22px rgba(0,0,0,.35), 0 0 14px rgba(255,255,255,.05);
+    }
+    .crossfader-label {
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--text);
+      opacity: 0.6;
+      margin-bottom: 3px;
+      user-select:none;
+    }
+    .crossfader-position {
+      font-size: clamp(18px, 5vw, 28px);
+      font-weight: 1000;
+      color: var(--text);
+      text-align: center;
+      user-select:none;
+    }
+    .slider-panel {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 18px;
+      padding: 8px 10px;
+      margin-top: 6px;
+    }
+    input[type="range"] {
+      width: 100%;
+      height: 34px;
+      appearance: none;
+      -webkit-appearance: none;
+      background: transparent;
+      cursor: pointer;
+      touch-action: pan-y;
+    }
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 10px;
+      border-radius: 999px;
+      background: linear-gradient(90deg, var(--prev) 0%, #757575 50%, var(--next) 100%);
+      border: 1px solid rgba(255,255,255,0.18);
+      box-shadow: inset 0 2px 6px rgba(0,0,0,0.38), 0 0 14px rgba(255,255,255,0.06);
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 30px;
+      height: 30px;
+      margin-top: -10px;
+      border-radius: 50%;
+      background: linear-gradient(180deg,#f8fafc 0%,#9ca3af 100%);
+      border: 3px solid rgba(255,255,255,0.92);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.48), 0 0 0 5px rgba(255,255,255,0.08);
+    }
+    input[type="range"]:active::-webkit-slider-thumb {
+      transform: scale(1.08);
+      box-shadow: 0 8px 22px rgba(0,0,0,0.55), 0 0 0 7px rgba(255,255,255,0.12);
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 900;
+      margin-top: 4px;
+      user-select:none;
+    }
+
+    .ltc-panel {
+      background: linear-gradient(180deg,#0b0b0b 0%,#050505 100%);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 16px;
+      padding: 10px 12px;
+      text-align:center;
+      box-shadow: 0 0 14px rgba(124,255,0,0.08), inset 0 0 18px rgba(124,255,0,0.025);
+      user-select:none;
+      width:min(100%, 360px);
+      margin-left:auto;
+      margin-right:auto;
+    }
+
+    .ltc-label {
+      color:#9ca3af;
+      font-size:10px;
+      font-weight:900;
+      letter-spacing:.14em;
+      text-transform:uppercase;
+      margin-bottom:4px;
+    }
+
+    .ltc-timecode {
+      color:var(--session);
+      font-family:"SF Mono", Menlo, Monaco, Consolas, monospace;
+      font-size:clamp(20px, 6vw, 36px);
+      font-weight:1000;
+      letter-spacing:.04em;
+      line-height:1;
+      text-shadow:0 0 14px rgba(124,255,0,.28);
+    }
+    .ltc-timecode[data-live="1"] {
+      color:#7CFF00;
+      text-shadow:0 0 18px rgba(124,255,0,.55);
+    }
+
+    .ltc-timecode[data-live="0"] {
+      color:#6b7280;
+      text-shadow:none;
+    }
+    .small {
+      color: var(--text);
+      font-size: 10px;
+      line-height: 1.2;
+      text-align: center;
+      margin-top: 4px;
+      margin-bottom: 0;
+      user-select:none;
+    }
+    @media (orientation:portrait) and (max-width:430px) {
+      .wrap { justify-content:flex-start; }
+      .buttons-row { gap: 6px; }
+      .button {
+        min-height: 60px;
+        font-size: 16px;
+      }
+      .button-go {
+        flex: 2;
+      }
+      .button-prev, .button-next {
+        flex: 1;
+      }
+      .button-stop {
+        min-height: 60px;
+        font-size: 18px;
+        margin-top: 6px;
+      }
+      .now-title {
+        font-size: clamp(26px, 9vw, 50px);
+      }
+      .arrow {
+        font-size: 36px;
+      }
+      .next-title {
+        font-size: clamp(20px, 7vw, 32px);
+      }
+    }
+    @media (orientation:landscape) {
+      body {
+        padding: calc(env(safe-area-inset-top) + 8px) calc(env(safe-area-inset-right) + 10px) calc(env(safe-area-inset-bottom) + 90px) calc(env(safe-area-inset-left) + 10px);
+      }
+      .wrap {
+        max-width: 900px;
+        gap: 5px;
+      }
+      .buttons-row {
+        gap: 10px;
+      }
+      .button {
+        min-height: 34px;
+        font-size: 15px;
+        border-radius: 10px;
+      }
+      .button-go {
+        flex: 2;
+      }
+      .button-prev, .button-next {
+        flex: 1;
+      }
+      .button-stop {
+        min-height: 34px;
+        font-size: 16px;
+        margin-top: 6px;
+        border-radius: 10px;
+      }
+      .now-title {
+        font-size: clamp(22px, 4.5vw, 36px);
+      }
+      .arrow {
+        font-size: 24px;
+      }
+      .next-title {
+        font-size: clamp(16px, 3.2vw, 24px);
+      }
+      .crossfader-section {
+        width:100%;
+        max-width:none;
+        margin-top:6px;
+      }
+      .buttons-dock {
+        left:calc(env(safe-area-inset-left) + 10px);
+        right:calc(env(safe-area-inset-right) + 10px);
+        max-width:900px;
+      }
+      .small {
+        display: none;
+      }
+    }
+
+    /* AB final compact layout — single source of truth */
+    body {
+      padding: 0 8px 4px 8px !important;
+      overflow: hidden !important;
+    }
+
+    .wrap {
+      width: 100% !important;
+      max-width: 312px !important;
+      min-height: 0 !important;
+      height: auto !important;
+      margin: 0 auto !important;
+      display: flex !important;
+      flex-direction: column !important;
+      justify-content: flex-start !important;
+      gap: 3px !important;
+      overflow: hidden !important;
+    }
+
+    .status {
+      height: 9px !important;
+      line-height: 9px !important;
+      font-size: 6px !important;
+      font-weight: 800 !important;
+      border-bottom: 0 !important;
+      opacity: .58 !important;
+    }
+
+    .topnav {
+      display: grid !important;
+      grid-template-columns: 1fr 1fr 1fr !important;
+      gap: 3px !important;
+    }
+
+    .topnav a {
+      font-size: 7px !important;
+      line-height: 1 !important;
+      padding: 2px 2px !important;
+      border-radius: 6px !important;
+      letter-spacing: .035em !important;
+    }
+
+    .card,
+    .deck-screen,
+    .ltc-panel,
+    .scene-select-panel,
+    .crossfader-section,
+    .buttons-dock {
+      width: 100% !important;
+      max-width: 312px !important;
+      overflow: hidden !important;
+    }
+
+    .card.deck-screen {
+      flex: 0 0 auto !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      padding: 4px 6px !important;
+      gap: 1px !important;
+      border-radius: 9px !important;
+    }
+
+    .screen-topline,
+    .screen-pill,
+    .counter,
+    .small {
+      display: none !important;
+    }
+
+    .display-stack {
+      display: flex !important;
+      flex-direction: column !important;
+      gap: 2px !important;
+      justify-content: flex-start !important;
+    }
+
+    .title-box {
+      width: 100% !important;
+      max-width: 296px !important;
+      margin: 0 auto !important;
+      padding: 10px 8px !important;
+      border-radius: 7px !important;
+      background: rgba(255,255,255,0.022) !important;
+    }
+
+    .title-box-current,
+    .title-box-next {
+      border-width: 1px !important;
+    }
+
+    .now-label {
+      font-size: 6px !important;
+      font-weight: 800 !important;
+      letter-spacing: .075em !important;
+      line-height: 1 !important;
+      margin: 0 0 1px 0 !important;
+      opacity: .62 !important;
+    }
+
+    .now-title {
+      font-size: clamp(16px, 4.8vw, 22px) !important;
+      font-weight: 850 !important;
+      letter-spacing: .005em !important;
+      line-height: .93 !important;
+      min-height: 0 !important;
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      word-break: normal !important;
+    }
+
+    .arrow {
+      font-size: 8px !important;
+      line-height: .7 !important;
+      margin: -1px 0 !important;
+    }
+
+    .next-title {
+      font-size: clamp(12px, 3.7vw, 17px) !important;
+      font-weight: 780 !important;
+      letter-spacing: .005em !important;
+      line-height: .93 !important;
+      min-height: 0 !important;
+      color: rgba(248,250,252,.84) !important;
+      white-space: nowrap !important;
+      overflow: hidden !important;
+      text-overflow: ellipsis !important;
+      word-break: normal !important;
+    }
+
+    .ltc-panel {
+      margin: 1px auto 0 auto !important;
+      padding: 2px 6px !important;
+      border-radius: 8px !important;
+    }
+
+    .ltc-label {
+      font-size: 5px !important;
+      line-height: 1 !important;
+      margin: 0 !important;
+      opacity: .5 !important;
+    }
+
+    .ltc-timecode {
+      font-size: clamp(10px, 3vw, 14px) !important;
+      line-height: .9 !important;
+    }
+
+    .scene-select-panel {
+      padding: 2px 5px !important;
+      border-radius: 8px !important;
+    }
+
+    .scene-select,
+    .scene-select-panel .scene-select {
+      min-height: 20px !important;
+      height: 20px !important;
+      font-size: 8px !important;
+      border-radius: 6px !important;
+      padding: 0 5px !important;
+    }
+
+    .crossfader-section {
+      margin: 2px auto 0 auto !important;
+      padding: 10px 8px !important;
+      border-radius: 8px !important;
+    }
+
+    .crossfader-label {
+      font-size: 5px !important;
+      line-height: 1 !important;
+      margin: 0 0 1px 0 !important;
+      opacity: .5 !important;
+    }
+
+    .crossfader-position {
+      font-size: clamp(11px, 3.3vw, 16px) !important;
+      line-height: .95 !important;
+    }
+
+    .slider-panel {
+      margin-top: 1px !important;
+      padding: 1px 5px !important;
+      border-radius: 8px !important;
+    }
+
+    input[type="range"] {
+      height: 16px !important;
+    }
+
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 5px !important;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      width: 15px !important;
+      height: 15px !important;
+      margin-top: -6px !important;
+      border-width: 2px !important;
+    }
+
+    .row {
+      font-size: 6px !important;
+      line-height: 1 !important;
+      margin-top: 0 !important;
+      opacity: .55 !important;
+    }
+
+    .buttons-dock {
+      position: static !important;
+      left: auto !important;
+      right: auto !important;
+      bottom: auto !important;
+      margin: 3px auto 0 auto !important;
+      padding: 3px !important;
+      border-radius: 9px !important;
+      display: block !important;
+      z-index: auto !important;
+      background: rgba(11,11,11,.82) !important;
+      border: 1px solid rgba(255,255,255,.10) !important;
+    }
+
+    .buttons-row {
+      gap: 5px !important;
+    }
+
+    .button,
+    .knob-button,
+    .button-a,
+    .button-b {
+      min-height: 30px !important;
+      height: 30px !important;
+      font-size: 10px !important;
+      line-height: 1 !important;
+      padding: 0 !important;
+      border-radius: 9px !important;
+    }
+
+    .knob-button {
+      font-size: 13px !important;
+      letter-spacing: .04em !important;
+    }
+
+  
+    /* AB page cleanup: logo and baseline are handled by remote_window.py */
+    .brand-banner,
+    .cl-audio-shell,
+    .status,
+    .small {
+      display: none !important;
+      height: 0 !important;
+      min-height: 0 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      border: 0 !important;
+      overflow: hidden !important;
+    }
+
+    body {
+      padding: 0 8px 0 8px !important;
+      overflow: hidden !important;
+    }
+
+    .wrap {
+      padding-top: 0 !important;
+      gap: 4px !important;
+      min-height: 0 !important;
+      height: auto !important;
+      justify-content: flex-start !important;
+    }
+
+    .topnav {
+      margin-top: 0 !important;
+    }
+
+    .card.deck-screen {
+      padding: 8px 7px !important;
+      gap: 4px !important;
+      border-radius: 10px !important;
+    }
+
+    .display-stack {
+      gap: 5px !important;
+    }
+
+    .title-box {
+      padding: 10px 8px !important;
+      border-radius: 10px !important;
+    }
+
+    .now-title {
+      font-size: clamp(19px, 5.6vw, 28px) !important;
+      line-height: 1 !important;
+      min-height: 1.05em !important;
+    }
+
+    .next-title {
+      font-size: clamp(15px, 4.4vw, 21px) !important;
+      line-height: 1 !important;
+      min-height: 1.05em !important;
+    }
+
+    .ltc-panel {
+      margin-top: 2px !important;
+    }
+
+    .crossfader-section {
+      margin: 2px auto 0 auto !important;
+      padding: 6px 8px !important;
+    }
+
+    .buttons-dock {
+      position: static !important;
+      left: auto !important;
+      right: auto !important;
+      bottom: auto !important;
+      margin: 4px auto 0 auto !important;
+      z-index: auto !important;
+      padding: 3px !important;
+      max-width: 312px !important;
+    }
+
+    .buttons-row {
+      gap: 5px !important;
+    }
+
+    .button,
+    .knob-button,
+    .button-a,
+    .button-b {
+      height: 30px !important;
+      min-height: 30px !important;
+      padding: 0 !important;
+      border-radius: 9px !important;
+    }
+ 
+    /* Hide internal AB page tabs; visible tabs are handled by remote_window.py */
+    .topnav {
+      display: none !important;
+      height: 0 !important;
+      min-height: 0 !important;
+      max-height: 0 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      border: 0 !important;
+      overflow: hidden !important;
+      visibility: hidden !important;
+    }
+
+    /* Repères visuels des titres — cadres colorés restaurés */
+    .title-box-current {
+      border: 2px solid #ff9f1a !important;
+      background: linear-gradient(180deg, rgba(255,159,26,.11), rgba(255,159,26,.035)) !important;
+      box-shadow: 0 0 14px rgba(255,159,26,.22), inset 0 0 12px rgba(255,159,26,.05) !important;
+    }
+
+    .title-box-current.is-playing {
+      border-color: #ffb13b !important;
+      box-shadow: 0 0 20px rgba(255,159,26,.36), inset 0 0 14px rgba(255,159,26,.08) !important;
+    }
+
+    .title-box-next {
+      border: 2px solid #42a5f5 !important;
+      background: linear-gradient(180deg, rgba(66,165,245,.105), rgba(66,165,245,.03)) !important;
+      box-shadow: 0 0 14px rgba(66,165,245,.22), inset 0 0 12px rgba(66,165,245,.05) !important;
+    }
+
+    /* XFAD légèrement plus compact, sans réduire la zone de contrôle utile */
+    .crossfader-section {
+      width: 90% !important;
+      max-width: 282px !important;
+      padding: 5px 7px !important;
+    }
+
+    .slider-panel {
+      padding: 0 5px !important;
+    }
+
+    input[type="range"] {
+      height: 14px !important;
+    }
+
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 4px !important;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      width: 13px !important;
+      height: 13px !important;
+      margin-top: -5px !important;
+    }
+
+    /* Hiérarchie typographique neutre : seul le titre en cours reste éclatant */
+    .status,
+    .status.connected,
+    .status.disconnected {
+      color: #c7cdd6 !important;
+      text-shadow: none !important;
+    }
+
+    .ltc-timecode,
+    .ltc-timecode[data-live="1"],
+    .ltc-timecode[data-live="0"] {
+      color: #c7cdd6 !important;
+      text-shadow: 0 0 10px rgba(199,205,214,.14) !important;
+    }
+
+    .next-title,
+    .scene-select,
+    .scene-select-panel .scene-select {
+      color: #b8c0cb !important;
+      text-shadow: none !important;
+    }
+
+    .now-title {
+      color: #ffffff !important;
+      text-shadow: 0 0 16px rgba(255,255,255,.28) !important;
+    }
+
+    /* Une seule fenêtre flottante pour la navigation, le contenu et les commandes */
+    body {
+      padding: 8px !important;
+      background: #05070b !important;
+    }
+
+    .wrap {
+      width: 100% !important;
+      max-width: 328px !important;
+      padding: 8px !important;
+      gap: 5px !important;
+      border: 1px solid rgba(255,255,255,.11) !important;
+      border-radius: 20px !important;
+      background: linear-gradient(180deg, rgba(18,21,27,.98), rgba(8,10,14,.98)) !important;
+      box-shadow: 0 18px 48px rgba(0,0,0,.48), inset 0 1px 0 rgba(255,255,255,.045) !important;
+      overflow: hidden !important;
+    }
+
+    .topnav {
+      display: grid !important;
+      visibility: visible !important;
+      grid-template-columns: repeat(3, 1fr) !important;
+      width: 100% !important;
+      height: auto !important;
+      min-height: 32px !important;
+      max-height: none !important;
+      margin: 0 0 3px 0 !important;
+      padding: 3px !important;
+      gap: 3px !important;
+      border: 1px solid rgba(255,255,255,.09) !important;
+      border-radius: 11px !important;
+      background: rgba(0,0,0,.28) !important;
+      box-shadow: inset 0 1px 8px rgba(0,0,0,.28) !important;
+      overflow: visible !important;
+    }
+
+    .topnav a {
+      min-height: 26px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      padding: 0 4px !important;
+      border: 1px solid transparent !important;
+      border-radius: 8px !important;
+      background: transparent !important;
+      color: #9ca5b2 !important;
+      font-size: 8px !important;
+      font-weight: 800 !important;
+      letter-spacing: .075em !important;
+      box-shadow: none !important;
+      transition: color .16s ease, background .16s ease, border-color .16s ease !important;
+    }
+
+    .topnav a:hover {
+      color: #e5e7eb !important;
+      background: rgba(255,255,255,.055) !important;
+    }
+
+    .topnav a.active {
+      color: #ffffff !important;
+      border-color: rgba(255,159,26,.48) !important;
+      background: linear-gradient(180deg, rgba(255,159,26,.19), rgba(255,159,26,.08)) !important;
+      box-shadow: 0 0 12px rgba(255,159,26,.10), inset 0 1px 0 rgba(255,255,255,.055) !important;
+    }
+
+    .paradis-brand {
+      width: 100% !important;
+      min-height: 52px !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      padding: 3px 8px 5px !important;
+      border-bottom: 1px solid rgba(255,255,255,.075) !important;
+    }
+
+    .paradis-brand img {
+      display: block !important;
+      width: min(100%, 248px) !important;
+      height: auto !important;
+      max-height: 48px !important;
+      object-fit: contain !important;
+    }
+
+    .card,
+    .deck-screen,
+    .ltc-panel,
+    .scene-select-panel,
+    .crossfader-section,
+    .buttons-dock {
+      max-width: 100% !important;
+    }
+
+    .buttons-dock {
+      width: 100% !important;
+      margin: 3px 0 0 0 !important;
+      background: rgba(255,255,255,.035) !important;
+    }
+
+    .buttons-row {
+      grid-template-columns: .8fr 1.25fr 1fr .8fr !important;
+      gap: 4px !important;
+    }
+
+    .button-pause {
+      border-color: rgba(203,213,225,.48) !important;
+      background: linear-gradient(180deg, #475569 0%, #1e293b 100%) !important;
+      color: #f1f5f9 !important;
+      font-size: 8px !important;
+      letter-spacing: .035em !important;
+      box-shadow: 0 0 8px rgba(148,163,184,.16), inset 0 1px 0 rgba(255,255,255,.08) !important;
+    }
+
+    .button-pause.is-paused {
+      border-color: rgba(255,159,26,.62) !important;
+      background: linear-gradient(180deg, rgba(180,96,10,.96), rgba(92,45,5,.98)) !important;
+      color: #ffffff !important;
+      box-shadow: 0 0 10px rgba(255,159,26,.20), inset 0 1px 0 rgba(255,255,255,.10) !important;
+    }
+
+    /* Crossfader épuré : valeur centrale plus technique et plus lisible */
+    .crossfader-label {
+      display: none !important;
+    }
+
+    .crossfader-position {
+      color: #d8dee9 !important;
+      font-family: "SF Mono", "Roboto Mono", Menlo, Monaco, Consolas, monospace !important;
+      font-size: clamp(11px, 3.2vw, 15px) !important;
+      font-weight: 750 !important;
+      letter-spacing: .055em !important;
+      line-height: 1 !important;
+      text-shadow: 0 0 8px rgba(216,222,233,.12) !important;
+    }
+
+    /* Accent champagne : présence scénique sans effet blanc surexposé */
+    .now-title {
+      color: #f4d58d !important;
+      text-shadow: 0 0 14px rgba(244,213,141,.22) !important;
+    }
+
+    .next-title.is-prepared {
+      color: #72b7f2 !important;
+      text-shadow: 0 0 12px rgba(66,165,245,.22) !important;
+    }
+
+    .scene-select-panel {
+      padding: 4px !important;
+      border: 1px solid rgba(114,183,242,.42) !important;
+      border-radius: 10px !important;
+      background: linear-gradient(180deg, rgba(66,165,245,.075), rgba(5,7,11,.82)) !important;
+      box-shadow: 0 0 12px rgba(66,165,245,.10), inset 0 1px 0 rgba(255,255,255,.04) !important;
+    }
+
+    .scene-select,
+    .scene-select-panel .scene-select {
+      height: 24px !important;
+      min-height: 24px !important;
+      padding: 0 8px !important;
+      border: 1px solid rgba(203,213,225,.28) !important;
+      border-radius: 7px !important;
+      background: #090c11 !important;
+      color: #cbd5e1 !important;
+      font-size: 8px !important;
+      box-shadow: inset 0 0 10px rgba(0,0,0,.36) !important;
+    }
+
+    .scene-select:focus {
+      border-color: rgba(114,183,242,.78) !important;
+      box-shadow: 0 0 0 2px rgba(66,165,245,.13), inset 0 0 10px rgba(0,0,0,.30) !important;
+    }
+
+    .title-box-current .now-label {
+      color: rgba(244,213,141,.72) !important;
+      opacity: 1 !important;
+    }
+
+    .title-box-next .now-label {
+      color: rgba(114,183,242,.72) !important;
+      opacity: 1 !important;
+    }
+
+    .arrow {
+      color: #aab2be !important;
+      text-shadow: 0 0 8px rgba(170,178,190,.16) !important;
+    }
+
+    .transport-dock {
+      width: 100% !important;
+      padding: 5px !important;
+      border: 1px solid rgba(255,255,255,.10) !important;
+      border-radius: 11px !important;
+      background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(0,0,0,.18)) !important;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.035) !important;
+    }
+
+    .transport-row {
+      display: grid !important;
+      grid-template-columns: 1fr 1.18fr !important;
+      gap: 6px !important;
+    }
+
+    .transport-row .button-pause,
+    .transport-row .knob-button {
+      width: 100% !important;
+      height: 42px !important;
+      min-height: 42px !important;
+      border-radius: 10px !important;
+    }
+
+    .transport-row .button-pause {
+      font-size: 10px !important;
+    }
+
+    .transport-row .knob-button {
+      font-size: 17px !important;
+    }
+
+    .xfade-buttons {
+      grid-template-columns: 1fr 1fr !important;
+      gap: 7px !important;
+    }
+
+    .button-a {
+      background: linear-gradient(180deg, #42678e 0%, #29445f 100%) !important;
+      border-color: #7295b8 !important;
+      box-shadow: 0 0 8px rgba(87,132,174,.24), inset 0 1px 0 rgba(255,255,255,.08) !important;
+    }
+
+    .button-b {
+      background: linear-gradient(180deg, #8c4a56 0%, #5e3039 100%) !important;
+      border-color: #b66b77 !important;
+      box-shadow: 0 0 8px rgba(156,79,92,.22), inset 0 1px 0 rgba(255,255,255,.08) !important;
+    }
+
+    @keyframes current-title-live-pulse {
+      0%, 100% {
+        border-color: #ff9f1a;
+        background: linear-gradient(180deg, rgba(255,159,26,.10), rgba(255,159,26,.025));
+        box-shadow: 0 0 12px rgba(255,159,26,.24), inset 0 0 12px rgba(255,159,26,.05);
+      }
+      50% {
+        border-color: #ffd07a;
+        background: linear-gradient(180deg, rgba(255,159,26,.25), rgba(255,159,26,.075));
+        box-shadow: 0 0 34px rgba(255,159,26,.70), 0 0 11px rgba(255,208,122,.42), inset 0 0 22px rgba(255,159,26,.18);
+      }
+    }
+
+    .title-box-current.is-playing {
+      animation: current-title-live-pulse 1.25s ease-in-out infinite !important;
+    }
+
+    @keyframes next-title-ready-pulse {
+      0%, 100% {
+        border-color: #42a5f5;
+        background: linear-gradient(180deg, rgba(66,165,245,.10), rgba(66,165,245,.025));
+        box-shadow: 0 0 12px rgba(66,165,245,.22), inset 0 0 12px rgba(66,165,245,.05);
+      }
+      50% {
+        border-color: #8bcbff;
+        background: linear-gradient(180deg, rgba(66,165,245,.22), rgba(66,165,245,.065));
+        box-shadow: 0 0 30px rgba(66,165,245,.58), 0 0 10px rgba(139,203,255,.36), inset 0 0 20px rgba(66,165,245,.15);
+      }
+    }
+
+    .title-box-next.is-prepared {
+      animation: next-title-ready-pulse 1.45s ease-in-out infinite !important;
+    }
+
+    .title-box-next.state-paused {
+      border-color: rgba(148,163,184,.34) !important;
+      background: linear-gradient(180deg, rgba(148,163,184,.045), rgba(5,7,11,.72)) !important;
+      box-shadow: inset 0 0 12px rgba(148,163,184,.025) !important;
+    }
+
+    .title-box-next.state-playing {
+      border-color: #42a5f5 !important;
+      background: linear-gradient(180deg, rgba(66,165,245,.10), rgba(66,165,245,.025)) !important;
+      box-shadow: 0 0 14px rgba(66,165,245,.22), inset 0 0 12px rgba(66,165,245,.05) !important;
+      animation: none !important;
+    }
+
+    .title-box-next.is-imminent {
+      border-color: #8bcbff !important;
+      background: linear-gradient(180deg, rgba(66,165,245,.16), rgba(66,165,245,.045)) !important;
+      box-shadow: 0 0 24px rgba(66,165,245,.42), inset 0 0 16px rgba(66,165,245,.10) !important;
+      animation: none !important;
+    }
+
+    body.desktop-embed .paradis-brand {
+      min-height: 84px !important;
+      padding: 4px 3px 8px !important;
+    }
+
+    body.desktop-embed .paradis-brand img {
+      width: 100% !important;
+      max-width: 318px !important;
+      max-height: 78px !important;
+    }
+
+    .title-box-current,
+    .title-box-next {
+      position: relative !important;
+      overflow: hidden !important;
+      isolation: isolate !important;
+    }
+
+    .title-box-current > *,
+    .title-box-next > * {
+      position: relative !important;
+      z-index: 2 !important;
+    }
+
+    .title-box-current::before,
+    .title-box-next::before,
+    .title-box-current::after,
+    .title-box-next::after {
+      content: "";
+      position: absolute;
+      pointer-events: none;
+      z-index: 1;
+      opacity: 0;
+    }
+
+    @keyframes live-inner-boom {
+      0%, 100% { opacity: .15; transform: scale(.72); }
+      48% { opacity: .92; transform: scale(1.18); }
+      62% { opacity: .48; transform: scale(.98); }
+    }
+
+    @keyframes ready-inner-boom {
+      0%, 100% { opacity: .12; transform: scale(.76); }
+      50% { opacity: .82; transform: scale(1.16); }
+    }
+
+    @keyframes title-light-sweep {
+      0% { opacity: 0; transform: translateX(-165%) skewX(-20deg); }
+      18% { opacity: .08; }
+      48% { opacity: .72; }
+      72% { opacity: .08; }
+      100% { opacity: 0; transform: translateX(165%) skewX(-20deg); }
+    }
+
+    @keyframes live-title-breathe {
+      0%, 100% { transform: scale(1); filter: brightness(1); }
+      50% { transform: scale(1.035); filter: brightness(1.28); }
+    }
+
+    .title-box-current.is-playing::before {
+      inset: -28%;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(255,190,75,.52) 0%, rgba(255,145,0,.22) 42%, transparent 70%);
+      animation: live-inner-boom 1.12s ease-in-out infinite !important;
+    }
+
+    .title-box-current.is-playing::after {
+      top: -35%;
+      bottom: -35%;
+      left: 31%;
+      width: 24%;
+      background: linear-gradient(90deg, transparent, rgba(255,239,200,.78), transparent);
+      filter: blur(5px);
+      animation: title-light-sweep 1.65s ease-in-out infinite !important;
+    }
+
+    .title-box-current.is-playing .now-title {
+      animation: live-title-breathe 1.12s ease-in-out infinite !important;
+    }
+
+    .title-box-next.is-prepared::before {
+      inset: -28%;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(116,198,255,.42) 0%, rgba(45,151,235,.18) 43%, transparent 71%);
+      animation: ready-inner-boom 1.36s ease-in-out infinite !important;
+    }
+
+    .title-box-next.is-prepared::after {
+      top: -35%;
+      bottom: -35%;
+      left: 31%;
+      width: 22%;
+      background: linear-gradient(90deg, transparent, rgba(205,235,255,.66), transparent);
+      filter: blur(5px);
+      animation: title-light-sweep 2s ease-in-out infinite .18s !important;
+    }
+
+    .title-box-next.is-prepared .next-title {
+      animation: live-title-breathe 1.36s ease-in-out infinite !important;
+    }
+
+    .title-box-next.is-imminent::after {
+      top: -35%;
+      bottom: -35%;
+      left: 31%;
+      width: 24%;
+      opacity: 1;
+      background: linear-gradient(90deg, transparent, rgba(220,242,255,.88), transparent);
+      filter: blur(4px);
+      animation: title-light-sweep 1.15s linear infinite !important;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .title-box-current.is-playing {
+        animation: none !important;
+        border-color: #ffc15b !important;
+        box-shadow: 0 0 24px rgba(255,159,26,.48), inset 0 0 16px rgba(255,159,26,.10) !important;
+      }
+
+      .title-box-next.is-prepared {
+        animation: none !important;
+        border-color: #8bcbff !important;
+        box-shadow: 0 0 22px rgba(66,165,245,.44), inset 0 0 15px rgba(66,165,245,.10) !important;
+      }
+    }
+
+    /* iPhone : la télécommande occupe réellement l'écran disponible. */
+    @media (max-width: 430px) and (orientation: portrait) {
+      body:not(.desktop-embed) {
+        min-height: 100dvh !important;
+        padding: calc(env(safe-area-inset-top) + 6px) 6px calc(env(safe-area-inset-bottom) + 6px) !important;
+        overflow-y: auto !important;
+      }
+
+      body:not(.desktop-embed) .wrap {
+        width: 100% !important;
+        max-width: none !important;
+        min-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 12px) !important;
+        padding: 9px !important;
+        gap: 7px !important;
+        justify-content: space-between !important;
+        border-radius: 22px !important;
+      }
+
+      body:not(.desktop-embed) .paradis-brand {
+        min-height: clamp(92px, 13dvh, 112px) !important;
+        padding: 5px 10px 8px !important;
+      }
+
+      body:not(.desktop-embed) .paradis-brand img {
+        width: min(88vw, 370px) !important;
+        max-height: 94px !important;
+      }
+
+      body:not(.desktop-embed) .topnav {
+        min-height: 50px !important;
+        padding: 4px !important;
+      }
+
+      body:not(.desktop-embed) .topnav a {
+        min-height: 40px !important;
+        font-size: 10px !important;
+      }
+
+      body:not(.desktop-embed) .card.deck-screen {
+        flex: 0 0 clamp(224px, 29dvh, 270px) !important;
+        min-height: 224px !important;
+        padding: 11px 9px !important;
+      }
+
+      body:not(.desktop-embed) .display-stack {
+        height: 100% !important;
+        gap: 8px !important;
+        justify-content: center !important;
+      }
+
+      body:not(.desktop-embed) .title-box {
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+        min-height: 68px !important;
+        padding: 9px 10px !important;
+      }
+
+      body:not(.desktop-embed) .title-box-current {
+        flex: 1.08 1 0 !important;
+      }
+
+      body:not(.desktop-embed) .title-box-next {
+        flex: .92 1 0 !important;
+      }
+
+      body:not(.desktop-embed) .now-title {
+        font-size: clamp(21px, 6.25vw, 27px) !important;
+      }
+
+      body:not(.desktop-embed) .next-title {
+        font-size: clamp(18px, 5.1vw, 22px) !important;
+      }
+
+      body:not(.desktop-embed) .now-label {
+        font-size: 8px !important;
+      }
+
+      body:not(.desktop-embed) .ltc-panel {
+        min-height: 52px !important;
+        padding: 5px 8px !important;
+      }
+
+      body:not(.desktop-embed) .ltc-timecode {
+        font-size: 18px !important;
+      }
+
+      body:not(.desktop-embed) .transport-dock {
+        min-height: 74px !important;
+        padding: 6px !important;
+      }
+
+      body:not(.desktop-embed) .transport-row .button-pause,
+      body:not(.desktop-embed) .transport-row .knob-button {
+        height: 60px !important;
+        min-height: 60px !important;
+        border-radius: 13px !important;
+      }
+
+      body:not(.desktop-embed) .transport-row .button-pause {
+        font-size: 14px !important;
+      }
+
+      body:not(.desktop-embed) .transport-row .knob-button {
+        font-size: 23px !important;
+      }
+
+      body:not(.desktop-embed) .scene-select-panel {
+        min-height: 58px !important;
+        padding: 5px !important;
+      }
+
+      body:not(.desktop-embed) .scene-select,
+      body:not(.desktop-embed) .scene-select-panel .scene-select {
+        height: 44px !important;
+        min-height: 44px !important;
+        font-size: 13px !important;
+      }
+
+      body:not(.desktop-embed) .crossfader-section {
+        width: 94% !important;
+        max-width: none !important;
+        min-height: 104px !important;
+        padding: 11px 10px !important;
+      }
+
+      body:not(.desktop-embed) .crossfader-position {
+        font-size: 21px !important;
+      }
+
+      body:not(.desktop-embed) input[type="range"] {
+        height: 26px !important;
+      }
+
+      body:not(.desktop-embed) input[type="range"]::-webkit-slider-thumb {
+        width: 20px !important;
+        height: 20px !important;
+        margin-top: -8px !important;
+      }
+
+      body:not(.desktop-embed) .buttons-dock {
+        min-height: 58px !important;
+        padding: 4px !important;
+      }
+
+      body:not(.desktop-embed) .button,
+      body:not(.desktop-embed) .knob-button,
+      body:not(.desktop-embed) .button-a,
+      body:not(.desktop-embed) .button-b {
+        height: 48px !important;
+        min-height: 48px !important;
+        font-size: 16px !important;
+      }
+
+      body:not(.desktop-embed) .button-pause {
+        font-size: 11px !important;
+      }
+    }
+</style>
+</head>
+<body>
+  
+  <main class="wrap">
+    <div class="status disconnected" id="status">Connexion…</div>
+
+    <div class="paradis-brand" aria-label="Paradis Latin Cabaret">
+      <img src="/assets/paradis%20latin.jpg" alt="Paradis Latin Cabaret">
+    </div>
+
+    <nav class="topnav" aria-label="Navigation de la télécommande">
+      <a href="/">Session</a>
+      <a href="/ab" class="active" aria-current="page">A/B</a>
+      <a href="/arrangement">Arrangement</a>
+    </nav>
+
+
+
+    <section class="card deck-screen" id="abNowCard" aria-live="polite">
+      <div class="display-stack">
+        <div class="title-box title-box-current" id="currentTitleCard">
+          <div class="now-label">TITRE EN COURS</div>
+          <div class="now-title" id="abCurrentTitle">—</div>
+        </div>
+        <div class="arrow" aria-hidden="true">↓</div>
+        <div class="title-box title-box-next" id="nextTitleCard">
+          <div class="now-label">PROCHAIN</div>
+          <div class="next-title" id="abNextTitle">—</div>
+        </div>
+        <div class="counter" id="abCounter" style="display:none;">—</div>
+      </div>
+    </section>
+
+    <section class="ltc-panel" aria-live="polite" aria-label="Retour LTC timecode">
+      <div class="ltc-label">LTC TIMECODE</div>
+      <div class="ltc-timecode" id="ltcTimecode">--:--:--:--</div>
+      </section>
+
+    <section class="transport-dock" aria-label="Commandes de transport Ableton">
+      <div class="transport-row">
+        <button class="button button-pause" id="abPauseResume" type="button" aria-label="Pause ou reprendre la lecture">PAUSE</button>
+        <button class="knob-button" id="abSceneConfirm" type="button">GO</button>
+      </div>
+    </section>
+
+      <section class="scene-select-panel" aria-label="Sélecteur de titre">
+      <select class="scene-select" id="abSceneSelect" aria-label="Choisir un titre">
+      <option value="">Choisir…</option>
+      </select>
+      </section>
+
+    <section class="crossfader-section" aria-live="polite" aria-label="Crossfader Ableton">
+      <div class="crossfader-label">Crossfader Ableton</div>
+      <div class="crossfader-position" id="position">—</div>
+      <div class="slider-panel" aria-label="Réglage progressif A/B">
+        <input id="xfader" type="range" min="-1" max="1" step="0.01" value="0" aria-valuemin="-1" aria-valuemax="1" aria-valuenow="0" aria-label="Crossfader slider">
+        <div class="row"><span>A</span><span>Centre</span><span>B</span></div>
+      </div>
+    </section>
+
+    <section class="buttons-dock" aria-label="Commandes A/B Ableton">
+      <div class="buttons-row xfade-buttons">
+        <button class="button button-a" data-target="a" type="button">A</button>
+        <button class="button button-b" data-target="b" type="button">B</button>
+      </div>
+    </section>
+
+
+    <div class="small">Interface verrouillée : A / B / sélection titre uniquement.</div>
+  </main>
+
+  <script>
+    document.body.classList.toggle('desktop-embed', new URLSearchParams(window.location.search).get('desktop') === '1');
+    const statusEl = document.getElementById('status');
+    const abNowCardEl = document.getElementById('abNowCard');
+    const abCurrentTitleEl = document.getElementById('abCurrentTitle');
+    const abNextTitleEl = document.getElementById('abNextTitle');
+    const nextTitleCardEl = document.getElementById('nextTitleCard');
+    const abCounterEl = document.getElementById('abCounter');
+    const abSceneSelectEl = document.getElementById('abSceneSelect');
+    const abSceneConfirmEl = document.getElementById('abSceneConfirm');
+    const abPauseResumeEl = document.getElementById('abPauseResume');
+    const positionEl = document.getElementById('position');
+    const ltcTimecodeEl = document.getElementById('ltcTimecode');
+    const buttons = [...document.querySelectorAll('button[data-target]')];
+    const slider = document.getElementById('xfader');
+    let busy = false;
+    let sliderTimer = null;
+    let sliderDragging = false;
+    let lastSceneSelectSignature = '';
+    let userSceneChoiceDirty = false;
+    let preparedNextScene = null;
+    let abletonSelectedScene = null;
+
+    function wait(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    function setStatus(text, connected) {
+      statusEl.textContent = text;
+      statusEl.classList.toggle('connected', connected);
+      statusEl.classList.toggle('disconnected', !connected);
+    }
+
+    function labelForValue(value, label) {
+      if (label) return label;
+      const v = Number(value || 0);
+      if (v <= -0.95) return 'A';
+      if (v >= 0.95) return 'B';
+      return 'Centre';
+    }
+
+    function pickFirstString(...values) {
+      for (const value of values) {
+        if (typeof value === 'string' && value.trim()) return value.trim();
+        if (value && typeof value === 'object') {
+          for (const key of ['name', 'title', 'label']) {
+            if (typeof value[key] === 'string' && value[key].trim()) return value[key].trim();
+          }
+        }
+      }
+      return '';
+    }
+
+    function cleanTitle(value) {
+      const raw = value && value !== '—' ? String(value).trim() : '';
+      if (!raw) return '—';
+      return raw.split(';')[0].trim() || raw;
+    }
+
+    function fillSceneSelectFromState(state) {
+      if (!abSceneSelectEl || !state || !state.scenes) return;
+
+      const entries = Object.entries(state.scenes)
+        .filter(([, name]) => name && String(name).trim())
+        .sort((a, b) => Number(a[0]) - Number(b[0]));
+
+      const signature = JSON.stringify(entries);
+      const currentValue = abSceneSelectEl.value;
+      const userIsChoosing = document.activeElement === abSceneSelectEl;
+      if (userIsChoosing) return;
+      if (signature === lastSceneSelectSignature && abSceneSelectEl.options.length > 1) return;
+
+      abSceneSelectEl.innerHTML = '<option value="">Choisir…</option>';
+      entries.forEach(([index, rawName]) => {
+        const option = document.createElement('option');
+        option.value = String(Number(index) + 1);
+        option.dataset.rawName = rawName;
+        option.textContent = `${Number(index) + 1} · ${cleanTitle(rawName)}`;
+        abSceneSelectEl.appendChild(option);
+      });
+
+      const preferredValue = preparedNextScene !== null ? String(preparedNextScene) : currentValue;
+
+      if (preferredValue && [...abSceneSelectEl.options].some(option => option.value === preferredValue)) {
+        abSceneSelectEl.value = preferredValue;
+      } else if (!userSceneChoiceDirty && preparedNextScene === null && abletonSelectedScene !== null) {
+        const nextValue = String(abletonSelectedScene);
+        if ([...abSceneSelectEl.options].some(option => option.value === nextValue)) {
+          abSceneSelectEl.value = nextValue;
+        }
+      }
+
+      lastSceneSelectSignature = signature;
+    }
+
+    function previewSceneSelect(markUserChoice = false) {
+      if (!abSceneSelectEl || !abNextTitleEl) return;
+      const option = abSceneSelectEl.options[abSceneSelectEl.selectedIndex];
+      if (!option || !option.value) return;
+
+      if (markUserChoice) {
+        const selected = Number.parseInt(option.value, 10);
+        if (Number.isInteger(selected) && selected > 0) {
+          userSceneChoiceDirty = true;
+          preparedNextScene = selected;
+        }
+      }
+
+      const rawName = option.dataset.rawName || option.textContent || '';
+      abNextTitleEl.textContent = cleanTitle(rawName);
+      abNextTitleEl.classList.add('is-prepared');
+      if (nextTitleCardEl) {
+        nextTitleCardEl.classList.add('is-prepared');
+        nextTitleCardEl.classList.remove('state-playing', 'is-imminent', 'state-paused');
+        nextTitleCardEl.dataset.nextState = 'ready';
+      }
+    }
+
+    function advanceSceneSelectAfterGo(sceneNumber) {
+      if (!abSceneSelectEl || !abNextTitleEl) return;
+      const nextValue = String(sceneNumber + 1);
+      const nextOption = [...abSceneSelectEl.options].find(option => option.value === nextValue);
+
+      if (!nextOption) {
+        preparedNextScene = null;
+        userSceneChoiceDirty = false;
+        abNextTitleEl.classList.remove('is-prepared');
+        if (nextTitleCardEl) {
+          nextTitleCardEl.classList.remove('is-prepared', 'state-playing', 'is-imminent');
+          nextTitleCardEl.classList.add('state-paused');
+          nextTitleCardEl.dataset.nextState = 'paused';
+        }
+        return;
+      }
+
+      abSceneSelectEl.value = nextValue;
+      abSceneSelectEl.dispatchEvent(new Event('change', { bubbles:true }));
+      preparedNextScene = sceneNumber + 1;
+      userSceneChoiceDirty = false;
+
+      const rawName = nextOption.dataset.rawName || nextOption.textContent || '';
+      abNextTitleEl.textContent = cleanTitle(rawName);
+      abNextTitleEl.classList.add('is-prepared');
+      if (nextTitleCardEl) nextTitleCardEl.classList.add('is-prepared');
+    }
+
+    function deepFindString(source, wantedKeys, depth = 0) {
+      if (!source || typeof source !== 'object' || depth > 3) return '';
+      for (const key of wantedKeys) {
+        const direct = source[key];
+        const picked = pickFirstString(direct);
+        if (picked) return picked;
+      }
+      for (const value of Object.values(source)) {
+        if (value && typeof value === 'object' && !Array.isArray(value)) {
+          const found = deepFindString(value, wantedKeys, depth + 1);
+          if (found) return found;
+        }
+      }
+      return '';
+    }
+
+    function applyStatus(state) {
+      const connected = Boolean(state && state.connected);
+      setStatus((connected ? '● ' : '○ ') + ((state && state.message) || (connected ? 'Connecté' : 'Interface non connectée')), connected);
+
+      const selectedSceneIndex = Number(state && state.selected_scene);
+      if (Number.isInteger(selectedSceneIndex) && selectedSceneIndex >= 0) {
+        abletonSelectedScene = selectedSceneIndex + 1;
+      }
+      fillSceneSelectFromState(state);
+
+      const rawMode = String(
+        (state && (
+          state.play_mode ||
+          state.mode ||
+          state.view ||
+          state.current_mode ||
+          state.transport_mode
+        )) || ''
+      ).toLowerCase();
+
+      const modeIsArrangement = rawMode.includes('arrangement');
+      const modeIsSession = rawMode.includes('session');
+
+      const inferredArrangement = !modeIsSession && Boolean(state && (
+        state.arrangement_marker ||
+        state.current_marker ||
+        state.current_locator_name ||
+        state.current_locator ||
+        state.locator_name
+      ));
+
+      const inferredSession = !modeIsArrangement && Boolean(state && (
+        state.current_scene_name ||
+        state.session_current_scene ||
+        state.current_scene ||
+        state.playing_scene_name ||
+        state.active_scene_name
+      ));
+
+      const looksArrangement = modeIsArrangement || inferredArrangement;
+      const looksSession = modeIsSession || inferredSession;
+
+      const scenes = state && state.scenes ? state.scenes : null;
+      const playingSceneIndex = Number(state && state.playing_scene);
+      const lastFiredSceneIndex = Number(state && state.last_fired_scene);
+
+      const sceneNameByIndex = index => {
+        if (!scenes || !Number.isInteger(index) || index < 0) return '';
+        return scenes[String(index)] || scenes[index] || '';
+      };
+
+      const selectedSceneFromMap = sceneNameByIndex(selectedSceneIndex);
+      const playingSceneFromMap = sceneNameByIndex(playingSceneIndex);
+      const lastFiredSceneFromMap = sceneNameByIndex(lastFiredSceneIndex);
+
+      const modeLabel = looksArrangement
+        ? 'MODE ARRANGEMENT'
+        : (looksSession ? 'MODE SESSION' : 'MODE —');
+
+      const sessionTitle = pickFirstString(
+        playingSceneFromMap,
+        lastFiredSceneFromMap,
+        state && state.playing_scene_name,
+        state && state.last_fired_scene_name,
+        state && state.current_scene_name,
+        state && state.session_current_scene,
+        state && state.current_scene,
+        state && state.active_scene_name,
+        state && state.current_scene_title,
+        selectedSceneFromMap,
+        deepFindString(state, ['current_scene_name', 'session_current_scene', 'playing_scene_name', 'last_fired_scene_name', 'active_scene_name', 'current_scene_title', 'current_scene'])
+      );
+
+      const arrangementTitle = pickFirstString(
+        state && state.arrangement_marker,
+        state && state.current_marker,
+        state && state.current_locator_name,
+        state && state.current_locator,
+        state && state.locator_name,
+        state && state.marker_name,
+        deepFindString(state, ['arrangement_marker', 'current_marker', 'current_locator_name', 'current_locator', 'locator_name', 'marker_name'])
+      );
+
+      const currentTitleRaw = looksArrangement
+        ? (arrangementTitle || sessionTitle || '—')
+        : (sessionTitle || arrangementTitle || '—');
+      const currentTitle = cleanTitle(currentTitleRaw);
+
+      // Next title: try to find next scene or marker
+      let nextTitleRaw = '';
+      if (looksSession) {
+        nextTitleRaw = pickFirstString(
+          selectedSceneFromMap,
+          state && state.selected_scene_name,
+          state && state.next_scene_name,
+          state && state.next_scene,
+          state && state.upcoming_scene_name,
+          state && state.upcoming_scene,
+          state && state.next_scene_title
+        );
+      }
+      if (!nextTitleRaw && looksArrangement) {
+        nextTitleRaw = pickFirstString(
+          state && state.next_marker,
+          state && state.next_locator_name,
+          state && state.next_locator,
+          state && state.next_marker_name
+        );
+      }
+      let nextTitle = cleanTitle(nextTitleRaw) || '—';
+
+      // If the dropdown has a prepared next title, it has priority over Ableton's selected scene.
+      // This prevents the periodic /status refresh from reverting PROCHAIN to the currently playing title.
+      if (abSceneSelectEl && abNextTitleEl) {
+        const selectedOption = abSceneSelectEl.options[abSceneSelectEl.selectedIndex];
+        if (selectedOption && selectedOption.value) {
+          const rawPreparedName = selectedOption.dataset.rawName || selectedOption.textContent || '';
+          nextTitle = cleanTitle(rawPreparedName) || nextTitle;
+        }
+      }
+
+      if (abCurrentTitleEl) abCurrentTitleEl.textContent = currentTitle;
+      if (abNextTitleEl) abNextTitleEl.textContent = nextTitle;
+      if (abNextTitleEl && nextTitleCardEl) {
+        const transportIsPlaying = Boolean(state && state.is_playing) && !Boolean(state && state.is_paused);
+        const remainingRaw = state && state.remaining_seconds;
+        const remainingSeconds = Number(remainingRaw);
+        const hasReliableCountdown = remainingRaw !== null && remainingRaw !== '' && typeof remainingRaw !== 'undefined' && Number.isFinite(remainingSeconds) && remainingSeconds >= 0;
+        const nextState = userSceneChoiceDirty
+          ? 'ready'
+          : (transportIsPlaying
+              ? (hasReliableCountdown && remainingSeconds <= 10 ? 'imminent' : 'playing')
+              : 'paused');
+
+        nextTitleCardEl.classList.toggle('is-prepared', nextState === 'ready');
+        nextTitleCardEl.classList.toggle('state-playing', nextState === 'playing');
+        nextTitleCardEl.classList.toggle('is-imminent', nextState === 'imminent');
+        nextTitleCardEl.classList.toggle('state-paused', nextState === 'paused');
+        abNextTitleEl.classList.toggle('is-prepared', nextState !== 'paused');
+        nextTitleCardEl.dataset.nextState = nextState;
+      }
+      const currentTitleCard = document.getElementById('currentTitleCard');
+      if (currentTitleCard) {
+        const isPlaying = Boolean(state && state.is_playing);
+        const isPaused = Boolean(state && state.is_paused);
+        const sessionJustLaunched = !isPaused && looksSession && (
+          Number.isInteger(playingSceneIndex) && playingSceneIndex >= 0 ||
+          Number.isInteger(lastFiredSceneIndex) && lastFiredSceneIndex >= 0
+        );
+        currentTitleCard.classList.toggle('is-playing', isPlaying || sessionJustLaunched);
+      }
+      if (abPauseResumeEl) {
+        const isPlaying = Boolean(state && state.is_playing);
+        abPauseResumeEl.textContent = isPlaying ? 'PAUSE' : 'REPRENDRE';
+        abPauseResumeEl.classList.toggle('is-paused', !isPlaying);
+        abPauseResumeEl.setAttribute('aria-label', isPlaying ? 'Mettre la lecture en pause' : 'Reprendre la lecture');
+      }
+
+      if (looksSession) {
+        if (abCounterEl) {
+          abCounterEl.style.display = 'block';
+          abCounterEl.textContent = state && typeof state.remaining_time === 'string' ? state.remaining_time : '—';
+        }
+      } else {
+        if (abCounterEl) {
+          abCounterEl.style.display = 'none';
+          abCounterEl.textContent = '';
+        }
+      }
+
+      const rawLtcValue = pickFirstString(
+        state && state.ltc_timecode,
+        state && state.timecode,
+        state && state.ltc,
+        state && state.smpte,
+        state && state.arrangement_timecode
+      );
+      const ltcValue = /^\d{1,2}:\d{2}:\d{2}:\d{2}$/.test(rawLtcValue)
+        ? rawLtcValue
+        : '';
+      if (ltcTimecodeEl) {
+        ltcTimecodeEl.textContent = ltcValue || '--:--:--:--';
+        ltcTimecodeEl.dataset.live = ltcValue ? '1' : '0';
+      }
+      const value = Number(state && typeof state.crossfader !== 'undefined' ? state.crossfader : slider.value);
+      if (!sliderDragging) {
+        positionEl.textContent = labelForValue(value, state && state.crossfader_label);
+        if (!Number.isNaN(value)) slider.value = value;
+      }
+    }
+
+    async function fetchJSON(url, options = {}, timeoutMs = 2500) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(url, {...options, cache:'no-store', signal:controller.signal});
+        let data = null;
+        try { data = await res.json(); } catch (_) {}
+        if (!res.ok) throw new Error((data && data.message) || 'Erreur serveur');
+        return data;
+      } finally { clearTimeout(timeout); }
+    }
+
+    async function update() {
+      if (busy) return;
+      try { applyStatus(await fetchJSON('/status', {}, 1800)); }
+      catch (_) { setStatus('○ Interface non connectée', false); }
+    }
+
+    async function sendXfade(payload) {
+      if (busy) return;
+      busy = true;
+      try {
+        buttons.forEach(b => b.disabled = true);
+        setStatus('● Envoi A/B…', true);
+        const data = await fetchJSON('/action', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)}, 2200);
+        if (data && data.state) applyStatus(data.state); else await update();
+      } catch (_) {
+        setStatus('○ Commande A/B impossible', false);
+      } finally {
+        setTimeout(() => { buttons.forEach(b => b.disabled = false); busy = false; }, 180);
+      }
+    }
+
+    async function confirmSelectedScene() {
+      if (!abSceneSelectEl) return;
+
+      let sceneNumber = Number.parseInt(abSceneSelectEl.value, 10);
+      if (!Number.isInteger(sceneNumber) || sceneNumber < 1) {
+        sceneNumber = Number.parseInt(preparedNextScene, 10);
+      }
+      if (!Number.isInteger(sceneNumber) || sceneNumber < 1) {
+        sceneNumber = Number.parseInt(abletonSelectedScene, 10);
+      }
+
+      if (!Number.isInteger(sceneNumber) || sceneNumber < 1) {
+        setStatus('○ Choisis un titre', false);
+        return;
+      }
+
+      const option = [...abSceneSelectEl.options].find(opt => Number.parseInt(opt.value, 10) === sceneNumber);
+      const rawName = option && option.dataset ? option.dataset.rawName : (option ? option.textContent : '');
+      if (rawName && abNextTitleEl) abNextTitleEl.textContent = cleanTitle(rawName);
+
+      try {
+        setStatus('● GO titre…', true);
+
+        // 1. Select the requested scene explicitly.
+        await fetchJSON('/action', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({action:'goto', scene:sceneNumber})
+        }, 2200);
+
+        // 2. Give AbletonOSC time to apply selection.
+        await wait(350);
+
+        // 3. Launch the exact same scene. The `scene` field is intentional:
+        // if the backend supports it, it avoids relaunching the previous selection.
+        const goData = await fetchJSON('/action', {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({action:'go', scene:sceneNumber})
+        }, 2200);
+
+        if (goData && goData.state) applyStatus(goData.state);
+        else await update();
+
+        // 4. Prepare next scene for the next GO.
+        advanceSceneSelectAfterGo(sceneNumber);
+        setStatus('● Titre lancé — prochain titre préparé', true);
+      } catch (_) {
+        setStatus('○ Sélection impossible', false);
+      }
+    }
+
+    if (abSceneSelectEl) {
+      abSceneSelectEl.addEventListener('change', () => previewSceneSelect(true));
+      abSceneSelectEl.addEventListener('input', () => previewSceneSelect(true));
+    }
+
+    if (abSceneConfirmEl) {
+      abSceneConfirmEl.addEventListener('click', confirmSelectedScene);
+    }
+
+    buttons.forEach(button => button.addEventListener('click', () => {
+      sendXfade({action:'xfade', target:button.dataset.target});
+    }));
+
+    if (abPauseResumeEl) {
+      abPauseResumeEl.addEventListener('click', togglePlayPauseFromKeyboard);
+    }
+
+    function sendSliderValue(delay = 40) {
+      positionEl.textContent = labelForValue(slider.value);
+      clearTimeout(sliderTimer);
+      sliderTimer = setTimeout(() => {
+        sendXfade({action:'xfade_value', value:Number(slider.value)});
+      }, delay);
+    }
+
+    slider.addEventListener('pointerdown', () => {
+      sliderDragging = true;
+    });
+
+    slider.addEventListener('pointerup', () => {
+      sliderDragging = false;
+      sendSliderValue(0);
+    });
+
+    slider.addEventListener('pointercancel', () => {
+      sliderDragging = false;
+      sendSliderValue(0);
+    });
+
+    slider.addEventListener('touchend', () => {
+      sliderDragging = false;
+      sendSliderValue(0);
+    });
+
+    slider.addEventListener('input', () => {
+      sliderDragging = true;
+      sendSliderValue(40);
+    });
+
+    slider.addEventListener('change', () => {
+      sliderDragging = false;
+      sendSliderValue(0);
+    });
+
+
+    function movePreparedScene(delta) {
+      if (!abSceneSelectEl || abSceneSelectEl.options.length <= 1) return;
+
+      const options = [...abSceneSelectEl.options].filter(option => option.value);
+      if (!options.length) return;
+
+      const currentIndex = options.findIndex(option => option.value === abSceneSelectEl.value);
+      const safeIndex = currentIndex >= 0 ? currentIndex : 0;
+      const nextIndex = Math.max(0, Math.min(options.length - 1, safeIndex + delta));
+      const nextOption = options[nextIndex];
+      if (!nextOption) return;
+
+      abSceneSelectEl.value = nextOption.value;
+      abSceneSelectEl.dispatchEvent(new Event('change', { bubbles: true }));
+      previewSceneSelect(true);
+    }
+
+    async function togglePlayPauseFromKeyboard() {
+      try {
+        setStatus('● Lecture / pause…', true);
+        const data = await fetchJSON('/action', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({action: 'pause'})
+        }, 1800);
+        if (data && data.state) applyStatus(data.state);
+        else await update();
+      } catch (_) {
+        setStatus('○ Lecture / pause impossible', false);
+      }
+    }
+
+    document.addEventListener('keydown', event => {
+      const activeTag = document.activeElement && document.activeElement.tagName;
+      const isEditing = activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT';
+      if (isEditing) return;
+
+      if (event.key === 'Enter' || event.key === 'Return') {
+        event.preventDefault();
+        confirmSelectedScene();
+        return;
+      }
+
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        movePreparedScene(-1);
+        return;
+      }
+
+      if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        movePreparedScene(1);
+        return;
+      }
+
+      if (event.code === 'Space' || event.key === ' ') {
+        event.preventDefault();
+        togglePlayPauseFromKeyboard();
+      }
+    });
+
+    update();
+    window.addEventListener('DOMContentLoaded', () => {
+      window.CLRemoteEnergy.startPolling(
+        update,
+        () => document.body.classList.contains('v2-playing'),
+        { activeMs: 650, idleMs: 2000, hiddenMs: 15000 }
+      );
+    }, { once: true });
+  </script>
+</body>
+</html>

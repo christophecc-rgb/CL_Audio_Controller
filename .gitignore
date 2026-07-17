@@ -1,0 +1,66 @@
+# macOS
+.DS_Store
+**/.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# Python : bytecode et caches
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Environnements Python
+.venv/
+venv/
+env/
+ENV/
+
+# Configuration locale
+.env
+.env.*
+!.env.example
+
+# PyInstaller et livrables
+build/
+dist/
+release/
+*.app
+*.app/
+*.dmg
+*.pkg
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+
+# Métadonnées de packaging
+*.egg-info/
+.eggs/
+pip-wheel-metadata/
+
+# Journaux et fichiers temporaires
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*~
+
+# Éditeurs
+.vscode/
+.idea/
+
+# Inventaire local contenant des chemins propres à la machine
+MANIFESTE_EXTRACTION.txt

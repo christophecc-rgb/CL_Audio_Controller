@@ -1,0 +1,2 @@
+AbletonOSC official repository: https://github.com/ideoforms/AbletonOSC
+Official installation note seen May 2026: AbletonOSC requires Ableton Live 11 or above.
