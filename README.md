@@ -60,6 +60,16 @@ Après installation, redémarrer Ableton Live et sélectionner AbletonOSC comme 
 
 L'installation active inspectée le 17 juillet 2026 est une copie de la branche `master` installée localement le 9 juillet 2026. Elle ne contient ni dossier `.git`, ni numéro de version, ni identifiant de commit vérifiable. **Son commit exact est donc inconnu et ne doit pas être déduit de sa date.** Avant toute nouvelle installation, choisir et documenter explicitement un commit ou une version d'AbletonOSC. Le script fourni dans `INSTALLER_AbletonOSC/` télécharge actuellement la branche mobile `master` et peut remplacer l'installation existante ; il ne doit pas être exécuté sans contrôle préalable.
 
+CL Audio Controller utilise également deux lectures `Song` non encore publiées par la version AbletonOSC inspectée : `/live/song/get/file_path` et `/live/song/get/name`. L'extension déclarative correspondante est conservée dans `INSTALLER_AbletonOSC/song-file-path-readonly.patch` en attendant son éventuelle intégration en amont.
+
+### Cohérence lors d'un changement de Live Set
+
+Le serveur identifie principalement le Live Set par le chemin absolu fourni par `Song.file_path`. `/live/startup` déclenche une réinitialisation immédiate et la comparaison régulière du chemin pendant le rafraîchissement normal sert de garde complémentaire si cet événement est perdu. Un Set non enregistré reçoit une identité temporaire de la forme `unsaved:<génération>`.
+
+Chaque réinitialisation incrémente `set_generation` et efface atomiquement les scènes, caches et états de lecture du Set précédent. Toutes les réponses HTTP contenant l'état publient `current_set_id` et `set_generation`. Les traitements asynchrones abandonnent leurs résultats si leur génération n'est plus courante ; les interfaces Session, A/B et Arrangement ignorent également toute réponse plus ancienne que la dernière génération acceptée.
+
+Le diagnostic détaillé est silencieux par défaut. Pour afficher temporairement les événements préfixés par `[SET_GENERATION]` côté serveur et dans les consoles Web, lancer l'application avec `CL_AUDIO_GENERATION_DEBUG=1`.
+
 ### Max for Live
 
 Le pont source est fourni dans :

@@ -1619,6 +1619,34 @@
     let userSceneChoiceDirty = false;
     let preparedNextScene = null;
     let abletonSelectedScene = null;
+    let lastAcceptedGeneration = -1;
+
+    function acceptStateGeneration(state) {
+      const generation = Number(state && state.set_generation);
+      if (!Number.isInteger(generation) || generation < lastAcceptedGeneration) {
+        if (state && state.generation_debug) {
+          console.warn('[SET_GENERATION] stale_response_rejected', {
+            interface: 'ab', received: generation, current: lastAcceptedGeneration
+          });
+        }
+        return false;
+      }
+      if (generation > lastAcceptedGeneration) {
+        if (state && state.generation_debug) {
+          console.info('[SET_GENERATION] generation_accepted', {
+            interface: 'ab', previous: lastAcceptedGeneration, generation
+          });
+        }
+        lastAcceptedGeneration = generation;
+        preparedNextScene = null;
+        abletonSelectedScene = null;
+        userSceneChoiceDirty = false;
+        lastSceneSelectSignature = '';
+        abCurrentTitleEl.textContent = '—';
+        abNextTitleEl.textContent = '—';
+      }
+      return true;
+    }
 
     function wait(ms) {
       return new Promise(resolve => setTimeout(resolve, ms));
@@ -1760,6 +1788,7 @@
     }
 
     function applyStatus(state) {
+      if (!acceptStateGeneration(state)) return;
       const connected = Boolean(state && state.connected);
       setStatus((connected ? '● ' : '○ ') + ((state && state.message) || (connected ? 'Connecté' : 'Interface non connectée')), connected);
 
@@ -1818,7 +1847,7 @@
         ? 'MODE ARRANGEMENT'
         : (looksSession ? 'MODE SESSION' : 'MODE —');
 
-      const sessionTitle = pickFirstString(
+      const sessionTitle = state && state.has_show_started ? pickFirstString(
         playingSceneFromMap,
         lastFiredSceneFromMap,
         state && state.playing_scene_name,
@@ -1830,7 +1859,7 @@
         state && state.current_scene_title,
         selectedSceneFromMap,
         deepFindString(state, ['current_scene_name', 'session_current_scene', 'playing_scene_name', 'last_fired_scene_name', 'active_scene_name', 'current_scene_title', 'current_scene'])
-      );
+      ) : '';
 
       const arrangementTitle = pickFirstString(
         state && state.arrangement_marker,

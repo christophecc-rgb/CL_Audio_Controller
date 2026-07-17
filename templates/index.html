@@ -542,6 +542,40 @@
     let countdownStartedAt = null;
     let countdownPausedRemaining = null;
     let countdownMode = 'stopped';
+    let lastAcceptedGeneration = -1;
+
+    function acceptStateGeneration(state) {
+      const generation = Number(state && state.set_generation);
+      if (!Number.isInteger(generation) || generation < lastAcceptedGeneration) {
+        if (state && state.generation_debug) {
+          console.warn('[SET_GENERATION] stale_response_rejected', {
+            interface: 'session', received: generation, current: lastAcceptedGeneration
+          });
+        }
+        return false;
+      }
+      if (generation > lastAcceptedGeneration) {
+        if (state && state.generation_debug) {
+          console.info('[SET_GENERATION] generation_accepted', {
+            interface: 'session', previous: lastAcceptedGeneration, generation
+          });
+        }
+        lastAcceptedGeneration = generation;
+        lastKnownState = null;
+        lastSessionCurrentTitle = '—';
+        lastSessionCurrentRaw = '';
+        sessionWasPlaying = false;
+        sessionStoppedByUser = false;
+        currentSceneRawName = '';
+        countdownDurationSeconds = null;
+        countdownStartedAt = null;
+        countdownPausedRemaining = null;
+        countdownMode = 'stopped';
+        currentEl.textContent = '—';
+        selectedEl.textContent = '—';
+      }
+      return true;
+    }
 
     function parseDurationToSeconds(value) {
       if (!value) return null;
@@ -578,6 +612,7 @@
 
     function currentRawSceneFromState(state, selectedRaw, playing) {
       if (!state) return '';
+      if (!state.has_show_started) return '';
 
       const byPlayingIndex = sceneRawFromStateByIndex(state, state.playing_scene);
       if (byPlayingIndex) return byPlayingIndex;
@@ -794,6 +829,7 @@
 
     function applyStatus(rawState) {
       const state = rawState && rawState.state ? rawState.state : rawState;
+      if (!acceptStateGeneration(state)) return;
       fillSceneSelect(state);
 
       const connected = Boolean(state && state.connected);

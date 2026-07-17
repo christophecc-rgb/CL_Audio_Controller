@@ -2,6 +2,20 @@
 
 Toutes les évolutions notables de CL Audio Controller seront documentées dans ce fichier.
 
+## [Non publié]
+
+### Corrigé
+
+- Réinitialisation atomique de la télécommande lors du chargement ou du rechargement d'un Live Set.
+- Identification principale du Set par `Song.file_path`, avec identité temporaire pour les Sets non enregistrés.
+- Protection des traitements asynchrones et des interfaces Session, A/B et Arrangement par `set_generation` afin d'ignorer les réponses obsolètes.
+- Maintien de « En cours » vide jusqu'au premier lancement réel, tandis que « Prochaine scène » suit immédiatement la sélection.
+
+### Intégration
+
+- Ajout d'un patch AbletonOSC reproductible exposant en lecture seule `/live/song/get/file_path` et `/live/song/get/name`.
+- Ajout de tests de non-régression pour les changements de Set, les identités temporaires et les générations périmées.
+
 ## [2.0.0] — 2026-07-17
 
 ### Création du dépôt autonome

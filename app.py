@@ -92,6 +92,12 @@ BACKGROUND_REFRESH_SECONDS = 0.25
 FULL_REFRESH_SECONDS = 1.0
 OSC_TIMEOUT = 0.06
 
+# Diagnostic ciblé des changements de Set, silencieux par défaut.
+# Activer ponctuellement avec CL_AUDIO_GENERATION_DEBUG=1.
+GENERATION_DEBUG = os.environ.get("CL_AUDIO_GENERATION_DEBUG", "0").strip().lower() in (
+    "1", "true", "on", "yes",
+)
+
 
 app = Flask(__name__)
 client = udp_client.SimpleUDPClient(ABLETON_IP, ABLETON_PORT)
@@ -289,6 +295,12 @@ def parse_scene_duration_seconds(name: Any) -> Optional[float]:
 
 
 state: Dict[str, Any] = {
+    "current_set_id": None,
+    "current_set_name": "",
+    "set_generation": 0,
+    "current_scene": None,
+    "next_scene": None,
+    "has_show_started": False,
     "selected_scene": 0,
     "selected_scene_name": "—",
     "scenes": {},
@@ -396,7 +408,7 @@ def normalize_transport_state_locked():
     if not is_playing and play_mode == "arrangement" and not bool(state.get("is_paused", False)):
         state["play_mode"] = "stopped"
 
-responses: Dict[str, Tuple[float, Tuple[Any, ...]]] = {}
+responses: Dict[str, Tuple[float, Tuple[Any, ...], int]] = {}
 lock = threading.RLock()
 query_lock = threading.Lock()
 
@@ -407,50 +419,129 @@ _track_count_cache: Tuple[float, int] = (0.0, MAX_TRACKS_TO_SCAN)
 _cue_points_cache: Tuple[float, list, str] = (0.0, [], "JSON")
 
 
-def osc_reply(address, *args):
+def state_snapshot_locked() -> Dict[str, Any]:
+    """Publie atomiquement l'identité et la génération avec chaque état HTTP."""
+    snapshot = dict(state)
+    snapshot["set_generation"] = int(state.get("set_generation", 0))
+    snapshot["current_set_id"] = state.get("current_set_id")
+    snapshot["generation_debug"] = GENERATION_DEBUG
+    return snapshot
+
+
+def generation_log(event: str, **details: Any) -> None:
+    """Trace de diagnostic activable pour les changements de Live Set."""
+    if not GENERATION_DEBUG:
+        return
+    suffix = " ".join(f"{key}={value!r}" for key, value in details.items())
+    print(f"[SET_GENERATION] {event}{' ' + suffix if suffix else ''}", flush=True)
+
+
+def reset_live_set_state_locked(set_id: Optional[str], reason: str) -> int:
+    """Ouvre atomiquement une génération et efface tout état propre au Set précédent."""
+    global _track_count_cache, _cue_points_cache
+
+    previous_generation = int(state.get("set_generation", 0))
+    previous_set_id = state.get("current_set_id")
+    generation = previous_generation + 1
+    identity = set_id or f"pending:{generation}"
+    state.update({
+        "current_set_id": identity,
+        "current_set_name": "",
+        "set_generation": generation,
+        "current_scene": None,
+        "next_scene": None,
+        "has_show_started": False,
+        "selected_scene": 0,
+        "selected_scene_name": "—",
+        "scenes": {},
+        "play_mode": "stopped",
+        "playing_scene": -1,
+        "playing_scene_name": "—",
+        "last_fired_scene": -1,
+        "last_fired_scene_name": "—",
+        "is_playing": False,
+        "is_paused": False,
+        "scene_duration_seconds": None,
+        "remaining_seconds": None,
+        "playback_deadline": None,
+        "arrangement_time": 0.0,
+        "last_arrangement_time": 0.0,
+        "arrangement_time_label": "00:00",
+        "arrangement_marker": "—",
+        "arrangement_markers": [],
+        "message": f"Nouveau Live Set détecté ({reason})",
+        "sync_source": "Ableton",
+    })
+    responses.clear()
+    _track_count_cache = (0.0, MAX_TRACKS_TO_SCAN)
+    _cue_points_cache = (0.0, [], "JSON")
+    generation_log(
+        "new_generation",
+        reason=reason,
+        previous_generation=previous_generation,
+        generation=generation,
+        previous_set_id=previous_set_id,
+        current_set_id=identity,
+    )
+    return generation
+
+
+def generation_is_current(expected_generation: int) -> bool:
     with lock:
-        responses[address] = (time.time(), args)
+        return int(state.get("set_generation", 0)) == int(expected_generation)
 
-        if address == "/live/view/get/selected_scene" and args:
-            state["selected_scene"] = int(args[0])
 
-        elif address == "/live/scene/get/name" and len(args) >= 2:
-            scene_index = int(args[0])
-            name = str(args[1])
-            state["scenes"][scene_index] = name
+def osc_reply(address, *args):
+    if address == "/live/startup":
+        generation_log("startup_received")
+        with lock:
+            generation = reset_live_set_state_locked(None, "startup")
+        threading.Thread(
+            target=refresh_live_set_identity,
+            kwargs={"expected_generation": generation},
+            daemon=True,
+        ).start()
+        return
 
-            if scene_index == state.get("selected_scene"):
-                state["selected_scene_name"] = name
-            if scene_index == state.get("playing_scene"):
-                state["playing_scene_name"] = name
-            if scene_index == state.get("last_fired_scene"):
-                state["last_fired_scene_name"] = name
+    with lock:
+        response_generation = int(state.get("set_generation", 0))
+        responses[address] = (time.time(), args, response_generation)
 
-        elif address == "/live/track/get/playing_slot_index" and len(args) >= 2:
-            slot = int(args[1])
-            if slot >= 0:
-                state["playing_scene"] = slot
 
-        elif address == "/live/song/get/is_playing" and args:
-            raw = args[0]
-            if isinstance(raw, str):
-                playing = raw.strip().lower() not in ("0", "false", "off", "no", "")
-            else:
-                playing = bool(raw)
+def apply_osc_response_locked(address: str, args: Tuple[Any, ...], expected_generation: int) -> None:
+    """Applique une réponse uniquement au traitement qui l'a demandée."""
+    if int(state.get("set_generation", 0)) != int(expected_generation):
+        return
 
-            state["is_playing"] = playing
+    if address == "/live/view/get/selected_scene" and args:
+        state["selected_scene"] = int(args[0])
+        state["next_scene"] = int(args[0])
 
-            # is_playing est global à Ableton : une scène Session peut jouer
-            # sans que l'Arrangement soit le mode UI actif. On ne force donc
-            # jamais play_mode="arrangement" depuis is_playing seul.
-            # jamais play_mode="arrangement" depuis is_playing seul.
-            if playing:
-                state["is_paused"] = False
-            else:
-                if state.get("play_mode") == "arrangement":
-                    state["is_paused"] = True
+    elif address == "/live/scene/get/name" and len(args) >= 2:
+        scene_index = int(args[0])
+        name = str(args[1])
+        state["scenes"][scene_index] = name
+        if scene_index == state.get("selected_scene"):
+            state["selected_scene_name"] = name
+        if state.get("has_show_started") and scene_index == state.get("playing_scene"):
+            state["playing_scene_name"] = name
+            state["current_scene"] = scene_index
+        if state.get("has_show_started") and scene_index == state.get("last_fired_scene"):
+            state["last_fired_scene_name"] = name
 
-            normalize_transport_state_locked()
+    elif address == "/live/song/get/is_playing" and args:
+        raw = args[0]
+        playing = (
+            raw.strip().lower() not in ("0", "false", "off", "no", "")
+            if isinstance(raw, str)
+            else bool(raw)
+        )
+        state["is_playing"] = playing
+        if playing:
+            state["is_paused"] = False
+        elif state.get("play_mode") == "arrangement":
+            state["is_paused"] = True
+        normalize_transport_state_locked()
 
 
 def start_osc_server():
@@ -484,13 +575,26 @@ def show_arrangement_view():
         send(address, "Arrangement View")
 
 
-def query(address: str, *args, timeout=OSC_TIMEOUT):
+def query(address: str, *args, timeout=OSC_TIMEOUT, expected_generation: Optional[int] = None):
     """
     Requête OSC protégée :
     - une seule requête à la fois pour éviter les réponses croisées ;
     - timeout court pour éviter de bloquer Flask.
     """
+    if expected_generation is None:
+        with lock:
+            expected_generation = int(state.get("set_generation", 0))
+
     with query_lock:
+        if not generation_is_current(expected_generation):
+            generation_log(
+                "async_discarded",
+                address=address,
+                expected_generation=expected_generation,
+                current_generation=state.get("set_generation"),
+                phase="before_send",
+            )
+            return None
         with lock:
             responses.pop(address, None)
 
@@ -500,7 +604,19 @@ def query(address: str, *args, timeout=OSC_TIMEOUT):
         while time.time() - t0 < timeout:
             with lock:
                 if address in responses:
-                    return responses[address][1]
+                    _, payload, response_generation = responses[address]
+                    if response_generation == expected_generation and generation_is_current(expected_generation):
+                        apply_osc_response_locked(address, payload, expected_generation)
+                        return payload
+                    generation_log(
+                        "async_discarded",
+                        address=address,
+                        expected_generation=expected_generation,
+                        response_generation=response_generation,
+                        current_generation=state.get("set_generation"),
+                        phase="after_reply",
+                    )
+                    return None
             time.sleep(0.006)
 
     return None
@@ -736,7 +852,13 @@ def current_arrangement_marker(seconds: float) -> str:
 
 def refresh_arrangement_time():
     """Suit la position de lecture Arrangement quand AbletonOSC répond."""
-    res = query("/live/song/get/current_song_time", timeout=0.035)
+    with lock:
+        generation = int(state.get("set_generation", 0))
+    res = query(
+        "/live/song/get/current_song_time",
+        timeout=0.035,
+        expected_generation=generation,
+    )
     if not res:
         return
     value = None
@@ -748,6 +870,8 @@ def refresh_arrangement_time():
     if value is None:
         return
     with lock:
+        if int(state.get("set_generation", 0)) != generation:
+            return
         previous_time = float(state.get("arrangement_time", 0.0))
 
         state["last_arrangement_time"] = previous_time
@@ -784,33 +908,120 @@ def set_arrangement_time(seconds: float, label: str = ""):
         state["sync_source"] = "Arrangement"
 
 
+def _first_text_value(response: Optional[Tuple[Any, ...]]) -> str:
+    if not response:
+        return ""
+    for value in reversed(response):
+        if value is not None:
+            return str(value).strip()
+    return ""
+
+
+def refresh_live_set_identity(expected_generation: Optional[int] = None) -> Optional[int]:
+    """Vérifie l'identité du Set pendant le rafraîchissement normal.
+
+    /live/startup donne la réinitialisation immédiate. Cette comparaison permanente
+    de file_path constitue la seconde source de détection si l'événement est perdu.
+    """
+    if expected_generation is None:
+        with lock:
+            expected_generation = int(state.get("set_generation", 0))
+
+    file_path_response = query(
+        "/live/song/get/file_path",
+        timeout=0.08,
+        expected_generation=expected_generation,
+    )
+    file_path_available = file_path_response is not None
+    file_path = _first_text_value(file_path_response)
+    if not generation_is_current(expected_generation):
+        return None
+
+    set_name = _first_text_value(query(
+        "/live/song/get/name",
+        timeout=0.06,
+        expected_generation=expected_generation,
+    ))
+    if not generation_is_current(expected_generation):
+        return None
+
+    with lock:
+        current_id = state.get("current_set_id")
+        if current_id is None:
+            generation = reset_live_set_state_locked(file_path or None, "initial identity")
+            if not file_path:
+                state["current_set_id"] = f"unsaved:{generation}"
+            state["current_set_name"] = set_name
+            return generation
+
+        pending = str(current_id).startswith("pending:")
+        observed_id = file_path or (f"unsaved:{expected_generation}" if pending else str(current_id))
+
+        if pending:
+            state["current_set_id"] = observed_id
+            state["current_set_name"] = set_name
+            return int(state["set_generation"])
+
+        current_is_temporary = str(current_id).startswith("unsaved:")
+        identity_changed = (
+            file_path_available
+            and (
+                (bool(file_path) and file_path != current_id)
+                or (not file_path and not current_is_temporary)
+            )
+        )
+        if identity_changed:
+            generation_log(
+                "file_path_changed",
+                previous_set_id=current_id,
+                observed_set_id=file_path or "<unsaved>",
+                generation=expected_generation,
+            )
+            generation = reset_live_set_state_locked(file_path or None, "file_path")
+            if not file_path:
+                state["current_set_id"] = f"unsaved:{generation}"
+            state["current_set_name"] = set_name
+            return generation
+
+        state["current_set_name"] = set_name
+        return int(state["set_generation"])
+
+
 
 def refresh_names_and_transport():
     """
     Refresh léger. Ne scanne pas toutes les pistes.
     """
     try:
-        res = query("/live/view/get/selected_scene")
+        with lock:
+            generation = int(state.get("set_generation", 0))
+
+        verified_generation = refresh_live_set_identity(generation)
+        if verified_generation is None:
+            return
+        generation = verified_generation
+
+        res = query("/live/view/get/selected_scene", expected_generation=generation)
         if res:
             selected = int(res[0])
             with lock:
+                if int(state.get("set_generation", 0)) != generation:
+                    return
                 state["selected_scene"] = selected
-            query("/live/scene/get/name", selected)
+                state["next_scene"] = selected
+            query("/live/scene/get/name", selected, expected_generation=generation)
 
-        query("/live/song/get/is_playing")
+        query("/live/song/get/is_playing", expected_generation=generation)
 
         with lock:
+            if int(state.get("set_generation", 0)) != generation:
+                return
             playing = int(state.get("playing_scene", -1))
-            last_fired = int(state.get("last_fired_scene", -1))
 
-        # Si aucun slot actif n'a été détecté, on garde la dernière scène lancée.
-        if playing < 0 and last_fired >= 0:
-            with lock:
-                state["playing_scene"] = last_fired
-                playing = last_fired
-
-        if playing >= 0:
-            query("/live/scene/get/name", playing)
+        with lock:
+            show_started = bool(state.get("has_show_started"))
+        if playing >= 0 and show_started:
+            query("/live/scene/get/name", playing, expected_generation=generation)
 
         with lock:
             state["connected"] = True
@@ -831,8 +1042,17 @@ def refresh_scene_name_async(scene_index: int):
     “prochaine scène sélectionnée” se mette à jour rapidement.
     """
     try:
-        query("/live/scene/get/name", int(scene_index), timeout=0.08)
         with lock:
+            generation = int(state.get("set_generation", 0))
+        query(
+            "/live/scene/get/name",
+            int(scene_index),
+            timeout=0.08,
+            expected_generation=generation,
+        )
+        with lock:
+            if int(state.get("set_generation", 0)) != generation:
+                return
             state["connected"] = True
             state["message"] = "Connecté à AbletonOSC"
     except Exception as e:
@@ -845,6 +1065,9 @@ def scan_scene_names_async(limit: int = 120, clear_before_scan: bool = False):
     clear_before_scan=True sert après changement de projet Ableton :
     on vide l'ancienne liste pour éviter d'afficher les scènes du projet précédent.
     """
+    with lock:
+        generation = int(state.get("set_generation", 0))
+
     if clear_before_scan:
         with lock:
             state["scenes"] = {}
@@ -854,12 +1077,21 @@ def scan_scene_names_async(limit: int = 120, clear_before_scan: bool = False):
             state["message"] = "Rescan scènes…"
 
     for scene_index in range(limit):
+        if not generation_is_current(generation):
+            return
         try:
-            query("/live/scene/get/name", scene_index, timeout=0.05)
+            query(
+                "/live/scene/get/name",
+                scene_index,
+                timeout=0.05,
+                expected_generation=generation,
+            )
         except Exception:
             pass
 
     with lock:
+        if int(state.get("set_generation", 0)) != generation:
+            return
         state["message"] = "Liste des scènes actualisée"
         state["connected"] = True
 def scan_playing_scene_from_tracks():
@@ -870,20 +1102,23 @@ def scan_playing_scene_from_tracks():
     /live/track/get/playing_slot_index suffit généralement à savoir quel slot joue.
     """
     with lock:
+        generation = int(state.get("set_generation", 0))
         current = int(state.get("playing_scene", -1))
-        selected = int(state.get("selected_scene", 0))
-        last_fired = int(state.get("last_fired_scene", -1))
 
-    # On teste d'abord la scène sélectionnée et la dernière scène lancée :
-    # c'est souvent là que le changement direct dans Ableton arrive.
     candidate_tracks = list(range(get_track_count()))
 
     detected_slot = -1
     for track_index in candidate_tracks:
+        if not generation_is_current(generation):
+            return
         if CHECK_MUTE_DURING_PLAYING_SCAN and not is_track_enabled(track_index):
             continue
 
-        res = query("/live/track/get/playing_slot_index", track_index)
+        res = query(
+            "/live/track/get/playing_slot_index",
+            track_index,
+            expected_generation=generation,
+        )
         if res and len(res) >= 2:
             try:
                 slot = int(res[1])
@@ -896,23 +1131,32 @@ def scan_playing_scene_from_tracks():
     if detected_slot >= 0:
         should_query_name = False
         with lock:
+            if int(state.get("set_generation", 0)) != generation:
+                return
             # Si l'utilisateur a repris la main en Arrangement, les anciens
             # playing_slot_index Ableton ne doivent pas rallumer Session.
-            if state.get("play_mode") != "arrangement" and detected_slot != current:
+            if (
+                state.get("play_mode") != "arrangement"
+                and bool(state.get("is_playing"))
+                and detected_slot != current
+            ):
                 state["playing_scene"] = detected_slot
                 state["last_fired_scene"] = detected_slot
                 state["playing_scene_name"] = f"Scène {detected_slot + 1}"
                 state["last_fired_scene_name"] = f"Scène {detected_slot + 1}"
+                state["current_scene"] = detected_slot
+                state["has_show_started"] = True
                 state["play_mode"] = "session"
                 state["sync_source"] = "Ableton direct"
                 should_query_name = True
         # Nom réel demandé hors verrou.
         if should_query_name:
-            query("/live/scene/get/name", detected_slot, timeout=0.05)
-    elif current < 0 and last_fired >= 0:
-        with lock:
-            if state.get("play_mode") != "arrangement":
-                state["playing_scene"] = last_fired
+            query(
+                "/live/scene/get/name",
+                detected_slot,
+                timeout=0.05,
+                expected_generation=generation,
+            )
 
 
 def background_refresh():
@@ -1098,12 +1342,12 @@ def status():
             if deadline is not None and bool(state.get("is_playing", False)) and not bool(state.get("is_paused", False)):
                 state["remaining_seconds"] = max(0.0, float(deadline) - time.time())
 
-            data = dict(state)
+            data = state_snapshot_locked()
         else:
             # Ne jamais déclarer l'interface non connectée juste parce que le lock
             # est occupé : on renvoie le dernier état connu et on signale seulement
             # que le serveur est en actualisation.
-            data = dict(state)
+            data = state_snapshot_locked()
             data["server_busy"] = True
             if data.get("connected"):
                 data["message"] = "Connecté à AbletonOSC — actualisation…"
@@ -1129,7 +1373,7 @@ def rescan_scenes():
     ).start()
     with lock:
         state["message"] = "Rescan scènes lancé"
-        data = dict(state)
+        data = state_snapshot_locked()
     return jsonify({"ok": True, "message": "Rescan scènes lancé", "state": data})
 
 
@@ -1149,7 +1393,7 @@ def build_show():
     ok, message = build_show_from_cached_scenes(spacing_beats=spacing_beats)
 
     with lock:
-        response_state = dict(state)
+        response_state = state_snapshot_locked()
 
     return jsonify({"ok": ok, "message": message, "state": response_state})
 
@@ -1170,6 +1414,7 @@ def select_scene(scene_index: int, source: str = "Télécommande"):
     send("/live/view/set/selected_scene", scene_index)
     with lock:
         state["selected_scene"] = scene_index
+        state["next_scene"] = scene_index
         state["selected_scene_name"] = f"Scène {scene_index + 1}"
         state["message"] = f"Scène {scene_index + 1} sélectionnée"
         state["sync_source"] = source
@@ -1202,6 +1447,8 @@ def action():
             state["last_fired_scene"] = selected
             state["playing_scene"] = selected
             state["playing_scene_name"] = playing_name
+            state["current_scene"] = selected
+            state["has_show_started"] = True
             state["play_mode"] = "session"
             state["is_playing"] = True
             state["is_paused"] = False
@@ -1219,6 +1466,7 @@ def action():
 
         with lock:
             state["selected_scene"] = next_scene
+            state["next_scene"] = next_scene
             state["selected_scene_name"] = f"Scène {next_scene + 1}"
         threading.Thread(target=refresh_scene_name_async, args=(next_scene,), daemon=True).start()
     elif action_name == "arrangement_toggle":
@@ -1396,7 +1644,7 @@ def action():
 
     # On ne bloque pas l'action avec un refresh complet.
     with lock:
-        return jsonify({"ok": True, "state": dict(state)})
+        return jsonify({"ok": True, "state": state_snapshot_locked()})
 
 
 

@@ -1,0 +1,11 @@
+diff --git a/abletonosc/song.py b/abletonosc/song.py
+--- a/abletonosc/song.py
++++ b/abletonosc/song.py
+@@ -86,6 +86,9 @@ class SongHandler(AbletonOSCHandler):
+             "session_record_status"
+         ]
+ 
++        for prop in ["file_path", "name"]:
++            self.osc_server.add_handler("/live/song/get/%s" % prop, partial(self._get_property, self.song, prop))
++
+         for prop in properties_r + properties_rw:

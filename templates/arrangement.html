@@ -526,6 +526,39 @@ body.is-arrangement-paused .card.current {
     let arrangementReturnActive = false;
     let pendingGotoIndex = null;
     let manualNextIndex = null;
+    let lastAcceptedGeneration = -1;
+
+    function acceptStateGeneration(state) {
+      const generation = Number(state && state.set_generation);
+      if (!Number.isInteger(generation) || generation < lastAcceptedGeneration) {
+        if (state && state.generation_debug) {
+          console.warn('[SET_GENERATION] stale_response_rejected', {
+            interface: 'arrangement', received: generation, current: lastAcceptedGeneration
+          });
+        }
+        return false;
+      }
+      if (generation > lastAcceptedGeneration) {
+        if (state && state.generation_debug) {
+          console.info('[SET_GENERATION] generation_accepted', {
+            interface: 'arrangement', previous: lastAcceptedGeneration, generation
+          });
+        }
+        lastAcceptedGeneration = generation;
+        markers = [];
+        markerSignature = '';
+        currentIndex = -1;
+        nextIndex = 0;
+        nextWasManuallySelected = false;
+        selectedMarkerIndex = null;
+        pendingGotoIndex = null;
+        manualNextIndex = null;
+        arrangementReturnActive = false;
+        currentNameEl.textContent = '—';
+        nextNameEl.textContent = '—';
+      }
+      return true;
+    }
 
     function setStatus(text, connected) {
       statusEl.textContent = text;
@@ -731,6 +764,7 @@ body.is-arrangement-paused .card.current {
     }
 
     function applyStatus(state) {
+      if (!acceptStateGeneration(state)) return;
       const connected = Boolean(state && state.connected);
       const arrangementMode = Boolean(state && state.play_mode === 'arrangement');
       if (arrangementMode) arrangementReturnActive = true;
