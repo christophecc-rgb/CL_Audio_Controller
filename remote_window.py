@@ -4,6 +4,29 @@ except ModuleNotFoundError:
     webview = None
 
 import webbrowser
+import json
+import threading
+import time
+from pathlib import Path
+
+KEYBOARD_LOG_PATH = Path("/private/tmp/CL_Audio_Controller_keyboard.log")
+keyboard_log_lock = threading.Lock()
+
+
+class KeyboardDiagnosticAPI:
+    def keyboard_log(self, record):
+        payload = dict(record) if isinstance(record, dict) else {"message": str(record)}
+        payload.setdefault("source", "Wrapper")
+        payload.setdefault("timestamp", int(time.time() * 1000))
+        line = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
+        print(f"[KEYBOARD] {line}", flush=True)
+        try:
+            with keyboard_log_lock:
+                with KEYBOARD_LOG_PATH.open("a", encoding="utf-8") as handle:
+                    handle.write(line + "\n")
+        except Exception as exc:
+            print(f"[KEYBOARD] écriture impossible: {exc}", flush=True)
+        return True
 
 REMOTE_URL = "http://127.0.0.1:5050"
 BASE_WIDTH = 390
@@ -86,6 +109,50 @@ HTML = f"""
 
     window.addEventListener('resize', resizeRemote);
     window.addEventListener('load', resizeRemote);
+    const remoteFrame = document.querySelector('#remote iframe');
+    function wrapperDiagnosticLog(eventName, details = {{}}) {{
+      const record = {{ source: 'Wrapper', event: eventName, ...details }};
+      console.info(`[KEYBOARD][Wrapper] ${{eventName}}`, record);
+      if (window.pywebview && window.pywebview.api && window.pywebview.api.keyboard_log) {{
+        window.pywebview.api.keyboard_log(record).catch(() => {{}});
+      }}
+    }}
+    function wrapperWindowHasFocus() {{
+      return typeof window.hasFocus === 'function' ? window.hasFocus() : document.hasFocus();
+    }}
+    function wrapperFocusSnapshot() {{
+      return {{
+        windowHasFocus: wrapperWindowHasFocus(),
+        documentHasFocus: document.hasFocus(),
+        activeElement: document.activeElement && document.activeElement.tagName,
+        activeElementId: document.activeElement && document.activeElement.id,
+        iframeIsActiveElement: document.activeElement === remoteFrame,
+        iframeMatchesFocus: remoteFrame.matches(':focus')
+      }};
+    }}
+    window.addEventListener('pywebviewready', () => {{
+      wrapperDiagnosticLog('initialized', {{
+        diagnosticCase: 'INITIALIZED_CASE_4_EXCLUDED',
+        timestamp: Date.now(),
+        ...wrapperFocusSnapshot()
+      }});
+    }});
+    remoteFrame.addEventListener('load', () => {{
+      wrapperDiagnosticLog('iframe-loaded', {{
+        timestamp: Date.now(),
+        ...wrapperFocusSnapshot()
+      }});
+    }});
+    document.addEventListener('keydown', event => {{
+      wrapperDiagnosticLog('keydown', {{
+        diagnosticCase: 'CASE_1_WRAPPER_RECEIVED',
+        timestamp: Date.now(),
+        key: event.key,
+        code: event.code,
+        repeat: event.repeat,
+        ...wrapperFocusSnapshot()
+      }});
+    }});
     resizeRemote();
   </script>
 </body>
@@ -107,5 +174,6 @@ if __name__ == "__main__":
         min_size=(390, 700),
         resizable=True,
         confirm_close=False,
+        js_api=KeyboardDiagnosticAPI(),
     )
     webview.start()

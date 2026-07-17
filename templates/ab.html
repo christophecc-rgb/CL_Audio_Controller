@@ -1621,6 +1621,27 @@
     let abletonSelectedScene = null;
     let lastAcceptedGeneration = -1;
 
+    function resetAbUiForGeneration() {
+      preparedNextScene = null;
+      abletonSelectedScene = null;
+      userSceneChoiceDirty = false;
+      lastSceneSelectSignature = '';
+
+      abCurrentTitleEl.textContent = '—';
+      abNextTitleEl.textContent = '—';
+      if (abCounterEl) abCounterEl.textContent = '';
+      if (abSceneSelectEl) {
+        abSceneSelectEl.innerHTML = '<option value="">Choisir…</option>';
+        abSceneSelectEl.value = '';
+      }
+      if (abNowCardEl) abNowCardEl.classList.remove('is-playing', 'state-playing', 'state-paused');
+      if (nextTitleCardEl) {
+        nextTitleCardEl.classList.remove('is-prepared', 'state-playing', 'is-imminent', 'state-paused');
+        nextTitleCardEl.dataset.nextState = '';
+      }
+      abNextTitleEl.classList.remove('is-prepared');
+    }
+
     function acceptStateGeneration(state) {
       const generation = Number(state && state.set_generation);
       if (!Number.isInteger(generation) || generation < lastAcceptedGeneration) {
@@ -1638,18 +1659,16 @@
           });
         }
         lastAcceptedGeneration = generation;
-        preparedNextScene = null;
-        abletonSelectedScene = null;
-        userSceneChoiceDirty = false;
-        lastSceneSelectSignature = '';
-        abCurrentTitleEl.textContent = '—';
-        abNextTitleEl.textContent = '—';
+        resetAbUiForGeneration();
       }
       return true;
     }
 
-    function wait(ms) {
-      return new Promise(resolve => setTimeout(resolve, ms));
+    function newRequestId() {
+      if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+        return window.crypto.randomUUID();
+      }
+      return `go-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     }
 
     function setStatus(text, connected) {
@@ -1692,32 +1711,32 @@
         .sort((a, b) => Number(a[0]) - Number(b[0]));
 
       const signature = JSON.stringify(entries);
-      const currentValue = abSceneSelectEl.value;
       const userIsChoosing = document.activeElement === abSceneSelectEl;
       if (userIsChoosing) return;
-      if (signature === lastSceneSelectSignature && abSceneSelectEl.options.length > 1) return;
+      if (signature !== lastSceneSelectSignature || abSceneSelectEl.options.length <= 1) {
+        abSceneSelectEl.innerHTML = '<option value="">Choisir…</option>';
+        entries.forEach(([index, rawName]) => {
+          const option = document.createElement('option');
+          option.value = String(Number(index) + 1);
+          option.dataset.rawName = rawName;
+          option.textContent = `${Number(index) + 1} · ${cleanTitle(rawName)}`;
+          abSceneSelectEl.appendChild(option);
+        });
+        lastSceneSelectSignature = signature;
+      }
 
-      abSceneSelectEl.innerHTML = '<option value="">Choisir…</option>';
-      entries.forEach(([index, rawName]) => {
-        const option = document.createElement('option');
-        option.value = String(Number(index) + 1);
-        option.dataset.rawName = rawName;
-        option.textContent = `${Number(index) + 1} · ${cleanTitle(rawName)}`;
-        abSceneSelectEl.appendChild(option);
-      });
-
-      const preferredValue = preparedNextScene !== null ? String(preparedNextScene) : currentValue;
+      const preferredValue = userSceneChoiceDirty && preparedNextScene !== null
+        ? String(preparedNextScene)
+        : '';
 
       if (preferredValue && [...abSceneSelectEl.options].some(option => option.value === preferredValue)) {
         abSceneSelectEl.value = preferredValue;
-      } else if (!userSceneChoiceDirty && preparedNextScene === null && abletonSelectedScene !== null) {
+      } else if (!userSceneChoiceDirty && abletonSelectedScene !== null) {
         const nextValue = String(abletonSelectedScene);
         if ([...abSceneSelectEl.options].some(option => option.value === nextValue)) {
           abSceneSelectEl.value = nextValue;
         }
       }
-
-      lastSceneSelectSignature = signature;
     }
 
     function previewSceneSelect(markUserChoice = false) {
@@ -2034,29 +2053,21 @@
 
       try {
         setStatus('● GO titre…', true);
-
-        // 1. Select the requested scene explicitly.
-        await fetchJSON('/action', {
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({action:'goto', scene:sceneNumber})
-        }, 2200);
-
-        // 2. Give AbletonOSC time to apply selection.
-        await wait(350);
-
-        // 3. Launch the exact same scene. The `scene` field is intentional:
-        // if the backend supports it, it avoids relaunching the previous selection.
         const goData = await fetchJSON('/action', {
           method:'POST',
           headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({action:'go', scene:sceneNumber})
+          body:JSON.stringify({
+            action:'go',
+            request_id:newRequestId(),
+            set_generation:lastAcceptedGeneration,
+            scene:sceneNumber
+          })
         }, 2200);
 
         if (goData && goData.state) applyStatus(goData.state);
         else await update();
 
-        // 4. Prepare next scene for the next GO.
+        // Prepare next scene for the next GO.
         advanceSceneSelectAfterGo(sceneNumber);
         setStatus('● Titre lancé — prochain titre préparé', true);
       } catch (_) {
@@ -2151,13 +2162,59 @@
       }
     }
 
-    document.addEventListener('keydown', event => {
-      const activeTag = document.activeElement && document.activeElement.tagName;
-      const isEditing = activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT';
-      if (isEditing) return;
+    function keyboardShortcutBlockReason(event) {
+      if (event.repeat) return 'key-repeat';
+      if (event.metaKey || event.altKey || event.ctrlKey) return 'modifier-key';
+      const target = event.target instanceof Element ? event.target : document.activeElement;
+      if (!target) return '';
+      return (
+        target.matches('input, textarea, select, [contenteditable]:not([contenteditable="false"])') ||
+        target.closest('[contenteditable]:not([contenteditable="false"])')
+      ) ? `editable-focus:${target.tagName || 'contenteditable'}` : '';
+    }
 
-      if (event.key === 'Enter' || event.key === 'Return') {
+    function keyboardDiagnosticLog(eventName, details = {}) {
+      const record = { source: 'AB', event: eventName, ...details };
+      console.info(`[KEYBOARD][AB] ${eventName}`, record);
+      fetch('/keyboard-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(record),
+        keepalive: true
+      }).catch(() => {});
+    }
+
+    keyboardDiagnosticLog('initialized', {
+      diagnosticCase: 'INITIALIZED_CASE_4_EXCLUDED',
+      timestamp: Date.now(),
+      readyState: document.readyState,
+      inIframe: window.top !== window,
+      documentHasFocus: document.hasFocus(),
+      windowHasFocus: typeof window.hasFocus === 'function' ? window.hasFocus() : document.hasFocus()
+    });
+
+    document.addEventListener('keydown', event => {
+      const reason = keyboardShortcutBlockReason(event) || (busy ? 'busy' : '');
+      keyboardDiagnosticLog('keydown', {
+        diagnosticCase: reason ? 'CASE_2_REJECTED' : 'KEYDOWN_ACCEPTED',
+        timestamp: Date.now(),
+        key: event.key,
+        code: event.code,
+        repeat: event.repeat,
+        target: event.target && event.target.tagName,
+        activeElement: document.activeElement && document.activeElement.tagName,
+        activeElementId: document.activeElement && document.activeElement.id,
+        documentHasFocus: document.hasFocus(),
+        windowHasFocus: typeof window.hasFocus === 'function' ? window.hasFocus() : document.hasFocus(),
+        ignored: Boolean(reason),
+        reason
+      });
+      if (reason) return;
+
+      if (event.key === 'Enter') {
         event.preventDefault();
+        event.stopPropagation();
+        keyboardDiagnosticLog('invoke-go', { diagnosticCase: 'CASE_3_HANDLER_CALLED', timestamp: Date.now() });
         confirmSelectedScene();
         return;
       }
@@ -2176,6 +2233,8 @@
 
       if (event.code === 'Space' || event.key === ' ') {
         event.preventDefault();
+        event.stopPropagation();
+        keyboardDiagnosticLog('invoke-play-pause', { diagnosticCase: 'CASE_3_HANDLER_CALLED', timestamp: Date.now() });
         togglePlayPauseFromKeyboard();
       }
     });

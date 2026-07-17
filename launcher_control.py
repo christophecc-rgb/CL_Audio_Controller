@@ -1,4 +1,6 @@
-import socket, subprocess, webbrowser, threading, os, time, sys, importlib.util
+import socket, subprocess, webbrowser, threading, os, time, sys, importlib.util, json, uuid, secrets
+import urllib.request
+import urllib.error
 
 try:
     import webview
@@ -6,10 +8,45 @@ except ModuleNotFoundError:
     webview = None
 from pathlib import Path
 from flask import Flask, jsonify, render_template_string, send_file
+from build_identity import BUILD_ID, IDENTITY_PROTOCOL_VERSION, SERVICE_NAME
+from server_ownership import (
+    DEFAULT_RECORD_PATH,
+    OwnershipRecordError,
+    load_record,
+    process_alive,
+    record_matches_status,
+    remove_record,
+    write_record,
+)
 
 ROOT = Path(__file__).resolve().parent
 APP = ROOT / "app.py"
 PYTHON = ROOT / ".venv" / "bin" / "python"
+KEYBOARD_LOG_PATH = Path("/private/tmp/CL_Audio_Controller_keyboard.log")
+launcher_log_lock = threading.Lock()
+
+
+def launcher_diagnostic_log(record):
+    payload = dict(record)
+    payload.setdefault("timestamp", int(time.time() * 1000))
+    payload.setdefault("processId", os.getpid())
+    line = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
+    print(f"[STATE_READY] {line}", flush=True)
+    try:
+        with launcher_log_lock:
+            with KEYBOARD_LOG_PATH.open("a", encoding="utf-8") as handle:
+                handle.write(line + "\n")
+    except Exception as exc:
+        print(f"[STATE_READY] écriture impossible: {exc}", flush=True)
+
+
+def read_remote_state_diagnostic(timeout=0.3):
+    try:
+        with urllib.request.urlopen(f"{REMOTE_ROOT_URL}status", timeout=timeout) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+            return payload if isinstance(payload, dict) else {}
+    except Exception as exc:
+        return {"diagnostic_error": str(exc)}
 
 
 def bundled_resource(*parts):
@@ -39,6 +76,114 @@ REMOTE_AB_URL = f"http://127.0.0.1:{WEB_PORT}/ab"
 REMOTE_ARRANGEMENT_URL = f"http://127.0.0.1:{WEB_PORT}/arrangement"
 REMOTE_ROOT_LAN_URL = lambda: f"http://{get_lan_ip()}:{WEB_PORT}/"
 REMOTE_APP_NAME = "Télécommande Ableton.app"
+server_ownership_lock = threading.RLock()
+owned_server = None
+claimable_server = None
+ignored_orphan_instance_id = None
+
+
+def ownership_headers(record):
+    return {
+        "X-CL-Launch-ID": record["launch_id"],
+        "X-CL-Server-Instance-ID": record["server_instance_id"],
+        "X-CL-Build-ID": record["build_id"],
+        "X-CL-Shutdown-Token": record["shutdown_token"],
+    }
+
+
+def verify_server_ownership(record, status, timeout=1.0):
+    """Confirme le fichier, l'identité publiée et le secret du serveur actif."""
+    if not record_matches_status(record, status):
+        return False, "identity-mismatch"
+    request_verify = urllib.request.Request(
+        f"{REMOTE_ROOT_URL}ownership/verify",
+        method="POST",
+        headers=ownership_headers(record),
+    )
+    try:
+        with urllib.request.urlopen(request_verify, timeout=timeout) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except Exception:
+        return False, "ownership-proof-failed"
+    if (
+        payload.get("owned") is True
+        and payload.get("server_instance_id") == status.get("server_instance_id")
+    ):
+        return True, "ownership-verified"
+    return False, "ownership-proof-failed"
+
+
+def validate_server_identity(payload, expected_launch_id=None, expected_instance_id=None):
+    """Valide l'identite logique; le PID reste strictement diagnostique."""
+    if not isinstance(payload, dict):
+        return {"valid": False, "code": "invalid-response", "message": "Réponse /status invalide"}
+    if payload.get("service") != SERVICE_NAME:
+        return {"valid": False, "code": "unknown-service", "message": "Service inconnu sur le port 5050"}
+
+    protocol = payload.get("identity_protocol_version")
+    if not isinstance(protocol, int):
+        return {"valid": False, "code": "unknown-protocol", "message": "Protocole d'identité absent ou inconnu"}
+    if protocol < IDENTITY_PROTOCOL_VERSION:
+        return {"valid": False, "code": "older-protocol", "message": f"Protocole serveur plus ancien ({protocol})"}
+    if protocol > IDENTITY_PROTOCOL_VERSION:
+        return {"valid": False, "code": "newer-protocol", "message": f"Protocole serveur plus récent ({protocol})"}
+    if payload.get("build_id") != BUILD_ID:
+        return {"valid": False, "code": "different-build", "message": "Instance issue d'un autre build"}
+
+    launch_id = payload.get("launch_id")
+    instance_id = payload.get("server_instance_id")
+    try:
+        uuid.UUID(str(launch_id))
+        uuid.UUID(str(instance_id))
+    except (ValueError, TypeError, AttributeError):
+        return {"valid": False, "code": "invalid-identity", "message": "Identifiants d'instance absents ou invalides"}
+    if expected_launch_id is not None and launch_id != expected_launch_id:
+        return {"valid": False, "code": "different-launch", "message": "Ancienne instance du même build encore active"}
+    if expected_instance_id is not None and instance_id != expected_instance_id:
+        return {"valid": False, "code": "different-instance", "message": "L'instance serveur a changé depuis sa validation"}
+    return {"valid": True, "code": "valid", "message": "Serveur validé"}
+
+
+def current_identity_status():
+    global claimable_server
+    payload = read_remote_state_diagnostic()
+    with server_ownership_lock:
+        ownership = owned_server
+        expected_launch = ownership["launch_id"] if ownership else None
+        expected_instance = ownership.get("server_instance_id") if ownership else None
+    validation = validate_server_identity(payload, expected_launch, expected_instance)
+    if ownership is not None and validation["valid"]:
+        validation = {"valid": True, "code": "owned-current", "message": "Serveur possédé et validé"}
+    if ownership is None and validation["valid"]:
+        try:
+            record = load_record()
+        except OwnershipRecordError as exc:
+            claimable_server = None
+            validation = {"valid": False, "code": "identity-mismatch", "message": f"Fichier de propriété non sûr : {exc}"}
+        else:
+            if record is None:
+                claimable_server = None
+                validation = {"valid": False, "code": "valid-unowned", "message": "Instance CL Audio valide sans preuve locale de propriété"}
+            elif not process_alive(record["server_process_id"]):
+                claimable_server = None
+                validation = {"valid": False, "code": "stale-record", "message": "Fichier de propriété obsolète"}
+            elif not record_matches_status(record, payload):
+                claimable_server = None
+                validation = {"valid": False, "code": "identity-mismatch", "message": "Le fichier de propriété ne correspond pas au serveur actif"}
+            else:
+                proof_ok, proof_reason = verify_server_ownership(record, payload)
+                if proof_ok:
+                    claimable_server = dict(record)
+                    if ignored_orphan_instance_id == record["server_instance_id"]:
+                        validation = {"valid": False, "code": "valid-unowned", "message": "Instance récupérable ignorée par l’utilisateur"}
+                    else:
+                        validation = {"valid": False, "code": "orphan-claimable", "message": "Instance CL Audio orpheline récupérable"}
+                else:
+                    claimable_server = None
+                    validation = {"valid": False, "code": "identity-mismatch", "message": f"Preuve de propriété refusée ({proof_reason})"}
+    return payload, validation
+
+
 def run_embedded_server():
     """Exécute le serveur inclus dans le bundle, sans Python externe ni Terminal."""
     spec = importlib.util.spec_from_file_location("cl_audio_embedded_server", APP)
@@ -58,12 +203,104 @@ def run_embedded_server():
     module.app.run(host="0.0.0.0", port=WEB_PORT, debug=False, use_reloader=False, threaded=True)
 
 
-def start_web_server():
-    if getattr(sys, "frozen", False):
-        subprocess.Popen([sys.executable, "--serve"], cwd=str(ROOT))
-    else:
-        py = str(PYTHON if PYTHON.exists() else sys.executable)
-        subprocess.Popen([py, str(APP)], cwd=str(ROOT))
+def start_web_server(timeout=6.0):
+    """Lance et valide exactement le processus enfant créé par ce launcher."""
+    global owned_server
+    with server_ownership_lock:
+        if owned_server is not None:
+            payload, validation = current_identity_status()
+            if validation["valid"]:
+                return True, validation["message"]
+            process = owned_server.get("process")
+            if process is not None and process.poll() is None:
+                return False, validation["message"]
+            owned_server = None
+
+        if tcp_ok(WEB_PORT):
+            payload, validation = current_identity_status()
+            launcher_diagnostic_log({
+                "source": "ServerIdentity",
+                "event": "existing-service-classified",
+                "classification": validation["code"],
+                "reason": validation["message"],
+                "launchId": payload.get("launch_id"),
+                "serverInstanceId": payload.get("server_instance_id"),
+                "buildId": payload.get("build_id"),
+                "serverProcessId": payload.get("server_process_id"),
+            })
+            return False, validation["message"]
+
+        try:
+            stale = load_record()
+            if stale is not None and not process_alive(stale["server_process_id"]):
+                remove_record()
+        except OwnershipRecordError as exc:
+            return False, f"Fichier de propriété non sûr : {exc}"
+
+        launch_id = str(uuid.uuid4())
+        shutdown_token = secrets.token_urlsafe(32)
+        child_environment = os.environ.copy()
+        child_environment.update({
+            "CL_AUDIO_LAUNCH_ID": launch_id,
+            "CL_AUDIO_EXPECTED_BUILD_ID": BUILD_ID,
+            "CL_AUDIO_SHUTDOWN_TOKEN": shutdown_token,
+        })
+        if getattr(sys, "frozen", False):
+            command = [sys.executable, "--serve"]
+        else:
+            py = str(PYTHON if PYTHON.exists() else sys.executable)
+            command = [py, str(APP)]
+        process = subprocess.Popen(command, cwd=str(ROOT), env=child_environment)
+        owned_server = {
+            "process": process,
+            "launch_id": launch_id,
+            "server_instance_id": None,
+            "shutdown_token": shutdown_token,
+            "build_id": BUILD_ID,
+        }
+
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            return False, f"Le serveur s'est arrêté pendant son démarrage (code {process.returncode})"
+        if tcp_ok(WEB_PORT):
+            payload = read_remote_state_diagnostic(timeout=0.5)
+            validation = validate_server_identity(payload, launch_id)
+            if validation["valid"]:
+                with server_ownership_lock:
+                    if owned_server and owned_server["launch_id"] == launch_id:
+                        owned_server["server_instance_id"] = payload["server_instance_id"]
+                        owned_server["server_process_id"] = payload["server_process_id"]
+                        owned_server["server_started_at"] = payload["started_at"]
+                try:
+                    write_record({
+                        "schema_version": 1,
+                        "service": SERVICE_NAME,
+                        "identity_protocol_version": IDENTITY_PROTOCOL_VERSION,
+                        "launch_id": launch_id,
+                        "server_instance_id": payload["server_instance_id"],
+                        "build_id": BUILD_ID,
+                        "server_process_id": payload["server_process_id"],
+                        "server_started_at": payload["started_at"],
+                        "recorded_at": time.time(),
+                        "shutdown_token": shutdown_token,
+                    })
+                except OwnershipRecordError as exc:
+                    return False, f"Identité validée mais propriété non sécurisée : {exc}"
+                launcher_diagnostic_log({
+                    "source": "ServerIdentity",
+                    "event": "identity-validated",
+                    "launchId": launch_id,
+                    "serverInstanceId": payload["server_instance_id"],
+                    "buildId": payload.get("build_id"),
+                    "serverProcessId": payload.get("server_process_id"),
+                    "launcherProcessId": os.getpid(),
+                })
+                return True, "Serveur lancé et identité validée"
+            if validation["code"] not in {"invalid-response"} and "diagnostic_error" not in payload:
+                return False, validation["message"]
+        time.sleep(0.05)
+    return False, "Délai dépassé avant validation de l'identité du serveur"
 def find_remote_app():
     candidates = []
 
@@ -294,8 +531,9 @@ async function refresh(){
   setState('ret', s.ret);
   const m=document.getElementById('main');
   const statusBox=document.getElementById('statusBox');
-  if(s.web){m.textContent="● SERVEUR EN MARCHE";m.className="ok";statusBox.className="status ready";}
-  else{m.textContent="● SERVEUR ARRÊTÉ";m.className="off";statusBox.className="status stopped";}
+  if(s.system_ready){m.textContent="● SYSTÈME PRÊT";m.className="ok";statusBox.className="status ready";}
+  else if(s.server_valid){m.textContent="● CHARGEMENT DU LIVE SET";m.className="off";statusBox.className="status stopped";}
+  else{m.textContent="● SERVEUR NON VALIDÉ";m.className="off";statusBox.className="status stopped";}
 }
 setInterval(refresh,1500);
 resizeControlPanel();
@@ -331,11 +569,138 @@ def tcp_ok(port):
 def port_used(port):
     return bool(subprocess.run(["lsof", "-i", f":{port}"], capture_output=True, text=True).stdout.strip())
 
-def kill_server():
-    if getattr(sys, "frozen", False):
-        subprocess.run(["pkill", "-f", f"{sys.executable} --serve"], stderr=subprocess.DEVNULL)
-    subprocess.run(["pkill", "-f", "app.py"], stderr=subprocess.DEVNULL)
-    subprocess.run(f"lsof -ti :{WEB_PORT} | xargs kill -9", shell=True, stderr=subprocess.DEVNULL)
+def stop_owned_server(graceful_timeout=3.0, terminate_timeout=2.0):
+    """Arrête une instance prouvée, sans action globale ni terminaison forcée."""
+    global owned_server
+    with server_ownership_lock:
+        ownership = owned_server
+    if ownership is None:
+        return False, "Aucune instance possédée par ce launcher"
+
+    instance_id = ownership.get("server_instance_id")
+    process = ownership.get("process")
+    pid = ownership.get("server_process_id") or getattr(process, "pid", None)
+    if not instance_id:
+        return False, "Arrêt refusé : identité serveur incomplète"
+
+    payload = read_remote_state_diagnostic()
+    validation = validate_server_identity(payload, ownership["launch_id"], instance_id)
+    if not validation["valid"]:
+        return False, f"Arrêt refusé : {validation['message']}"
+    proof_record = {
+        "schema_version": 1,
+        "service": SERVICE_NAME,
+        "identity_protocol_version": IDENTITY_PROTOCOL_VERSION,
+        "launch_id": ownership["launch_id"],
+        "server_instance_id": instance_id,
+        "build_id": ownership["build_id"],
+        "server_process_id": payload.get("server_process_id"),
+        "server_started_at": payload.get("started_at"),
+        "recorded_at": ownership.get("recorded_at", time.time()),
+        "shutdown_token": ownership["shutdown_token"],
+    }
+    proof_ok, proof_reason = verify_server_ownership(proof_record, payload)
+    if not proof_ok:
+        return False, f"Arrêt refusé : {proof_reason}"
+
+    request_shutdown = urllib.request.Request(
+        f"{REMOTE_ROOT_URL}shutdown",
+        method="POST",
+        headers=ownership_headers(ownership),
+    )
+    try:
+        with urllib.request.urlopen(request_shutdown, timeout=1.0):
+            launcher_diagnostic_log({
+                "source": "ServerIdentity",
+                "event": "graceful-shutdown-accepted",
+                "launchId": ownership["launch_id"],
+                "serverInstanceId": instance_id,
+                "buildId": ownership["build_id"],
+                "serverProcessId": payload.get("server_process_id"),
+            })
+    except (urllib.error.URLError, TimeoutError) as exc:
+        return False, f"Arrêt propre non confirmé : {exc}"
+
+    deadline = time.monotonic() + graceful_timeout
+    while time.monotonic() < deadline:
+        process_stopped = process is None or process.poll() is not None
+        pid_stopped = not pid or not process_alive(pid)
+        if process_stopped and pid_stopped and not tcp_ok(WEB_PORT) and not port_used(RETURN_PORT):
+            break
+        time.sleep(0.05)
+    else:
+        if process is not None and process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=terminate_timeout)
+            except subprocess.TimeoutExpired:
+                return False, "Le processus exact résiste à l’arrêt normal ; terminaison forcée non exécutée"
+        else:
+            return False, "Arrêt demandé mais libération des ports non confirmée"
+
+    if tcp_ok(WEB_PORT) or port_used(RETURN_PORT):
+        return False, "Processus arrêté mais ports 5050/11001 encore occupés"
+    try:
+        remove_record()
+    except OwnershipRecordError as exc:
+        return False, f"Serveur arrêté, mais fichier de propriété non supprimé : {exc}"
+
+    with server_ownership_lock:
+        if owned_server is ownership:
+            owned_server = None
+    return True, "Serveur arrêté proprement"
+
+
+def ensure_valid_server():
+    payload, validation = current_identity_status() if tcp_ok(WEB_PORT) else ({}, {"valid": False})
+    if validation.get("valid"):
+        return True, validation["message"]
+    if tcp_ok(WEB_PORT):
+        return False, validation.get("message", "Serveur non identifiable sur le port 5050")
+    return start_web_server()
+
+
+def adopt_claimable_server():
+    """Adopte explicitement une instance après une nouvelle preuve complète."""
+    global owned_server, claimable_server, ignored_orphan_instance_id
+    payload, validation = current_identity_status()
+    if validation.get("code") != "orphan-claimable" or claimable_server is None:
+        return False, validation.get("message", "Instance non récupérable")
+    record = dict(claimable_server)
+    proof_ok, proof_reason = verify_server_ownership(record, payload)
+    if not proof_ok or not record_matches_status(record, payload):
+        return False, f"Reprise refusée : {proof_reason}"
+    with server_ownership_lock:
+        owned_server = {
+            **record,
+            "process": None,
+            "adopted": True,
+        }
+        claimable_server = None
+        ignored_orphan_instance_id = None
+    return True, "Instance orpheline reprise après validation de propriété"
+
+
+def stop_claimable_server():
+    """Arrête explicitement une instance orpheline après revérification."""
+    global owned_server, claimable_server
+    payload, validation = current_identity_status()
+    if validation.get("code") != "orphan-claimable" or claimable_server is None:
+        return False, validation.get("message", "Instance non récupérable")
+    record = dict(claimable_server)
+    proof_ok, proof_reason = verify_server_ownership(record, payload)
+    if not proof_ok or not record_matches_status(record, payload):
+        return False, f"Arrêt refusé : {proof_reason}"
+    with server_ownership_lock:
+        owned_server = {**record, "process": None, "adopted": True}
+    ok, message = stop_owned_server()
+    if not ok:
+        with server_ownership_lock:
+            if owned_server and owned_server.get("server_instance_id") == record["server_instance_id"]:
+                owned_server = None
+        return False, message
+    claimable_server = None
+    return True, message
 
 def open_remote_app_window(url, title="Télécommande Ableton"):
     """Ouvre la télécommande dans une fenêtre autonome si pywebview est disponible."""
@@ -479,7 +844,7 @@ async function refresh(){
 }
 async function action(path,label){
   const status=document.getElementById('status');status.textContent=label+'…';
-  try{const r=await (await fetch(path)).json();status.textContent=r.message||'Terminé.';}
+  try{const response=await fetch(path);const r=await response.json();status.textContent=response.ok?(r.message||'Terminé.'):('Refus : '+(r.error||response.status));}
   catch(e){status.textContent='Erreur : '+e;}
   await refresh();
 }
@@ -536,6 +901,8 @@ button{font:inherit}
 .action.restart{border-color:rgba(229,166,59,.62);background:rgba(229,166,59,.17)}
 .action:hover{filter:brightness(1.12)}
 .action-status{min-height:18px;font-size:11px;color:var(--muted);padding:2px 3px 0}
+.orphan{display:none;border-color:rgba(229,166,59,.62);background:rgba(229,166,59,.09)}
+.orphan.show{display:block}.orphan-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px}
 .access-head,.tech-head{font-size:11px;font-weight:780;text-transform:uppercase;letter-spacing:.08em;color:#c9ced8;margin-bottom:8px}
 .address-row{display:grid;grid-template-columns:1fr auto auto;gap:7px;align-items:center}
 .address{height:34px;display:flex;align-items:center;padding:0 10px;border-radius:9px;background:#11141a;border:1px solid #303540;font:12px Menlo,monospace;color:#e4e8ee;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -581,6 +948,16 @@ body.show-mode .system{min-height:86px}
   </div>
   <div id="actionStatus" class="action-status">Prêt.</div>
 
+  <section id="orphanCard" class="card orphan">
+    <div class="access-head">Instance précédente détectée</div>
+    <div id="orphanDetail" class="state-detail">—</div>
+    <div class="orphan-actions">
+      <button class="action start" onclick="runPostAction('/orphan/adopt','Reprise de l’instance')">Reprendre</button>
+      <button class="action restart" onclick="runPostAction('/orphan/stop','Arrêt de l’instance')">Arrêter</button>
+      <button class="action" onclick="runPostAction('/orphan/cancel','Annulation')">Annuler</button>
+    </div>
+  </section>
+
   <section class="card">
     <div class="access-head">Accès distant</div>
     <div class="address-row">
@@ -612,16 +989,21 @@ function setTech(id,on){el(id).className='tech-item '+(on?'on':'');}
 function setBusy(label){el('systemCard').className='card system busy';el('stateTitle').textContent=label.toUpperCase();el('stateDetail').textContent='Veuillez patienter…';}
 function render(s){
   latestState=s;const card=el('systemCard'),title=el('stateTitle'),detail=el('stateDetail');
-  if(s.web&&s.ret){card.className='card system ready';title.textContent='SYSTÈME PRÊT';detail.textContent=s.osc?'Serveur et liaisons OSC opérationnels':'Serveur prêt · attente d’AbletonOSC';}
-  else if(s.web){card.className='card system warning';title.textContent='CONNEXION PARTIELLE';detail.textContent='Le serveur répond, liaison OSC incomplète';}
+  if(s.system_ready){card.className='card system ready';title.textContent='SYSTÈME PRÊT';detail.textContent='Serveur validé · Live Set prêt · OSC retour disponible';}
+  else if(s.server_valid&&!s.live_set_ready){card.className='card system warning';title.textContent='CHARGEMENT DU LIVE SET';detail.textContent='Serveur validé · '+(s.bootstrap_step||'attente de l’état Ableton');}
+  else if(s.server_valid){card.className='card system warning';title.textContent='SERVEUR VALIDÉ';detail.textContent='Attente de la liaison OSC retour';}
+  else if(s.web){card.className='card system error';title.textContent='SERVEUR NON VALIDÉ';detail.textContent=s.identity_message||'Instance inconnue ou incompatible sur le port 5050';}
   else{card.className='card system error';title.textContent='SYSTÈME ARRÊTÉ';detail.textContent='Démarrez le serveur avant le spectacle';}
   const now=new Date();el('stateTime').textContent=now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
   el('remoteAddress').textContent=s.lan_url;el('localAddress').textContent=s.local_url.replace(/^https?:\/\//,'');
   setTech('techWeb',s.web);setTech('techOsc',s.osc);setTech('techReturn',s.ret);
   el('events').innerHTML=(s.events||[]).slice().reverse().join('<br>')||'Aucun événement récent.';
+  el('orphanCard').className='card orphan '+(s.orphan_actions_available?'show':'');
+  if(s.orphan_actions_available)el('orphanDetail').textContent='Instance '+s.orphan_instance_id+' · PID '+s.orphan_process_id+' · '+s.build_id;
 }
 async function refresh(){try{render(await(await fetch('/state')).json());}catch(e){el('systemCard').className='card system error';el('stateTitle').textContent='PANNEAU HORS LIGNE';el('stateDetail').textContent=String(e);}}
-async function runAction(path,label){setBusy(label);el('actionStatus').textContent=label+'…';try{const r=await(await fetch(path)).json();el('actionStatus').textContent='✓ '+(r.message||'Action terminée');}catch(e){el('actionStatus').textContent='! '+e;}setTimeout(refresh,450);}
+async function runAction(path,label){setBusy(label);el('actionStatus').textContent=label+'…';try{const response=await fetch(path);const r=await response.json();el('actionStatus').textContent=response.ok?('✓ '+(r.message||'Action terminée')):('! Refus : '+(r.error||response.status));}catch(e){el('actionStatus').textContent='! '+e;}setTimeout(refresh,450);}
+async function runPostAction(path,label){setBusy(label);el('actionStatus').textContent=label+'…';try{const response=await fetch(path,{method:'POST'});const r=await response.json();el('actionStatus').textContent=response.ok?('✓ '+(r.message||'Action terminée')):('! Refus : '+(r.error||response.status));}catch(e){el('actionStatus').textContent='! '+e;}setTimeout(refresh,450);}
 function confirmStop(){if(confirm('Arrêter le serveur de télécommande ?\n\nLes appareils connectés perdront immédiatement l’accès.'))runAction('/stop','Arrêt du serveur');}
 async function copyAddress(){if(!latestState)return;try{await navigator.clipboard.writeText(latestState.lan_url);el('actionStatus').textContent='✓ Adresse copiée';}catch(e){el('actionStatus').textContent='Adresse : '+latestState.lan_url;}}
 function toggleShowMode(){document.body.classList.toggle('show-mode');el('showMode').textContent=document.body.classList.contains('show-mode')?'Quitter le mode spectacle':'Mode spectacle';}
@@ -651,41 +1033,133 @@ def paradis_logo():
 
 @app.route("/state")
 def state():
-    return jsonify(
-        web=tcp_ok(WEB_PORT),
+    web_ready = tcp_ok(WEB_PORT)
+    if web_ready:
+        remote_state, identity = current_identity_status()
+    else:
+        remote_state = {}
+        identity = {"valid": False, "code": "offline", "message": "Serveur HTTP absent"}
+    server_valid = bool(identity["valid"])
+    live_set_ready = bool(remote_state.get("set_ready")) if server_valid else False
+    osc_return_ready = port_used(RETURN_PORT)
+    system_ready = server_valid and live_set_ready and osc_return_ready
+    response_payload = dict(
+        web=web_ready,
         osc=port_used(OSC_PORT),
-        ret=port_used(RETURN_PORT),
+        ret=osc_return_ready,
         local_url=REMOTE_ROOT_URL,
         lan_url=REMOTE_ROOT_LAN_URL(),
-        events=events[-5:]
+        events=events[-5:],
+        set_ready=remote_state.get("set_ready"),
+        set_generation=remote_state.get("set_generation"),
+        state_object_id=remote_state.get("state_object_id"),
+        server_process_id=remote_state.get("server_process_id"),
+        launcher_process_id=os.getpid(),
+        remote_state_error=remote_state.get("diagnostic_error"),
+        server_valid=server_valid,
+        live_set_ready=live_set_ready,
+        system_ready=system_ready,
+        identity_status=identity["code"],
+        identity_message=identity["message"],
+        launch_id=remote_state.get("launch_id"),
+        server_instance_id=remote_state.get("server_instance_id"),
+        build_id=remote_state.get("build_id"),
+        identity_protocol_version=remote_state.get("identity_protocol_version"),
+        bootstrap_step=remote_state.get("bootstrap_step"),
+        bootstrap_running=remote_state.get("bootstrap_running"),
+        bootstrap_generation=remote_state.get("bootstrap_generation"),
+        last_successful_bootstrap=remote_state.get("last_successful_bootstrap"),
+        pending_request=remote_state.get("pending_request"),
+        orphan_actions_available=identity["code"] == "orphan-claimable",
+        orphan_instance_id=(remote_state.get("server_instance_id") or "")[:8] or None,
+        orphan_process_id=remote_state.get("server_process_id") if identity["code"] == "orphan-claimable" else None,
+        orphan_started_at=remote_state.get("started_at") if identity["code"] == "orphan-claimable" else None,
     )
+    launcher_diagnostic_log({
+        "source": "LauncherState",
+        "event": "state-response",
+        "panelSystemReady": system_ready,
+        "serverValid": server_valid,
+        "liveSetReady": live_set_ready,
+        "systemReady": system_ready,
+        "identityStatus": identity["code"],
+        "identityReason": identity["message"],
+        "launchId": remote_state.get("launch_id"),
+        "serverInstanceId": remote_state.get("server_instance_id"),
+        "buildId": remote_state.get("build_id"),
+        "setReady": response_payload["set_ready"],
+        "setGeneration": response_payload["set_generation"],
+        "stateObjectId": response_payload["state_object_id"],
+        "serverProcessId": response_payload["server_process_id"],
+        "launcherProcessId": response_payload["launcher_process_id"],
+        "webPortReady": response_payload["web"],
+        "oscSendPortPresent": response_payload["osc"],
+        "oscReturnPortPresent": response_payload["ret"],
+    })
+    return jsonify(response_payload)
 
 @app.route("/start")
 def start():
-    kill_server()
-    start_web_server()
-    event("Serveur lancé")
-    return jsonify(message="Serveur lancé")
+    ok, message = ensure_valid_server()
+    if not ok:
+        event(f"Démarrage refusé : {message}")
+        return jsonify(error=message), 409
+    event(message)
+    return jsonify(message=message)
+
+
+@app.route("/orphan/adopt", methods=["POST"])
+def orphan_adopt():
+    ok, message = adopt_claimable_server()
+    event(message)
+    return jsonify(message=message) if ok else (jsonify(error=message), 409)
+
+
+@app.route("/orphan/stop", methods=["POST"])
+def orphan_stop():
+    ok, message = stop_claimable_server()
+    event(message)
+    return jsonify(message=message) if ok else (jsonify(error=message), 409)
+
+
+@app.route("/orphan/cancel", methods=["POST"])
+def orphan_cancel():
+    global ignored_orphan_instance_id
+    payload, identity = current_identity_status()
+    if identity.get("code") != "orphan-claimable":
+        return jsonify(error="Aucune instance orpheline récupérable"), 409
+    ignored_orphan_instance_id = payload.get("server_instance_id")
+    event("Instance orpheline laissée intacte")
+    return jsonify(message="Instance orpheline laissée intacte")
 
 @app.route("/stop")
 def stop():
-    kill_server()
-    event("Serveur arrêté")
-    return jsonify(message="Serveur arrêté")
+    ok, message = stop_owned_server()
+    if not ok:
+        event(message)
+        return jsonify(error=message), 409
+    event(message)
+    return jsonify(message=message)
 
 @app.route("/restart")
 def restart():
-    kill_server()
-    start_web_server()
-    event("Serveur relancé")
-    return jsonify(message="Serveur relancé")
+    if tcp_ok(WEB_PORT):
+        ok, message = stop_owned_server()
+        if not ok:
+            event(f"Redémarrage refusé : {message}")
+            return jsonify(error=message), 409
+    ok, message = start_web_server()
+    if not ok:
+        event(f"Redémarrage impossible : {message}")
+        return jsonify(error=message), 409
+    event("Serveur relancé et validé")
+    return jsonify(message="Serveur relancé et validé")
 
 @app.route("/open")
 def open_web():
-    if not tcp_ok(WEB_PORT):
-        start_web_server()
-        time.sleep(1.0)
-        event("Serveur lancé")
+    ok, message = ensure_valid_server()
+    if not ok:
+        return jsonify(error=message), 409
     mode = open_remote_app_window(REMOTE_ROOT_URL, "Télécommande Ableton — Session")
     event("Onglet Session ouvert")
     return jsonify(message=f"Onglet Session ouvert en {mode}", url=REMOTE_ROOT_URL)
@@ -693,20 +1167,18 @@ def open_web():
 
 @app.route("/local-page")
 def local_page():
-    if not tcp_ok(WEB_PORT):
-        start_web_server()
-        time.sleep(1.0)
-        event("Serveur lancé")
+    ok, message = ensure_valid_server()
+    if not ok:
+        return jsonify(error=message), 409
     webbrowser.open(REMOTE_ROOT_URL)
     event("Page locale ouverte")
     return jsonify(message="Page locale ouverte dans le navigateur", url=REMOTE_ROOT_URL)
 
 @app.route("/open-ab")
 def open_ab():
-    if not tcp_ok(WEB_PORT):
-        start_web_server()
-        time.sleep(1.0)
-        event("Serveur lancé")
+    ok, message = ensure_valid_server()
+    if not ok:
+        return jsonify(error=message), 409
     desktop_url = f"{REMOTE_AB_URL}?desktop=1&v=2.0.1"
     mode = open_remote_app_window(desktop_url, "Télécommande Ableton — A/B")
     event("Onglet A/B ouvert")
@@ -715,20 +1187,18 @@ def open_ab():
 
 @app.route("/open-arrangement")
 def open_arrangement():
-    if not tcp_ok(WEB_PORT):
-        start_web_server()
-        time.sleep(1.0)
-        event("Serveur lancé")
+    ok, message = ensure_valid_server()
+    if not ok:
+        return jsonify(error=message), 409
     mode = open_remote_app_window(REMOTE_ARRANGEMENT_URL, "Télécommande Ableton — Arrangement")
     event("Onglet Arrangement ouvert")
     return jsonify(message=f"Onglet Arrangement ouvert en {mode}", url=REMOTE_ARRANGEMENT_URL)
 
 @app.route("/remote-window")
 def remote_window():
-    if not tcp_ok(WEB_PORT):
-        start_web_server()
-        time.sleep(1.0)
-        event("Serveur lancé")
+    ok, message = ensure_valid_server()
+    if not ok:
+        return jsonify(error=message), 409
 
     mode = open_remote_app_window(REMOTE_ROOT_URL, "Télécommande Ableton")
     event("Télécommande ouverte sur Session")
@@ -737,7 +1207,12 @@ def remote_window():
 @app.route("/quit")
 def quit_launcher():
     event("Launcher fermé")
-    threading.Timer(0.5, lambda: os._exit(0)).start()
+
+    def close_owned_processes():
+        stop_owned_server()
+        os._exit(0)
+
+    threading.Timer(0.5, close_owned_processes).start()
     return jsonify(message="Launcher fermé")
 
 
@@ -777,3 +1252,4 @@ if __name__ == "__main__":
         text_select=True,
     )
     webview.start(gui="cocoa", debug=False)
+    stop_owned_server()

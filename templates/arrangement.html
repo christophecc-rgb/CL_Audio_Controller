@@ -528,6 +528,30 @@ body.is-arrangement-paused .card.current {
     let manualNextIndex = null;
     let lastAcceptedGeneration = -1;
 
+    function resetArrangementUiForGeneration() {
+      markers = [];
+      markerSignature = '';
+      currentIndex = -1;
+      nextIndex = -1;
+      nextWasManuallySelected = false;
+      selectedMarkerIndex = null;
+      markerSelectIsOpen = false;
+      pendingGotoIndex = null;
+      manualNextIndex = null;
+      arrangementReturnActive = false;
+
+      currentNameEl.textContent = '—';
+      nextNameEl.textContent = '—';
+      currentMetaEl.textContent = '';
+      nextMetaEl.textContent = '';
+      countLabelEl.textContent = '';
+      timeLabelEl.textContent = '';
+      if (markerSelectEl) markerSelectEl.innerHTML = '';
+      document.body.classList.remove('is-arrangement-playing', 'is-arrangement-paused');
+      if (currentCardEl) currentCardEl.classList.remove('is-playing', 'is-paused');
+      if (nextCardEl) nextCardEl.classList.remove('is-prepared', 'next-selected');
+    }
+
     function acceptStateGeneration(state) {
       const generation = Number(state && state.set_generation);
       if (!Number.isInteger(generation) || generation < lastAcceptedGeneration) {
@@ -545,17 +569,7 @@ body.is-arrangement-paused .card.current {
           });
         }
         lastAcceptedGeneration = generation;
-        markers = [];
-        markerSignature = '';
-        currentIndex = -1;
-        nextIndex = 0;
-        nextWasManuallySelected = false;
-        selectedMarkerIndex = null;
-        pendingGotoIndex = null;
-        manualNextIndex = null;
-        arrangementReturnActive = false;
-        currentNameEl.textContent = '—';
-        nextNameEl.textContent = '—';
+        resetArrangementUiForGeneration();
       }
       return true;
     }
@@ -858,7 +872,7 @@ body.is-arrangement-paused .card.current {
       return {action, time:marker.time, name:marker.name, source:marker.source, cue_index:marker.cue_index};
     }
 
-goBtn.addEventListener('click', async () => {
+async function runArrangementGo() {
   if (busy) return;
 
   let launchIndex = manualNextIndex !== null ? manualNextIndex : selectedMarkerIndex;
@@ -906,7 +920,9 @@ goBtn.addEventListener('click', async () => {
   } finally {
     setTimeout(() => { setDisabled(false); update(); }, 180);
   }
-});
+}
+
+goBtn.addEventListener('click', runArrangementGo);
 
     previewBtn.addEventListener('click', () => {
       if (!markers.length) return;
@@ -974,7 +990,82 @@ markerSelectEl.addEventListener('change', () => {
       previewSelectedMarker(idx, true, true);
     });
 
-    transportButtons.forEach(button => button.addEventListener('click', () => sendAction({action:button.dataset.action})));
+    function runArrangementPlayPause() {
+      return sendAction({action: pauseToggleBtn.dataset.action});
+    }
+
+    transportButtons.forEach(button => {
+      if (button === pauseToggleBtn) {
+        button.addEventListener('click', runArrangementPlayPause);
+      } else {
+        button.addEventListener('click', () => sendAction({action:button.dataset.action}));
+      }
+    });
+
+    function keyboardShortcutBlockReason(event) {
+      if (event.repeat) return 'key-repeat';
+      if (event.metaKey || event.altKey || event.ctrlKey) return 'modifier-key';
+      const target = event.target instanceof Element ? event.target : document.activeElement;
+      if (!target) return '';
+      return (
+        target.matches('input, textarea, select, [contenteditable]:not([contenteditable="false"])') ||
+        target.closest('[contenteditable]:not([contenteditable="false"])')
+      ) ? `editable-focus:${target.tagName || 'contenteditable'}` : '';
+    }
+
+    function keyboardDiagnosticLog(eventName, details = {}) {
+      const record = { source: 'Arrangement', event: eventName, ...details };
+      console.info(`[KEYBOARD][Arrangement] ${eventName}`, record);
+      fetch('/keyboard-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(record),
+        keepalive: true
+      }).catch(() => {});
+    }
+
+    keyboardDiagnosticLog('initialized', {
+      diagnosticCase: 'INITIALIZED_CASE_4_EXCLUDED',
+      timestamp: Date.now(),
+      readyState: document.readyState,
+      inIframe: window.top !== window,
+      documentHasFocus: document.hasFocus(),
+      windowHasFocus: typeof window.hasFocus === 'function' ? window.hasFocus() : document.hasFocus()
+    });
+
+    document.addEventListener('keydown', event => {
+      const reason = keyboardShortcutBlockReason(event) || (busy ? 'busy' : '');
+      keyboardDiagnosticLog('keydown', {
+        diagnosticCase: reason ? 'CASE_2_REJECTED' : 'KEYDOWN_ACCEPTED',
+        timestamp: Date.now(),
+        key: event.key,
+        code: event.code,
+        repeat: event.repeat,
+        target: event.target && event.target.tagName,
+        activeElement: document.activeElement && document.activeElement.tagName,
+        activeElementId: document.activeElement && document.activeElement.id,
+        documentHasFocus: document.hasFocus(),
+        windowHasFocus: typeof window.hasFocus === 'function' ? window.hasFocus() : document.hasFocus(),
+        ignored: Boolean(reason),
+        reason
+      });
+      if (reason) return;
+
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        event.stopPropagation();
+        keyboardDiagnosticLog('invoke-go', { diagnosticCase: 'CASE_3_HANDLER_CALLED', timestamp: Date.now() });
+        runArrangementGo();
+        return;
+      }
+
+      if (event.code === 'Space' || event.key === ' ') {
+        event.preventDefault();
+        event.stopPropagation();
+        keyboardDiagnosticLog('invoke-play-pause', { diagnosticCase: 'CASE_3_HANDLER_CALLED', timestamp: Date.now() });
+        runArrangementPlayPause();
+      }
+    });
 
     renderConduite();
     update();

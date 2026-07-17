@@ -13,19 +13,21 @@
 # - ce script reçoit les réponses sur 11001
 
 import json
+import hmac
 import re
 import socket
 import threading
 import multiprocessing
 import time
+import uuid
 from typing import Any, Dict, Optional, Tuple
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
+from build_identity import BUILD_ID, IDENTITY_PROTOCOL_VERSION, SERVICE_NAME
 
 multiprocessing.freeze_support()
 
-import subprocess
 import os
 import signal
 import webbrowser
@@ -33,26 +35,29 @@ import threading
 import multiprocessing
 import socket
 
-def free_port_5050():
-    try:
-        result = subprocess.run(
-            ["lsof", "-ti", ":5050"],
-            capture_output=True,
-            text=True
-        )
-        for pid_txt in result.stdout.splitlines():
-            try:
-                pid = int(pid_txt.strip())
-                if pid != os.getpid():
-                    os.kill(pid, signal.SIGKILL)
-                    print(f"Ancien serveur arrêté sur 5050 : PID {pid}")
-            except Exception as e:
-                print(f"Impossible d'arrêter PID {pid_txt}: {e}")
-    except Exception as e:
-        print(f"Vérification port 5050 impossible : {e}")
-
-free_port_5050()
 from pythonosc import dispatcher, osc_server, udp_client
+
+SERVER_STARTED_MONOTONIC = time.monotonic()
+SERVER_STARTED_AT = time.time()
+SERVER_INSTANCE_ID = str(uuid.uuid4())
+LAUNCH_ID = os.environ.get("CL_AUDIO_LAUNCH_ID")
+EXPECTED_BUILD_ID = os.environ.get("CL_AUDIO_EXPECTED_BUILD_ID")
+SHUTDOWN_TOKEN = os.environ.get("CL_AUDIO_SHUTDOWN_TOKEN")
+
+if EXPECTED_BUILD_ID and EXPECTED_BUILD_ID != BUILD_ID:
+    raise RuntimeError(
+        f"Build serveur incompatible: attendu={EXPECTED_BUILD_ID!r}, embarque={BUILD_ID!r}"
+    )
+
+print(json.dumps({
+    "source": "ServerIdentity",
+    "event": "server-instance-created",
+    "launchId": LAUNCH_ID,
+    "serverInstanceId": SERVER_INSTANCE_ID,
+    "buildId": BUILD_ID,
+    "serverProcessId": os.getpid(),
+    "startedAt": SERVER_STARTED_AT,
+}, ensure_ascii=False, sort_keys=True), flush=True)
 
 # Crossfader Ableton via Max for Live OSC, zéro MIDI.
 
@@ -87,10 +92,10 @@ TRACK_COUNT_CACHE_SECONDS = 10.0
 CHECK_MUTE_DURING_PLAYING_SCAN = False
 
 # Réglages anti-gel / stabilité
-GO_COOLDOWN = 0.8
 BACKGROUND_REFRESH_SECONDS = 0.25
 FULL_REFRESH_SECONDS = 1.0
 OSC_TIMEOUT = 0.06
+OSC_BOOTSTRAP_DRAIN_SECONDS = 0.25
 
 # Diagnostic ciblé des changements de Set, silencieux par défaut.
 # Activer ponctuellement avec CL_AUDIO_GENERATION_DEBUG=1.
@@ -101,6 +106,55 @@ GENERATION_DEBUG = os.environ.get("CL_AUDIO_GENERATION_DEBUG", "0").strip().lowe
 
 app = Flask(__name__)
 client = udp_client.SimpleUDPClient(ABLETON_IP, ABLETON_PORT)
+
+KEYBOARD_LOG_PATH = Path("/private/tmp/CL_Audio_Controller_keyboard.log")
+keyboard_log_lock = threading.Lock()
+keyboard_diagnostic_session = f"server-{os.getpid()}-{int(time.time())}"
+BOOTSTRAP_LOG_PATH = Path("/private/tmp/CL_Audio_Controller_bootstrap.log")
+bootstrap_log_lock = threading.Lock()
+
+
+def write_keyboard_diagnostic(record: Dict[str, Any]) -> None:
+    """Écrit une trace clavier temporaire sans intervenir dans son traitement."""
+    payload = dict(record)
+    payload.setdefault("timestamp", int(time.time() * 1000))
+    payload.setdefault("session", keyboard_diagnostic_session)
+    line = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
+    print(f"[KEYBOARD] {line}", flush=True)
+    try:
+        with keyboard_log_lock:
+            with KEYBOARD_LOG_PATH.open("a", encoding="utf-8") as handle:
+                handle.write(line + "\n")
+    except Exception as exc:
+        print(f"[KEYBOARD] écriture impossible: {exc}", flush=True)
+
+
+def write_bootstrap_diagnostic(event: str, **details: Any) -> None:
+    """Journal temporaire en lecture seule du cycle OSC et du bootstrap."""
+    payload = {
+        "timestamp": int(time.time() * 1000),
+        "source": "BootstrapDiagnostic",
+        "event": event,
+        "processId": os.getpid(),
+        "serverInstanceId": SERVER_INSTANCE_ID,
+        **details,
+    }
+    line = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str)
+    print(f"[BOOTSTRAP] {line}", flush=True)
+    try:
+        with bootstrap_log_lock:
+            with BOOTSTRAP_LOG_PATH.open("a", encoding="utf-8") as handle:
+                handle.write(line + "\n")
+    except Exception as exc:
+        print(f"[BOOTSTRAP] écriture impossible: {exc}", flush=True)
+
+
+write_bootstrap_diagnostic(
+    "server-started",
+    launchId=LAUNCH_ID,
+    buildId=BUILD_ID,
+    bootstrapStep="démarrage du serveur",
+)
 
 # -----------------------------------------------------------------------------
 # Arrangement / conduite spectacle
@@ -298,6 +352,7 @@ state: Dict[str, Any] = {
     "current_set_id": None,
     "current_set_name": "",
     "set_generation": 0,
+    "set_ready": False,
     "current_scene": None,
     "next_scene": None,
     "has_show_started": False,
@@ -315,6 +370,11 @@ state: Dict[str, Any] = {
     "remaining_seconds": None,
     "playback_deadline": None,
     "connected": False,
+    "bootstrap_step": "attente de /live/startup ou de Song.file_path",
+    "bootstrap_running": False,
+    "bootstrap_generation": None,
+    "last_successful_bootstrap": None,
+    "pending_request": None,
     "message": "Démarrage…",
     "sync_source": "Ableton",
     "arrangement_time": 0.0,
@@ -328,6 +388,77 @@ state: Dict[str, Any] = {
     "ltc": "--:--:--:--",
     "smpte": "--:--:--:--",
 }
+
+
+def set_set_ready_locked(new_value: bool, reason: str, function_name: str) -> None:
+    """Modifie set_ready en traçant l'instance et la génération concernées."""
+    old_value = bool(state.get("set_ready", False))
+    normalized_value = bool(new_value)
+    state["set_ready"] = normalized_value
+    if old_value == normalized_value:
+        return
+    write_bootstrap_diagnostic(
+        "set-ready-changed",
+        oldValue=old_value,
+        newValue=normalized_value,
+        reason=reason,
+        function=function_name,
+        setGeneration=int(state.get("set_generation", 0)),
+    )
+    write_keyboard_diagnostic({
+        "source": "ServerState",
+        "event": "set-ready-changed",
+        "oldValue": old_value,
+        "newValue": normalized_value,
+        "reason": reason,
+        "function": function_name,
+        "setGeneration": int(state.get("set_generation", 0)),
+        "stateObjectId": id(state),
+        "processId": os.getpid(),
+    })
+
+
+def set_connected_locked(new_value: bool, reason: str, function_name: str) -> None:
+    old_value = bool(state.get("connected", False))
+    normalized_value = bool(new_value)
+    state["connected"] = normalized_value
+    if old_value != normalized_value:
+        write_bootstrap_diagnostic(
+            "connected-changed",
+            oldValue=old_value,
+            newValue=normalized_value,
+            reason=reason,
+            function=function_name,
+            setGeneration=int(state.get("set_generation", 0)),
+        )
+
+
+def set_bootstrap_step_locked(step: str, reason: str = "") -> None:
+    old_step = str(state.get("bootstrap_step") or "")
+    state["bootstrap_step"] = step
+    if old_step != step:
+        write_bootstrap_diagnostic(
+            "bootstrap-step-changed",
+            oldStep=old_step,
+            newStep=step,
+            reason=reason,
+            setGeneration=int(state.get("set_generation", 0)),
+        )
+
+
+write_keyboard_diagnostic({
+    "source": "ServerState",
+    "event": "state-created",
+    "oldValue": None,
+    "newValue": bool(state.get("set_ready", False)),
+    "reason": "initialisation du module app.py",
+    "function": "module initialization",
+    "setGeneration": int(state.get("set_generation", 0)),
+    "stateObjectId": id(state),
+    "processId": os.getpid(),
+})
+
+
 def start_ltc_udp_listener():
     """Écoute LTC Display v1.9 en UDP et injecte le TC dans /status.
 
@@ -408,15 +539,17 @@ def normalize_transport_state_locked():
     if not is_playing and play_mode == "arrangement" and not bool(state.get("is_paused", False)):
         state["play_mode"] = "stopped"
 
-responses: Dict[str, Tuple[float, Tuple[Any, ...], int]] = {}
+active_query: Optional[Dict[str, Any]] = None
 lock = threading.RLock()
 query_lock = threading.Lock()
+scene_transaction_lock = threading.Lock()
 
-last_go_time = 0.0
+completed_go_requests: Dict[Tuple[int, str], Dict[str, Any]] = {}
 last_full_refresh = 0.0
 last_playing_scan = 0.0
 _track_count_cache: Tuple[float, int] = (0.0, MAX_TRACKS_TO_SCAN)
 _cue_points_cache: Tuple[float, list, str] = (0.0, [], "JSON")
+_bootstrap_generation: Optional[int] = None
 
 
 def state_snapshot_locked() -> Dict[str, Any]:
@@ -425,6 +558,29 @@ def state_snapshot_locked() -> Dict[str, Any]:
     snapshot["set_generation"] = int(state.get("set_generation", 0))
     snapshot["current_set_id"] = state.get("current_set_id")
     snapshot["generation_debug"] = GENERATION_DEBUG
+    snapshot["state_object_id"] = id(state)
+    snapshot["server_process_id"] = os.getpid()
+    snapshot["service"] = SERVICE_NAME
+    snapshot["identity_protocol_version"] = IDENTITY_PROTOCOL_VERSION
+    snapshot["launch_id"] = LAUNCH_ID
+    snapshot["server_instance_id"] = SERVER_INSTANCE_ID
+    snapshot["build_id"] = BUILD_ID
+    snapshot["started_at"] = SERVER_STARTED_AT
+    snapshot["uptime_ms"] = int((time.monotonic() - SERVER_STARTED_MONOTONIC) * 1000)
+    if not snapshot.get("set_ready", False):
+        snapshot.update({
+            "scenes": {},
+            "current_scene": None,
+            "next_scene": None,
+            "selected_scene_name": "—",
+            "playing_scene": -1,
+            "playing_scene_name": "—",
+            "last_fired_scene": -1,
+            "last_fired_scene_name": "—",
+            "has_show_started": False,
+            "arrangement_marker": "—",
+            "arrangement_markers": [],
+        })
     return snapshot
 
 
@@ -438,7 +594,7 @@ def generation_log(event: str, **details: Any) -> None:
 
 def reset_live_set_state_locked(set_id: Optional[str], reason: str) -> int:
     """Ouvre atomiquement une génération et efface tout état propre au Set précédent."""
-    global _track_count_cache, _cue_points_cache
+    global active_query, _track_count_cache, _cue_points_cache, _bootstrap_generation
 
     previous_generation = int(state.get("set_generation", 0))
     previous_set_id = state.get("current_set_id")
@@ -471,8 +627,14 @@ def reset_live_set_state_locked(set_id: Optional[str], reason: str) -> int:
         "arrangement_markers": [],
         "message": f"Nouveau Live Set détecté ({reason})",
         "sync_source": "Ableton",
+        "bootstrap_running": False,
+        "bootstrap_generation": None,
+        "pending_request": None,
     })
-    responses.clear()
+    set_set_ready_locked(False, reason, "reset_live_set_state_locked")
+    active_query = None
+    completed_go_requests.clear()
+    _bootstrap_generation = None
     _track_count_cache = (0.0, MAX_TRACKS_TO_SCAN)
     _cue_points_cache = (0.0, [], "JSON")
     generation_log(
@@ -493,19 +655,80 @@ def generation_is_current(expected_generation: int) -> bool:
 
 def osc_reply(address, *args):
     if address == "/live/startup":
+        write_bootstrap_diagnostic(
+            "live-startup-received",
+            setGeneration=int(state.get("set_generation", 0)),
+        )
         generation_log("startup_received")
         with lock:
             generation = reset_live_set_state_locked(None, "startup")
-        threading.Thread(
-            target=refresh_live_set_identity,
-            kwargs={"expected_generation": generation},
-            daemon=True,
-        ).start()
+            set_bootstrap_step_locked("attente de Song.file_path", "/live/startup reçu")
+        start_live_set_bootstrap(generation)
         return
 
     with lock:
-        response_generation = int(state.get("set_generation", 0))
-        responses[address] = (time.time(), args, response_generation)
+        request_state = active_query
+        diagnostic_reply = bool(request_state and request_state.get("bootstrap_diagnostic"))
+        if diagnostic_reply:
+            write_bootstrap_diagnostic(
+                "bootstrap-response-received",
+                address=address,
+                arguments=list(args),
+                setGeneration=int(state.get("set_generation", 0)),
+            )
+        if request_state is None:
+            generation_log("orphan_reply_ignored", address=address)
+            return
+        if request_state.get("address") != address:
+            if diagnostic_reply:
+                write_bootstrap_diagnostic(
+                    "bootstrap-response-invalid",
+                    address=address,
+                    reason="adresse différente de la requête active",
+                    expectedAddress=request_state.get("address"),
+                )
+            generation_log(
+                "incompatible_reply_ignored",
+                address=address,
+                expected_address=request_state.get("address"),
+            )
+            return
+        if int(request_state.get("generation", -1)) != int(state.get("set_generation", 0)):
+            if diagnostic_reply:
+                write_bootstrap_diagnostic("bootstrap-response-invalid", address=address, reason="ancienne génération")
+            generation_log("stale_reply_ignored", address=address)
+            return
+        if not state.get("set_ready", False) and not request_state.get("allow_during_bootstrap", False):
+            if diagnostic_reply:
+                write_bootstrap_diagnostic("bootstrap-response-invalid", address=address, reason="réponse interdite pendant bootstrap")
+            generation_log("bootstrap_reply_ignored", address=address)
+            return
+        if not osc_response_matches_request(address, request_state.get("args", ()), args):
+            if diagnostic_reply:
+                write_bootstrap_diagnostic("bootstrap-response-invalid", address=address, reason="réponse incompatible")
+            generation_log(
+                "incompatible_reply_ignored",
+                address=address,
+                request_args=request_state.get("args", ()),
+                response_args=args,
+            )
+            return
+        request_state["response"] = args
+        request_state["received_at"] = time.time()
+
+
+def osc_response_matches_request(address: str, request_args: Tuple[Any, ...], response_args: Tuple[Any, ...]) -> bool:
+    """Corrèle seulement les arguments effectivement répétés par AbletonOSC."""
+    if not request_args:
+        return True
+    if address.startswith("/live/scene/") or address.startswith("/live/track/"):
+        if not response_args:
+            return False
+        try:
+            return int(response_args[0]) == int(request_args[0])
+        except (TypeError, ValueError):
+            return response_args[0] == request_args[0]
+    return True
 
 
 def apply_osc_response_locked(address: str, args: Tuple[Any, ...], expected_generation: int) -> None:
@@ -548,6 +771,13 @@ def start_osc_server():
     disp = dispatcher.Dispatcher()
     disp.set_default_handler(osc_reply)
     server = osc_server.ThreadingOSCUDPServer(("0.0.0.0", LOCAL_OSC_PORT), disp)
+    write_bootstrap_diagnostic(
+        "osc-socket-opened",
+        bindAddress="0.0.0.0",
+        returnPort=LOCAL_OSC_PORT,
+        abletonAddress=ABLETON_IP,
+        abletonPort=ABLETON_PORT,
+    )
     print(f"OSC reply server listening on 0.0.0.0:{LOCAL_OSC_PORT}")
     server.serve_forever()
 
@@ -575,7 +805,14 @@ def show_arrangement_view():
         send(address, "Arrangement View")
 
 
-def query(address: str, *args, timeout=OSC_TIMEOUT, expected_generation: Optional[int] = None):
+def _query_with_query_lock_held(
+    address: str,
+    *args,
+    timeout=OSC_TIMEOUT,
+    expected_generation: Optional[int] = None,
+    allow_during_bootstrap: bool = False,
+    apply_response: bool = True,
+):
     """
     Requête OSC protégée :
     - une seule requête à la fois pour éviter les réponses croisées ;
@@ -585,41 +822,141 @@ def query(address: str, *args, timeout=OSC_TIMEOUT, expected_generation: Optiona
         with lock:
             expected_generation = int(state.get("set_generation", 0))
 
-    with query_lock:
-        if not generation_is_current(expected_generation):
+    global active_query
+
+    with lock:
+        bootstrap_diagnostic = bool(allow_during_bootstrap and not state.get("set_ready", False))
+
+    if not generation_is_current(expected_generation):
+        if bootstrap_diagnostic:
+            write_bootstrap_diagnostic(
+                "bootstrap-query-interrupted",
+                address=address,
+                reason="génération périmée avant envoi",
+                expectedGeneration=expected_generation,
+            )
+        generation_log(
+            "async_discarded",
+            address=address,
+            expected_generation=expected_generation,
+            current_generation=state.get("set_generation"),
+            phase="before_send",
+        )
+        return None
+    with lock:
+        if not state.get("set_ready", False) and not allow_during_bootstrap:
             generation_log(
                 "async_discarded",
                 address=address,
                 expected_generation=expected_generation,
-                current_generation=state.get("set_generation"),
-                phase="before_send",
+                phase="set_not_ready",
             )
             return None
+        request_state = {
+            "address": address,
+            "args": tuple(args),
+            "generation": int(expected_generation),
+            "sent_at": time.time(),
+            "allow_during_bootstrap": bool(allow_during_bootstrap),
+            "apply_response": bool(apply_response),
+            "bootstrap_diagnostic": bootstrap_diagnostic,
+            "response": None,
+        }
+        active_query = request_state
+        if bootstrap_diagnostic:
+            state["pending_request"] = {
+                "address": address,
+                "arguments": list(args),
+                "generation": int(expected_generation),
+                "sent_at": request_state["sent_at"],
+                "timeout_ms": int(float(timeout) * 1000),
+            }
+
+    if bootstrap_diagnostic:
+        write_bootstrap_diagnostic(
+            "bootstrap-query-sent",
+            address=address,
+            arguments=list(args),
+            expectedGeneration=expected_generation,
+            timeoutMs=int(float(timeout) * 1000),
+        )
+    send(address, *args)
+
+    t0 = time.time()
+    while time.time() - t0 < timeout:
         with lock:
-            responses.pop(address, None)
-
-        send(address, *args)
-
-        t0 = time.time()
-        while time.time() - t0 < timeout:
-            with lock:
-                if address in responses:
-                    _, payload, response_generation = responses[address]
-                    if response_generation == expected_generation and generation_is_current(expected_generation):
-                        apply_osc_response_locked(address, payload, expected_generation)
-                        return payload
-                    generation_log(
-                        "async_discarded",
+            if active_query is not request_state:
+                if bootstrap_diagnostic:
+                    state["pending_request"] = None
+                    write_bootstrap_diagnostic(
+                        "bootstrap-query-interrupted",
                         address=address,
-                        expected_generation=expected_generation,
-                        response_generation=response_generation,
-                        current_generation=state.get("set_generation"),
-                        phase="after_reply",
+                        reason="requête active invalidée ou remplacée",
+                        expectedGeneration=expected_generation,
                     )
-                    return None
-            time.sleep(0.006)
+                return None
+            payload = request_state.get("response")
+            if payload is not None:
+                if generation_is_current(expected_generation):
+                    if request_state.get("apply_response", True):
+                        apply_osc_response_locked(address, payload, expected_generation)
+                    active_query = None
+                    if bootstrap_diagnostic:
+                        state["pending_request"] = None
+                        write_bootstrap_diagnostic(
+                            "bootstrap-query-completed",
+                            address=address,
+                            response=list(payload),
+                            expectedGeneration=expected_generation,
+                            elapsedMs=int((time.time() - t0) * 1000),
+                        )
+                    return payload
+                active_query = None
+                if bootstrap_diagnostic:
+                    state["pending_request"] = None
+                    write_bootstrap_diagnostic(
+                        "bootstrap-query-interrupted",
+                        address=address,
+                        reason="génération modifiée après réception",
+                        expectedGeneration=expected_generation,
+                    )
+                return None
+        time.sleep(0.006)
 
+    with lock:
+        if active_query is request_state:
+            active_query = None
+        if bootstrap_diagnostic:
+            state["pending_request"] = None
+    if bootstrap_diagnostic:
+        write_bootstrap_diagnostic(
+            "bootstrap-query-timeout",
+            address=address,
+            reason="aucune réponse compatible reçue avant expiration",
+            expectedGeneration=expected_generation,
+            timeoutMs=int(float(timeout) * 1000),
+        )
     return None
+
+
+def query(
+    address: str,
+    *args,
+    timeout=OSC_TIMEOUT,
+    expected_generation: Optional[int] = None,
+    allow_during_bootstrap: bool = False,
+    apply_response: bool = True,
+):
+    """Exécute une requête OSC corrélée, sérialisée avec les transactions de scène."""
+    with query_lock:
+        return _query_with_query_lock_held(
+            address,
+            *args,
+            timeout=timeout,
+            expected_generation=expected_generation,
+            allow_during_bootstrap=allow_during_bootstrap,
+            apply_response=apply_response,
+        )
 
 
 def safe_float(value) -> Optional[float]:
@@ -629,34 +966,50 @@ def safe_float(value) -> Optional[float]:
         return None
 
 
-def get_track_count() -> int:
+def get_track_count(expected_generation: Optional[int] = None) -> int:
     """Retourne le nombre de pistes Ableton, avec cache pour éviter de ralentir le suivi."""
     global _track_count_cache
+    if expected_generation is None:
+        with lock:
+            expected_generation = int(state.get("set_generation", 0))
 
     now = time.time()
     cached_at, cached_value = _track_count_cache
     if now - cached_at < TRACK_COUNT_CACHE_SECONDS and cached_value > 0:
         return min(int(cached_value), MAX_TRACKS_TO_SCAN)
 
-    res = query("/live/song/get/num_tracks")
+    res = query(
+        "/live/song/get/num_tracks",
+        expected_generation=expected_generation,
+    )
     if res:
         for item in list(res)[::-1]:
             value = safe_float(item)
             if value is not None and value > 0:
                 count = min(int(value), MAX_TRACKS_TO_SCAN)
-                _track_count_cache = (now, count)
+                with lock:
+                    if (
+                        int(state.get("set_generation", 0)) != int(expected_generation)
+                        or not state.get("set_ready", False)
+                    ):
+                        return min(int(cached_value or MAX_TRACKS_TO_SCAN), MAX_TRACKS_TO_SCAN)
+                    _track_count_cache = (now, count)
                 return count
 
     return min(int(cached_value or MAX_TRACKS_TO_SCAN), MAX_TRACKS_TO_SCAN)
 
 
-def is_track_enabled(track_index: int) -> bool:
+def is_track_enabled(track_index: int, expected_generation: Optional[int] = None) -> bool:
     """True si la piste peut servir à détecter la scène en lecture.
 
     AbletonOSC renvoie généralement mute=True quand la piste est coupée.
     Si la requête mute ne répond pas, on garde la piste pour ne pas rater un playback.
     """
-    res = query("/live/track/get/mute", track_index)
+    res = query(
+        "/live/track/get/mute",
+        track_index,
+        expected_generation=expected_generation,
+    )
     if not res:
         return True
 
@@ -733,22 +1086,39 @@ def parse_cue_points_response(args):
     return markers
 
 
-def get_live_cue_points(force: bool = False):
+def get_live_cue_points(force: bool = False, expected_generation: Optional[int] = None):
     """Lit les Locators/Cue Points du Set Ableton via AbletonOSC.
 
     Si AbletonOSC ne répond pas, on garde un cache court, puis on repasse au JSON.
     """
     global _cue_points_cache
+    if expected_generation is None:
+        with lock:
+            expected_generation = int(state.get("set_generation", 0))
+    with lock:
+        if not state.get("set_ready", False):
+            return [], "STALE"
+
     now = time.time()
     cached_at, cached_markers, cached_source = _cue_points_cache
     if not force and cached_markers and now - cached_at < CUE_POINTS_REFRESH_SECONDS:
         return cached_markers, cached_source
 
     try:
-        res = query("/live/song/get/cue_points", timeout=0.12)
+        res = query(
+            "/live/song/get/cue_points",
+            timeout=0.12,
+            expected_generation=expected_generation,
+        )
         markers = parse_cue_points_response(res)
         if markers:
-            _cue_points_cache = (now, markers, "Ableton Set")
+            with lock:
+                if (
+                    int(state.get("set_generation", 0)) != int(expected_generation)
+                    or not state.get("set_ready", False)
+                ):
+                    return [], "STALE"
+                _cue_points_cache = (now, markers, "Ableton Set")
             return markers, "Ableton Set"
     except Exception as e:
         print("Erreur lecture cue points AbletonOSC :", e, flush=True)
@@ -756,11 +1126,26 @@ def get_live_cue_points(force: bool = False):
     return [], "JSON"
 
 
-def load_arrangement_markers(force_live: bool = False):
+def load_arrangement_markers(force_live: bool = False, expected_generation: Optional[int] = None):
+    if expected_generation is None:
+        with lock:
+            expected_generation = int(state.get("set_generation", 0))
+    with lock:
+        if (
+            int(state.get("set_generation", 0)) != int(expected_generation)
+            or not state.get("set_ready", False)
+        ):
+            return []
+
     # 1) Priorité aux repères réellement présents dans le Set Ableton.
-    live_markers, source = get_live_cue_points(force=force_live)
+    live_markers, source = get_live_cue_points(
+        force=force_live,
+        expected_generation=expected_generation,
+    )
     if live_markers:
         with lock:
+            if int(state.get("set_generation", 0)) != int(expected_generation):
+                return []
             state["arrangement_markers_source"] = source
         return live_markers
 
@@ -786,6 +1171,11 @@ def load_arrangement_markers(force_live: bool = False):
             continue
     clean.sort(key=lambda x: x["time"])
     with lock:
+        if (
+            int(state.get("set_generation", 0)) != int(expected_generation)
+            or not state.get("set_ready", False)
+        ):
+            return []
         state["arrangement_markers_source"] = "JSON"
     return clean or DEFAULT_ARRANGEMENT_MARKERS
 
@@ -931,6 +1321,8 @@ def refresh_live_set_identity(expected_generation: Optional[int] = None) -> Opti
         "/live/song/get/file_path",
         timeout=0.08,
         expected_generation=expected_generation,
+        allow_during_bootstrap=True,
+        apply_response=False,
     )
     file_path_available = file_path_response is not None
     file_path = _first_text_value(file_path_response)
@@ -941,8 +1333,29 @@ def refresh_live_set_identity(expected_generation: Optional[int] = None) -> Opti
         "/live/song/get/name",
         timeout=0.06,
         expected_generation=expected_generation,
+        allow_during_bootstrap=True,
+        apply_response=False,
     ))
     if not generation_is_current(expected_generation):
+        return None
+
+    confirmation_response = query(
+        "/live/song/get/file_path",
+        timeout=0.08,
+        expected_generation=expected_generation,
+        allow_during_bootstrap=True,
+        apply_response=False,
+    )
+    if confirmation_response is None or not generation_is_current(expected_generation):
+        return None
+    confirmed_file_path = _first_text_value(confirmation_response)
+    if confirmed_file_path != file_path:
+        generation_log(
+            "identity_confirmation_mismatch",
+            first=file_path,
+            second=confirmed_file_path,
+            generation=expected_generation,
+        )
         return None
 
     with lock:
@@ -987,8 +1400,264 @@ def refresh_live_set_identity(expected_generation: Optional[int] = None) -> Opti
         return int(state["set_generation"])
 
 
+def _bootstrap_file_path(generation: int) -> Optional[str]:
+    response = query(
+        "/live/song/get/file_path",
+        timeout=0.10,
+        expected_generation=generation,
+        allow_during_bootstrap=True,
+        apply_response=False,
+    )
+    if response is None:
+        return None
+    file_path = _first_text_value(response)
+    write_bootstrap_diagnostic(
+        "song-file-path-read",
+        value=file_path,
+        setGeneration=generation,
+    )
+    return file_path
 
-def refresh_names_and_transport():
+
+def abort_bootstrap(generation: int, reason: str) -> None:
+    with lock:
+        if int(state.get("set_generation", 0)) == int(generation):
+            set_bootstrap_step_locked(f"bootstrap interrompu : {reason}", reason)
+            state["bootstrap_running"] = False
+            state["bootstrap_generation"] = None
+            state["pending_request"] = None
+    write_bootstrap_diagnostic(
+        "bootstrap-interrupted",
+        reason=reason,
+        expectedGeneration=generation,
+        currentGeneration=int(state.get("set_generation", 0)),
+    )
+
+
+def apply_live_set_bootstrap_locked(
+    generation: int,
+    file_path: str,
+    set_name: str,
+    selected_scene: int,
+    scene_names: Tuple[Any, ...],
+) -> bool:
+    """Remplace en une écriture l'intégralité des données propres au nouveau Set."""
+    global _bootstrap_generation
+
+    if int(state.get("set_generation", 0)) != int(generation):
+        return False
+    if state.get("set_ready", False):
+        return False
+
+    set_id = file_path or f"unsaved:{generation}"
+    current_id = str(state.get("current_set_id") or "")
+    if current_id and not current_id.startswith("pending:") and current_id != set_id:
+        return False
+
+    new_scenes = {
+        index: str(name)
+        for index, name in enumerate(scene_names)
+        if name is not None
+    }
+    selected_name = new_scenes.get(int(selected_scene), "—") or "—"
+    state.update({
+        "current_set_id": set_id,
+        "current_set_name": set_name,
+        "selected_scene": int(selected_scene),
+        "next_scene": int(selected_scene),
+        "selected_scene_name": selected_name,
+        "scenes": new_scenes,
+        "current_scene": None,
+        "playing_scene": -1,
+        "playing_scene_name": "—",
+        "last_fired_scene": -1,
+        "last_fired_scene_name": "—",
+        "has_show_started": False,
+        "message": "Live Set prêt",
+        "sync_source": "Ableton",
+    })
+    set_connected_locked(True, "bootstrap complet", "apply_live_set_bootstrap_locked")
+    set_set_ready_locked(True, "bootstrap complet et cohérent", "apply_live_set_bootstrap_locked")
+    set_bootstrap_step_locked("Live Set prêt", "bootstrap complet et cohérent")
+    state["bootstrap_running"] = False
+    state["bootstrap_generation"] = None
+    state["pending_request"] = None
+    state["last_successful_bootstrap"] = {
+        "generation": int(generation),
+        "completed_at": time.time(),
+        "current_set_id": set_id,
+        "scene_count": len(new_scenes),
+        "selected_scene": int(selected_scene),
+    }
+    _bootstrap_generation = None
+    generation_log(
+        "bootstrap_complete",
+        generation=generation,
+        current_set_id=set_id,
+        selected_scene=selected_scene,
+        scene_count=len(new_scenes),
+    )
+    return True
+
+
+def bootstrap_live_set(generation: int) -> None:
+    """Confirme l'identité puis construit un instantané Session cohérent."""
+    global _bootstrap_generation
+
+    try:
+        # Laisse arriver les datagrammes émis avant l'invalidation. Sans identifiant
+        # de requête dans AbletonOSC, ils ne sont corrélables qu'une fois drainés.
+        with lock:
+            set_bootstrap_step_locked("purge des réponses OSC antérieures", "début du bootstrap")
+        write_bootstrap_diagnostic("bootstrap-started", setGeneration=generation)
+        time.sleep(OSC_BOOTSTRAP_DRAIN_SECONDS)
+        if not generation_is_current(generation):
+            abort_bootstrap(generation, "génération modifiée pendant la purge OSC")
+            return
+        with lock:
+            set_bootstrap_step_locked("attente de Song.file_path", "confirmation initiale")
+        first_path = _bootstrap_file_path(generation)
+        if first_path is None:
+            abort_bootstrap(generation, "timeout pendant la lecture initiale de Song.file_path")
+            return
+        if not generation_is_current(generation):
+            abort_bootstrap(generation, "génération modifiée après Song.file_path")
+            return
+
+        with lock:
+            set_bootstrap_step_locked("attente de Song.name", "identité du Live Set")
+        set_name_response = query(
+            "/live/song/get/name",
+            timeout=0.08,
+            expected_generation=generation,
+            allow_during_bootstrap=True,
+            apply_response=False,
+        )
+        write_bootstrap_diagnostic(
+            "song-name-read",
+            value=_first_text_value(set_name_response),
+            setGeneration=generation,
+        )
+        with lock:
+            set_bootstrap_step_locked("attente de la scène sélectionnée", "lecture de la vue Session")
+        selected_response = query(
+            "/live/view/get/selected_scene",
+            timeout=0.10,
+            expected_generation=generation,
+            allow_during_bootstrap=True,
+            apply_response=False,
+        )
+        write_bootstrap_diagnostic(
+            "selected-scene-read",
+            value=list(selected_response) if selected_response is not None else None,
+            setGeneration=generation,
+        )
+        with lock:
+            set_bootstrap_step_locked("attente des noms de scènes", "construction de la liste")
+        scene_names = query(
+            "/live/song/get/scenes/name",
+            timeout=0.20,
+            expected_generation=generation,
+            allow_during_bootstrap=True,
+            apply_response=False,
+        )
+        write_bootstrap_diagnostic(
+            "scene-names-read",
+            count=len(scene_names) if scene_names is not None else None,
+            values=list(scene_names) if scene_names is not None else None,
+            setGeneration=generation,
+        )
+        with lock:
+            set_bootstrap_step_locked("confirmation de Song.file_path", "validation finale de l'identité")
+        final_path = _bootstrap_file_path(generation)
+        write_bootstrap_diagnostic(
+            "bootstrap-file-path-compared",
+            initialFilePath=first_path,
+            finalFilePath=final_path,
+            matches=bool(final_path is not None and first_path == final_path),
+            setGeneration=generation,
+        )
+
+        if set_name_response is None:
+            abort_bootstrap(generation, "timeout pendant la lecture de Song.name")
+            return
+        if selected_response is None:
+            abort_bootstrap(generation, "timeout pendant la lecture de la scène sélectionnée")
+            return
+        if scene_names is None:
+            abort_bootstrap(generation, "timeout pendant la lecture des noms de scènes")
+            return
+        if final_path is None:
+            abort_bootstrap(generation, "timeout pendant la confirmation de Song.file_path")
+            return
+        if first_path != final_path:
+            abort_bootstrap(generation, "Song.file_path a changé pendant le bootstrap")
+            return
+        if not generation_is_current(generation):
+            abort_bootstrap(generation, "génération modifiée avant publication")
+            return
+
+        selected_scene = int(selected_response[0]) if selected_response else 0
+        set_name = _first_text_value(set_name_response)
+        with lock:
+            applied = apply_live_set_bootstrap_locked(
+                generation,
+                final_path,
+                set_name,
+                selected_scene,
+                tuple(scene_names),
+            )
+            if not applied:
+                abort_bootstrap(generation, "instantané cohérent refusé avant publication")
+            else:
+                write_bootstrap_diagnostic(
+                    "bootstrap-completed",
+                    setGeneration=generation,
+                    filePath=final_path,
+                    setName=set_name,
+                    selectedScene=selected_scene,
+                    sceneCount=len(scene_names),
+                )
+    except Exception as exc:
+        abort_bootstrap(generation, f"exception {type(exc).__name__}: {exc}")
+    finally:
+        with lock:
+            if _bootstrap_generation == generation and not state.get("set_ready", False):
+                _bootstrap_generation = None
+                state["bootstrap_running"] = False
+                state["bootstrap_generation"] = None
+                state["pending_request"] = None
+
+
+def start_live_set_bootstrap(generation: int) -> None:
+    global _bootstrap_generation
+
+    with lock:
+        if int(state.get("set_generation", 0)) != int(generation):
+            write_bootstrap_diagnostic(
+                "bootstrap-not-started",
+                reason="génération déjà périmée",
+                expectedGeneration=generation,
+                currentGeneration=int(state.get("set_generation", 0)),
+            )
+            return
+        if state.get("set_ready", False) or _bootstrap_generation == generation:
+            write_bootstrap_diagnostic(
+                "bootstrap-not-started",
+                reason="Live Set déjà prêt" if state.get("set_ready", False) else "bootstrap déjà actif",
+                setGeneration=generation,
+            )
+            return
+        _bootstrap_generation = generation
+        state["bootstrap_running"] = True
+        state["bootstrap_generation"] = int(generation)
+        state["pending_request"] = None
+        set_bootstrap_step_locked("bootstrap planifié", "nouvelle génération à initialiser")
+    threading.Thread(target=bootstrap_live_set, args=(generation,), daemon=True).start()
+
+
+
+def refresh_names_and_transport() -> bool:
     """
     Refresh léger. Ne scanne pas toutes les pistes.
     """
@@ -998,8 +1667,17 @@ def refresh_names_and_transport():
 
         verified_generation = refresh_live_set_identity(generation)
         if verified_generation is None:
-            return
+            return False
+        if verified_generation != generation:
+            start_live_set_bootstrap(verified_generation)
+            return False
         generation = verified_generation
+
+        with lock:
+            ready = bool(state.get("set_ready", False))
+        if not ready:
+            start_live_set_bootstrap(generation)
+            return False
 
         res = query("/live/view/get/selected_scene", expected_generation=generation)
         if res:
@@ -1024,14 +1702,16 @@ def refresh_names_and_transport():
             query("/live/scene/get/name", playing, expected_generation=generation)
 
         with lock:
-            state["connected"] = True
+            set_connected_locked(True, "rafraîchissement OSC réussi", "refresh_names_and_transport")
             state["message"] = "Connecté à AbletonOSC"
             state["sync_source"] = "Ableton"
+        return True
 
     except Exception as e:
         with lock:
-            state["connected"] = False
+            set_connected_locked(False, str(e), "refresh_names_and_transport")
             state["message"] = f"Erreur : {e}"
+        return False
 
 
 
@@ -1053,11 +1733,11 @@ def refresh_scene_name_async(scene_index: int):
         with lock:
             if int(state.get("set_generation", 0)) != generation:
                 return
-            state["connected"] = True
+            set_connected_locked(True, "nom de scène reçu", "refresh_scene_name_async")
             state["message"] = "Connecté à AbletonOSC"
     except Exception as e:
         with lock:
-            state["connected"] = False
+            set_connected_locked(False, str(e), "refresh_scene_name_async")
             state["message"] = f"Erreur : {e}"
 def scan_scene_names_async(limit: int = 120, clear_before_scan: bool = False):
     """Demande les noms des scènes Ableton pour alimenter le menu déroulant.
@@ -1067,6 +1747,8 @@ def scan_scene_names_async(limit: int = 120, clear_before_scan: bool = False):
     """
     with lock:
         generation = int(state.get("set_generation", 0))
+        if not state.get("set_ready", False):
+            return
 
     if clear_before_scan:
         with lock:
@@ -1093,7 +1775,7 @@ def scan_scene_names_async(limit: int = 120, clear_before_scan: bool = False):
         if int(state.get("set_generation", 0)) != generation:
             return
         state["message"] = "Liste des scènes actualisée"
-        state["connected"] = True
+        set_connected_locked(True, "liste des scènes actualisée", "scan_scene_names_async")
 def scan_playing_scene_from_tracks():
     """
     Détection rapide de la scène en lecture, même si elle a été lancée depuis Ableton.
@@ -1103,15 +1785,20 @@ def scan_playing_scene_from_tracks():
     """
     with lock:
         generation = int(state.get("set_generation", 0))
+        if not state.get("set_ready", False):
+            return
         current = int(state.get("playing_scene", -1))
 
-    candidate_tracks = list(range(get_track_count()))
+    candidate_tracks = list(range(get_track_count(expected_generation=generation)))
 
     detected_slot = -1
     for track_index in candidate_tracks:
         if not generation_is_current(generation):
             return
-        if CHECK_MUTE_DURING_PLAYING_SCAN and not is_track_enabled(track_index):
+        if CHECK_MUTE_DURING_PLAYING_SCAN and not is_track_enabled(
+            track_index,
+            expected_generation=generation,
+        ):
             continue
 
         res = query(
@@ -1165,18 +1852,28 @@ def background_refresh():
 
     while True:
         now = time.time()
+        full_refresh_due = now - last_full_refresh >= FULL_REFRESH_SECONDS
+        playing_scan_due = now - last_playing_scan >= PLAYING_SCAN_SECONDS
 
-        # Suit aussi les lancements faits directement dans Ableton.
-        if SCAN_PLAYING_SCENE_FROM_TRACKS and now - last_playing_scan >= PLAYING_SCAN_SECONDS:
-            scan_playing_scene_from_tracks()
-            last_playing_scan = now
+        # L'identité du Set est toujours vérifiée avant les lectures de scène,
+        # de transport ou d'Arrangement du cycle.
+        if full_refresh_due or (SCAN_PLAYING_SCENE_FROM_TRACKS and playing_scan_due):
+            cycle_ready = refresh_names_and_transport()
+            if not cycle_ready:
+                if full_refresh_due:
+                    last_full_refresh = now
+                if playing_scan_due:
+                    last_playing_scan = now
+                time.sleep(BACKGROUND_REFRESH_SECONDS)
+                continue
 
-        # Refresh noms/transport rapide mais léger.
-        if now - last_full_refresh >= FULL_REFRESH_SECONDS:
-            refresh_names_and_transport()
-            refresh_arrangement_time()
-            last_full_refresh = now
+            if SCAN_PLAYING_SCENE_FROM_TRACKS and playing_scan_due:
+                scan_playing_scene_from_tracks()
+                last_playing_scan = now
 
+            if full_refresh_due:
+                refresh_arrangement_time()
+                last_full_refresh = now
 
         time.sleep(BACKGROUND_REFRESH_SECONDS)
 
@@ -1310,8 +2007,18 @@ def ab_page():
 def arrangement_page():
     show_arrangement_view()
     try:
-        markers = load_arrangement_markers(force_live=True)
         with lock:
+            generation = int(state.get("set_generation", 0))
+        markers = load_arrangement_markers(
+            force_live=True,
+            expected_generation=generation,
+        )
+        with lock:
+            if (
+                int(state.get("set_generation", 0)) != generation
+                or not state.get("set_ready", False)
+            ):
+                return render_template("arrangement.html")
             state["arrangement_markers"] = markers
             if markers:
                 state["arrangement_markers_source"] = markers[0].get("source", state.get("arrangement_markers_source", "CACHE"))
@@ -1357,10 +2064,84 @@ def status():
         if acquired:
             lock.release()
 
-
     data["arrangement_markers"] = data.get("arrangement_markers", [])
     data["arrangement_markers_source"] = data.get("arrangement_markers_source", "CACHE")
     return jsonify(data)
+
+
+@app.route("/shutdown", methods=["POST"])
+def shutdown():
+    """Arrete uniquement l'instance dont le launcher connait le jeton de possession."""
+    identity_matches = (
+        bool(LAUNCH_ID)
+        and request.headers.get("X-CL-Launch-ID") == LAUNCH_ID
+        and request.headers.get("X-CL-Server-Instance-ID") == SERVER_INSTANCE_ID
+        and request.headers.get("X-CL-Build-ID") == BUILD_ID
+        and bool(SHUTDOWN_TOKEN)
+        and hmac.compare_digest(
+            request.headers.get("X-CL-Shutdown-Token", ""),
+            SHUTDOWN_TOKEN,
+        )
+    )
+    if not identity_matches:
+        print(json.dumps({
+            "source": "ServerIdentity",
+            "event": "shutdown-refused",
+            "serverInstanceId": SERVER_INSTANCE_ID,
+            "buildId": BUILD_ID,
+            "serverProcessId": os.getpid(),
+            "reason": "server ownership not validated",
+        }, ensure_ascii=False, sort_keys=True), flush=True)
+        return jsonify(error="server ownership not validated"), 403
+
+    shutdown_callback = request.environ.get("werkzeug.server.shutdown")
+
+    def stop_process():
+        time.sleep(0.1)
+        if callable(shutdown_callback):
+            shutdown_callback()
+        else:
+            os.kill(os.getpid(), signal.SIGTERM)
+
+    threading.Thread(target=stop_process, daemon=True).start()
+    print(json.dumps({
+        "source": "ServerIdentity",
+        "event": "shutdown-accepted",
+        "launchId": LAUNCH_ID,
+        "serverInstanceId": SERVER_INSTANCE_ID,
+        "buildId": BUILD_ID,
+        "serverProcessId": os.getpid(),
+    }, ensure_ascii=False, sort_keys=True), flush=True)
+    return jsonify(message="server shutdown requested", server_instance_id=SERVER_INSTANCE_ID)
+
+
+@app.route("/ownership/verify", methods=["POST"])
+def verify_ownership():
+    """Prouve la possession sans jamais exposer le jeton secret."""
+    identity_matches = (
+        bool(LAUNCH_ID)
+        and request.headers.get("X-CL-Launch-ID") == LAUNCH_ID
+        and request.headers.get("X-CL-Server-Instance-ID") == SERVER_INSTANCE_ID
+        and request.headers.get("X-CL-Build-ID") == BUILD_ID
+        and bool(SHUTDOWN_TOKEN)
+        and hmac.compare_digest(
+            request.headers.get("X-CL-Shutdown-Token", ""),
+            SHUTDOWN_TOKEN,
+        )
+    )
+    return jsonify(
+        owned=bool(identity_matches),
+        server_instance_id=SERVER_INSTANCE_ID,
+    )
+
+
+@app.route("/keyboard-log", methods=["POST"])
+def keyboard_log():
+    record = request.get_json(force=True, silent=True)
+    if not isinstance(record, dict):
+        return jsonify({"ok": False, "message": "Trace clavier invalide"}), 400
+    write_keyboard_diagnostic(record)
+    return jsonify({"ok": True})
 
 
 @app.route("/rescan-scenes", methods=["POST", "GET"])
@@ -1411,43 +2192,90 @@ def clamp_scene_number(value: Any) -> Optional[int]:
 def select_scene(scene_index: int, source: str = "Télécommande"):
     """Sélectionne une scène sans la lancer, puis met le nom à jour en arrière-plan."""
     scene_index = max(0, int(scene_index))
-    send("/live/view/set/selected_scene", scene_index)
-    with lock:
-        state["selected_scene"] = scene_index
-        state["next_scene"] = scene_index
-        state["selected_scene_name"] = f"Scène {scene_index + 1}"
-        state["message"] = f"Scène {scene_index + 1} sélectionnée"
-        state["sync_source"] = source
+    with scene_transaction_lock:
+        send("/live/view/set/selected_scene", scene_index)
+        with lock:
+            state["selected_scene"] = scene_index
+            state["next_scene"] = scene_index
+            state["selected_scene_name"] = f"Scène {scene_index + 1}"
+            state["message"] = f"Scène {scene_index + 1} sélectionnée"
+            state["sync_source"] = source
     threading.Thread(target=refresh_scene_name_async, args=(scene_index,), daemon=True).start()
 
 
-@app.route("/action", methods=["POST"])
-def action():
-    global last_go_time
+def execute_go_transaction(request_id: str, expected_generation: int, scene_number: Any) -> Tuple[bool, str]:
+    """Sélectionne, confirme puis lance explicitement une scène dans une génération donnée."""
+    scene_index = clamp_scene_number(scene_number)
+    if scene_index is None:
+        return False, "Numéro de scène invalide"
 
-    data = request.get_json(force=True, silent=True) or {}
-    action_name = data.get("action")
-    print("ACTION REÇUE :", action_name, flush=True)
-
-    with lock:
-        selected = int(state.get("selected_scene", 0))
-
-    if action_name == "go":
-        show_session_view()
-        now = time.time()
-        if now - last_go_time < GO_COOLDOWN:
-            return jsonify({"ok": False, "message": "Double GO ignoré"})
-        last_go_time = now
-
-        send("/live/scene/fire_as_selected", selected)
-
+    request_key = (int(expected_generation), request_id)
+    with scene_transaction_lock:
         with lock:
-            playing_name = state.get("selected_scene_name", "—")
-            duration_seconds = parse_scene_duration_seconds(playing_name)
-            state["last_fired_scene"] = selected
-            state["playing_scene"] = selected
-            state["playing_scene_name"] = playing_name
-            state["current_scene"] = selected
+            cached = completed_go_requests.get(request_key)
+            if cached is not None:
+                return bool(cached["ok"]), str(cached["message"])
+            if int(state.get("set_generation", 0)) != int(expected_generation):
+                return False, "Génération de Live Set obsolète"
+            if not state.get("set_ready", False):
+                return False, "Live Set en cours de chargement"
+            scenes_snapshot = dict(state.get("scenes", {}))
+            requested_name = scenes_snapshot.get(scene_index)
+
+        if requested_name is None:
+            return False, "Scène absente du Live Set courant"
+
+        show_session_view()
+        confirmed = False
+        confirmation_deadline = time.monotonic() + 0.8
+
+        with query_lock:
+            while time.monotonic() < confirmation_deadline:
+                if not generation_is_current(expected_generation):
+                    return False, "Live Set modifié pendant le GO"
+                with lock:
+                    if not state.get("set_ready", False):
+                        return False, "Live Set en cours de chargement"
+
+                send("/live/view/set/selected_scene", scene_index)
+                response = _query_with_query_lock_held(
+                    "/live/view/get/selected_scene",
+                    expected_generation=expected_generation,
+                    apply_response=False,
+                )
+                if response:
+                    try:
+                        confirmed = int(response[0]) == scene_index
+                    except (TypeError, ValueError, IndexError):
+                        confirmed = False
+                if confirmed:
+                    break
+
+            if not confirmed:
+                return False, "Sélection de scène non confirmée par Ableton"
+            if not generation_is_current(expected_generation):
+                return False, "Live Set modifié pendant le GO"
+
+            # Le lancement utilise l'index de la transaction, jamais selected_scene.
+            send("/live/scene/fire_as_selected", scene_index)
+
+            next_scene = scene_index + 1 if (scene_index + 1) in scenes_snapshot else scene_index
+            send("/live/view/set/selected_scene", next_scene)
+
+        now = time.time()
+        with lock:
+            if (
+                int(state.get("set_generation", 0)) != int(expected_generation)
+                or not state.get("set_ready", False)
+            ):
+                return False, "Live Set modifié pendant le GO"
+
+            duration_seconds = parse_scene_duration_seconds(requested_name)
+            state["last_fired_scene"] = scene_index
+            state["last_fired_scene_name"] = requested_name
+            state["playing_scene"] = scene_index
+            state["playing_scene_name"] = requested_name
+            state["current_scene"] = scene_index
             state["has_show_started"] = True
             state["play_mode"] = "session"
             state["is_playing"] = True
@@ -1456,19 +2284,92 @@ def action():
             state["remaining_seconds"] = duration_seconds
             state["playback_deadline"] = (now + duration_seconds) if duration_seconds is not None else None
             state["arrangement_marker"] = "—"
-            state["message"] = f"Scène {selected + 1} lancée"
-            state["sync_source"] = "Télécommande"
-
-
-        # Auto-next.
-        next_scene = selected + 1
-        send("/live/view/set/selected_scene", next_scene)
-
-        with lock:
             state["selected_scene"] = next_scene
             state["next_scene"] = next_scene
-            state["selected_scene_name"] = f"Scène {next_scene + 1}"
-        threading.Thread(target=refresh_scene_name_async, args=(next_scene,), daemon=True).start()
+            state["selected_scene_name"] = scenes_snapshot.get(next_scene, requested_name)
+            state["message"] = f"Scène {scene_index + 1} lancée"
+            state["sync_source"] = "Télécommande"
+            completed_go_requests[request_key] = {
+                "ok": True,
+                "message": state["message"],
+            }
+
+        return True, f"Scène {scene_index + 1} lancée"
+
+
+@app.route("/action", methods=["POST"])
+def action():
+    data = request.get_json(force=True, silent=True) or {}
+    action_name = data.get("action")
+    print("ACTION REÇUE :", action_name, flush=True)
+
+    with lock:
+        action_ready = bool(state.get("set_ready", False))
+        action_generation = int(state.get("set_generation", 0))
+        action_state_id = id(state)
+        write_keyboard_diagnostic({
+            "source": "ServerAction",
+            "event": "action-entry",
+            "action": action_name,
+            "setReady": action_ready,
+            "setGeneration": action_generation,
+            "stateObjectId": action_state_id,
+            "processId": os.getpid(),
+            "clientGeneration": data.get("set_generation"),
+            "requestId": data.get("request_id"),
+        })
+        if not action_ready and action_name not in ("xfade", "xfade_value"):
+            write_keyboard_diagnostic({
+                "source": "ServerAction",
+                "event": "action-rejected",
+                "action": action_name,
+                "httpStatus": 409,
+                "reason": "set_ready est false à l'entrée de /action",
+                "setReady": action_ready,
+                "setGeneration": action_generation,
+                "stateObjectId": action_state_id,
+                "processId": os.getpid(),
+            })
+            return jsonify({
+                "ok": False,
+                "message": "Live Set en cours de chargement",
+                "state": state_snapshot_locked(),
+            }), 409
+        selected = int(state.get("selected_scene", 0))
+
+    if action_name == "go":
+        request_id = str(data.get("request_id", "")).strip()
+        try:
+            expected_generation = int(data.get("set_generation"))
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "message": "Génération de Live Set manquante"}), 400
+        if not request_id:
+            return jsonify({"ok": False, "message": "Identifiant de requête manquant"}), 400
+
+        ok, message = execute_go_transaction(request_id, expected_generation, data.get("scene"))
+        if not ok:
+            with lock:
+                write_keyboard_diagnostic({
+                    "source": "ServerAction",
+                    "event": "action-rejected",
+                    "action": action_name,
+                    "httpStatus": 409,
+                    "reason": message,
+                    "setReady": bool(state.get("set_ready", False)),
+                    "setGeneration": int(state.get("set_generation", 0)),
+                    "stateObjectId": id(state),
+                    "processId": os.getpid(),
+                    "clientGeneration": expected_generation,
+                    "requestId": request_id,
+                })
+        with lock:
+            response_state = state_snapshot_locked()
+        return jsonify({
+            "ok": ok,
+            "message": message,
+            "request_id": request_id,
+            "state": response_state,
+        }), (200 if ok else 409)
     elif action_name == "arrangement_toggle":
         # Bouton dédié Arrangement :
         # - si l'Arrangement joue, on met en pause
@@ -1600,9 +2501,23 @@ def action():
             now_time = float(state.get("arrangement_time", 0.0))
 
         if not markers:
-            markers = load_arrangement_markers(force_live=True)
             with lock:
-                state["arrangement_markers"] = markers
+                generation = int(state.get("set_generation", 0))
+            markers = load_arrangement_markers(
+                force_live=True,
+                expected_generation=generation,
+            )
+            with lock:
+                if (
+                    int(state.get("set_generation", 0)) != generation
+                    or not state.get("set_ready", False)
+                ):
+                    markers = []
+                else:
+                    state["arrangement_markers"] = markers
+
+        if not markers:
+            return jsonify({"ok": False, "message": "Repères Arrangement indisponibles"}), 409
 
         if action_name == "arrangement_prev":
             previous = [m for m in markers if float(m["time"]) < now_time - 1.0]

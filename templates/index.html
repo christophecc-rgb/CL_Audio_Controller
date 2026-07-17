@@ -544,6 +544,34 @@
     let countdownMode = 'stopped';
     let lastAcceptedGeneration = -1;
 
+    function resetSessionUiForGeneration() {
+      lastKnownState = null;
+      lastSessionCurrentTitle = '—';
+      lastSessionCurrentRaw = '';
+      sessionWasPlaying = false;
+      sessionStoppedByUser = false;
+      currentSceneRawName = '';
+      lastSceneSelectSignature = '';
+      suspendSceneSelectRefreshUntil = 0;
+      countdownDurationSeconds = null;
+      countdownStartedAt = null;
+      countdownPausedRemaining = null;
+      countdownMode = 'stopped';
+
+      currentEl.textContent = '—';
+      selectedEl.textContent = '—';
+      if (currentTimerEl) currentTimerEl.textContent = '';
+      if (selectedDurationEl) selectedDurationEl.textContent = '';
+      if (gotoInput && gotoInput.tagName === 'SELECT') {
+        gotoInput.innerHTML = '<option value="">Choisir une scène...</option>';
+        gotoInput.value = '';
+      }
+      if (currentCardEl) {
+        currentCardEl.classList.remove('session-playing', 'session-paused', 'is-playing');
+      }
+      if (selectedCard) selectedCard.classList.remove('is-prepared', 'selection-pulse');
+    }
+
     function acceptStateGeneration(state) {
       const generation = Number(state && state.set_generation);
       if (!Number.isInteger(generation) || generation < lastAcceptedGeneration) {
@@ -561,18 +589,7 @@
           });
         }
         lastAcceptedGeneration = generation;
-        lastKnownState = null;
-        lastSessionCurrentTitle = '—';
-        lastSessionCurrentRaw = '';
-        sessionWasPlaying = false;
-        sessionStoppedByUser = false;
-        currentSceneRawName = '';
-        countdownDurationSeconds = null;
-        countdownStartedAt = null;
-        countdownPausedRemaining = null;
-        countdownMode = 'stopped';
-        currentEl.textContent = '—';
-        selectedEl.textContent = '—';
+        resetSessionUiForGeneration();
       }
       return true;
     }
@@ -921,6 +938,13 @@
       }
     }
 
+    function newRequestId() {
+      if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+        return window.crypto.randomUUID();
+      }
+      return `go-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    }
+
     async function act(action) {
       if (action === 'play_pause') {
         action = 'pause';
@@ -942,6 +966,22 @@
       }
 
       if (actionBusy) return;
+
+      let actionPayload = { action };
+      if (action === 'go') {
+        const generation = Number(lastKnownState && lastKnownState.set_generation);
+        const selectedIndex = Number(lastKnownState && lastKnownState.selected_scene);
+        if (!Number.isInteger(generation) || !Number.isInteger(selectedIndex) || selectedIndex < 0) {
+          setActionMessage('○ État du Live Set indisponible', true);
+          return;
+        }
+        actionPayload = {
+          action: 'go',
+          request_id: newRequestId(),
+          set_generation: generation,
+          scene: selectedIndex + 1
+        };
+      }
 
       if (action === 'prev' || action === 'next') {
         pulseSelectedCard();
@@ -985,7 +1025,7 @@
         const response = await fetchWithTimeout('/action', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action })
+          body: JSON.stringify(actionPayload)
         }, 2500);
 
         let data = null;
@@ -1134,6 +1174,71 @@ gotoInput.addEventListener('blur', () => {
       if (event.key === 'Enter') {
         event.preventDefault();
         gotoScene();
+      }
+    });
+
+    function keyboardShortcutBlockReason(event) {
+      if (event.repeat) return 'key-repeat';
+      if (event.metaKey || event.altKey || event.ctrlKey) return 'modifier-key';
+      const target = event.target instanceof Element ? event.target : document.activeElement;
+      if (!target) return '';
+      return (
+        target.matches('input, textarea, select, [contenteditable]:not([contenteditable="false"])') ||
+        target.closest('[contenteditable]:not([contenteditable="false"])')
+      ) ? `editable-focus:${target.tagName || 'contenteditable'}` : '';
+    }
+
+    function keyboardDiagnosticLog(eventName, details = {}) {
+      const record = { source: 'Session', event: eventName, ...details };
+      console.info(`[KEYBOARD][Session] ${eventName}`, record);
+      fetch('/keyboard-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(record),
+        keepalive: true
+      }).catch(() => {});
+    }
+
+    keyboardDiagnosticLog('initialized', {
+      diagnosticCase: 'INITIALIZED_CASE_4_EXCLUDED',
+      timestamp: Date.now(),
+      readyState: document.readyState,
+      inIframe: window.top !== window,
+      documentHasFocus: document.hasFocus(),
+      windowHasFocus: typeof window.hasFocus === 'function' ? window.hasFocus() : document.hasFocus()
+    });
+
+    document.addEventListener('keydown', event => {
+      const reason = keyboardShortcutBlockReason(event) || (actionBusy ? 'action-busy' : '');
+      keyboardDiagnosticLog('keydown', {
+        diagnosticCase: reason ? 'CASE_2_REJECTED' : 'KEYDOWN_ACCEPTED',
+        timestamp: Date.now(),
+        key: event.key,
+        code: event.code,
+        repeat: event.repeat,
+        target: event.target && event.target.tagName,
+        activeElement: document.activeElement && document.activeElement.tagName,
+        activeElementId: document.activeElement && document.activeElement.id,
+        documentHasFocus: document.hasFocus(),
+        windowHasFocus: typeof window.hasFocus === 'function' ? window.hasFocus() : document.hasFocus(),
+        ignored: Boolean(reason),
+        reason
+      });
+      if (reason) return;
+
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        event.stopPropagation();
+        keyboardDiagnosticLog('invoke-go', { diagnosticCase: 'CASE_3_HANDLER_CALLED', timestamp: Date.now() });
+        act('go');
+        return;
+      }
+
+      if (event.code === 'Space' || event.key === ' ') {
+        event.preventDefault();
+        event.stopPropagation();
+        keyboardDiagnosticLog('invoke-play-pause', { diagnosticCase: 'CASE_3_HANDLER_CALLED', timestamp: Date.now() });
+        act('pause');
       }
     });
 
