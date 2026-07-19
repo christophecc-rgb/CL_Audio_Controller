@@ -227,6 +227,15 @@ class ServerStatusContractTests(unittest.TestCase):
         self.assertIsInstance(payload["started_at"], float)
         self.assertGreaterEqual(payload["uptime_ms"], 0)
 
+    def test_status_exposes_ltc_receiver_diagnostics(self):
+        payload = self.module.app.test_client().get("/status").get_json()
+        self.assertFalse(payload["ltc_connected"])
+        self.assertFalse(payload["ltc_listener_active"])
+        self.assertIsNone(payload["ltc_last_received_at"])
+        self.assertIsNone(payload["ltc_last_source"])
+        self.assertEqual(payload["ltc_rejected_count"], 0)
+        self.assertIsNone(payload["ltc_last_rejection_reason"])
+
     def test_shutdown_rejects_unowned_request(self):
         response = self.module.app.test_client().post("/shutdown")
         self.assertEqual(response.status_code, 403)

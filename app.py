@@ -39,6 +39,7 @@ import socket
 
 from pythonosc import udp_client
 from osc_transport import OSCTransport
+from ltc_receiver import LTCReceiver, LTC_BIND_HOST, LTC_PORT
 
 SERVER_STARTED_MONOTONIC = time.monotonic()
 SERVER_STARTED_AT = time.time()
@@ -64,10 +65,11 @@ print(json.dumps({
 
 # Crossfader Ableton via Max for Live OSC, zéro MIDI.
 
-# LTC Display v1.9 → UDP 63123 → /status → ab.html
-LTC_UDP_IP = "127.0.0.1"
-LTC_UDP_PORT = 63123
-LTC_TC_RE = re.compile(r"tc,s?(\d{1,2}:\d{2}:\d{2}:\d{2})")
+# LTC Display → UDP 63123 → /status → ab.html.
+# Le listener écoute toutes les interfaces; LTCReceiver filtre strictement la
+# source selon le profil Ableton actif (loopback en Local, cible en Distant).
+LTC_UDP_IP = LTC_BIND_HOST
+LTC_UDP_PORT = LTC_PORT
 
 # Max for Live Crossfader Bridge
 M4L_IP = "127.0.0.1"
@@ -399,6 +401,13 @@ state: Dict[str, Any] = {
     "timecode": "--:--:--:--",
     "ltc": "--:--:--:--",
     "smpte": "--:--:--:--",
+    "ltc_connected": False,
+    "ltc_listener_active": False,
+    "ltc_last_received_at": None,
+    "ltc_last_source": None,
+    "ltc_rejected_count": 0,
+    "ltc_last_rejection_reason": None,
+    "ltc_last_rejected_source": None,
 }
 
 
@@ -472,52 +481,33 @@ write_keyboard_diagnostic({
 
 
 def start_ltc_udp_listener():
-    """Écoute LTC Display v1.9 en UDP et injecte le TC dans /status.
-
-    Formats acceptés :
-    - tc,s13:05:13:24
-    - tc\x00\x00,s\x00\x0013:05:13:24\x00
-    - plusieurs TC collés dans le même paquet UDP
-    """
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
-    try:
-        sock.bind((LTC_UDP_IP, LTC_UDP_PORT))
-    except OSError as exc:
-        print(f"LTC UDP désactivé : {LTC_UDP_IP}:{LTC_UDP_PORT} déjà utilisé ({exc})", flush=True)
-        print("Ferme l'ancien bridge LTC ou libère le port 63123 si tu veux afficher le TC dans AB.", flush=True)
-        return
-
-    print(f"LTC UDP listener actif sur {LTC_UDP_IP}:{LTC_UDP_PORT}", flush=True)
-    last_tc = None
-    count = 0
+    """Lance le récepteur LTC filtré sans intervenir dans AbletonOSC."""
     last_print = 0.0
 
-    while True:
-        data, _ = sock.recvfrom(8192)
-        text = data.decode("utf-8", errors="ignore").replace("\x00", "")
-        matches = LTC_TC_RE.findall(text)
+    def update_diagnostics(values: Dict[str, Any]) -> None:
+        with lock:
+            state.update(values)
 
-        if not matches and "tc" in text:
-            print("LTC reçu mais non parsé :", repr(text[:200]), flush=True)
+    def publish(timecode: str, source_ip: str, received_at: float) -> None:
+        nonlocal last_print
+        with lock:
+            state["ltc_timecode"] = timecode
+            state["timecode"] = timecode
+            state["ltc"] = timecode
+            state["smpte"] = timecode
+        now = time.time()
+        if not last_print or now - last_print > 0.5:
+            print(f"LTC -> {timecode} source={source_ip}", flush=True)
+            last_print = now
 
-        for tc in matches:
-            if tc == last_tc:
-                continue
-
-            last_tc = tc
-            count += 1
-
-            with lock:
-                state["ltc_timecode"] = tc
-                state["timecode"] = tc
-                state["ltc"] = tc
-                state["smpte"] = tc
-
-            now = time.time()
-            if count == 1 or now - last_print > 0.5:
-                print(f"LTC -> {tc} count={count}", flush=True)
-                last_print = now
+    receiver = LTCReceiver(
+        target_provider=lambda: ableton_target,
+        publish=publish,
+        diagnostics=update_diagnostics,
+    )
+    print(f"LTC UDP listener actif sur {LTC_UDP_IP}:{LTC_UDP_PORT}", flush=True)
+    if not receiver.serve_forever():
+        print(f"LTC UDP désactivé : impossible d'écouter {LTC_UDP_IP}:{LTC_UDP_PORT}", flush=True)
 
 # -----------------------------------------------------------------------------
 # Transport state normalization helper

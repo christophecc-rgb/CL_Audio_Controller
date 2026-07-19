@@ -14,7 +14,7 @@ a = Analysis(
         ('M4L', 'M4L'),
         ('arrangement_markers.json', '.'),
     ],
-    hiddenimports=['osc_transport', 'pythonosc.dispatcher', 'pythonosc.osc_server', 'pythonosc.udp_client'],
+    hiddenimports=['osc_transport', 'ltc_receiver', 'pythonosc.dispatcher', 'pythonosc.osc_server', 'pythonosc.udp_client'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

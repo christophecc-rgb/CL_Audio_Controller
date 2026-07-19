@@ -54,6 +54,8 @@ The following project-owned or locally supplied material has no provenance state
 - `assets/` images and photographs;
 - `CL_AUDIO.icns`, `icon.iconset/` and logo files;
 - `M4L/XFADER_OSC_BRIDGE_v8_OSC_REMOTE_STORE_ID.maxpat`;
+- `M4L/LTC Display v2.0 Remote Config.maxpat` et son `.amxd`, dérivés du
+  périphérique LTC Display v1.9 fourni localement ;
 - screenshots, model images and venue-related artwork;
 - installation and diagnostic scripts derived from earlier workspaces.
 

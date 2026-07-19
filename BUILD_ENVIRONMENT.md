@@ -107,6 +107,22 @@ Le device compilé `.amxd` reste un livrable externe. Il doit être chargé sur 
 ### LTC Display
 
 L'entrée LTC sur UDP 63123 est facultative pour les autres fonctions de l'application.
+La source Max de référence est `M4L/LTC Display v2.0 Remote Config.maxpat`, avec
+le périphérique compilé homonyme `.amxd`. Ils sont dérivés de v1.9 sans modification
+du calcul, de la cadence ni du format du timecode. Le script reproductible
+`scripts/create_ltc_remote_device.py` génère les deux variantes sans écraser v1.9.
+
+Configuration :
+
+- Local : destination `127.0.0.1`, UDP 63123 ;
+- Distant : destination égale à l'adresse LAN du Mac contrôleur, UDP 63123 ;
+- le profil Ableton distant continue de désigner le Mac Ableton pour les flux
+  AbletonOSC 11000/11001 et ne stocke pas l'adresse du contrôleur LTC.
+
+Le listener est lié à `0.0.0.0:63123`, puis filtre chaque datagramme à partir de
+son adresse source : loopback uniquement en Local, adresse du Mac Ableton actif
+uniquement en Distant. Le pare-feu macOS doit autoriser l'application sur le Mac
+contrôleur si celui-ci est activé.
 
 ## Ports utilisés
 
@@ -117,7 +133,7 @@ L'entrée LTC sur UDP 63123 est facultative pour les autres fonctions de l'appli
 | 11000 | UDP | Commandes AbletonOSC |
 | 11001 | UDP | Réponses AbletonOSC |
 | 9001 | UDP | Pont Max for Live |
-| 63123 | UDP | Entrée LTC Display |
+| 63123 | UDP | Entrée LTC Display locale ou distante, avec filtrage de source |
 
 ## Procédure de reconstruction
 

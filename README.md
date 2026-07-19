@@ -89,9 +89,29 @@ Le device doit écouter en UDP sur le port 9001 et être placé sur la piste Mas
 | 11000 | UDP | Commandes envoyées à AbletonOSC |
 | 11001 | UDP | Réponses reçues depuis AbletonOSC |
 | 9001 | UDP | Commandes envoyées au pont Max for Live |
-| 63123 | UDP | Entrée optionnelle LTC Display |
+| 63123 | UDP | Entrée optionnelle LTC Display, filtrée selon le profil Ableton actif |
 
 Le serveur principal écoute sur `0.0.0.0`. Utiliser l'application uniquement sur un réseau de confiance et vérifier le pare-feu macOS.
+
+### LTC Local et Distant
+
+Le LTC utilise un flux UDP distinct d'AbletonOSC. La source et le périphérique de
+référence sont `M4L/LTC Display v2.0 Remote Config.maxpat` et son `.amxd` associé ;
+son calcul et son message historique `tc,sHH:MM:SS:FF` sont inchangés.
+
+- En mode **Local**, conserver la destination `127.0.0.1` et le port `63123`.
+- En mode **Distant**, saisir dans le périphérique Max for Live l'adresse LAN du
+  Mac qui exécute CL Audio Controller, toujours sur le port `63123`.
+
+Les deux adresses réseau ont des rôles opposés : le profil Ableton distant contient
+l'adresse du Mac Ableton auquel le contrôleur envoie ses commandes sur UDP 11000,
+alors que le périphérique LTC contient l'adresse du Mac contrôleur auquel le Mac
+Ableton envoie le timecode sur UDP 63123. Le contrôleur écoute 63123 sur ses
+interfaces réseau, mais n'accepte que la boucle locale en mode Local ou l'adresse
+du Mac Ableton actif en mode Distant.
+
+Si le pare-feu macOS du Mac contrôleur est actif, autoriser CL Audio Controller à
+recevoir des datagrammes UDP sur 63123. Aucune découverte réseau n'est effectuée.
 
 ## Construction macOS
 
