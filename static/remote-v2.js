@@ -3,7 +3,8 @@
 
   window.CLRemoteEnergy = {
     startPolling(task, isActive, options = {}) {
-      const activeMs = Math.max(250, Number(options.activeMs) || 900);
+      const minActiveMs = Math.max(40, Number(options.minActiveMs) || 250);
+      const activeMs = Math.max(minActiveMs, Number(options.activeMs) || 900);
       const idleMs = Math.max(activeMs, Number(options.idleMs) || 2500);
       const hiddenMs = Math.max(idleMs, Number(options.hiddenMs) || 15000);
       let timer = null;

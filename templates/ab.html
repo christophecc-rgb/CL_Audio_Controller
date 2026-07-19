@@ -2244,7 +2244,7 @@
       window.CLRemoteEnergy.startPolling(
         update,
         () => document.body.classList.contains('v2-playing'),
-        { activeMs: 650, idleMs: 2000, hiddenMs: 15000 }
+        { activeMs: 40, idleMs: 2000, hiddenMs: 15000, minActiveMs: 40 }
       );
     }, { once: true });
   </script>

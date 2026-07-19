@@ -753,6 +753,56 @@ class LiveSetGenerationTests(unittest.TestCase):
             self.assertIn("scene:", source)
         self.assertNotIn("await wait(350)", ab_source)
 
+    def test_ab_polling_allows_40ms_without_changing_other_interfaces(self):
+        scheduler_source = (PROJECT_ROOT / "static/remote-v2.js").read_text(encoding="utf-8")
+        ab_source = (PROJECT_ROOT / "templates/ab.html").read_text(encoding="utf-8")
+        session_source = (PROJECT_ROOT / "templates/index.html").read_text(encoding="utf-8")
+        arrangement_source = (PROJECT_ROOT / "templates/arrangement.html").read_text(encoding="utf-8")
+
+        self.assertIn(
+            "const minActiveMs = Math.max(40, Number(options.minActiveMs) || 250);",
+            scheduler_source,
+        )
+        self.assertIn(
+            "const activeMs = Math.max(minActiveMs, Number(options.activeMs) || 900);",
+            scheduler_source,
+        )
+        self.assertIn(
+            "{ activeMs: 40, idleMs: 2000, hiddenMs: 15000, minActiveMs: 40 }",
+            ab_source,
+        )
+        self.assertIn(
+            "{ activeMs: 1000, idleMs: 2500, hiddenMs: 15000 }",
+            session_source,
+        )
+        self.assertIn(
+            "{ activeMs: 850, idleMs: 2500, hiddenMs: 15000 }",
+            arrangement_source,
+        )
+        self.assertNotIn("minActiveMs", session_source)
+        self.assertNotIn("minActiveMs", arrangement_source)
+
+    def test_polling_remains_serialized_and_recovers_after_failures(self):
+        scheduler_source = (PROJECT_ROOT / "static/remote-v2.js").read_text(encoding="utf-8")
+
+        self.assertNotIn("setInterval", scheduler_source)
+        self.assertIn("let running = false;", scheduler_source)
+        self.assertIn("if (running) {", scheduler_source)
+        self.assertIn("try { await task(); }", scheduler_source)
+        self.assertIn("catch (_) {}", scheduler_source)
+        self.assertIn("finally {", scheduler_source)
+        self.assertIn("running = false;", scheduler_source)
+        self.assertIn("schedule();", scheduler_source)
+
+    def test_ab_generation_filter_and_controls_are_unchanged(self):
+        ab_source = (PROJECT_ROOT / "templates/ab.html").read_text(encoding="utf-8")
+
+        self.assertIn("generation < lastAcceptedGeneration", ab_source)
+        self.assertIn("confirmSelectedScene();", ab_source)
+        self.assertIn("togglePlayPauseFromKeyboard();", ab_source)
+        self.assertIn("timeoutMs = 2500", ab_source)
+        self.assertIn("fetchJSON('/status', {}, 1800)", ab_source)
+
     def test_keyboard_shortcuts_share_button_handlers_on_all_interfaces(self):
         sources = {
             "session": (PROJECT_ROOT / "templates/index.html").read_text(encoding="utf-8"),
