@@ -279,11 +279,20 @@ class ServerStatusContractTests(unittest.TestCase):
 
 
 class NetworkConfigurationRouteTests(unittest.TestCase):
+    @staticmethod
+    def remote_profiles(host="192.168.50.10", name="Mac Blue"):
+        return ableton_targets.update_profile(
+            ableton_targets.default_profiles(),
+            ableton_targets.AbletonTarget(mode="remote", host=host),
+            name=name,
+            activate=True,
+        )
+
     def test_local_configuration_without_server_is_saved_without_restart(self):
-        previous = ableton_targets.AbletonTarget(mode="remote", host="192.168.50.10")
+        previous_profiles = self.remote_profiles()
         with (
-            mock.patch.object(launcher, "load_target", return_value=previous),
-            mock.patch.object(launcher, "save_target") as save,
+            mock.patch.object(launcher, "load_profiles", return_value=previous_profiles),
+            mock.patch.object(launcher, "save_profiles") as save,
             mock.patch.object(launcher, "tcp_ok", return_value=False),
             mock.patch.object(launcher, "start_web_server") as start,
         ):
@@ -292,14 +301,18 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
                 json={"mode": "local", "host": "192.168.50.99", "send_port": 11000, "reply_port": 11001},
             )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(save.call_args.args[0].host, "127.0.0.1")
+        saved = save.call_args.args[0]
+        self.assertEqual(saved.active_mode, "local")
+        self.assertEqual(saved.active_target().host, "127.0.0.1")
+        self.assertEqual(saved.remote, previous_profiles.remote)
+        self.assertEqual(saved.remote_name, "Mac Blue")
         start.assert_not_called()
 
     def test_configuration_change_restarts_only_owned_server(self):
-        previous = ableton_targets.local_target()
+        previous_profiles = ableton_targets.default_profiles()
         with (
-            mock.patch.object(launcher, "load_target", return_value=previous),
-            mock.patch.object(launcher, "save_target") as save,
+            mock.patch.object(launcher, "load_profiles", return_value=previous_profiles),
+            mock.patch.object(launcher, "save_profiles") as save,
             mock.patch.object(launcher, "tcp_ok", return_value=True),
             mock.patch.object(launcher, "current_identity_status", return_value=(valid_status(), {"valid": True})),
             mock.patch.object(launcher, "stop_owned_server", return_value=(True, "stopped")) as stop,
@@ -310,14 +323,17 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
                 json={"mode": "remote", "host": "192.168.50.10", "send_port": 11000, "reply_port": 11001},
             )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(save.call_args.args[0].host, "192.168.50.10")
+        saved = save.call_args.args[0]
+        self.assertEqual(saved.active_mode, "remote")
+        self.assertEqual(saved.remote.host, "192.168.50.10")
+        self.assertEqual(saved.local, previous_profiles.local)
         stop.assert_called_once_with()
         start.assert_called_once_with()
 
     def test_configuration_refuses_unowned_active_server(self):
         with (
-            mock.patch.object(launcher, "load_target", return_value=ableton_targets.local_target()),
-            mock.patch.object(launcher, "save_target") as save,
+            mock.patch.object(launcher, "load_profiles", return_value=ableton_targets.default_profiles()),
+            mock.patch.object(launcher, "save_profiles") as save,
             mock.patch.object(launcher, "tcp_ok", return_value=True),
             mock.patch.object(launcher, "current_identity_status", return_value=(valid_status(), {"valid": False})),
         ):
@@ -327,6 +343,43 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
             )
         self.assertEqual(response.status_code, 409)
         save.assert_not_called()
+
+    def test_applying_remote_preserves_custom_local_profile(self):
+        previous_profiles = ableton_targets.update_profile(
+            ableton_targets.default_profiles(),
+            ableton_targets.local_target(12000, 12001),
+        )
+        with (
+            mock.patch.object(launcher, "load_profiles", return_value=previous_profiles),
+            mock.patch.object(launcher, "save_profiles") as save,
+            mock.patch.object(launcher, "tcp_ok", return_value=False),
+        ):
+            response = launcher.app.test_client().post(
+                "/network-config",
+                json={"mode": "remote", "name": "Régie", "host": "192.168.50.20", "send_port": 13000, "reply_port": 13001},
+            )
+        self.assertEqual(response.status_code, 200)
+        saved = save.call_args.args[0]
+        self.assertEqual((saved.local.send_port, saved.local.reply_port), (12000, 12001))
+        self.assertEqual(saved.remote_name, "Régie")
+        self.assertEqual((saved.remote.send_port, saved.remote.reply_port), (13000, 13001))
+
+    def test_get_configuration_exposes_profiles_and_active_target(self):
+        profiles = self.remote_profiles()
+        with mock.patch.object(launcher, "load_profiles", return_value=profiles):
+            response = launcher.app.test_client().get("/network-config")
+        payload = response.get_json()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["active_mode"], "remote")
+        self.assertEqual(payload["profiles"]["remote"]["name"], "Mac Blue")
+        self.assertEqual(payload["active_target"]["host"], "192.168.50.10")
+
+    def test_panel_contains_two_non_destructive_drafts(self):
+        page = launcher.app.test_client().get("/").get_data(as_text=True)
+        self.assertIn("networkDrafts={local:null,remote:null}", page)
+        self.assertIn("captureVisibleNetworkDraft();", page)
+        self.assertIn("restoreNetworkDraft(networkVisibleMode);", page)
+        self.assertNotIn("if(local)el('abletonHost').value='127.0.0.1'", page)
 
 
 if __name__ == "__main__":

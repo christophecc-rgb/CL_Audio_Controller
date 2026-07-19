@@ -9,7 +9,14 @@ except ModuleNotFoundError:
 from pathlib import Path
 from flask import Flask, jsonify, render_template_string, request, send_file
 from build_identity import BUILD_ID, IDENTITY_PROTOCOL_VERSION, SERVICE_NAME
-from ableton_targets import AbletonTargetError, load_target, save_target, validate_target
+from ableton_targets import (
+    AbletonTargetError,
+    load_profiles,
+    load_target,
+    save_profiles,
+    update_profile,
+    validate_target,
+)
 from server_ownership import (
     DEFAULT_RECORD_PATH,
     OwnershipRecordError,
@@ -977,6 +984,7 @@ body.show-mode .system{min-height:86px}
     <div class="access-head">Connexion AbletonOSC</div>
     <div class="network-grid">
       <label>Mode<select id="abletonMode" onchange="updateNetworkFields()"><option value="local">Local</option><option value="remote">Ableton distant</option></select></label>
+      <label>Nom de la cible<input id="abletonName" placeholder="Mac Blue"></label>
       <label>Adresse Ableton<input id="abletonHost" value="127.0.0.1"></label>
       <label>Port émission<input id="abletonSendPort" type="number" value="11000"></label>
       <label>Port retour<input id="abletonReplyPort" type="number" value="11001"></label>
@@ -1008,6 +1016,9 @@ body.show-mode .system{min-height:86px}
 <script>
 let latestState=null;
 let networkFormInitialized=false;
+let networkFormDirty=false;
+let networkVisibleMode=null;
+let networkDrafts={local:null,remote:null};
 const el=id=>document.getElementById(id);
 function setTech(id,on){el(id).className='tech-item '+(on?'on':'');}
 function setBusy(label){el('systemCard').className='card system busy';el('stateTitle').textContent=label.toUpperCase();el('stateDetail').textContent='Veuillez patienter…';}
@@ -1024,22 +1035,55 @@ function render(s){
   el('events').innerHTML=(s.events||[]).slice().reverse().join('<br>')||'Aucun événement récent.';
   el('orphanCard').className='card orphan '+(s.orphan_actions_available?'show':'');
   if(s.orphan_actions_available)el('orphanDetail').textContent='Instance '+s.orphan_instance_id+' · PID '+s.orphan_process_id+' · '+s.build_id;
-  if(!networkFormInitialized&&s.ableton_config){
-    el('abletonMode').value=s.ableton_config.mode;el('abletonHost').value=s.ableton_config.host;
-    el('abletonSendPort').value=s.ableton_config.send_port;el('abletonReplyPort').value=s.ableton_config.reply_port;
-    networkFormInitialized=true;updateNetworkFields();
-  }
+  if(!networkFormInitialized&&s.ableton_profiles)initializeNetworkForm(s);
   if(s.ableton_config){el('techAbletonMode').textContent='Ableton · '+(s.ableton_config.mode==='local'?'Local':'Distant');el('techAbletonAddress').textContent=s.ableton_config.host+':'+s.ableton_config.send_port+' → '+s.ableton_config.reply_port;el('techOscLabel').textContent='OSC aller · '+s.ableton_config.send_port;el('techReturnLabel').textContent='OSC retour · '+s.ableton_config.reply_port;}
   if(s.osc_transport){el('techAbletonLatency').textContent='Dernière réponse · '+(s.osc_transport.last_latency_ms==null?'—':Math.round(s.osc_transport.last_latency_ms)+' ms');el('techAbletonTimeouts').textContent='Timeouts · '+s.osc_transport.timeout_count;}
 }
 async function refresh(){try{render(await(await fetch('/state')).json());}catch(e){el('systemCard').className='card system error';el('stateTitle').textContent='PANNEAU HORS LIGNE';el('stateDetail').textContent=String(e);}}
 async function runAction(path,label){setBusy(label);el('actionStatus').textContent=label+'…';try{const response=await fetch(path);const r=await response.json();el('actionStatus').textContent=response.ok?('✓ '+(r.message||'Action terminée')):('! Refus : '+(r.error||response.status));}catch(e){el('actionStatus').textContent='! '+e;}setTimeout(refresh,450);}
 async function runPostAction(path,label){setBusy(label);el('actionStatus').textContent=label+'…';try{const response=await fetch(path,{method:'POST'});const r=await response.json();el('actionStatus').textContent=response.ok?('✓ '+(r.message||'Action terminée')):('! Refus : '+(r.error||response.status));}catch(e){el('actionStatus').textContent='! '+e;}setTimeout(refresh,450);}
-function updateNetworkFields(){const local=el('abletonMode').value==='local';el('abletonHost').disabled=local;if(local)el('abletonHost').value='127.0.0.1';}
+function copyNetworkDraft(value,mode){
+  if(!value)return mode==='local'?{name:'',host:'127.0.0.1',send_port:11000,reply_port:11001}:{name:'',host:'',send_port:11000,reply_port:11001};
+  return {name:value.name||'',host:mode==='local'?'127.0.0.1':(value.host||''),send_port:Number(value.send_port),reply_port:Number(value.reply_port)};
+}
+function initializeNetworkForm(s){
+  networkDrafts.local=copyNetworkDraft(s.ableton_profiles.local,'local');
+  networkDrafts.remote=copyNetworkDraft(s.ableton_profiles.remote,'remote');
+  networkVisibleMode=s.ableton_active_mode;
+  el('abletonMode').value=networkVisibleMode;
+  restoreNetworkDraft(networkVisibleMode);
+  networkFormDirty=false;networkFormInitialized=true;
+}
+function captureVisibleNetworkDraft(){
+  if(!networkVisibleMode)return;
+  networkDrafts[networkVisibleMode]={
+    name:el('abletonName').value,
+    host:networkVisibleMode==='local'?'127.0.0.1':el('abletonHost').value,
+    send_port:Number(el('abletonSendPort').value),
+    reply_port:Number(el('abletonReplyPort').value)
+  };
+}
+function restoreNetworkDraft(mode){
+  const draft=networkDrafts[mode]||copyNetworkDraft(null,mode),local=mode==='local';
+  el('abletonName').value=local?'':draft.name;
+  el('abletonName').disabled=local;
+  el('abletonHost').value=local?'127.0.0.1':draft.host;
+  el('abletonHost').disabled=local;
+  el('abletonSendPort').value=draft.send_port;
+  el('abletonReplyPort').value=draft.reply_port;
+}
+function updateNetworkFields(){
+  captureVisibleNetworkDraft();
+  networkVisibleMode=el('abletonMode').value;
+  restoreNetworkDraft(networkVisibleMode);
+  networkFormDirty=true;
+}
+function markNetworkDraftDirty(){captureVisibleNetworkDraft();networkFormDirty=true;}
 async function saveNetworkConfig(){
-  const payload={mode:el('abletonMode').value,host:el('abletonHost').value,send_port:Number(el('abletonSendPort').value),reply_port:Number(el('abletonReplyPort').value)};
+  captureVisibleNetworkDraft();const draft=networkDrafts[networkVisibleMode];
+  const payload={mode:networkVisibleMode,name:draft.name,host:draft.host,send_port:draft.send_port,reply_port:draft.reply_port};
   el('actionStatus').textContent='Application de la configuration OSC…';
-  try{const response=await fetch('/network-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const r=await response.json();el('actionStatus').textContent=response.ok?('✓ '+r.message):('! Refus : '+(r.error||response.status));if(response.ok){networkFormInitialized=false;setTimeout(refresh,500);}}
+  try{const response=await fetch('/network-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const r=await response.json();el('actionStatus').textContent=response.ok?('✓ '+r.message):('! Refus : '+(r.error||response.status));if(response.ok){networkFormInitialized=false;networkFormDirty=false;setTimeout(refresh,500);}}
   catch(e){el('actionStatus').textContent='! '+e;}
 }
 async function testAbletonConnection(){
@@ -1050,6 +1094,7 @@ async function testAbletonConnection(){
 function confirmStop(){if(confirm('Arrêter le serveur de télécommande ?\n\nLes appareils connectés perdront immédiatement l’accès.'))runAction('/stop','Arrêt du serveur');}
 async function copyAddress(){if(!latestState)return;try{await navigator.clipboard.writeText(latestState.lan_url);el('actionStatus').textContent='✓ Adresse copiée';}catch(e){el('actionStatus').textContent='Adresse : '+latestState.lan_url;}}
 function toggleShowMode(){document.body.classList.toggle('show-mode');el('showMode').textContent=document.body.classList.contains('show-mode')?'Quitter le mode spectacle':'Mode spectacle';}
+['abletonName','abletonHost','abletonSendPort','abletonReplyPort'].forEach(id=>el(id).addEventListener('input',markNetworkDraftDirty));
 refresh();setInterval(refresh,1500);
 </script>
 </body>
@@ -1084,10 +1129,16 @@ def state():
         identity = {"valid": False, "code": "offline", "message": "Serveur HTTP absent"}
     server_valid = bool(identity["valid"])
     try:
-        configured_target = load_target().to_dict()
+        configured_profiles = load_profiles()
+        configured_target = configured_profiles.active_target().to_dict()
+        public_profiles = configured_profiles.to_dict()["profiles"]
+        active_mode = configured_profiles.active_mode
         network_config_error = None
     except AbletonTargetError as exc:
+        configured_profiles = None
         configured_target = None
+        public_profiles = None
+        active_mode = None
         network_config_error = str(exc)
     live_set_ready = bool(remote_state.get("set_ready")) if server_valid else False
     reply_port = int((configured_target or {}).get("reply_port", RETURN_PORT))
@@ -1124,6 +1175,9 @@ def state():
         last_successful_bootstrap=remote_state.get("last_successful_bootstrap"),
         pending_request=remote_state.get("pending_request"),
         ableton_config=configured_target,
+        ableton_active_mode=active_mode,
+        ableton_profiles=public_profiles,
+        ableton_server_target=remote_state.get("ableton_target"),
         network_config_error=network_config_error,
         osc_transport=remote_state.get("osc_transport"),
         orphan_actions_available=identity["code"] == "orphan-claimable",
@@ -1159,18 +1213,38 @@ def state():
 def network_config():
     if request.method == "GET":
         try:
-            return jsonify(load_target().to_dict())
+            profiles = load_profiles()
+            return jsonify({
+                **profiles.to_dict(),
+                "active_target": profiles.active_target().to_dict(),
+            })
         except AbletonTargetError as exc:
             return jsonify(error=str(exc)), 409
 
     payload = request.get_json(silent=True)
     try:
-        previous = load_target()
-        candidate = validate_target(payload)
+        previous_profiles = load_profiles()
+        previous = previous_profiles.active_target()
+        if not isinstance(payload, dict):
+            raise AbletonTargetError("configuration Ableton invalide")
+        allowed = {"mode", "name", "host", "send_port", "reply_port"}
+        if set(payload) - allowed:
+            raise AbletonTargetError("champs de configuration inconnus")
+        candidate = validate_target({key: value for key, value in payload.items() if key != "name"})
+        candidate_profiles = update_profile(
+            previous_profiles,
+            candidate,
+            name=payload.get("name"),
+            activate=True,
+        )
     except AbletonTargetError as exc:
         return jsonify(error=str(exc)), 400
-    if candidate == previous:
-        return jsonify(message="Configuration OSC inchangée", target=candidate.to_dict())
+    if candidate_profiles == previous_profiles:
+        return jsonify(
+            message="Configuration OSC inchangée",
+            target=candidate.to_dict(),
+            profiles=candidate_profiles.to_dict(),
+        )
 
     server_was_running = tcp_ok(WEB_PORT)
     if server_was_running:
@@ -1178,18 +1252,18 @@ def network_config():
         if not identity.get("valid"):
             return jsonify(error="Configuration refusée : le serveur actif n'est pas possédé par ce launcher"), 409
     try:
-        save_target(candidate)
+        save_profiles(candidate_profiles)
     except AbletonTargetError as exc:
         return jsonify(error=str(exc)), 400
 
     if server_was_running:
         stopped, stop_message = stop_owned_server()
         if not stopped:
-            save_target(previous)
+            save_profiles(previous_profiles)
             return jsonify(error=f"Configuration annulée : {stop_message}"), 409
         started, start_message = start_web_server()
         if not started:
-            save_target(previous)
+            save_profiles(previous_profiles)
             restored, restore_message = start_web_server()
             suffix = "ancienne configuration restaurée" if restored else f"restauration impossible : {restore_message}"
             return jsonify(error=f"Nouvelle configuration non démarrée : {start_message} ; {suffix}"), 409
@@ -1197,6 +1271,7 @@ def network_config():
     return jsonify(
         message="Configuration OSC appliquée" + (" et serveur redémarré" if server_was_running else ""),
         target=candidate.to_dict(),
+        profiles=candidate_profiles.to_dict(),
     )
 
 
