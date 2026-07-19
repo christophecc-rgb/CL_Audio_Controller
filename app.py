@@ -20,11 +20,13 @@ import threading
 import multiprocessing
 import time
 import uuid
+from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Tuple
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
 from build_identity import BUILD_ID, IDENTITY_PROTOCOL_VERSION, SERVICE_NAME
+from ableton_targets import load_target
 
 multiprocessing.freeze_support()
 
@@ -35,7 +37,8 @@ import threading
 import multiprocessing
 import socket
 
-from pythonosc import dispatcher, osc_server, udp_client
+from pythonosc import udp_client
+from osc_transport import OSCTransport
 
 SERVER_STARTED_MONOTONIC = time.monotonic()
 SERVER_STARTED_AT = time.time()
@@ -60,10 +63,6 @@ print(json.dumps({
 }, ensure_ascii=False, sort_keys=True), flush=True)
 
 # Crossfader Ableton via Max for Live OSC, zéro MIDI.
-
-ABLETON_IP = "127.0.0.1"
-ABLETON_PORT = 11000
-LOCAL_OSC_PORT = 11001
 
 # LTC Display v1.9 → UDP 63123 → /status → ab.html
 LTC_UDP_IP = "127.0.0.1"
@@ -96,6 +95,8 @@ BACKGROUND_REFRESH_SECONDS = 0.25
 FULL_REFRESH_SECONDS = 1.0
 OSC_TIMEOUT = 0.06
 OSC_BOOTSTRAP_DRAIN_SECONDS = 0.25
+BOOTSTRAP_TRANSACTION_TIMEOUT = 2.0
+BOOTSTRAP_RETRY_PAUSE_SECONDS = 0.02
 
 # Diagnostic ciblé des changements de Set, silencieux par défaut.
 # Activer ponctuellement avec CL_AUDIO_GENERATION_DEBUG=1.
@@ -105,7 +106,12 @@ GENERATION_DEBUG = os.environ.get("CL_AUDIO_GENERATION_DEBUG", "0").strip().lowe
 
 
 app = Flask(__name__)
-client = udp_client.SimpleUDPClient(ABLETON_IP, ABLETON_PORT)
+ableton_target = load_target()
+ableton_transport = OSCTransport(
+    host=ableton_target.host,
+    send_port=ableton_target.send_port,
+    reply_port=ableton_target.reply_port,
+)
 
 KEYBOARD_LOG_PATH = Path("/private/tmp/CL_Audio_Controller_keyboard.log")
 keyboard_log_lock = threading.Lock()
@@ -149,6 +155,12 @@ def write_bootstrap_diagnostic(event: str, **details: Any) -> None:
         print(f"[BOOTSTRAP] écriture impossible: {exc}", flush=True)
 
 
+BOOTSTRAP_IMPLEMENTATION = "transactional-initial-bootstrap"
+
+write_bootstrap_diagnostic(
+    "bootstrap-implementation",
+    implementation=BOOTSTRAP_IMPLEMENTATION,
+)
 write_bootstrap_diagnostic(
     "server-started",
     launchId=LAUNCH_ID,
@@ -539,9 +551,7 @@ def normalize_transport_state_locked():
     if not is_playing and play_mode == "arrangement" and not bool(state.get("is_paused", False)):
         state["play_mode"] = "stopped"
 
-active_query: Optional[Dict[str, Any]] = None
 lock = threading.RLock()
-query_lock = threading.Lock()
 scene_transaction_lock = threading.Lock()
 
 completed_go_requests: Dict[Tuple[int, str], Dict[str, Any]] = {}
@@ -550,6 +560,45 @@ last_playing_scan = 0.0
 _track_count_cache: Tuple[float, int] = (0.0, MAX_TRACKS_TO_SCAN)
 _cue_points_cache: Tuple[float, list, str] = (0.0, [], "JSON")
 _bootstrap_generation: Optional[int] = None
+_NOT_RECEIVED = object()
+
+
+@dataclass
+class BootstrapTransaction:
+    """Instantané privé accumulé avant l'unique publication d'un Live Set."""
+
+    generation: int
+    started_at: float
+    deadline: float
+    target_identity: Tuple[str, int, int]
+    file_path: Any = _NOT_RECEIVED
+    song_name: Any = _NOT_RECEIVED
+    selected_scene: Any = _NOT_RECEIVED
+    scene_names: Any = _NOT_RECEIVED
+    confirmed_file_path: Any = _NOT_RECEIVED
+    completed: bool = False
+    cancelled: bool = False
+    cancel_reason: str = ""
+    attempts: Dict[str, int] = field(default_factory=dict)
+
+    def received(self, field_name: str) -> bool:
+        return getattr(self, field_name) is not _NOT_RECEIVED
+
+    def missing(self) -> list:
+        return [
+            field_name
+            for field_name in ("file_path", "song_name", "selected_scene", "scene_names")
+            if not self.received(field_name)
+        ]
+
+    def ready_to_confirm(self) -> bool:
+        return not self.missing()
+
+    def complete(self) -> bool:
+        return self.ready_to_confirm() and self.received("confirmed_file_path")
+
+
+_bootstrap_transaction: Optional[BootstrapTransaction] = None
 
 
 def state_snapshot_locked() -> Dict[str, Any]:
@@ -567,6 +616,8 @@ def state_snapshot_locked() -> Dict[str, Any]:
     snapshot["build_id"] = BUILD_ID
     snapshot["started_at"] = SERVER_STARTED_AT
     snapshot["uptime_ms"] = int((time.monotonic() - SERVER_STARTED_MONOTONIC) * 1000)
+    snapshot["ableton_target"] = ableton_target.to_dict()
+    snapshot["osc_transport"] = ableton_transport.diagnostics()
     if not snapshot.get("set_ready", False):
         snapshot.update({
             "scenes": {},
@@ -594,7 +645,7 @@ def generation_log(event: str, **details: Any) -> None:
 
 def reset_live_set_state_locked(set_id: Optional[str], reason: str) -> int:
     """Ouvre atomiquement une génération et efface tout état propre au Set précédent."""
-    global active_query, _track_count_cache, _cue_points_cache, _bootstrap_generation
+    global _track_count_cache, _cue_points_cache, _bootstrap_generation
 
     previous_generation = int(state.get("set_generation", 0))
     previous_set_id = state.get("current_set_id")
@@ -632,7 +683,7 @@ def reset_live_set_state_locked(set_id: Optional[str], reason: str) -> int:
         "pending_request": None,
     })
     set_set_ready_locked(False, reason, "reset_live_set_state_locked")
-    active_query = None
+    ableton_transport.cancel_pending()
     completed_go_requests.clear()
     _bootstrap_generation = None
     _track_count_cache = (0.0, MAX_TRACKS_TO_SCAN)
@@ -665,70 +716,10 @@ def osc_reply(address, *args):
             set_bootstrap_step_locked("attente de Song.file_path", "/live/startup reçu")
         start_live_set_bootstrap(generation)
         return
-
-    with lock:
-        request_state = active_query
-        diagnostic_reply = bool(request_state and request_state.get("bootstrap_diagnostic"))
-        if diagnostic_reply:
-            write_bootstrap_diagnostic(
-                "bootstrap-response-received",
-                address=address,
-                arguments=list(args),
-                setGeneration=int(state.get("set_generation", 0)),
-            )
-        if request_state is None:
-            generation_log("orphan_reply_ignored", address=address)
-            return
-        if request_state.get("address") != address:
-            if diagnostic_reply:
-                write_bootstrap_diagnostic(
-                    "bootstrap-response-invalid",
-                    address=address,
-                    reason="adresse différente de la requête active",
-                    expectedAddress=request_state.get("address"),
-                )
-            generation_log(
-                "incompatible_reply_ignored",
-                address=address,
-                expected_address=request_state.get("address"),
-            )
-            return
-        if int(request_state.get("generation", -1)) != int(state.get("set_generation", 0)):
-            if diagnostic_reply:
-                write_bootstrap_diagnostic("bootstrap-response-invalid", address=address, reason="ancienne génération")
-            generation_log("stale_reply_ignored", address=address)
-            return
-        if not state.get("set_ready", False) and not request_state.get("allow_during_bootstrap", False):
-            if diagnostic_reply:
-                write_bootstrap_diagnostic("bootstrap-response-invalid", address=address, reason="réponse interdite pendant bootstrap")
-            generation_log("bootstrap_reply_ignored", address=address)
-            return
-        if not osc_response_matches_request(address, request_state.get("args", ()), args):
-            if diagnostic_reply:
-                write_bootstrap_diagnostic("bootstrap-response-invalid", address=address, reason="réponse incompatible")
-            generation_log(
-                "incompatible_reply_ignored",
-                address=address,
-                request_args=request_state.get("args", ()),
-                response_args=args,
-            )
-            return
-        request_state["response"] = args
-        request_state["received_at"] = time.time()
+    generation_log("orphan_reply_ignored", address=address)
 
 
-def osc_response_matches_request(address: str, request_args: Tuple[Any, ...], response_args: Tuple[Any, ...]) -> bool:
-    """Corrèle seulement les arguments effectivement répétés par AbletonOSC."""
-    if not request_args:
-        return True
-    if address.startswith("/live/scene/") or address.startswith("/live/track/"):
-        if not response_args:
-            return False
-        try:
-            return int(response_args[0]) == int(request_args[0])
-        except (TypeError, ValueError):
-            return response_args[0] == request_args[0]
-    return True
+ableton_transport.set_unsolicited_handler(osc_reply)
 
 
 def apply_osc_response_locked(address: str, args: Tuple[Any, ...], expected_generation: int) -> None:
@@ -768,22 +759,19 @@ def apply_osc_response_locked(address: str, args: Tuple[Any, ...], expected_gene
 
 
 def start_osc_server():
-    disp = dispatcher.Dispatcher()
-    disp.set_default_handler(osc_reply)
-    server = osc_server.ThreadingOSCUDPServer(("0.0.0.0", LOCAL_OSC_PORT), disp)
     write_bootstrap_diagnostic(
         "osc-socket-opened",
         bindAddress="0.0.0.0",
-        returnPort=LOCAL_OSC_PORT,
-        abletonAddress=ABLETON_IP,
-        abletonPort=ABLETON_PORT,
+        returnPort=ableton_transport.reply_port,
+        abletonAddress=ableton_transport.host,
+        abletonPort=ableton_transport.send_port,
     )
-    print(f"OSC reply server listening on 0.0.0.0:{LOCAL_OSC_PORT}")
-    server.serve_forever()
+    print(f"OSC reply server listening on 0.0.0.0:{ableton_transport.reply_port}")
+    ableton_transport.serve_forever()
 
 
 def send(address: str, *args):
-    client.send_message(address, list(args))
+    ableton_transport.send(address, *args)
 
 def show_session_view():
     for address in (
@@ -822,8 +810,6 @@ def _query_with_query_lock_held(
         with lock:
             expected_generation = int(state.get("set_generation", 0))
 
-    global active_query
-
     with lock:
         bootstrap_diagnostic = bool(allow_during_bootstrap and not state.get("set_ready", False))
 
@@ -852,23 +838,13 @@ def _query_with_query_lock_held(
                 phase="set_not_ready",
             )
             return None
-        request_state = {
-            "address": address,
-            "args": tuple(args),
-            "generation": int(expected_generation),
-            "sent_at": time.time(),
-            "allow_during_bootstrap": bool(allow_during_bootstrap),
-            "apply_response": bool(apply_response),
-            "bootstrap_diagnostic": bootstrap_diagnostic,
-            "response": None,
-        }
-        active_query = request_state
+        sent_at = time.time()
         if bootstrap_diagnostic:
             state["pending_request"] = {
                 "address": address,
                 "arguments": list(args),
                 "generation": int(expected_generation),
-                "sent_at": request_state["sent_at"],
+                "sent_at": sent_at,
                 "timeout_ms": int(float(timeout) * 1000),
             }
 
@@ -880,62 +856,55 @@ def _query_with_query_lock_held(
             expectedGeneration=expected_generation,
             timeoutMs=int(float(timeout) * 1000),
         )
-    send(address, *args)
-
     t0 = time.time()
-    while time.time() - t0 < timeout:
-        with lock:
-            if active_query is not request_state:
-                if bootstrap_diagnostic:
-                    state["pending_request"] = None
-                    write_bootstrap_diagnostic(
-                        "bootstrap-query-interrupted",
-                        address=address,
-                        reason="requête active invalidée ou remplacée",
-                        expectedGeneration=expected_generation,
-                    )
-                return None
-            payload = request_state.get("response")
-            if payload is not None:
-                if generation_is_current(expected_generation):
-                    if request_state.get("apply_response", True):
-                        apply_osc_response_locked(address, payload, expected_generation)
-                    active_query = None
-                    if bootstrap_diagnostic:
-                        state["pending_request"] = None
-                        write_bootstrap_diagnostic(
-                            "bootstrap-query-completed",
-                            address=address,
-                            response=list(payload),
-                            expectedGeneration=expected_generation,
-                            elapsedMs=int((time.time() - t0) * 1000),
-                        )
-                    return payload
-                active_query = None
-                if bootstrap_diagnostic:
-                    state["pending_request"] = None
-                    write_bootstrap_diagnostic(
-                        "bootstrap-query-interrupted",
-                        address=address,
-                        reason="génération modifiée après réception",
-                        expectedGeneration=expected_generation,
-                    )
-                return None
-        time.sleep(0.006)
-
+    payload = ableton_transport.query_locked(
+        address,
+        *args,
+        timeout=timeout,
+        context={
+            "generation": int(expected_generation),
+            "allow_during_bootstrap": bool(allow_during_bootstrap),
+            "apply_response": bool(apply_response),
+        },
+    )
     with lock:
-        if active_query is request_state:
-            active_query = None
         if bootstrap_diagnostic:
             state["pending_request"] = None
+        if payload is not None and generation_is_current(expected_generation):
+            if apply_response:
+                apply_osc_response_locked(address, payload, expected_generation)
+            if bootstrap_diagnostic:
+                write_bootstrap_diagnostic(
+                    "bootstrap-response-received",
+                    address=address,
+                    arguments=list(payload),
+                    setGeneration=int(state.get("set_generation", 0)),
+                )
+                write_bootstrap_diagnostic(
+                    "bootstrap-query-completed",
+                    address=address,
+                    response=list(payload),
+                    expectedGeneration=expected_generation,
+                    elapsedMs=int((time.time() - t0) * 1000),
+                )
+            return payload
+
     if bootstrap_diagnostic:
-        write_bootstrap_diagnostic(
-            "bootstrap-query-timeout",
-            address=address,
-            reason="aucune réponse compatible reçue avant expiration",
-            expectedGeneration=expected_generation,
-            timeoutMs=int(float(timeout) * 1000),
-        )
+        if generation_is_current(expected_generation):
+            write_bootstrap_diagnostic(
+                "bootstrap-query-timeout",
+                address=address,
+                reason="aucune réponse compatible reçue avant expiration",
+                expectedGeneration=expected_generation,
+                timeoutMs=int(float(timeout) * 1000),
+            )
+        else:
+            write_bootstrap_diagnostic(
+                "bootstrap-query-interrupted",
+                address=address,
+                reason="requête active invalidée ou génération modifiée",
+                expectedGeneration=expected_generation,
+            )
     return None
 
 
@@ -948,7 +917,7 @@ def query(
     apply_response: bool = True,
 ):
     """Exécute une requête OSC corrélée, sérialisée avec les transactions de scène."""
-    with query_lock:
+    with ableton_transport.serialized_queries():
         return _query_with_query_lock_held(
             address,
             *args,
@@ -1317,6 +1286,19 @@ def refresh_live_set_identity(expected_generation: Optional[int] = None) -> Opti
         with lock:
             expected_generation = int(state.get("set_generation", 0))
 
+    # Le bootstrap confirme lui-même file_path au début et à la fin de sa
+    # transaction. Le cycle normal ne doit pas intercaler une seconde série de
+    # lectures pendant cette courte fenêtre.
+    with lock:
+        transaction = _bootstrap_transaction
+        if (
+            transaction is not None
+            and transaction.generation == int(expected_generation)
+            and not transaction.completed
+            and not transaction.cancelled
+        ):
+            return int(expected_generation)
+
     file_path_response = query(
         "/live/song/get/file_path",
         timeout=0.08,
@@ -1329,13 +1311,15 @@ def refresh_live_set_identity(expected_generation: Optional[int] = None) -> Opti
     if not generation_is_current(expected_generation):
         return None
 
-    set_name = _first_text_value(query(
+    set_name_response = query(
         "/live/song/get/name",
         timeout=0.06,
         expected_generation=expected_generation,
         allow_during_bootstrap=True,
         apply_response=False,
-    ))
+    )
+    set_name_available = set_name_response is not None
+    set_name = _first_text_value(set_name_response)
     if not generation_is_current(expected_generation):
         return None
 
@@ -1396,27 +1380,109 @@ def refresh_live_set_identity(expected_generation: Optional[int] = None) -> Opti
             state["current_set_name"] = set_name
             return generation
 
-        state["current_set_name"] = set_name
+        if set_name_available:
+            state["current_set_name"] = set_name
         return int(state["set_generation"])
 
 
-def _bootstrap_file_path(generation: int) -> Optional[str]:
+def _bootstrap_target_identity() -> Tuple[str, int, int]:
+    return (
+        str(ableton_target.host),
+        int(ableton_target.send_port),
+        int(ableton_target.reply_port),
+    )
+
+
+def _new_bootstrap_transaction(generation: int) -> BootstrapTransaction:
+    started_at = time.monotonic()
+    transaction = BootstrapTransaction(
+        generation=int(generation),
+        started_at=started_at,
+        deadline=started_at + BOOTSTRAP_TRANSACTION_TIMEOUT,
+        target_identity=_bootstrap_target_identity(),
+    )
+    write_bootstrap_diagnostic(
+        "bootstrap-transaction-created",
+        setGeneration=generation,
+        timeoutMs=int(BOOTSTRAP_TRANSACTION_TIMEOUT * 1000),
+        target=list(transaction.target_identity),
+    )
+    return transaction
+
+
+def _bootstrap_cancel(transaction: BootstrapTransaction, reason: str, event: str = "cancelled") -> None:
+    if transaction.completed or transaction.cancelled:
+        return
+    transaction.cancelled = True
+    transaction.cancel_reason = reason
+    elapsed_ms = int((time.monotonic() - transaction.started_at) * 1000)
+    write_bootstrap_diagnostic(
+        f"bootstrap-transaction-{event}",
+        setGeneration=transaction.generation,
+        reason=reason,
+        missing=transaction.missing(),
+        attempts=dict(transaction.attempts),
+        elapsedMs=elapsed_ms,
+    )
+    abort_bootstrap(transaction.generation, reason)
+
+
+def _bootstrap_query_field(
+    transaction: BootstrapTransaction,
+    field_name: str,
+    address: str,
+    technical_timeout: float,
+) -> bool:
+    """Tente un champ sans faire d'un timeout individuel un échec global."""
+    remaining = transaction.deadline - time.monotonic()
+    if remaining <= 0:
+        return False
+
+    attempt = transaction.attempts.get(field_name, 0) + 1
+    transaction.attempts[field_name] = attempt
+    if attempt > 1:
+        write_bootstrap_diagnostic(
+            "bootstrap-field-retry",
+            setGeneration=transaction.generation,
+            field=field_name,
+            attempt=attempt,
+            remainingMs=max(0, int(remaining * 1000)),
+        )
+
     response = query(
-        "/live/song/get/file_path",
-        timeout=0.10,
-        expected_generation=generation,
+        address,
+        timeout=min(float(technical_timeout), remaining),
+        expected_generation=transaction.generation,
         allow_during_bootstrap=True,
         apply_response=False,
     )
     if response is None:
-        return None
-    file_path = _first_text_value(response)
+        write_bootstrap_diagnostic(
+            "bootstrap-field-missing",
+            setGeneration=transaction.generation,
+            field=field_name,
+            attempt=attempt,
+            missing=transaction.missing(),
+        )
+        return False
+
+    if field_name in ("file_path", "song_name", "confirmed_file_path"):
+        value: Any = _first_text_value(response)
+    elif field_name == "selected_scene":
+        value = int(response[0]) if response else 0
+    else:
+        value = tuple(response)
+    setattr(transaction, field_name, value)
     write_bootstrap_diagnostic(
-        "song-file-path-read",
-        value=file_path,
-        setGeneration=generation,
+        "bootstrap-field-received",
+        setGeneration=transaction.generation,
+        field=field_name,
+        attempt=attempt,
+        value=value if field_name != "scene_names" else None,
+        count=len(value) if field_name == "scene_names" else None,
+        missing=transaction.missing(),
     )
-    return file_path
+    return True
 
 
 def abort_bootstrap(generation: int, reason: str) -> None:
@@ -1501,127 +1567,120 @@ def apply_live_set_bootstrap_locked(
 
 
 def bootstrap_live_set(generation: int) -> None:
-    """Confirme l'identité puis construit un instantané Session cohérent."""
-    global _bootstrap_generation
+    """Accumule un instantané privé jusqu'à complétion ou échéance globale."""
+    global _bootstrap_generation, _bootstrap_transaction
+
+    with lock:
+        transaction = _bootstrap_transaction
+        if transaction is None or transaction.generation != int(generation):
+            transaction = _new_bootstrap_transaction(generation)
+            _bootstrap_transaction = transaction
 
     try:
         # Laisse arriver les datagrammes émis avant l'invalidation. Sans identifiant
         # de requête dans AbletonOSC, ils ne sont corrélables qu'une fois drainés.
         with lock:
-            set_bootstrap_step_locked("purge des réponses OSC antérieures", "début du bootstrap")
+            set_bootstrap_step_locked("purge des réponses OSC antérieures", "début du bootstrap transactionnel")
         write_bootstrap_diagnostic("bootstrap-started", setGeneration=generation)
         time.sleep(OSC_BOOTSTRAP_DRAIN_SECONDS)
-        if not generation_is_current(generation):
-            abort_bootstrap(generation, "génération modifiée pendant la purge OSC")
-            return
-        with lock:
-            set_bootstrap_step_locked("attente de Song.file_path", "confirmation initiale")
-        first_path = _bootstrap_file_path(generation)
-        if first_path is None:
-            abort_bootstrap(generation, "timeout pendant la lecture initiale de Song.file_path")
-            return
-        if not generation_is_current(generation):
-            abort_bootstrap(generation, "génération modifiée après Song.file_path")
-            return
 
-        with lock:
-            set_bootstrap_step_locked("attente de Song.name", "identité du Live Set")
-        set_name_response = query(
-            "/live/song/get/name",
-            timeout=0.08,
-            expected_generation=generation,
-            allow_during_bootstrap=True,
-            apply_response=False,
-        )
-        write_bootstrap_diagnostic(
-            "song-name-read",
-            value=_first_text_value(set_name_response),
-            setGeneration=generation,
-        )
-        with lock:
-            set_bootstrap_step_locked("attente de la scène sélectionnée", "lecture de la vue Session")
-        selected_response = query(
-            "/live/view/get/selected_scene",
-            timeout=0.10,
-            expected_generation=generation,
-            allow_during_bootstrap=True,
-            apply_response=False,
-        )
-        write_bootstrap_diagnostic(
-            "selected-scene-read",
-            value=list(selected_response) if selected_response is not None else None,
-            setGeneration=generation,
-        )
-        with lock:
-            set_bootstrap_step_locked("attente des noms de scènes", "construction de la liste")
-        scene_names = query(
-            "/live/song/get/scenes/name",
-            timeout=0.20,
-            expected_generation=generation,
-            allow_during_bootstrap=True,
-            apply_response=False,
-        )
-        write_bootstrap_diagnostic(
-            "scene-names-read",
-            count=len(scene_names) if scene_names is not None else None,
-            values=list(scene_names) if scene_names is not None else None,
-            setGeneration=generation,
-        )
-        with lock:
-            set_bootstrap_step_locked("confirmation de Song.file_path", "validation finale de l'identité")
-        final_path = _bootstrap_file_path(generation)
-        write_bootstrap_diagnostic(
-            "bootstrap-file-path-compared",
-            initialFilePath=first_path,
-            finalFilePath=final_path,
-            matches=bool(final_path is not None and first_path == final_path),
-            setGeneration=generation,
+        request_fields = (
+            ("file_path", "/live/song/get/file_path", 0.10, "attente de Song.file_path"),
+            ("song_name", "/live/song/get/name", 0.08, "attente de Song.name"),
+            ("selected_scene", "/live/view/get/selected_scene", 0.10, "attente de la scène sélectionnée"),
+            ("scene_names", "/live/song/get/scenes/name", 0.20, "attente des noms de scènes"),
         )
 
-        if set_name_response is None:
-            abort_bootstrap(generation, "timeout pendant la lecture de Song.name")
-            return
-        if selected_response is None:
-            abort_bootstrap(generation, "timeout pendant la lecture de la scène sélectionnée")
-            return
-        if scene_names is None:
-            abort_bootstrap(generation, "timeout pendant la lecture des noms de scènes")
-            return
-        if final_path is None:
-            abort_bootstrap(generation, "timeout pendant la confirmation de Song.file_path")
-            return
-        if first_path != final_path:
-            abort_bootstrap(generation, "Song.file_path a changé pendant le bootstrap")
-            return
-        if not generation_is_current(generation):
-            abort_bootstrap(generation, "génération modifiée avant publication")
-            return
+        while not transaction.completed and not transaction.cancelled:
+            if not generation_is_current(generation):
+                _bootstrap_cancel(transaction, "génération modifiée pendant le bootstrap")
+                return
+            if transaction.target_identity != _bootstrap_target_identity():
+                _bootstrap_cancel(transaction, "cible OSC modifiée pendant le bootstrap")
+                return
+            if time.monotonic() >= transaction.deadline:
+                _bootstrap_cancel(transaction, "timeout global du bootstrap", event="timeout")
+                return
 
-        selected_scene = int(selected_response[0]) if selected_response else 0
-        set_name = _first_text_value(set_name_response)
-        with lock:
-            applied = apply_live_set_bootstrap_locked(
-                generation,
-                final_path,
-                set_name,
-                selected_scene,
-                tuple(scene_names),
-            )
-            if not applied:
-                abort_bootstrap(generation, "instantané cohérent refusé avant publication")
-            else:
+            progress = False
+            for field_name, address, technical_timeout, step in request_fields:
+                if transaction.received(field_name):
+                    continue
+                with lock:
+                    set_bootstrap_step_locked(step, f"transaction #{generation}")
+                if _bootstrap_query_field(transaction, field_name, address, technical_timeout):
+                    progress = True
+                if not generation_is_current(generation):
+                    _bootstrap_cancel(transaction, "génération modifiée pendant une lecture")
+                    return
+                if time.monotonic() >= transaction.deadline:
+                    break
+
+            if transaction.ready_to_confirm() and not transaction.received("confirmed_file_path"):
+                with lock:
+                    set_bootstrap_step_locked("confirmation de Song.file_path", "validation finale de l'identité")
+                if _bootstrap_query_field(
+                    transaction,
+                    "confirmed_file_path",
+                    "/live/song/get/file_path",
+                    0.10,
+                ):
+                    progress = True
+                    if transaction.confirmed_file_path != transaction.file_path:
+                        _bootstrap_cancel(transaction, "Song.file_path a changé pendant le bootstrap")
+                        return
+                    write_bootstrap_diagnostic(
+                        "bootstrap-file-path-confirmed",
+                        setGeneration=generation,
+                        filePath=transaction.file_path,
+                    )
+
+            if transaction.complete():
+                if not generation_is_current(generation):
+                    _bootstrap_cancel(transaction, "génération modifiée avant publication")
+                    return
+                with lock:
+                    applied = apply_live_set_bootstrap_locked(
+                        generation,
+                        str(transaction.confirmed_file_path),
+                        str(transaction.song_name),
+                        int(transaction.selected_scene),
+                        tuple(transaction.scene_names),
+                    )
+                if not applied:
+                    _bootstrap_cancel(transaction, "instantané cohérent refusé avant publication")
+                    return
+                transaction.completed = True
+                elapsed_ms = int((time.monotonic() - transaction.started_at) * 1000)
                 write_bootstrap_diagnostic(
-                    "bootstrap-completed",
+                    "bootstrap-transaction-completed",
                     setGeneration=generation,
-                    filePath=final_path,
-                    setName=set_name,
-                    selectedScene=selected_scene,
-                    sceneCount=len(scene_names),
+                    filePath=transaction.confirmed_file_path,
+                    selectedScene=transaction.selected_scene,
+                    sceneCount=len(transaction.scene_names),
+                    attempts=dict(transaction.attempts),
+                    elapsedMs=elapsed_ms,
                 )
+                return
+
+            write_bootstrap_diagnostic(
+                "bootstrap-transaction-waiting",
+                setGeneration=generation,
+                missing=transaction.missing(),
+                attempts=dict(transaction.attempts),
+                remainingMs=max(0, int((transaction.deadline - time.monotonic()) * 1000)),
+            )
+            if not progress:
+                time.sleep(min(
+                    BOOTSTRAP_RETRY_PAUSE_SECONDS,
+                    max(0.0, transaction.deadline - time.monotonic()),
+                ))
     except Exception as exc:
-        abort_bootstrap(generation, f"exception {type(exc).__name__}: {exc}")
+        _bootstrap_cancel(transaction, f"exception {type(exc).__name__}: {exc}")
     finally:
         with lock:
+            if _bootstrap_transaction is transaction and (transaction.completed or transaction.cancelled):
+                _bootstrap_transaction = None
             if _bootstrap_generation == generation and not state.get("set_ready", False):
                 _bootstrap_generation = None
                 state["bootstrap_running"] = False
@@ -1630,7 +1689,7 @@ def bootstrap_live_set(generation: int) -> None:
 
 
 def start_live_set_bootstrap(generation: int) -> None:
-    global _bootstrap_generation
+    global _bootstrap_generation, _bootstrap_transaction
 
     with lock:
         if int(state.get("set_generation", 0)) != int(generation):
@@ -1649,6 +1708,7 @@ def start_live_set_bootstrap(generation: int) -> None:
             )
             return
         _bootstrap_generation = generation
+        _bootstrap_transaction = _new_bootstrap_transaction(generation)
         state["bootstrap_running"] = True
         state["bootstrap_generation"] = int(generation)
         state["pending_request"] = None
@@ -1662,8 +1722,35 @@ def refresh_names_and_transport() -> bool:
     Refresh léger. Ne scanne pas toutes les pistes.
     """
     try:
+        initial_generation = None
+        wait_for_initial_bootstrap = False
         with lock:
             generation = int(state.get("set_generation", 0))
+            transaction = _bootstrap_transaction
+            bootstrap_active = (
+                _bootstrap_generation is not None
+                or (
+                    transaction is not None
+                    and not transaction.completed
+                    and not transaction.cancelled
+                )
+            )
+            if bootstrap_active and not state.get("set_ready", False):
+                wait_for_initial_bootstrap = True
+            elif state.get("current_set_id") is None:
+                initial_generation = reset_live_set_state_locked(None, "initial bootstrap")
+
+        # Le premier instantané est confié directement à la transaction.
+        # Il ne dépend donc ni d'un /live/startup spontané, ni des trois
+        # prélectures historiques aux timeouts adaptés au seul mode local.
+        if initial_generation is not None:
+            start_live_set_bootstrap(initial_generation)
+            return False
+
+        # Une transaction initiale déjà active reste l'unique propriétaire
+        # des lectures d'identité jusqu'à sa complétion ou son annulation.
+        if wait_for_initial_bootstrap:
+            return False
 
         verified_generation = refresh_live_set_identity(generation)
         if verified_generation is None:
@@ -2069,6 +2156,32 @@ def status():
     return jsonify(data)
 
 
+@app.route("/transport/test", methods=["POST"])
+def test_ableton_transport():
+    """Teste le transport sans appliquer la réponse à l'état métier."""
+    started = time.monotonic()
+    response = ableton_transport.query(
+        "/live/application/get/version",
+        timeout=0.5,
+        context={"purpose": "connection-test"},
+    )
+    elapsed_ms = int((time.monotonic() - started) * 1000)
+    if response is None:
+        return jsonify(
+            ok=False,
+            message="Aucune réponse d'Ableton",
+            latency_ms=None,
+            target=ableton_target.to_dict(),
+        ), 504
+    return jsonify(
+        ok=True,
+        message="Connexion OK",
+        latency_ms=elapsed_ms,
+        response=list(response),
+        target=ableton_target.to_dict(),
+    )
+
+
 @app.route("/shutdown", methods=["POST"])
 def shutdown():
     """Arrete uniquement l'instance dont le launcher connait le jeton de possession."""
@@ -2229,7 +2342,7 @@ def execute_go_transaction(request_id: str, expected_generation: int, scene_numb
         confirmed = False
         confirmation_deadline = time.monotonic() + 0.8
 
-        with query_lock:
+        with ableton_transport.serialized_queries():
             while time.monotonic() < confirmation_deadline:
                 if not generation_is_current(expected_generation):
                     return False, "Live Set modifié pendant le GO"
@@ -2570,8 +2683,8 @@ def build_server_info():
         "port": 5050,
         "url": f"http://{ip}:5050",
         "local_url": "http://127.0.0.1:5050",
-        "osc_in": ABLETON_PORT,
-        "osc_reply": LOCAL_OSC_PORT,
+        "osc_in": ableton_transport.send_port,
+        "osc_reply": ableton_transport.reply_port,
         "midi_port": "M4L_OSC_9001",
         "midi_cc": None,
         "midi_channel": None,
@@ -2625,8 +2738,8 @@ if __name__ == "__main__":
     print("  Vérifications utiles :")
     print("  1. Ableton Live doit être ouvert.")
     print("  2. AbletonOSC doit être installé et actif dans Ableton.")
-    print(f"  3. AbletonOSC reçoit sur le port {ABLETON_PORT}.")
-    print(f"  4. Ce serveur reçoit les réponses OSC sur le port {LOCAL_OSC_PORT}.")
+    print(f"  3. AbletonOSC reçoit sur le port {ableton_transport.send_port}.")
+    print(f"  4. Ce serveur reçoit les réponses OSC sur le port {ableton_transport.reply_port}.")
     print(f"  5. Crossfader A/B : mapper le CC{MIDI_CC} canal {MIDI_CHANNEL + 1} au crossfader Live.")
     print(f"  6. Port MIDI attendu : {MIDI_PORT_EXACT}")
     print("")

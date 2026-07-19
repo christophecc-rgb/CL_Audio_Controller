@@ -7,8 +7,9 @@ try:
 except ModuleNotFoundError:
     webview = None
 from pathlib import Path
-from flask import Flask, jsonify, render_template_string, send_file
+from flask import Flask, jsonify, render_template_string, request, send_file
 from build_identity import BUILD_ID, IDENTITY_PROTOCOL_VERSION, SERVICE_NAME
+from ableton_targets import AbletonTargetError, load_target, save_target, validate_target
 from server_ownership import (
     DEFAULT_RECORD_PATH,
     OwnershipRecordError,
@@ -602,6 +603,7 @@ def stop_owned_server(graceful_timeout=3.0, terminate_timeout=2.0):
     proof_ok, proof_reason = verify_server_ownership(proof_record, payload)
     if not proof_ok:
         return False, f"Arrêt refusé : {proof_reason}"
+    return_port = int((payload.get("ableton_target") or {}).get("reply_port", RETURN_PORT))
 
     request_shutdown = urllib.request.Request(
         f"{REMOTE_ROOT_URL}shutdown",
@@ -625,7 +627,7 @@ def stop_owned_server(graceful_timeout=3.0, terminate_timeout=2.0):
     while time.monotonic() < deadline:
         process_stopped = process is None or process.poll() is not None
         pid_stopped = not pid or not process_alive(pid)
-        if process_stopped and pid_stopped and not tcp_ok(WEB_PORT) and not port_used(RETURN_PORT):
+        if process_stopped and pid_stopped and not tcp_ok(WEB_PORT) and not port_used(return_port):
             break
         time.sleep(0.05)
     else:
@@ -638,8 +640,8 @@ def stop_owned_server(graceful_timeout=3.0, terminate_timeout=2.0):
         else:
             return False, "Arrêt demandé mais libération des ports non confirmée"
 
-    if tcp_ok(WEB_PORT) or port_used(RETURN_PORT):
-        return False, "Processus arrêté mais ports 5050/11001 encore occupés"
+    if tcp_ok(WEB_PORT) or port_used(return_port):
+        return False, f"Processus arrêté mais ports 5050/{return_port} encore occupés"
     try:
         remove_record()
     except OwnershipRecordError as exc:
@@ -873,7 +875,7 @@ PANEL_HTML_V2 = r'''
 html,body{margin:0;width:100%;height:100%;overflow:hidden}
 body{background:linear-gradient(180deg,#0e1015,#11141a);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif}
 button{font:inherit}
-.app{width:440px;max-width:calc(100% - 16px);height:100%;margin:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+.app{width:440px;max-width:calc(100% - 16px);height:100%;margin:auto;padding:12px;display:flex;flex-direction:column;gap:10px;overflow-y:auto}
 .brand{height:84px;border-radius:14px;background:#020304;border:1px solid #272a31;display:flex;align-items:center;justify-content:center;overflow:hidden;box-shadow:0 10px 24px rgba(0,0,0,.28)}
 .brand img{width:100%;height:100%;object-fit:contain}
 .product-row{display:flex;align-items:center;justify-content:space-between;min-height:24px}
@@ -908,6 +910,9 @@ button{font:inherit}
 .address{height:34px;display:flex;align-items:center;padding:0 10px;border-radius:9px;background:#11141a;border:1px solid #303540;font:12px Menlo,monospace;color:#e4e8ee;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mini{height:34px;padding:0 10px;border-radius:9px;border:1px solid #424853;background:#272c35;color:#e5e8ee;font-size:11px;font-weight:700;cursor:pointer}
 .device-row{display:flex;justify-content:space-between;align-items:center;margin-top:9px;font-size:12px;color:var(--muted)}
+.network-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.network-grid label{font-size:10px;color:var(--muted)}
+.network-grid input,.network-grid select{width:100%;height:31px;margin-top:3px;border-radius:8px;border:1px solid #3b414c;background:#11141a;color:#e4e8ee;padding:0 8px}
+.network-buttons{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}
 .badge{padding:4px 8px;border-radius:999px;background:rgba(67,200,111,.12);color:#7ee39e;border:1px solid rgba(67,200,111,.28);font-size:10px}
 details{background:var(--card2);border:1px solid #292e37;border-radius:12px;overflow:hidden}
 summary{height:34px;padding:0 11px;display:flex;align-items:center;cursor:pointer;font-size:12px;color:#c5cad3;list-style:none}
@@ -923,7 +928,7 @@ details[open] summary::before{transform:rotate(90deg)}
 .local{height:30px;border:0;background:transparent;color:#91a9cb;font-size:11px;cursor:pointer}
 .stop{height:30px;padding:0 11px;border-radius:8px;border:1px solid rgba(217,88,88,.42);background:rgba(217,88,88,.10);color:#e68b8b;font-size:11px;cursor:pointer}
 .footer{font-size:9px;color:#707784;letter-spacing:.05em;text-align:center}
-body.show-mode .secondary-actions,body.show-mode details,body.show-mode .bottom{display:none}
+body.show-mode .secondary-actions,body.show-mode details,body.show-mode .bottom,body.show-mode .network-card{display:none}
 body.show-mode .app{justify-content:center;max-height:470px}
 body.show-mode .brand{height:105px}
 body.show-mode .system{min-height:86px}
@@ -968,12 +973,30 @@ body.show-mode .system{min-height:86px}
     <div class="device-row"><span>Télécommande iPhone / iPad</span><span id="deviceBadge" class="badge">Disponible</span></div>
   </section>
 
+  <section class="card network-card">
+    <div class="access-head">Connexion AbletonOSC</div>
+    <div class="network-grid">
+      <label>Mode<select id="abletonMode" onchange="updateNetworkFields()"><option value="local">Local</option><option value="remote">Ableton distant</option></select></label>
+      <label>Adresse Ableton<input id="abletonHost" value="127.0.0.1"></label>
+      <label>Port émission<input id="abletonSendPort" type="number" value="11000"></label>
+      <label>Port retour<input id="abletonReplyPort" type="number" value="11001"></label>
+    </div>
+    <div class="network-buttons">
+      <button class="action" onclick="saveNetworkConfig()">Appliquer</button>
+      <button class="action" onclick="testAbletonConnection()">Tester la connexion</button>
+    </div>
+  </section>
+
   <details>
     <summary>Détails techniques et événements</summary>
     <div class="technical">
       <div id="techWeb" class="tech-item"><span class="tech-led"></span><span>Serveur Web · 5050</span></div>
-      <div id="techOsc" class="tech-item"><span class="tech-led"></span><span>OSC aller · 11000</span></div>
-      <div id="techReturn" class="tech-item"><span class="tech-led"></span><span>OSC retour · 11001</span></div>
+      <div id="techOsc" class="tech-item"><span class="tech-led"></span><span id="techOscLabel">OSC aller · 11000</span></div>
+      <div id="techReturn" class="tech-item"><span class="tech-led"></span><span id="techReturnLabel">OSC retour · 11001</span></div>
+      <div class="tech-item on"><span class="tech-led"></span><span id="techAbletonMode">Ableton · Local</span></div>
+      <div class="tech-item on"><span class="tech-led"></span><span id="techAbletonAddress">127.0.0.1:11000</span></div>
+      <div class="tech-item on"><span class="tech-led"></span><span id="techAbletonLatency">Dernière réponse · —</span></div>
+      <div class="tech-item on"><span class="tech-led"></span><span id="techAbletonTimeouts">Timeouts · 0</span></div>
       <div class="tech-item on"><span class="tech-led"></span><span id="localAddress">Adresse Mac</span></div>
       <div id="events" class="event-list">Aucun événement récent.</div>
     </div>
@@ -984,6 +1007,7 @@ body.show-mode .system{min-height:86px}
 </main>
 <script>
 let latestState=null;
+let networkFormInitialized=false;
 const el=id=>document.getElementById(id);
 function setTech(id,on){el(id).className='tech-item '+(on?'on':'');}
 function setBusy(label){el('systemCard').className='card system busy';el('stateTitle').textContent=label.toUpperCase();el('stateDetail').textContent='Veuillez patienter…';}
@@ -1000,10 +1024,29 @@ function render(s){
   el('events').innerHTML=(s.events||[]).slice().reverse().join('<br>')||'Aucun événement récent.';
   el('orphanCard').className='card orphan '+(s.orphan_actions_available?'show':'');
   if(s.orphan_actions_available)el('orphanDetail').textContent='Instance '+s.orphan_instance_id+' · PID '+s.orphan_process_id+' · '+s.build_id;
+  if(!networkFormInitialized&&s.ableton_config){
+    el('abletonMode').value=s.ableton_config.mode;el('abletonHost').value=s.ableton_config.host;
+    el('abletonSendPort').value=s.ableton_config.send_port;el('abletonReplyPort').value=s.ableton_config.reply_port;
+    networkFormInitialized=true;updateNetworkFields();
+  }
+  if(s.ableton_config){el('techAbletonMode').textContent='Ableton · '+(s.ableton_config.mode==='local'?'Local':'Distant');el('techAbletonAddress').textContent=s.ableton_config.host+':'+s.ableton_config.send_port+' → '+s.ableton_config.reply_port;el('techOscLabel').textContent='OSC aller · '+s.ableton_config.send_port;el('techReturnLabel').textContent='OSC retour · '+s.ableton_config.reply_port;}
+  if(s.osc_transport){el('techAbletonLatency').textContent='Dernière réponse · '+(s.osc_transport.last_latency_ms==null?'—':Math.round(s.osc_transport.last_latency_ms)+' ms');el('techAbletonTimeouts').textContent='Timeouts · '+s.osc_transport.timeout_count;}
 }
 async function refresh(){try{render(await(await fetch('/state')).json());}catch(e){el('systemCard').className='card system error';el('stateTitle').textContent='PANNEAU HORS LIGNE';el('stateDetail').textContent=String(e);}}
 async function runAction(path,label){setBusy(label);el('actionStatus').textContent=label+'…';try{const response=await fetch(path);const r=await response.json();el('actionStatus').textContent=response.ok?('✓ '+(r.message||'Action terminée')):('! Refus : '+(r.error||response.status));}catch(e){el('actionStatus').textContent='! '+e;}setTimeout(refresh,450);}
 async function runPostAction(path,label){setBusy(label);el('actionStatus').textContent=label+'…';try{const response=await fetch(path,{method:'POST'});const r=await response.json();el('actionStatus').textContent=response.ok?('✓ '+(r.message||'Action terminée')):('! Refus : '+(r.error||response.status));}catch(e){el('actionStatus').textContent='! '+e;}setTimeout(refresh,450);}
+function updateNetworkFields(){const local=el('abletonMode').value==='local';el('abletonHost').disabled=local;if(local)el('abletonHost').value='127.0.0.1';}
+async function saveNetworkConfig(){
+  const payload={mode:el('abletonMode').value,host:el('abletonHost').value,send_port:Number(el('abletonSendPort').value),reply_port:Number(el('abletonReplyPort').value)};
+  el('actionStatus').textContent='Application de la configuration OSC…';
+  try{const response=await fetch('/network-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const r=await response.json();el('actionStatus').textContent=response.ok?('✓ '+r.message):('! Refus : '+(r.error||response.status));if(response.ok){networkFormInitialized=false;setTimeout(refresh,500);}}
+  catch(e){el('actionStatus').textContent='! '+e;}
+}
+async function testAbletonConnection(){
+  el('actionStatus').textContent='Test de connexion Ableton…';
+  try{const response=await fetch('/test-ableton',{method:'POST'});const r=await response.json();el('actionStatus').textContent=response.ok?('✓ Connexion OK · '+r.latency_ms+' ms'):('! '+(r.error||'Aucune réponse d’Ableton'));}
+  catch(e){el('actionStatus').textContent='! '+e;}
+}
 function confirmStop(){if(confirm('Arrêter le serveur de télécommande ?\n\nLes appareils connectés perdront immédiatement l’accès.'))runAction('/stop','Arrêt du serveur');}
 async function copyAddress(){if(!latestState)return;try{await navigator.clipboard.writeText(latestState.lan_url);el('actionStatus').textContent='✓ Adresse copiée';}catch(e){el('actionStatus').textContent='Adresse : '+latestState.lan_url;}}
 function toggleShowMode(){document.body.classList.toggle('show-mode');el('showMode').textContent=document.body.classList.contains('show-mode')?'Quitter le mode spectacle':'Mode spectacle';}
@@ -1040,12 +1083,22 @@ def state():
         remote_state = {}
         identity = {"valid": False, "code": "offline", "message": "Serveur HTTP absent"}
     server_valid = bool(identity["valid"])
+    try:
+        configured_target = load_target().to_dict()
+        network_config_error = None
+    except AbletonTargetError as exc:
+        configured_target = None
+        network_config_error = str(exc)
     live_set_ready = bool(remote_state.get("set_ready")) if server_valid else False
-    osc_return_ready = port_used(RETURN_PORT)
+    reply_port = int((configured_target or {}).get("reply_port", RETURN_PORT))
+    send_port = int((configured_target or {}).get("send_port", OSC_PORT))
+    osc_return_ready = port_used(reply_port)
+    transport_connected = bool((remote_state.get("osc_transport") or {}).get("connected"))
+    osc_send_ready = port_used(send_port) if (configured_target or {}).get("mode", "local") == "local" else transport_connected
     system_ready = server_valid and live_set_ready and osc_return_ready
     response_payload = dict(
         web=web_ready,
-        osc=port_used(OSC_PORT),
+        osc=osc_send_ready,
         ret=osc_return_ready,
         local_url=REMOTE_ROOT_URL,
         lan_url=REMOTE_ROOT_LAN_URL(),
@@ -1070,6 +1123,9 @@ def state():
         bootstrap_generation=remote_state.get("bootstrap_generation"),
         last_successful_bootstrap=remote_state.get("last_successful_bootstrap"),
         pending_request=remote_state.get("pending_request"),
+        ableton_config=configured_target,
+        network_config_error=network_config_error,
+        osc_transport=remote_state.get("osc_transport"),
         orphan_actions_available=identity["code"] == "orphan-claimable",
         orphan_instance_id=(remote_state.get("server_instance_id") or "")[:8] or None,
         orphan_process_id=remote_state.get("server_process_id") if identity["code"] == "orphan-claimable" else None,
@@ -1097,6 +1153,71 @@ def state():
         "oscReturnPortPresent": response_payload["ret"],
     })
     return jsonify(response_payload)
+
+
+@app.route("/network-config", methods=["GET", "POST"])
+def network_config():
+    if request.method == "GET":
+        try:
+            return jsonify(load_target().to_dict())
+        except AbletonTargetError as exc:
+            return jsonify(error=str(exc)), 409
+
+    payload = request.get_json(silent=True)
+    try:
+        previous = load_target()
+        candidate = validate_target(payload)
+    except AbletonTargetError as exc:
+        return jsonify(error=str(exc)), 400
+    if candidate == previous:
+        return jsonify(message="Configuration OSC inchangée", target=candidate.to_dict())
+
+    server_was_running = tcp_ok(WEB_PORT)
+    if server_was_running:
+        _, identity = current_identity_status()
+        if not identity.get("valid"):
+            return jsonify(error="Configuration refusée : le serveur actif n'est pas possédé par ce launcher"), 409
+    try:
+        save_target(candidate)
+    except AbletonTargetError as exc:
+        return jsonify(error=str(exc)), 400
+
+    if server_was_running:
+        stopped, stop_message = stop_owned_server()
+        if not stopped:
+            save_target(previous)
+            return jsonify(error=f"Configuration annulée : {stop_message}"), 409
+        started, start_message = start_web_server()
+        if not started:
+            save_target(previous)
+            restored, restore_message = start_web_server()
+            suffix = "ancienne configuration restaurée" if restored else f"restauration impossible : {restore_message}"
+            return jsonify(error=f"Nouvelle configuration non démarrée : {start_message} ; {suffix}"), 409
+    event(f"AbletonOSC configuré en mode {candidate.mode} ({candidate.host}:{candidate.send_port})")
+    return jsonify(
+        message="Configuration OSC appliquée" + (" et serveur redémarré" if server_was_running else ""),
+        target=candidate.to_dict(),
+    )
+
+
+@app.route("/test-ableton", methods=["POST"])
+def test_ableton():
+    ok, message = ensure_valid_server()
+    if not ok:
+        return jsonify(error=message), 409
+    request_test = urllib.request.Request(f"{REMOTE_ROOT_URL}transport/test", method="POST")
+    try:
+        with urllib.request.urlopen(request_test, timeout=1.5) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+            return jsonify(payload)
+    except urllib.error.HTTPError as exc:
+        try:
+            payload = json.loads(exc.read().decode("utf-8"))
+        except Exception:
+            payload = {"error": "Aucune réponse d'Ableton"}
+        return jsonify(error=payload.get("message") or payload.get("error"), latency_ms=None), 504
+    except Exception as exc:
+        return jsonify(error=f"Test Ableton impossible : {exc}"), 504
 
 @app.route("/start")
 def start():

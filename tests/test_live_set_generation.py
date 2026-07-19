@@ -26,6 +26,8 @@ class LiveSetGenerationTests(unittest.TestCase):
 
     def setUp(self):
         with self.app.lock:
+            self.app._bootstrap_generation = None
+            self.app._bootstrap_transaction = None
             self.app.completed_go_requests.clear()
             self.app.state["set_generation"] = 3
             self.app.state["set_ready"] = True
@@ -112,6 +114,22 @@ class LiveSetGenerationTests(unittest.TestCase):
             generation = self.app.refresh_live_set_identity(expected_generation=3)
         self.assertEqual(generation, 3)
 
+    def test_missing_name_refresh_does_not_erase_bootstrapped_name(self):
+        with self.app.lock:
+            self.app.state["current_set_name"] = "Saison 6 - 2025"
+
+        replies = {
+            "/live/song/get/file_path": ("/Sets/ancien.als",),
+            "/live/song/get/name": None,
+        }
+        with mock.patch.object(self.app, "query", side_effect=lambda address, *args, **kwargs: replies[address]):
+            generation = self.app.refresh_live_set_identity(expected_generation=3)
+
+        with self.app.lock:
+            current_set_name = self.app.state["current_set_name"]
+        self.assertEqual(generation, 3)
+        self.assertEqual(current_set_name, "Saison 6 - 2025")
+
     def test_same_name_in_another_folder_creates_a_generation(self):
         replies = {
             "/live/song/get/file_path": ("/Autre dossier/ancien.als",),
@@ -167,22 +185,15 @@ class LiveSetGenerationTests(unittest.TestCase):
         self.assertEqual(snapshot["selected_scene_name"], "—")
 
     def test_late_osc_reply_from_previous_set_is_ignored(self):
-        with self.app.lock:
-            self.app.active_query = {
-                "address": "/live/scene/get/name",
-                "args": (7,),
-                "generation": 3,
-                "allow_during_bootstrap": False,
-                "response": None,
-            }
-            self.app.reset_live_set_state_locked("/Sets/nouveau.als", "file_path")
+        with mock.patch.object(self.app.ableton_transport, "cancel_pending") as cancel_pending:
+            with self.app.lock:
+                self.app.reset_live_set_state_locked("/Sets/nouveau.als", "file_path")
+            cancel_pending.assert_called_once_with()
 
         self.app.osc_reply("/live/scene/get/name", 7, "Ancienne en cours")
 
         with self.app.lock:
             snapshot = self.app.state_snapshot_locked()
-            active_query = self.app.active_query
-        self.assertIsNone(active_query)
         self.assertEqual(snapshot["scenes"], {})
         self.assertEqual(snapshot["playing_scene_name"], "—")
 
@@ -235,13 +246,14 @@ class LiveSetGenerationTests(unittest.TestCase):
             self.app._bootstrap_generation = generation
 
         replies = {
+            "/live/song/get/file_path": ("/Sets/nouveau.als",),
             "/live/song/get/name": ("nouveau",),
             "/live/view/get/selected_scene": (0,),
             "/live/song/get/scenes/name": None,
         }
         with (
-            mock.patch.object(self.app.time, "sleep"),
-            mock.patch.object(self.app, "_bootstrap_file_path", side_effect=["/Sets/nouveau.als", "/Sets/nouveau.als"]),
+            mock.patch.object(self.app, "BOOTSTRAP_TRANSACTION_TIMEOUT", 0.03),
+            mock.patch.object(self.app, "OSC_BOOTSTRAP_DRAIN_SECONDS", 0.0),
             mock.patch.object(self.app, "query", side_effect=lambda address, *args, **kwargs: replies[address]),
         ):
             self.app.bootstrap_live_set(generation)
@@ -251,6 +263,250 @@ class LiveSetGenerationTests(unittest.TestCase):
         self.assertFalse(snapshot["set_ready"])
         self.assertEqual(snapshot["scenes"], {})
         self.assertEqual(snapshot["playing_scene_name"], "—")
+
+    def test_transaction_retries_an_individual_timeout_then_succeeds(self):
+        with self.app.lock:
+            generation = self.app.reset_live_set_state_locked("/Sets/nouveau.als", "file_path")
+            self.app._bootstrap_generation = generation
+
+        attempts = {"scene_names": 0}
+
+        def delayed_scene_names(address, *args, **kwargs):
+            if address == "/live/song/get/file_path":
+                return ("/Sets/nouveau.als",)
+            if address == "/live/song/get/name":
+                return ("nouveau",)
+            if address == "/live/view/get/selected_scene":
+                return (1,)
+            attempts["scene_names"] += 1
+            return None if attempts["scene_names"] == 1 else ("Ouverture", "Final")
+
+        with (
+            mock.patch.object(self.app, "OSC_BOOTSTRAP_DRAIN_SECONDS", 0.0),
+            mock.patch.object(self.app, "query", side_effect=delayed_scene_names),
+        ):
+            self.app.bootstrap_live_set(generation)
+
+        self.assertEqual(attempts["scene_names"], 2)
+        self.assertTrue(self.app.state["set_ready"])
+        self.assertEqual(self.app.state["scenes"], {0: "Ouverture", 1: "Final"})
+
+    def test_transaction_accepts_a_response_after_several_slow_retries(self):
+        with self.app.lock:
+            generation = self.app.reset_live_set_state_locked("/Sets/nouveau.als", "file_path")
+            self.app._bootstrap_generation = generation
+
+        song_attempts = 0
+
+        def slow_song_name(address, *args, **kwargs):
+            nonlocal song_attempts
+            if address == "/live/song/get/file_path":
+                return ("/Sets/nouveau.als",)
+            if address == "/live/view/get/selected_scene":
+                return (0,)
+            if address == "/live/song/get/scenes/name":
+                return ("Ouverture", "Final")
+            song_attempts += 1
+            if song_attempts < 8:
+                self.app.time.sleep(0.10)
+                return None
+            return ("nouveau",)
+
+        started_at = self.app.time.monotonic()
+        with (
+            mock.patch.object(self.app, "BOOTSTRAP_TRANSACTION_TIMEOUT", 1.5),
+            mock.patch.object(self.app, "OSC_BOOTSTRAP_DRAIN_SECONDS", 0.0),
+            mock.patch.object(self.app, "query", side_effect=slow_song_name),
+        ):
+            self.app.bootstrap_live_set(generation)
+
+        self.assertGreaterEqual(self.app.time.monotonic() - started_at, 0.7)
+        self.assertEqual(song_attempts, 8)
+        self.assertTrue(self.app.state["set_ready"])
+
+    def test_transaction_accepts_fields_in_a_different_order(self):
+        transaction = self.app._new_bootstrap_transaction(3)
+        responses = {
+            "/live/song/get/scenes/name": ("Ouverture", "Final"),
+            "/live/view/get/selected_scene": (1,),
+            "/live/song/get/name": ("nouveau",),
+            "/live/song/get/file_path": ("/Sets/nouveau.als",),
+        }
+        with mock.patch.object(self.app, "query", side_effect=lambda address, *args, **kwargs: responses[address]):
+            self.assertTrue(self.app._bootstrap_query_field(transaction, "scene_names", "/live/song/get/scenes/name", 0.2))
+            self.assertTrue(self.app._bootstrap_query_field(transaction, "selected_scene", "/live/view/get/selected_scene", 0.1))
+            self.assertTrue(self.app._bootstrap_query_field(transaction, "song_name", "/live/song/get/name", 0.08))
+            self.assertTrue(self.app._bootstrap_query_field(transaction, "file_path", "/live/song/get/file_path", 0.1))
+
+        self.assertTrue(transaction.ready_to_confirm())
+        self.assertEqual(transaction.scene_names, ("Ouverture", "Final"))
+        self.assertEqual(transaction.selected_scene, 1)
+
+    def test_empty_values_are_received_values_not_missing_fields(self):
+        transaction = self.app._new_bootstrap_transaction(3)
+        with mock.patch.object(self.app, "query", return_value=("",)):
+            self.app._bootstrap_query_field(transaction, "file_path", "/live/song/get/file_path", 0.1)
+            self.app._bootstrap_query_field(transaction, "song_name", "/live/song/get/name", 0.08)
+        with mock.patch.object(self.app, "query", return_value=()):
+            self.app._bootstrap_query_field(transaction, "scene_names", "/live/song/get/scenes/name", 0.2)
+
+        self.assertTrue(transaction.received("file_path"))
+        self.assertTrue(transaction.received("song_name"))
+        self.assertTrue(transaction.received("scene_names"))
+
+    def test_generation_change_cancels_transaction_without_publication(self):
+        with self.app.lock:
+            generation = self.app.reset_live_set_state_locked("/Sets/nouveau.als", "file_path")
+            self.app._bootstrap_generation = generation
+
+        def change_generation(address, *args, **kwargs):
+            if address == "/live/song/get/name":
+                with self.app.lock:
+                    self.app.reset_live_set_state_locked("/Sets/autre.als", "test")
+            return ("/Sets/nouveau.als",) if address == "/live/song/get/file_path" else ("nouveau",)
+
+        with (
+            mock.patch.object(self.app, "OSC_BOOTSTRAP_DRAIN_SECONDS", 0.0),
+            mock.patch.object(self.app, "query", side_effect=change_generation),
+            mock.patch.object(self.app, "apply_live_set_bootstrap_locked", wraps=self.app.apply_live_set_bootstrap_locked) as apply,
+        ):
+            self.app.bootstrap_live_set(generation)
+
+        apply.assert_not_called()
+        self.assertFalse(self.app.state["set_ready"])
+        self.assertEqual(self.app.state["current_set_id"], "/Sets/autre.als")
+
+    def test_file_path_change_during_transaction_cancels_publication(self):
+        with self.app.lock:
+            generation = self.app.reset_live_set_state_locked("/Sets/nouveau.als", "file_path")
+            self.app._bootstrap_generation = generation
+
+        paths = iter((("/Sets/nouveau.als",), ("/Sets/autre.als",)))
+        replies = {
+            "/live/song/get/name": ("nouveau",),
+            "/live/view/get/selected_scene": (0,),
+            "/live/song/get/scenes/name": ("Ouverture",),
+        }
+
+        def changed_path(address, *args, **kwargs):
+            return next(paths) if address == "/live/song/get/file_path" else replies[address]
+
+        with (
+            mock.patch.object(self.app, "OSC_BOOTSTRAP_DRAIN_SECONDS", 0.0),
+            mock.patch.object(self.app, "query", side_effect=changed_path),
+        ):
+            self.app.bootstrap_live_set(generation)
+
+        self.assertFalse(self.app.state["set_ready"])
+        self.assertEqual(self.app.state["scenes"], {})
+
+    def test_set_ready_is_published_only_once(self):
+        with self.app.lock:
+            generation = self.app.reset_live_set_state_locked("/Sets/nouveau.als", "file_path")
+            self.app._bootstrap_generation = generation
+        replies = {
+            "/live/song/get/file_path": ("/Sets/nouveau.als",),
+            "/live/song/get/name": ("nouveau",),
+            "/live/view/get/selected_scene": (0,),
+            "/live/song/get/scenes/name": ("Ouverture",),
+        }
+        with (
+            mock.patch.object(self.app, "OSC_BOOTSTRAP_DRAIN_SECONDS", 0.0),
+            mock.patch.object(self.app, "query", side_effect=lambda address, *args, **kwargs: replies[address]),
+            mock.patch.object(self.app, "apply_live_set_bootstrap_locked", wraps=self.app.apply_live_set_bootstrap_locked) as apply,
+        ):
+            self.app.bootstrap_live_set(generation)
+
+        apply.assert_called_once()
+        self.assertTrue(self.app.state["set_ready"])
+
+    def test_expired_transaction_times_out_without_publication(self):
+        with self.app.lock:
+            generation = self.app.reset_live_set_state_locked("/Sets/nouveau.als", "file_path")
+            self.app._bootstrap_generation = generation
+            transaction = self.app._new_bootstrap_transaction(generation)
+            transaction.deadline = self.app.time.monotonic() - 0.001
+            self.app._bootstrap_transaction = transaction
+
+        with (
+            mock.patch.object(self.app, "OSC_BOOTSTRAP_DRAIN_SECONDS", 0.0),
+            mock.patch.object(self.app, "query") as query,
+        ):
+            self.app.bootstrap_live_set(generation)
+
+        query.assert_not_called()
+        self.assertTrue(transaction.cancelled)
+        self.assertEqual(transaction.cancel_reason, "timeout global du bootstrap")
+        self.assertFalse(self.app.state["set_ready"])
+
+    def test_target_change_during_bootstrap_cancels_transaction(self):
+        with self.app.lock:
+            generation = self.app.reset_live_set_state_locked("/Sets/nouveau.als", "file_path")
+            self.app._bootstrap_generation = generation
+
+        targets = iter([
+            ("127.0.0.1", 11000, 11001),
+            ("192.168.1.20", 11000, 11001),
+        ])
+        with (
+            mock.patch.object(self.app, "OSC_BOOTSTRAP_DRAIN_SECONDS", 0.0),
+            mock.patch.object(self.app, "_bootstrap_target_identity", side_effect=lambda: next(targets)),
+            mock.patch.object(self.app, "query") as query,
+        ):
+            self.app.bootstrap_live_set(generation)
+
+        query.assert_not_called()
+        self.assertFalse(self.app.state["set_ready"])
+
+    def test_received_field_is_not_requested_twice(self):
+        with self.app.lock:
+            generation = self.app.reset_live_set_state_locked("/Sets/nouveau.als", "file_path")
+            self.app._bootstrap_generation = generation
+        replies = {
+            "/live/song/get/file_path": ("/Sets/nouveau.als",),
+            "/live/song/get/name": ("nouveau",),
+            "/live/view/get/selected_scene": (0,),
+            "/live/song/get/scenes/name": ("Ouverture",),
+        }
+        with (
+            mock.patch.object(self.app, "OSC_BOOTSTRAP_DRAIN_SECONDS", 0.0),
+            mock.patch.object(
+                self.app,
+                "query",
+                side_effect=lambda address, *args, **kwargs: replies[address],
+            ) as query,
+        ):
+            self.app.bootstrap_live_set(generation)
+
+        addresses = [call.args[0] for call in query.call_args_list]
+        self.assertEqual(addresses.count("/live/song/get/name"), 1)
+        self.assertEqual(addresses.count("/live/view/get/selected_scene"), 1)
+        self.assertEqual(addresses.count("/live/song/get/scenes/name"), 1)
+        self.assertEqual(addresses.count("/live/song/get/file_path"), 2)
+
+    def test_active_transaction_prevents_concurrent_bootstrap_and_identity_queries(self):
+        with self.app.lock:
+            generation = self.app.reset_live_set_state_locked("/Sets/nouveau.als", "file_path")
+
+        created_threads = []
+
+        class DeferredThread:
+            def __init__(self, *args, **kwargs):
+                created_threads.append((args, kwargs))
+
+            def start(self):
+                return None
+
+        with mock.patch.object(self.app.threading, "Thread", DeferredThread):
+            self.app.start_live_set_bootstrap(generation)
+            first_transaction = self.app._bootstrap_transaction
+            self.app.start_live_set_bootstrap(generation)
+
+        self.assertEqual(len(created_threads), 1)
+        self.assertIs(self.app._bootstrap_transaction, first_transaction)
+        with mock.patch.object(self.app, "query") as query:
+            self.assertEqual(self.app.refresh_live_set_identity(generation), generation)
+        query.assert_not_called()
 
     def test_complete_bootstrap_uses_grouped_scene_snapshot(self):
         with self.app.lock:
@@ -265,11 +521,11 @@ class LiveSetGenerationTests(unittest.TestCase):
         }
 
         def reply_immediately(address, *args):
-            self.app.osc_reply(address, *replies[address])
+            self.app.ableton_transport._receive(address, *replies[address])
 
         with (
             mock.patch.object(self.app.time, "sleep"),
-            mock.patch.object(self.app, "send", side_effect=reply_immediately),
+            mock.patch.object(self.app.ableton_transport, "send", side_effect=reply_immediately),
         ):
             self.app.bootstrap_live_set(generation)
 
@@ -309,6 +565,69 @@ class LiveSetGenerationTests(unittest.TestCase):
             ready = self.app.refresh_names_and_transport()
 
         self.assertFalse(ready)
+        start_bootstrap.assert_called_once_with(4)
+        query.assert_not_called()
+
+    def test_initial_cycle_starts_bootstrap_directly_in_local_and_remote_modes(self):
+        target_values = (
+            self.app.ableton_target.__class__(mode="local", host="127.0.0.1"),
+            self.app.ableton_target.__class__(mode="remote", host="192.168.1.20"),
+        )
+        for target in target_values:
+            with self.subTest(mode=target.mode):
+                with self.app.lock:
+                    self.app._bootstrap_generation = None
+                    self.app._bootstrap_transaction = None
+                    self.app.state["set_generation"] = 3
+                    self.app.state["set_ready"] = False
+                    self.app.state["current_set_id"] = None
+                with (
+                    mock.patch.object(self.app, "ableton_target", target),
+                    mock.patch.object(self.app, "refresh_live_set_identity") as refresh_identity,
+                    mock.patch.object(self.app, "start_live_set_bootstrap") as start_bootstrap,
+                ):
+                    ready = self.app.refresh_names_and_transport()
+
+                self.assertFalse(ready)
+                self.assertEqual(self.app.state["set_generation"], 4)
+                self.assertEqual(self.app.state["current_set_id"], "pending:4")
+                start_bootstrap.assert_called_once_with(4)
+                refresh_identity.assert_not_called()
+
+    def test_background_cycles_never_launch_a_second_initial_bootstrap(self):
+        with self.app.lock:
+            self.app._bootstrap_generation = None
+            self.app._bootstrap_transaction = None
+            self.app.state["set_generation"] = 3
+            self.app.state["set_ready"] = False
+            self.app.state["current_set_id"] = None
+
+        created_threads = []
+
+        class DeferredThread:
+            def __init__(self, *args, **kwargs):
+                created_threads.append((args, kwargs))
+
+            def start(self):
+                return None
+
+        with (
+            mock.patch.object(self.app.threading, "Thread", DeferredThread),
+            mock.patch.object(self.app, "query") as query,
+            mock.patch.object(
+                self.app,
+                "start_live_set_bootstrap",
+                wraps=self.app.start_live_set_bootstrap,
+            ) as start_bootstrap,
+        ):
+            for _ in range(6):
+                self.assertFalse(self.app.refresh_names_and_transport())
+
+        self.assertEqual(self.app.state["set_generation"], 4)
+        self.assertEqual(self.app.state["current_set_id"], "pending:4")
+        self.assertEqual(self.app._bootstrap_generation, 4)
+        self.assertEqual(self.app._bootstrap_transaction.generation, 4)
+        self.assertEqual(len(created_threads), 1)
         start_bootstrap.assert_called_once_with(4)
         query.assert_not_called()
 

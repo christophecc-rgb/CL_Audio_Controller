@@ -12,6 +12,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 import build_identity
+import ableton_targets
 import launcher_control as launcher
 
 
@@ -259,6 +260,73 @@ class ServerStatusContractTests(unittest.TestCase):
             self.assertFalse(refused["owned"])
         finally:
             self.module.LAUNCH_ID, self.module.SHUTDOWN_TOKEN = old_values
+
+    def test_transport_connection_test_does_not_mutate_business_state(self):
+        with self.module.lock:
+            before = self.module.state_snapshot_locked()
+        with mock.patch.object(
+            self.module.ableton_transport,
+            "query",
+            return_value=(12, 1),
+        ):
+            response = self.module.app.test_client().post("/transport/test")
+        with self.module.lock:
+            after = self.module.state_snapshot_locked()
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.get_json()["ok"])
+        for key in ("set_generation", "set_ready", "current_set_id", "scenes"):
+            self.assertEqual(after[key], before[key])
+
+
+class NetworkConfigurationRouteTests(unittest.TestCase):
+    def test_local_configuration_without_server_is_saved_without_restart(self):
+        previous = ableton_targets.AbletonTarget(mode="remote", host="192.168.50.10")
+        with (
+            mock.patch.object(launcher, "load_target", return_value=previous),
+            mock.patch.object(launcher, "save_target") as save,
+            mock.patch.object(launcher, "tcp_ok", return_value=False),
+            mock.patch.object(launcher, "start_web_server") as start,
+        ):
+            response = launcher.app.test_client().post(
+                "/network-config",
+                json={"mode": "local", "host": "192.168.50.99", "send_port": 11000, "reply_port": 11001},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(save.call_args.args[0].host, "127.0.0.1")
+        start.assert_not_called()
+
+    def test_configuration_change_restarts_only_owned_server(self):
+        previous = ableton_targets.local_target()
+        with (
+            mock.patch.object(launcher, "load_target", return_value=previous),
+            mock.patch.object(launcher, "save_target") as save,
+            mock.patch.object(launcher, "tcp_ok", return_value=True),
+            mock.patch.object(launcher, "current_identity_status", return_value=(valid_status(), {"valid": True})),
+            mock.patch.object(launcher, "stop_owned_server", return_value=(True, "stopped")) as stop,
+            mock.patch.object(launcher, "start_web_server", return_value=(True, "started")) as start,
+        ):
+            response = launcher.app.test_client().post(
+                "/network-config",
+                json={"mode": "remote", "host": "192.168.50.10", "send_port": 11000, "reply_port": 11001},
+            )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(save.call_args.args[0].host, "192.168.50.10")
+        stop.assert_called_once_with()
+        start.assert_called_once_with()
+
+    def test_configuration_refuses_unowned_active_server(self):
+        with (
+            mock.patch.object(launcher, "load_target", return_value=ableton_targets.local_target()),
+            mock.patch.object(launcher, "save_target") as save,
+            mock.patch.object(launcher, "tcp_ok", return_value=True),
+            mock.patch.object(launcher, "current_identity_status", return_value=(valid_status(), {"valid": False})),
+        ):
+            response = launcher.app.test_client().post(
+                "/network-config",
+                json={"mode": "remote", "host": "192.168.50.10", "send_port": 11000, "reply_port": 11001},
+            )
+        self.assertEqual(response.status_code, 409)
+        save.assert_not_called()
 
 
 if __name__ == "__main__":
