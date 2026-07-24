@@ -24,6 +24,9 @@ Toutes les évolutions notables de CL Audio Controller seront documentées dans 
 
 - Ajout d'un patch AbletonOSC reproductible exposant en lecture seule `/live/song/get/file_path` et `/live/song/get/name`.
 - Ajout de tests de non-régression pour les changements de Set, les identités temporaires et les générations périmées.
+- Ajout d'un kit Max for Live transportable réunissant X-Fader, AutoScene,
+  AutoScene Live 10 et LTC Remote Config, inclus séparément dans le DMG et dans
+  une archive ZIP dédiée.
 
 ## [2.0.0] — 2026-07-17
 

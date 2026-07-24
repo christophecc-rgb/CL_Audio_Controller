@@ -18,7 +18,7 @@ La reproductibilité fonctionnelle est documentée et validée. Une identité bi
 - `templates/` : interfaces HTML.
 - `static/` : feuilles de style et JavaScript.
 - `assets/` : images utilisées par l'interface.
-- `M4L/` : pont Max for Live source pour le crossfader.
+- `M4L/` : sources Max et dossier `Install/` contenant les périphériques `.amxd` transportables.
 - `arrangement_markers.json` : repères de secours lorsque les locators ne sont pas fournis par AbletonOSC.
 - `CL Audio Controller.spec` : configuration PyInstaller de l'application macOS.
 - `Diagnostics/`, `Guides/` et `INSTALLER_AbletonOSC/` : outils et documentation d'exploitation.
@@ -72,13 +72,24 @@ Le diagnostic détaillé est silencieux par défaut. Pour afficher temporairemen
 
 ### Max for Live
 
-Le pont source est fourni dans :
+Les périphériques prêts à installer sont fournis dans :
 
 ```text
-M4L/XFADER_OSC_BRIDGE_v8_OSC_REMOTE_STORE_ID.maxpat
+M4L/Install/
+├── XFADER OSC BRIDGE v8.amxd
+├── Paradis Latin AutoScene.amxd
+├── Paradis Latin AutoScene - Live 10.amxd
+└── LTC Display v2.0 Remote Config.amxd
 ```
 
-Le device doit écouter en UDP sur le port 9001 et être placé sur la piste Master. Le fichier `.amxd` compilé est traité comme un livrable externe et n'est pas versionné dans ce projet.
+Le X-Fader doit écouter en UDP sur le port 9001 et être placé sur la piste Master.
+La variante AutoScene à charger dépend de la version du Live Set : utiliser la
+version standard pour les versions actuelles de Live et la variante `Live 10`
+pour les projets qui l'exigent. Le LTC Remote Config écoute sur le port 63123.
+
+Chaque distribution contient également un dossier autonome
+`Max for Live à installer` et une archive ZIP dédiée. Les empreintes de référence
+sont conservées dans `M4L/Install/SHA256SUMS.txt`.
 
 ## Ports réseau
 
