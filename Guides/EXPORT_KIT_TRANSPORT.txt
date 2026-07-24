@@ -1,0 +1,24 @@
+EXPORT DU KIT COMPLET SUR LE BUREAU
+
+Le script :
+
+    scripts/export_transport_kit.command
+
+sélectionne automatiquement le fichier CL_Production_Suite le plus récent
+présent dans le dossier local Releases.
+
+Il crée sur le Bureau :
+
+    CL_Suite_Transport_AAAA-MM-JJ_HHMMSS.zip
+    CL_Suite_Transport_AAAA-MM-JJ_HHMMSS_SHA256.txt
+
+La copie est comparée à la source par SHA-256 avant d'être présentée comme
+valide. Le script n'effectue aucune reconstruction, aucun commit et aucun
+envoi vers GitHub.
+
+Un raccourci portant le nom :
+
+    Créer le kit CL sur le Bureau.command
+
+peut être placé directement sur le Bureau. Un double-clic suffit alors pour
+produire une nouvelle copie transportable.
