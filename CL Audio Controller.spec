@@ -58,8 +58,8 @@ app = BUNDLE(
     bundle_identifier='com.claudio.controller',
     info_plist={
         'CFBundleDisplayName': 'CL Audio Controller',
-        'CFBundleShortVersionString': '2.0.0',
-        'CFBundleVersion': '4',
+        'CFBundleShortVersionString': '2.1.0',
+        'CFBundleVersion': '5',
         'NSHighResolutionCapable': True,
     },
 )

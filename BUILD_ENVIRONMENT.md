@@ -3,8 +3,8 @@
 ## Application de référence
 
 - Nom : CL Audio Controller
-- Version : 2.0.0
-- Numéro de build : 4
+- Version : 2.1.0
+- Numéro de build : 5
 - Identifiant macOS : `com.claudio.controller`
 - Point d'entrée : `launcher_control.py`
 - Configuration : `CL Audio Controller.spec`

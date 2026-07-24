@@ -2,7 +2,7 @@
 
 CL Audio Controller est une application macOS de pilotage d'Ableton Live. Elle réunit une interface native, une télécommande Web accessible sur le réseau local, des échanges OSC avec AbletonOSC, un suivi de l'arrangement et un pont Max for Live pour le crossfader.
 
-La version de référence est **2.0.0** (build 4), identifiée par le bundle macOS `com.claudio.controller`.
+La version de référence est **2.1.0** (build 5), identifiée par le bundle macOS `com.claudio.controller`.
 
 ## État du projet
 

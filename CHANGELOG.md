@@ -2,7 +2,7 @@
 
 Toutes les évolutions notables de CL Audio Controller seront documentées dans ce fichier.
 
-## [Non publié]
+## [2.1.0] — 2026-07-24
 
 ### Corrigé
 
@@ -10,6 +10,15 @@ Toutes les évolutions notables de CL Audio Controller seront documentées dans 
 - Identification principale du Set par `Song.file_path`, avec identité temporaire pour les Sets non enregistrés.
 - Protection des traitements asynchrones et des interfaces Session, A/B et Arrangement par `set_generation` afin d'ignorer les réponses obsolètes.
 - Maintien de « En cours » vide jusqu'au premier lancement réel, tandis que « Prochaine scène » suit immédiatement la sélection.
+- Confirmation de l'état réel d'Ableton avant les commandes Play/Pause et suppression du délai artificiel qui pouvait rendre le bouton Session temporairement inactif.
+
+### Interfaces
+
+- Affichage LTC partagé dans Session et Arrangement, avec rafraîchissement fluide et sérialisé.
+- Interface A/B recentrée sur le crossfader et les commandes essentielles.
+- Mise en page Session et A/B compacte, adaptée à l'affichage complet sur iPhone sans défilement.
+- Bouton GO placé immédiatement sous le LTC dans Session.
+- Avertissement et confirmation explicite avant l'entrée en mode Arrangement.
 
 ### Intégration
 
