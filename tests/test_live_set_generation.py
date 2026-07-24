@@ -1,4 +1,5 @@
 import importlib.util
+import re
 import subprocess
 import sys
 import unittest
@@ -55,6 +56,25 @@ class LiveSetGenerationTests(unittest.TestCase):
             mock.patch.object(self.app, "_query_with_query_lock_held", side_effect=confirm_selected),
         ):
             return self.app.execute_go_transaction(request_id, generation, scene_number)
+
+    def post_action_with_playing_reply(self, action_name, playing, sent):
+        with (
+            mock.patch.object(
+                self.app,
+                "query",
+                return_value=(1 if playing else 0,),
+            ) as query_playing,
+            mock.patch.object(
+                self.app,
+                "send",
+                side_effect=lambda address, *args: sent.append((address, args)),
+            ),
+        ):
+            response = self.app.app.test_client().post(
+                "/action",
+                json={"action": action_name},
+            )
+        return response, query_playing
 
     def test_startup_reset_is_atomic_and_clears_previous_titles(self):
         with self.app.lock:
@@ -113,6 +133,73 @@ class LiveSetGenerationTests(unittest.TestCase):
         with mock.patch.object(self.app, "query", side_effect=lambda address, *args, **kwargs: replies[address]):
             generation = self.app.refresh_live_set_identity(expected_generation=3)
         self.assertEqual(generation, 3)
+
+    def test_pause_uses_confirmed_live_state_instead_of_stale_stopped_cache(self):
+        sent = []
+        with self.app.lock:
+            self.app.state["is_playing"] = False
+            self.app.state["is_paused"] = False
+            self.app.state["play_mode"] = "session"
+
+        response, query_playing = self.post_action_with_playing_reply("pause", True, sent)
+
+        self.assertEqual(response.status_code, 200)
+        query_playing.assert_called_once_with(
+            "/live/song/get/is_playing",
+            timeout=0.20,
+            expected_generation=3,
+        )
+        self.assertIn(("/live/song/stop_playing", ()), sent)
+        self.assertNotIn(("/live/song/continue_playing", ()), sent)
+
+    def test_pause_uses_confirmed_live_state_instead_of_stale_playing_cache(self):
+        sent = []
+        with self.app.lock:
+            self.app.state["is_playing"] = True
+            self.app.state["is_paused"] = True
+            self.app.state["play_mode"] = "session"
+
+        response, _ = self.post_action_with_playing_reply("pause", False, sent)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(("/live/song/continue_playing", ()), sent)
+        self.assertNotIn(("/live/song/stop_playing", ()), sent)
+
+    def test_arrangement_toggle_uses_confirmed_live_state(self):
+        sent = []
+        with self.app.lock:
+            self.app.state["is_playing"] = False
+            self.app.state["is_paused"] = False
+            self.app.state["play_mode"] = "arrangement"
+
+        response, _ = self.post_action_with_playing_reply(
+            "arrangement_toggle",
+            True,
+            sent,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(("/live/song/stop_playing", ()), sent)
+        self.assertNotIn(("/live/song/continue_playing", ()), sent)
+
+    def test_toggle_refuses_if_generation_changes_during_confirmation(self):
+        def change_generation(*args, **kwargs):
+            with self.app.lock:
+                self.app.state["set_generation"] = 4
+                self.app.state["set_ready"] = False
+            return (1,)
+
+        with (
+            mock.patch.object(self.app, "query", side_effect=change_generation),
+            mock.patch.object(self.app, "send") as send,
+        ):
+            response = self.app.app.test_client().post(
+                "/action",
+                json={"action": "pause"},
+            )
+
+        self.assertEqual(response.status_code, 409)
+        send.assert_not_called()
 
     def test_missing_name_refresh_does_not_erase_bootstrapped_name(self):
         with self.app.lock:
@@ -753,7 +840,7 @@ class LiveSetGenerationTests(unittest.TestCase):
             self.assertIn("scene:", source)
         self.assertNotIn("await wait(350)", ab_source)
 
-    def test_ab_polling_allows_40ms_without_changing_other_interfaces(self):
+    def test_shared_ltc_interfaces_allow_40ms_active_polling(self):
         scheduler_source = (PROJECT_ROOT / "static/remote-v2.js").read_text(encoding="utf-8")
         ab_source = (PROJECT_ROOT / "templates/ab.html").read_text(encoding="utf-8")
         session_source = (PROJECT_ROOT / "templates/index.html").read_text(encoding="utf-8")
@@ -772,15 +859,13 @@ class LiveSetGenerationTests(unittest.TestCase):
             ab_source,
         )
         self.assertIn(
-            "{ activeMs: 1000, idleMs: 2500, hiddenMs: 15000 }",
+            "{ activeMs: 40, idleMs: 2500, hiddenMs: 15000, minActiveMs: 40 }",
             session_source,
         )
         self.assertIn(
-            "{ activeMs: 850, idleMs: 2500, hiddenMs: 15000 }",
+            "{ activeMs: 40, idleMs: 2500, hiddenMs: 15000, minActiveMs: 40 }",
             arrangement_source,
         )
-        self.assertNotIn("minActiveMs", session_source)
-        self.assertNotIn("minActiveMs", arrangement_source)
 
     def test_polling_remains_serialized_and_recovers_after_failures(self):
         scheduler_source = (PROJECT_ROOT / "static/remote-v2.js").read_text(encoding="utf-8")
@@ -802,6 +887,110 @@ class LiveSetGenerationTests(unittest.TestCase):
         self.assertIn("togglePlayPauseFromKeyboard();", ab_source)
         self.assertIn("timeoutMs = 2500", ab_source)
         self.assertIn("fetchJSON('/status', {}, 1800)", ab_source)
+
+    def test_shared_ltc_display_is_present_on_session_and_arrangement_only(self):
+        for relative_path in (
+            "templates/index.html",
+            "templates/arrangement.html",
+        ):
+            source = (PROJECT_ROOT / relative_path).read_text(encoding="utf-8")
+            self.assertIn('class="ltc-display ltc-display--disconnected"', source)
+            self.assertIn('class="ltc-display__value" id="ltcTimecode"', source)
+            self.assertIn("window.CLRemoteLTC.render(ltcTimecodeEl, state)", source)
+
+        ab_source = (PROJECT_ROOT / "templates/ab.html").read_text(encoding="utf-8")
+        self.assertNotIn('id="ltcTimecode"', ab_source)
+        self.assertNotIn("window.CLRemoteLTC.render", ab_source)
+
+    def test_session_places_ltc_between_next_scene_and_go_controls(self):
+        source = (PROJECT_ROOT / "templates/index.html").read_text(encoding="utf-8")
+
+        selected_position = source.index('class="card selected-card"')
+        ltc_position = source.index('class="ltc-display ltc-display--disconnected"')
+        go_position = source.index('class="grid" aria-label="Commandes Ableton"')
+        self.assertLess(selected_position, ltc_position)
+        self.assertLess(ltc_position, go_position)
+
+    def test_ab_places_the_single_crossfader_slider_where_ltc_was_removed(self):
+        source = (PROJECT_ROOT / "templates/ab.html").read_text(encoding="utf-8")
+
+        deck_position = source.index('class="card deck-screen"')
+        slider_position = source.index('class="crossfader-section" aria-live="polite"')
+        transport_position = source.index('class="transport-dock"')
+        self.assertEqual(source.count('id="xfader"'), 1)
+        self.assertLess(deck_position, slider_position)
+        self.assertLess(slider_position, transport_position)
+
+    def test_arrangement_navigation_requires_explicit_confirmation(self):
+        session_page = self.app.app.test_client().get("/").get_data(as_text=True)
+        script = (PROJECT_ROOT / "static/remote-v2.js").read_text(encoding="utf-8")
+        arrangement_source = (PROJECT_ROOT / "templates/arrangement.html").read_text(encoding="utf-8")
+
+        self.assertIn('href="/arrangement" data-arrangement-link', session_page)
+        self.assertIn("Attention : vous passez en mode Arrangement", script)
+        self.assertIn("window.confirm(arrangementWarning)", script)
+        self.assertIn("action: 'back_to_arrangement'", script)
+        self.assertIn("Attention : vous êtes en mode Arrangement", arrangement_source)
+
+    def test_opening_arrangement_page_does_not_switch_ableton_view(self):
+        with (
+            mock.patch.object(self.app, "show_arrangement_view") as show_arrangement,
+            mock.patch.object(self.app, "load_arrangement_markers", return_value=[]),
+        ):
+            response = self.app.app.test_client().get("/arrangement")
+
+        self.assertEqual(response.status_code, 200)
+        show_arrangement.assert_not_called()
+
+    def test_launcher_remote_window_still_opens_session_by_default(self):
+        launcher_source = (PROJECT_ROOT / "launcher_control.py").read_text(encoding="utf-8")
+
+        self.assertIn('REMOTE_ROOT_URL = f"http://127.0.0.1:{WEB_PORT}/"', launcher_source)
+        self.assertIn('open_remote_app_window(REMOTE_ROOT_URL, "Télécommande Ableton")', launcher_source)
+        self.assertIn('event("Télécommande ouverte sur Session")', launcher_source)
+
+    def test_shared_ltc_renderer_uses_only_published_ltc_state(self):
+        source = (PROJECT_ROOT / "static/remote-v2.js").read_text(encoding="utf-8")
+
+        self.assertIn("const LTC_PLACEHOLDER = '--:--:--:--';", source)
+        self.assertIn("const LTC_PATTERN = /^\\d{2}:\\d{2}:\\d{2}:\\d{2}$/;", source)
+        self.assertIn("state.ltc_connected === true", source)
+        self.assertIn("state.ltc_timecode", source)
+        self.assertIn("element.textContent = active ? value : LTC_PLACEHOLDER;", source)
+        self.assertIn("ltc-display--connected", source)
+        self.assertIn("ltc-display--disconnected", source)
+        for legacy_source in ("state.timecode", "state.smpte", "state.arrangement_timecode"):
+            self.assertNotIn(legacy_source, source)
+        self.assertIsNone(re.search(r"state\.ltc(?!_)", source))
+        for interpolation_marker in ("requestAnimationFrame", "interpolate", "setInterval"):
+            self.assertNotIn(interpolation_marker, source)
+
+    def test_shared_ltc_style_is_stable_and_uses_system_fonts(self):
+        source = (PROJECT_ROOT / "static/remote-v2.css").read_text(encoding="utf-8")
+
+        self.assertIn(".ltc-display__value", source)
+        self.assertIn('ui-monospace, "SF Mono", Menlo, Monaco, Consolas, monospace', source)
+        self.assertIn("font-variant-numeric: tabular-nums", source)
+        self.assertIn("min-width: 11ch", source)
+        self.assertNotIn("Ableton Sans", source)
+
+    def test_ltc_display_does_not_change_polling_or_generation_guards(self):
+        expected_polling = {
+            "templates/index.html": "{ activeMs: 40, idleMs: 2500, hiddenMs: 15000, minActiveMs: 40 }",
+            "templates/ab.html": "{ activeMs: 40, idleMs: 2000, hiddenMs: 15000, minActiveMs: 40 }",
+            "templates/arrangement.html": "{ activeMs: 40, idleMs: 2500, hiddenMs: 15000, minActiveMs: 40 }",
+        }
+        for relative_path, polling in expected_polling.items():
+            source = (PROJECT_ROOT / relative_path).read_text(encoding="utf-8")
+            self.assertIn(polling, source)
+            self.assertIn("generation < lastAcceptedGeneration", source)
+
+        scheduler_source = (PROJECT_ROOT / "static/remote-v2.js").read_text(encoding="utf-8")
+        self.assertIn("wake() { schedule(document.hidden ? hiddenMs : 0); }", scheduler_source)
+        self.assertIn("controllers.add(controller);\n      schedule(0);", scheduler_source)
+        self.assertIn("const hiddenMs = Math.max(idleMs, Number(options.hiddenMs) || 15000);", scheduler_source)
+
+        self.assertIsNotNone(re.fullmatch(r"\d{2}:\d{2}:\d{2}:\d{2}", "14:27:53:24"))
 
     def test_keyboard_shortcuts_share_button_handlers_on_all_interfaces(self):
         sources = {
@@ -845,6 +1034,48 @@ class LiveSetGenerationTests(unittest.TestCase):
             source = (PROJECT_ROOT / relative_path).read_text(encoding="utf-8")
             space_branch = source.rsplit("if (event.code === 'Space' || event.key === ' ')", 1)[1]
             self.assertIn("event.preventDefault();", space_branch.split("}", 1)[0])
+
+    def test_session_buttons_are_reenabled_without_artificial_delay(self):
+        source = (PROJECT_ROOT / "templates/index.html").read_text(encoding="utf-8")
+        action_finally = source.split(
+            "if (action === 'go' && selectedCard) selectedCard.classList.add('is-prepared');",
+            1,
+        )[1].split("async function update(", 1)[0]
+
+        self.assertIn("buttons.forEach(button => { button.disabled = false; });", action_finally)
+        self.assertIn("actionBusy = false;", action_finally)
+        self.assertNotIn("setTimeout(() =>", action_finally)
+
+    def test_session_portrait_layout_is_compact_and_places_go_below_ltc(self):
+        source = (PROJECT_ROOT / "templates/index.html").read_text(encoding="utf-8")
+        portrait_css = source.split(
+            "@media (orientation: portrait) and (max-width: 430px)",
+            1,
+        )[1].split("@media (orientation: landscape)", 1)[0]
+
+        self.assertIn(".topnav a", portrait_css)
+        self.assertIn("min-height: 22px;", portrait_css)
+        self.assertIn(".card", portrait_css)
+        self.assertIn("padding: 8px 10px;", portrait_css)
+        self.assertIn(".ltc-display", portrait_css)
+        self.assertIn("padding: 4px 8px;", portrait_css)
+        self.assertIn(".go-button", portrait_css)
+        self.assertIn("order: -1;", portrait_css)
+        self.assertIn("min-height: 62px;", portrait_css)
+
+    def test_ab_portrait_layout_fits_without_scrolling(self):
+        source = (PROJECT_ROOT / "templates/ab.html").read_text(encoding="utf-8")
+        portrait_css = source.rsplit(
+            "@media (max-width: 430px) and (orientation: portrait)",
+            1,
+        )[1].split("</style>", 1)[0]
+
+        self.assertIn("overflow-y: hidden !important;", portrait_css)
+        self.assertIn("height: 48px !important;", portrait_css)
+        self.assertIn("min-height: 31px !important;", portrait_css)
+        self.assertIn("flex: 0 0 clamp(154px, 22dvh, 180px) !important;", portrait_css)
+        self.assertIn("min-height: 72px !important;", portrait_css)
+        self.assertIn("height: 42px !important;", portrait_css)
 
 
 if __name__ == "__main__":

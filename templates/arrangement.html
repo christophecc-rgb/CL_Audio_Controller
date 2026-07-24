@@ -440,6 +440,15 @@ body.is-arrangement-paused .card.current {
     <div class="status disconnected" id="status">Connexion…</div>
     <nav class="topnav"><a href="/">Session</a><a href="/ab">A/B</a><a href="/arrangement" class="active">Arrangement</a></nav>
 
+    <section class="arrangement-warning" role="alert">
+      Attention : vous êtes en mode Arrangement. Vérifiez la position de lecture avant toute commande.
+    </section>
+
+    <section class="ltc-display ltc-display--disconnected" aria-live="polite" aria-label="Retour LTC timecode">
+      <div class="ltc-display__label">LTC Timecode</div>
+      <output class="ltc-display__value" id="ltcTimecode">--:--:--:--</output>
+    </section>
+
   <div class="main">
   <section style="display:flex; flex-direction:column; gap:8px">
     <section class="card current" id="currentCard" aria-live="polite">
@@ -503,6 +512,7 @@ body.is-arrangement-paused .card.current {
     const currentMetaEl = document.getElementById('currentMeta');
     const currentCardEl = document.getElementById('currentCard');
     const nextNameEl = document.getElementById('nextName');
+    const ltcTimecodeEl = document.getElementById('ltcTimecode');
     const nextMetaEl = document.getElementById('nextMeta');
     const nextCardEl = document.querySelector('.card.next');
     const countLabelEl = document.getElementById('countLabel');
@@ -779,6 +789,7 @@ body.is-arrangement-paused .card.current {
 
     function applyStatus(state) {
       if (!acceptStateGeneration(state)) return;
+      if (window.CLRemoteLTC) window.CLRemoteLTC.render(ltcTimecodeEl, state);
       const connected = Boolean(state && state.connected);
       const arrangementMode = Boolean(state && state.play_mode === 'arrangement');
       if (arrangementMode) arrangementReturnActive = true;
@@ -1068,12 +1079,11 @@ markerSelectEl.addEventListener('change', () => {
     });
 
     renderConduite();
-    update();
     window.addEventListener('DOMContentLoaded', () => {
       window.CLRemoteEnergy.startPolling(
         update,
         () => document.body.classList.contains('is-arrangement-playing'),
-        { activeMs: 850, idleMs: 2500, hiddenMs: 15000 }
+        { activeMs: 40, idleMs: 2500, hiddenMs: 15000, minActiveMs: 40 }
       );
     }, { once: true });
   </script>

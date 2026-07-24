@@ -285,7 +285,11 @@ def decorate_remote_page_html(response):
     module_label = {"session": "Session", "ab": "A/B", "arrangement": "Arrangement"}[module]
     tabs = "".join(
         f'<a href="{href}" aria-current="page">{label}</a>' if key == module
-        else f'<a href="{href}">{label}</a>'
+        else (
+            f'<a href="{href}" data-arrangement-link>{label}</a>'
+            if key == "arrangement"
+            else f'<a href="{href}">{label}</a>'
+        )
         for key, href, label in (
             ("session", "/", "Session"),
             ("ab", "/ab", "A/B"),
@@ -2082,7 +2086,6 @@ def ab_page():
 
 @app.route("/arrangement")
 def arrangement_page():
-    show_arrangement_view()
     try:
         with lock:
             generation = int(state.get("set_generation", 0))
@@ -2400,6 +2403,39 @@ def execute_go_transaction(request_id: str, expected_generation: int, scene_numb
         return True, f"Scène {scene_index + 1} lancée"
 
 
+def confirm_live_playing_state(expected_generation: int) -> Tuple[Optional[bool], bool]:
+    """Lit l'état de lecture réel avant une commande à bascule.
+
+    Le booléen de retour indique si la valeur a été confirmée par Ableton.
+    En l'absence de réponse, le dernier cache cohérent reste disponible comme
+    secours, mais jamais si la génération a changé pendant la lecture.
+    """
+    response = query(
+        "/live/song/get/is_playing",
+        timeout=0.20,
+        expected_generation=expected_generation,
+    )
+
+    with lock:
+        if (
+            int(state.get("set_generation", 0)) != int(expected_generation)
+            or not state.get("set_ready", False)
+        ):
+            return None, False
+        cached_playing = bool(state.get("is_playing", False))
+
+    if not response:
+        return cached_playing, False
+
+    raw = response[0]
+    confirmed_playing = (
+        raw.strip().lower() not in ("0", "false", "off", "no", "")
+        if isinstance(raw, str)
+        else bool(raw)
+    )
+    return confirmed_playing, True
+
+
 @app.route("/action", methods=["POST"])
 def action():
     data = request.get_json(force=True, silent=True) or {}
@@ -2477,9 +2513,15 @@ def action():
         # Bouton dédié Arrangement :
         # - si l'Arrangement joue, on met en pause
         # - sinon on reprend la lecture Arrangement à la position courante
+        confirmed_playing, _ = confirm_live_playing_state(action_generation)
+        if confirmed_playing is None:
+            return jsonify({
+                "ok": False,
+                "message": "Live Set modifié pendant la commande",
+            }), 409
         with lock:
             arrangement_is_playing = (
-                bool(state.get("is_playing", False))
+                confirmed_playing
                 and str(state.get("play_mode", "")) == "arrangement"
                 and not bool(state.get("is_paused", False))
             )
@@ -2512,8 +2554,14 @@ def action():
                 state["sync_source"] = "Télécommande"
 
     elif action_name == "pause":
+        confirmed_playing, _ = confirm_live_playing_state(action_generation)
+        if confirmed_playing is None:
+            return jsonify({
+                "ok": False,
+                "message": "Live Set modifié pendant la commande",
+            }), 409
         with lock:
-            is_playing = bool(state.get("is_playing", False))
+            is_playing = confirmed_playing
             is_paused = bool(state.get("is_paused", False))
             current_mode = str(state.get("play_mode", "stopped"))
 

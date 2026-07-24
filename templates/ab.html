@@ -1371,49 +1371,52 @@
     @media (max-width: 430px) and (orientation: portrait) {
       body:not(.desktop-embed) {
         min-height: 100dvh !important;
-        padding: calc(env(safe-area-inset-top) + 6px) 6px calc(env(safe-area-inset-bottom) + 6px) !important;
-        overflow-y: auto !important;
+        padding: calc(env(safe-area-inset-top) + 3px) 5px calc(env(safe-area-inset-bottom) + 3px) !important;
+        overflow-y: hidden !important;
       }
 
       body:not(.desktop-embed) .wrap {
         width: 100% !important;
         max-width: none !important;
-        min-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 12px) !important;
-        padding: 9px !important;
-        gap: 7px !important;
-        justify-content: space-between !important;
-        border-radius: 22px !important;
+        min-height: 0 !important;
+        max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 6px) !important;
+        padding: 5px !important;
+        gap: 4px !important;
+        justify-content: flex-start !important;
+        border-radius: 16px !important;
       }
 
       body:not(.desktop-embed) .paradis-brand {
-        min-height: clamp(92px, 13dvh, 112px) !important;
-        padding: 5px 10px 8px !important;
+        min-height: 48px !important;
+        height: 48px !important;
+        padding: 2px 8px 4px !important;
       }
 
       body:not(.desktop-embed) .paradis-brand img {
-        width: min(88vw, 370px) !important;
-        max-height: 94px !important;
+        width: min(72vw, 280px) !important;
+        max-height: 42px !important;
       }
 
       body:not(.desktop-embed) .topnav {
-        min-height: 50px !important;
-        padding: 4px !important;
+        min-height: 31px !important;
+        margin-bottom: 0 !important;
+        padding: 2px !important;
       }
 
       body:not(.desktop-embed) .topnav a {
-        min-height: 40px !important;
-        font-size: 10px !important;
+        min-height: 27px !important;
+        font-size: 9px !important;
       }
 
       body:not(.desktop-embed) .card.deck-screen {
-        flex: 0 0 clamp(224px, 29dvh, 270px) !important;
-        min-height: 224px !important;
-        padding: 11px 9px !important;
+        flex: 0 0 clamp(154px, 22dvh, 180px) !important;
+        min-height: 154px !important;
+        padding: 7px !important;
       }
 
       body:not(.desktop-embed) .display-stack {
         height: 100% !important;
-        gap: 8px !important;
+        gap: 4px !important;
         justify-content: center !important;
       }
 
@@ -1421,8 +1424,8 @@
         display: flex !important;
         flex-direction: column !important;
         justify-content: center !important;
-        min-height: 68px !important;
-        padding: 9px 10px !important;
+        min-height: 48px !important;
+        padding: 6px 8px !important;
       }
 
       body:not(.desktop-embed) .title-box-current {
@@ -1434,71 +1437,62 @@
       }
 
       body:not(.desktop-embed) .now-title {
-        font-size: clamp(21px, 6.25vw, 27px) !important;
+        font-size: clamp(19px, 5.8vw, 25px) !important;
       }
 
       body:not(.desktop-embed) .next-title {
-        font-size: clamp(18px, 5.1vw, 22px) !important;
+        font-size: clamp(16px, 4.8vw, 21px) !important;
       }
 
       body:not(.desktop-embed) .now-label {
-        font-size: 8px !important;
-      }
-
-      body:not(.desktop-embed) .ltc-panel {
-        min-height: 52px !important;
-        padding: 5px 8px !important;
-      }
-
-      body:not(.desktop-embed) .ltc-timecode {
-        font-size: 18px !important;
+        font-size: 7px !important;
       }
 
       body:not(.desktop-embed) .transport-dock {
-        min-height: 74px !important;
-        padding: 6px !important;
+        min-height: 50px !important;
+        padding: 4px !important;
       }
 
       body:not(.desktop-embed) .transport-row .button-pause,
       body:not(.desktop-embed) .transport-row .knob-button {
-        height: 60px !important;
-        min-height: 60px !important;
-        border-radius: 13px !important;
+        height: 42px !important;
+        min-height: 42px !important;
+        border-radius: 10px !important;
       }
 
       body:not(.desktop-embed) .transport-row .button-pause {
-        font-size: 14px !important;
+        font-size: 11px !important;
       }
 
       body:not(.desktop-embed) .transport-row .knob-button {
-        font-size: 23px !important;
+        font-size: 19px !important;
       }
 
       body:not(.desktop-embed) .scene-select-panel {
-        min-height: 58px !important;
-        padding: 5px !important;
+        min-height: 46px !important;
+        padding: 4px !important;
       }
 
       body:not(.desktop-embed) .scene-select,
       body:not(.desktop-embed) .scene-select-panel .scene-select {
-        height: 44px !important;
-        min-height: 44px !important;
-        font-size: 13px !important;
+        height: 38px !important;
+        min-height: 38px !important;
+        font-size: 12px !important;
       }
 
       body:not(.desktop-embed) .crossfader-section {
-        width: 94% !important;
+        width: 96% !important;
         max-width: none !important;
-        min-height: 104px !important;
-        padding: 11px 10px !important;
+        min-height: 72px !important;
+        padding: 6px 9px !important;
       }
 
       body:not(.desktop-embed) .crossfader-position {
-        font-size: 21px !important;
+        font-size: 17px !important;
       }
 
       body:not(.desktop-embed) input[type="range"] {
-        height: 26px !important;
+        height: 22px !important;
       }
 
       body:not(.desktop-embed) input[type="range"]::-webkit-slider-thumb {
@@ -1508,17 +1502,18 @@
       }
 
       body:not(.desktop-embed) .buttons-dock {
-        min-height: 58px !important;
-        padding: 4px !important;
+        min-height: 48px !important;
+        margin-top: 0 !important;
+        padding: 3px !important;
       }
 
       body:not(.desktop-embed) .button,
       body:not(.desktop-embed) .knob-button,
       body:not(.desktop-embed) .button-a,
       body:not(.desktop-embed) .button-b {
-        height: 48px !important;
-        min-height: 48px !important;
-        font-size: 16px !important;
+        height: 42px !important;
+        min-height: 42px !important;
+        font-size: 15px !important;
       }
 
       body:not(.desktop-embed) .button-pause {
@@ -1539,7 +1534,7 @@
     <nav class="topnav" aria-label="Navigation de la télécommande">
       <a href="/">Session</a>
       <a href="/ab" class="active" aria-current="page">A/B</a>
-      <a href="/arrangement">Arrangement</a>
+      <a href="/arrangement" data-arrangement-link>Arrangement</a>
     </nav>
 
 
@@ -1559,10 +1554,14 @@
       </div>
     </section>
 
-    <section class="ltc-panel" aria-live="polite" aria-label="Retour LTC timecode">
-      <div class="ltc-label">LTC TIMECODE</div>
-      <div class="ltc-timecode" id="ltcTimecode">--:--:--:--</div>
-      </section>
+    <section class="crossfader-section" aria-live="polite" aria-label="Crossfader Ableton">
+      <div class="crossfader-label">Crossfader Ableton</div>
+      <div class="crossfader-position" id="position">—</div>
+      <div class="slider-panel" aria-label="Réglage progressif A/B">
+        <input id="xfader" type="range" min="-1" max="1" step="0.01" value="0" aria-valuemin="-1" aria-valuemax="1" aria-valuenow="0" aria-label="Crossfader slider">
+        <div class="row"><span>A</span><span>Centre</span><span>B</span></div>
+      </div>
+    </section>
 
     <section class="transport-dock" aria-label="Commandes de transport Ableton">
       <div class="transport-row">
@@ -1576,15 +1575,6 @@
       <option value="">Choisir…</option>
       </select>
       </section>
-
-    <section class="crossfader-section" aria-live="polite" aria-label="Crossfader Ableton">
-      <div class="crossfader-label">Crossfader Ableton</div>
-      <div class="crossfader-position" id="position">—</div>
-      <div class="slider-panel" aria-label="Réglage progressif A/B">
-        <input id="xfader" type="range" min="-1" max="1" step="0.01" value="0" aria-valuemin="-1" aria-valuemax="1" aria-valuenow="0" aria-label="Crossfader slider">
-        <div class="row"><span>A</span><span>Centre</span><span>B</span></div>
-      </div>
-    </section>
 
     <section class="buttons-dock" aria-label="Commandes A/B Ableton">
       <div class="buttons-row xfade-buttons">
@@ -1609,7 +1599,6 @@
     const abSceneConfirmEl = document.getElementById('abSceneConfirm');
     const abPauseResumeEl = document.getElementById('abPauseResume');
     const positionEl = document.getElementById('position');
-    const ltcTimecodeEl = document.getElementById('ltcTimecode');
     const buttons = [...document.querySelectorAll('button[data-target]')];
     const slider = document.getElementById('xfader');
     let busy = false;
@@ -1977,20 +1966,6 @@
         }
       }
 
-      const rawLtcValue = pickFirstString(
-        state && state.ltc_timecode,
-        state && state.timecode,
-        state && state.ltc,
-        state && state.smpte,
-        state && state.arrangement_timecode
-      );
-      const ltcValue = /^\d{1,2}:\d{2}:\d{2}:\d{2}$/.test(rawLtcValue)
-        ? rawLtcValue
-        : '';
-      if (ltcTimecodeEl) {
-        ltcTimecodeEl.textContent = ltcValue || '--:--:--:--';
-        ltcTimecodeEl.dataset.live = ltcValue ? '1' : '0';
-      }
       const value = Number(state && typeof state.crossfader !== 'undefined' ? state.crossfader : slider.value);
       if (!sliderDragging) {
         positionEl.textContent = labelForValue(value, state && state.crossfader_label);
@@ -2239,7 +2214,6 @@
       }
     });
 
-    update();
     window.addEventListener('DOMContentLoaded', () => {
       window.CLRemoteEnergy.startPolling(
         update,

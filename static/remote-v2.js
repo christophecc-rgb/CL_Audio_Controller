@@ -37,7 +37,7 @@
       };
 
       const controller = {
-        wake() { schedule(document.hidden ? hiddenMs : 40); },
+        wake() { schedule(document.hidden ? hiddenMs : 0); },
         stop() {
           stopped = true;
           clearTimeout(timer);
@@ -45,10 +45,49 @@
         }
       };
       controllers.add(controller);
-      schedule();
+      schedule(0);
       return controller;
     }
   };
+
+  const LTC_PLACEHOLDER = '--:--:--:--';
+  const LTC_PATTERN = /^\d{2}:\d{2}:\d{2}:\d{2}$/;
+
+  window.CLRemoteLTC = {
+    render(element, state) {
+      if (!element) return;
+      const connected = Boolean(state && state.ltc_connected === true);
+      const value = state && typeof state.ltc_timecode === 'string'
+        ? state.ltc_timecode.trim()
+        : '';
+      const active = connected && LTC_PATTERN.test(value);
+      element.textContent = active ? value : LTC_PLACEHOLDER;
+      const display = element.closest('.ltc-display');
+      if (display) {
+        display.classList.toggle('ltc-display--connected', active);
+        display.classList.toggle('ltc-display--disconnected', !active);
+      }
+    }
+  };
+
+  const arrangementWarning = 'Attention : vous passez en mode Arrangement. Cette action peut modifier la lecture en cours. Continuer ?';
+  document.querySelectorAll('[data-arrangement-link]').forEach(link => {
+    link.addEventListener('click', async event => {
+      event.preventDefault();
+      if (!window.confirm(arrangementWarning)) return;
+      try {
+        const response = await fetch('/action', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'back_to_arrangement' })
+        });
+        if (!response.ok) throw new Error('Activation Arrangement refusée');
+        window.location.assign(link.href);
+      } catch (_) {
+        window.alert('Impossible d’activer le mode Arrangement.');
+      }
+    });
+  });
 
   const syncEnergyState = () => {
     document.body.classList.toggle('v2-energy-saver', document.hidden);

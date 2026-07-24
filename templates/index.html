@@ -359,16 +359,133 @@
     }
 
     @media (orientation: portrait) and (max-width: 430px) {
+      body {
+        padding: calc(env(safe-area-inset-top) + 3px) 6px calc(env(safe-area-inset-bottom) + 4px);
+      }
+
       .wrap {
         justify-content: flex-start;
+        min-height: calc(100dvh - 7px);
+        gap: 4px;
+      }
+
+      .status {
+        min-height: 11px;
+        font-size: 9px;
+        line-height: 1.1;
+      }
+
+      .topnav {
+        gap: 2px;
+      }
+
+      .topnav a {
+        min-height: 22px;
+        padding: 3px 2px;
+        border-radius: 6px;
+        font-size: 9px;
       }
 
       .scene-cards {
         flex: 0 0 auto;
+        gap: 4px;
+      }
+
+      .card {
+        min-height: 0;
+        padding: 8px 10px;
+        border-width: 1px;
+        border-radius: 12px;
+      }
+
+      .selected-card {
+        border-width: 2px !important;
+      }
+
+      .label {
+        margin-bottom: 3px;
+        font-size: 10px;
+        line-height: 1.05;
+      }
+
+      .title {
+        font-size: clamp(24px, 7vw, 32px);
+        line-height: 1;
+      }
+
+      .selected-title {
+        font-size: clamp(22px, 6.5vw, 30px);
+        line-height: 1;
+      }
+
+      .scene-countdown {
+        margin-top: 3px;
+        font-size: clamp(14px, 4vw, 18px);
+      }
+
+      .selected-duration {
+        margin-top: 2px;
+        font-size: 10px;
+      }
+
+      .ltc-display {
+        padding: 4px 8px;
+        border-radius: 8px;
+      }
+
+      .ltc-display__label {
+        margin-bottom: 1px;
+        font-size: 8px;
+      }
+
+      .ltc-display__value {
+        font-size: clamp(22px, 7vw, 30px);
+        line-height: 1;
       }
 
       .grid {
         flex: 0 0 auto;
+        gap: 4px;
+      }
+
+      button {
+        min-height: 42px;
+        border-radius: 10px;
+        font-size: 14px;
+      }
+
+      .go-button {
+        order: -1;
+        min-height: 62px;
+        border-radius: 14px;
+        font-size: 30px;
+        gap: 7px;
+      }
+
+      .go-button .go-main {
+        font-size: 34px;
+      }
+
+      .goto-panel {
+        gap: 4px;
+        padding: 4px;
+        border-radius: 10px;
+      }
+
+      .goto-input,
+      .goto-button {
+        min-height: 40px;
+        border-radius: 9px;
+      }
+
+      .goto-input {
+        font-size: 13px;
+        padding: 0 6px;
+      }
+
+      .goto-button {
+        padding: 0 8px;
+        font-size: 10px;
       }
 
       .small {
@@ -479,7 +596,7 @@
     <nav class="topnav">
       <a href="/" class="active">Session</a>
       <a href="/ab">A/B</a>
-      <a href="/arrangement">Arrangement</a>
+      <a href="/arrangement" data-arrangement-link>Arrangement</a>
     </nav>
 
     <div class="scene-cards">
@@ -495,6 +612,11 @@
         <div class="selected-duration" id="selectedDuration"></div>
       </section>
     </div>
+
+    <section class="ltc-display ltc-display--disconnected" aria-live="polite" aria-label="Retour LTC timecode">
+      <div class="ltc-display__label">LTC Timecode</div>
+      <output class="ltc-display__value" id="ltcTimecode">--:--:--:--</output>
+    </section>
 
     <section class="grid" aria-label="Commandes Ableton">
       <button class="prev-button" data-action="prev">◀ PREV</button>
@@ -526,6 +648,7 @@
     const gotoInput = document.getElementById('gotoScene');
     const gotoButton = document.getElementById('gotoButton');
     const pauseButton = document.getElementById('pauseButton');
+    const ltcTimecodeEl = document.getElementById('ltcTimecode');
 
     let actionBusy = false;
     let lastKnownState = null;
@@ -847,6 +970,7 @@
     function applyStatus(rawState) {
       const state = rawState && rawState.state ? rawState.state : rawState;
       if (!acceptStateGeneration(state)) return;
+      if (window.CLRemoteLTC) window.CLRemoteLTC.render(ltcTimecodeEl, state);
       fillSceneSelect(state);
 
       const connected = Boolean(state && state.connected);
@@ -1054,15 +1178,13 @@
           : '○ Action impossible — vérifie le serveur';
         setActionMessage(msg, true);
       } finally {
-        setTimeout(() => {
-          buttons.forEach(button => { button.disabled = false; });
-          if (pauseButton && sessionStoppedByUser && pauseButton.textContent.trim().toUpperCase() === 'PLAY') {
-            pauseButton.disabled = true;
-            pauseButton.title = 'Après STOP, relance avec GO.';
-          }
-          gotoButton.disabled = false;
-          actionBusy = false;
-        }, 250);
+        buttons.forEach(button => { button.disabled = false; });
+        if (pauseButton && sessionStoppedByUser && pauseButton.textContent.trim().toUpperCase() === 'PLAY') {
+          pauseButton.disabled = true;
+          pauseButton.title = 'Après STOP, relance avec GO.';
+        }
+        gotoButton.disabled = false;
+        actionBusy = false;
       }
     }
 
@@ -1242,12 +1364,11 @@ gotoInput.addEventListener('blur', () => {
       }
     });
 
-    update();
     window.addEventListener('DOMContentLoaded', () => {
       window.CLRemoteEnergy.startPolling(
         update,
         () => Boolean(lastKnownState && isAbletonPlaying(lastKnownState)),
-        { activeMs: 1000, idleMs: 2500, hiddenMs: 15000 }
+        { activeMs: 40, idleMs: 2500, hiddenMs: 15000, minActiveMs: 40 }
       );
       window.CLRemoteEnergy.startPolling(
         updateCountdownDisplay,
