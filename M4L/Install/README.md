@@ -14,6 +14,10 @@ transportable sur un autre Mac.
 - `LTC Display v2.0 Remote Config.amxd` : affichage et émission du LTC. Le port
   attendu par défaut est 63123 ; en mode distant, renseigner l'adresse du Mac
   exécutant CL Audio Controller.
+- `ParadisLatin_AutoScene.js` et `paradis_latin_logo.jpg` : dépendances des
+  deux variantes AutoScene. Elles doivent rester dans le même dossier que les
+  `.amxd`.
+- `cache.js` : dépendance JavaScript conservée avec le périphérique LTC.
 
 ## Installation
 
@@ -25,3 +29,5 @@ transportable sur un autre Mac.
 
 Ne jamais remplacer automatiquement un périphérique déjà utilisé dans un Live
 Set de production. Tester d'abord une nouvelle instance dans une copie du Set.
+
+Les sources éditables correspondantes sont conservées dans `M4L/Devices/`.

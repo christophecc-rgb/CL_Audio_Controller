@@ -2,6 +2,17 @@
 
 Toutes les évolutions notables de CL Audio Controller seront documentées dans ce fichier.
 
+## [Non publié]
+
+### Sources Max for Live
+
+- Organisation de chaque périphérique dans `M4L/Devices/` avec sa source
+  `.maxpat`, son `.amxd` installable et ses dépendances JavaScript ou graphiques.
+- Suppression des chemins personnels dans les deux variantes AutoScene et ajout
+  de leurs dépendances au kit transportable.
+- Ajout de contrôles automatiques garantissant la présence et la portabilité des
+  sources Max for Live distribuées.
+
 ## [2.1.0] — 2026-07-24
 
 ### Corrigé

@@ -79,13 +79,23 @@ M4L/Install/
 ├── XFADER OSC BRIDGE v8.amxd
 ├── Paradis Latin AutoScene.amxd
 ├── Paradis Latin AutoScene - Live 10.amxd
-└── LTC Display v2.0 Remote Config.amxd
+├── LTC Display v2.0 Remote Config.amxd
+├── ParadisLatin_AutoScene.js
+├── paradis_latin_logo.jpg
+└── cache.js
 ```
 
 Le X-Fader doit écouter en UDP sur le port 9001 et être placé sur la piste Master.
 La variante AutoScene à charger dépend de la version du Live Set : utiliser la
 version standard pour les versions actuelles de Live et la variante `Live 10`
 pour les projets qui l'exigent. Le LTC Remote Config écoute sur le port 63123.
+Les fichiers auxiliaires doivent rester dans le même dossier que les `.amxd`.
+
+Les sources éditables sont organisées dans `M4L/Devices/`. Chaque périphérique
+doit y conserver son `.maxpat`, son `.amxd` validé et ses éventuels scripts
+JavaScript ou ressources. Le fichier `framerate.js` référencé par la source LTC
+n'a pas encore été retrouvé ; cette limite de reconstruction est documentée
+dans `M4L/Devices/README.md` sans modifier l'AMXD LTC fonctionnel.
 
 Chaque distribution contient également un dossier autonome
 `Max for Live à installer` et une archive ZIP dédiée. Les empreintes de référence
@@ -107,7 +117,8 @@ Le serveur principal écoute sur `0.0.0.0`. Utiliser l'application uniquement su
 ### LTC Local et Distant
 
 Le LTC utilise un flux UDP distinct d'AbletonOSC. La source et le périphérique de
-référence sont `M4L/LTC Display v2.0 Remote Config.maxpat` et son `.amxd` associé ;
+référence sont conservés dans
+`M4L/Devices/LTC Display v2.0 Remote Config/` ;
 son calcul et son message historique `tc,sHH:MM:SS:FF` sont inchangés.
 
 - En mode **Local**, conserver la destination `127.0.0.1` et le port `63123`.
