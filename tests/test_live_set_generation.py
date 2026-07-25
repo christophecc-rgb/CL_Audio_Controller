@@ -1025,6 +1025,67 @@ class LiveSetGenerationTests(unittest.TestCase):
             self.assertIn("keyboardShortcutBlockReason(event)", source)
             self.assertIn("[KEYBOARD]", source)
 
+    def test_session_arrow_keys_share_previous_and_next_handlers(self):
+        source = (PROJECT_ROOT / "templates/index.html").read_text(encoding="utf-8")
+
+        self.assertIn("event.key === 'ArrowLeft' || event.key === 'ArrowRight'", source)
+        self.assertIn("event.key === 'ArrowLeft' ? 'prev' : 'next'", source)
+        self.assertIn("act(action);", source)
+        self.assertIn("keyboardShortcutBlockReason(event)", source)
+
+    def test_session_countdown_uses_published_remaining_time(self):
+        source = (PROJECT_ROOT / "templates/index.html").read_text(encoding="utf-8")
+
+        self.assertIn(
+            '<div class="scene-countdown" id="currentTimer">Temps restant · --:--</div>',
+            source,
+        )
+        self.assertIn("currentTimerEl.textContent = 'Temps restant · --:--';", source)
+        self.assertIn("Temps restant · ${formatted}", source)
+        self.assertIn("state && state.remaining_seconds", source)
+        self.assertIn("Math.min(info.durationSeconds, publishedRemaining)", source)
+
+    def test_ab_displays_published_remaining_time_in_current_title(self):
+        source = (PROJECT_ROOT / "templates/ab.html").read_text(encoding="utf-8")
+
+        current_position = source.index('id="abCurrentTitle"')
+        remaining_position = source.index('id="abRemaining"')
+        next_position = source.index('id="nextTitleCard"')
+        self.assertLess(current_position, remaining_position)
+        self.assertLess(remaining_position, next_position)
+        self.assertIn("state && state.remaining_seconds", source)
+        self.assertIn("Temps restant · ${formatRemainingSeconds(", source)
+        self.assertIn("Temps restant · --:--", source)
+
+    def test_ab_arrow_keys_keep_using_the_existing_scene_preview_handler(self):
+        source = (PROJECT_ROOT / "templates/ab.html").read_text(encoding="utf-8")
+
+        self.assertIn("if (event.key === 'ArrowLeft')", source)
+        self.assertIn("movePreparedScene(-1);", source)
+        self.assertIn("if (event.key === 'ArrowRight')", source)
+        self.assertIn("movePreparedScene(1);", source)
+        self.assertIn("previewSceneSelect(true);", source)
+
+    def test_scene_selection_publishes_cached_title_immediately(self):
+        with self.app.lock:
+            self.app.state["scenes"] = {
+                7: "Ancienne en cours",
+                8: "Final ; 128 ; 03:45",
+            }
+
+        with (
+            mock.patch.object(self.app, "send"),
+            mock.patch.object(self.app.threading, "Thread") as thread_class,
+        ):
+            self.app.select_scene(8)
+
+        with self.app.lock:
+            self.assertEqual(
+                self.app.state["selected_scene_name"],
+                "Final ; 128 ; 03:45",
+            )
+        thread_class.assert_called_once()
+
     def test_space_shortcut_prevents_page_scrolling(self):
         for relative_path in (
             "templates/index.html",

@@ -189,6 +189,16 @@
       min-height: 1em;
       user-select:text;
     }
+    .current-remaining {
+      margin-top: 3px;
+      color: var(--session);
+      font-size: clamp(11px, 3vw, 14px);
+      font-weight: 750;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.03em;
+      opacity: 0.82;
+      user-select: none;
+    }
     .counter {
       font-size: 14px;
       font-weight: 700;
@@ -1544,6 +1554,7 @@
         <div class="title-box title-box-current" id="currentTitleCard">
           <div class="now-label">TITRE EN COURS</div>
           <div class="now-title" id="abCurrentTitle">—</div>
+          <div class="current-remaining" id="abRemaining">Temps restant · --:--</div>
         </div>
         <div class="arrow" aria-hidden="true">↓</div>
         <div class="title-box title-box-next" id="nextTitleCard">
@@ -1592,6 +1603,7 @@
     const statusEl = document.getElementById('status');
     const abNowCardEl = document.getElementById('abNowCard');
     const abCurrentTitleEl = document.getElementById('abCurrentTitle');
+    const abRemainingEl = document.getElementById('abRemaining');
     const abNextTitleEl = document.getElementById('abNextTitle');
     const nextTitleCardEl = document.getElementById('nextTitleCard');
     const abCounterEl = document.getElementById('abCounter');
@@ -1617,6 +1629,7 @@
       lastSceneSelectSignature = '';
 
       abCurrentTitleEl.textContent = '—';
+      if (abRemainingEl) abRemainingEl.textContent = 'Temps restant · --:--';
       abNextTitleEl.textContent = '—';
       if (abCounterEl) abCounterEl.textContent = '';
       if (abSceneSelectEl) {
@@ -1749,6 +1762,15 @@
         nextTitleCardEl.classList.remove('state-playing', 'is-imminent', 'state-paused');
         nextTitleCardEl.dataset.nextState = 'ready';
       }
+    }
+
+    function formatRemainingSeconds(value) {
+      const seconds = Number(value);
+      if (!Number.isFinite(seconds) || seconds < 0) return '--:--';
+      const rounded = Math.max(0, Math.ceil(seconds));
+      const minutes = Math.floor(rounded / 60);
+      const remainder = rounded % 60;
+      return `${minutes}:${String(remainder).padStart(2, '0')}`;
     }
 
     function advanceSceneSelectAfterGo(sceneNumber) {
@@ -1918,6 +1940,11 @@
       }
 
       if (abCurrentTitleEl) abCurrentTitleEl.textContent = currentTitle;
+      if (abRemainingEl) {
+        abRemainingEl.textContent = `Temps restant · ${formatRemainingSeconds(
+          state && state.remaining_seconds
+        )}`;
+      }
       if (abNextTitleEl) abNextTitleEl.textContent = nextTitle;
       if (abNextTitleEl && nextTitleCardEl) {
         const transportIsPlaying = Boolean(state && state.is_playing) && !Boolean(state && state.is_paused);

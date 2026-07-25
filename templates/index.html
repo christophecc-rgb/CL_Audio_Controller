@@ -603,7 +603,7 @@
       <section class="card current-card" id="currentCard" aria-live="polite">
         <div class="label">En cours</div>
         <div class="title" id="current">—</div>
-        <div class="scene-countdown" id="currentTimer"></div>
+        <div class="scene-countdown" id="currentTimer">Temps restant · --:--</div>
       </section>
 
       <section class="card selected-card" id="selectedCard" aria-live="polite">
@@ -683,7 +683,7 @@
 
       currentEl.textContent = '—';
       selectedEl.textContent = '—';
-      if (currentTimerEl) currentTimerEl.textContent = '';
+      if (currentTimerEl) currentTimerEl.textContent = 'Temps restant · --:--';
       if (selectedDurationEl) selectedDurationEl.textContent = '';
       if (gotoInput && gotoInput.tagName === 'SELECT') {
         gotoInput.innerHTML = '<option value="">Choisir une scène...</option>';
@@ -790,7 +790,7 @@
     function updateCountdownDisplay() {
       if (!currentTimerEl) return;
       if (!countdownDurationSeconds || countdownMode === 'stopped') {
-        currentTimerEl.textContent = '';
+        currentTimerEl.textContent = 'Temps restant · --:--';
         return;
       }
 
@@ -799,12 +799,20 @@
         remaining = countdownDurationSeconds - ((Date.now() - countdownStartedAt) / 1000);
       }
 
-      currentTimerEl.textContent = formatRemaining(remaining);
+      const formatted = formatRemaining(remaining);
+      currentTimerEl.textContent = formatted ? `Temps restant · ${formatted}` : '';
     }
 
-    function setCountdownForScene(rawName, mode) {
+    function setCountdownForScene(rawName, mode, serverRemaining = null) {
       const info = parseSceneInfo(rawName);
       const hasDuration = Number.isFinite(info.durationSeconds) && info.durationSeconds > 0;
+      const publishedRemaining = Number(serverRemaining);
+      const hasPublishedRemaining = (
+        serverRemaining !== null &&
+        serverRemaining !== '' &&
+        Number.isFinite(publishedRemaining) &&
+        publishedRemaining >= 0
+      );
 
       if (!hasDuration) {
         countdownDurationSeconds = null;
@@ -828,6 +836,13 @@
         countdownDurationSeconds = info.durationSeconds;
         countdownPausedRemaining = info.durationSeconds;
         countdownStartedAt = Date.now();
+      }
+
+      if (hasPublishedRemaining) {
+        countdownPausedRemaining = Math.min(info.durationSeconds, publishedRemaining);
+        countdownStartedAt = mode === 'playing'
+          ? Date.now() - ((info.durationSeconds - countdownPausedRemaining) * 1000)
+          : null;
       }
 
       if (mode === 'playing') {
@@ -1006,7 +1021,11 @@
       }
 
       if (sessionMode && current !== '—') {
-        setCountdownForScene(currentRaw, playing ? 'playing' : paused ? 'paused' : 'stopped');
+        setCountdownForScene(
+          currentRaw,
+          playing ? 'playing' : paused ? 'paused' : 'stopped',
+          state && state.remaining_seconds
+        );
       } else {
         setCountdownForScene('', 'stopped');
       }
@@ -1353,6 +1372,18 @@ gotoInput.addEventListener('blur', () => {
         event.stopPropagation();
         keyboardDiagnosticLog('invoke-go', { diagnosticCase: 'CASE_3_HANDLER_CALLED', timestamp: Date.now() });
         act('go');
+        return;
+      }
+
+      if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+        event.preventDefault();
+        event.stopPropagation();
+        const action = event.key === 'ArrowLeft' ? 'prev' : 'next';
+        keyboardDiagnosticLog(`invoke-${action}`, {
+          diagnosticCase: 'CASE_3_HANDLER_CALLED',
+          timestamp: Date.now()
+        });
+        act(action);
         return;
       }
 

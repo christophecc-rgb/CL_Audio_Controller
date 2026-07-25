@@ -2301,9 +2301,13 @@ def select_scene(scene_index: int, source: str = "Télécommande"):
     with scene_transaction_lock:
         send("/live/view/set/selected_scene", scene_index)
         with lock:
+            cached_name = str(state.get("scenes", {}).get(scene_index, "") or "").strip()
             state["selected_scene"] = scene_index
             state["next_scene"] = scene_index
-            state["selected_scene_name"] = f"Scène {scene_index + 1}"
+            # Le bootstrap fournit déjà la table complète des scènes. Publier
+            # immédiatement son titre évite d'afficher « Scène N » pendant
+            # l'aller-retour OSC de confirmation.
+            state["selected_scene_name"] = cached_name or f"Scène {scene_index + 1}"
             state["message"] = f"Scène {scene_index + 1} sélectionnée"
             state["sync_source"] = source
     threading.Thread(target=refresh_scene_name_async, args=(scene_index,), daemon=True).start()
