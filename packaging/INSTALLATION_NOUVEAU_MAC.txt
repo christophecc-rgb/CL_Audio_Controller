@@ -1,0 +1,94 @@
+CL AUDIO CONTROLLER 2.2.0 — INSTALLATION SUR UN NOUVEAU MAC
+================================================================
+
+CE KIT CONTIENT
+
+1. CL Audio Controller.app
+   L'application complète. Python et les bibliothèques nécessaires sont déjà
+   inclus : aucune installation Python ou commande pip n'est nécessaire.
+
+2. Max for Live à installer
+   - XFADER OSC BRIDGE v8
+   - LTC Display v2.0 Remote Config
+   - Paradis Latin AutoScene
+   - Paradis Latin AutoScene - Live 10
+
+3. AbletonOSC CL — Live 11 et Live 12
+   Version validée avec les routes utilisées par CL Audio Controller.
+
+4. Installer_CL_Audio_Controller.command
+   Installe les trois éléments ci-dessus dans le compte utilisateur.
+
+
+INSTALLATION AUTOMATIQUE RECOMMANDÉE
+
+1. Fermer complètement Ableton Live.
+2. Double-cliquer sur Installer_CL_Audio_Controller.command.
+3. Si macOS refuse le premier lancement :
+   clic droit sur le fichier > Ouvrir > Ouvrir.
+4. Relancer Ableton Live.
+5. Ouvrir Réglages > Link, Tempo et MIDI.
+6. Choisir AbletonOSC comme surface de contrôle.
+7. Ouvrir CL Audio Controller depuis le dossier Applications de votre compte.
+8. Conserver le profil Local pour une installation sur un seul Mac.
+
+
+EMPLACEMENTS UTILISÉS
+
+Application :
+~/Applications/CL Audio Controller.app
+
+AbletonOSC :
+~/Music/Ableton/User Library/Remote Scripts/AbletonOSC
+
+Max for Live :
+~/Music/Ableton/User Library/Presets/Audio Effects/Max Audio Effect/
+CL Audio Controller
+
+L'installation dans le compte utilisateur évite de demander un mot de passe
+administrateur. Une ancienne installation n'est jamais supprimée : elle est
+renommée avec la date et l'heure avant remplacement.
+
+
+COMPATIBILITÉ
+
+- macOS : Apple Silicon et Intel (application universal2)
+- Ableton Live 11 et 12 : AbletonOSC CL fourni et validé
+- Ableton Live 10 : ne pas installer l'AbletonOSC fourni sans validation ;
+  seul le périphérique « Paradis Latin AutoScene - Live 10 » est identifié
+  explicitement pour Live 10.
+- Max for Live est nécessaire pour les périphériques LTC et crossfader.
+
+
+RÉSEAU
+
+Mode Local :
+- AbletonOSC reçoit sur UDP 11000
+- CL Audio Controller reçoit les réponses sur UDP 11001
+- LTC arrive sur UDP 63123
+- le pont crossfader écoute sur UDP 9001
+
+Mode Distant :
+- renseigner l'adresse du Mac Ableton dans le panneau de contrôle ;
+- autoriser les connexions entrantes dans le pare-feu macOS si demandé ;
+- utiliser de préférence un réseau Ethernet dédié.
+
+
+VÉRIFICATION
+
+Le fichier SHA256SUMS.txt permet de contrôler l'intégrité des archives.
+Double-cliquer sur Verifier_SHA256.command depuis le dossier du kit.
+
+
+SÉCURITÉ MACOS
+
+Cette version n'est pas encore notarisée par Apple. Au premier lancement,
+utiliser clic droit > Ouvrir si Gatekeeper affiche un avertissement.
+Ne désactivez pas globalement les protections de macOS.
+
+
+CL ARRANGEMENT BUILDER LIVE
+
+CL Arrangement Builder Live est une application indépendante. Elle n'est pas
+nécessaire pour faire fonctionner CL Audio Controller et possède son propre
+DMG/ZIP. Elle pourra être ajoutée à un kit « CL Production Suite » distinct.

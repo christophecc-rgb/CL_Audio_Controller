@@ -11,7 +11,6 @@ a = Analysis(
         ('templates', 'templates'),
         ('static', 'static'),
         ('assets', 'assets'),
-        ('M4L', 'M4L'),
         ('arrangement_markers.json', '.'),
     ],
     hiddenimports=['osc_transport', 'ltc_receiver', 'pythonosc.dispatcher', 'pythonosc.osc_server', 'pythonosc.udp_client'],
@@ -58,8 +57,8 @@ app = BUNDLE(
     bundle_identifier='com.claudio.controller',
     info_plist={
         'CFBundleDisplayName': 'CL Audio Controller',
-        'CFBundleShortVersionString': '2.1.0',
-        'CFBundleVersion': '5',
+        'CFBundleShortVersionString': '2.2.0',
+        'CFBundleVersion': '6',
         'NSHighResolutionCapable': True,
     },
 )

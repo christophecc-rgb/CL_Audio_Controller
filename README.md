@@ -2,7 +2,7 @@
 
 CL Audio Controller est une application macOS de pilotage d'Ableton Live. Elle réunit une interface native, une télécommande Web accessible sur le réseau local, des échanges OSC avec AbletonOSC, un suivi de l'arrangement et un pont Max for Live pour le crossfader.
 
-La version de référence est **2.1.0** (build 5), identifiée par le bundle macOS `com.claudio.controller`.
+La version de référence est **2.2.0** (build 6), identifiée par le bundle macOS `com.claudio.controller`.
 
 ## État du projet
 
@@ -58,9 +58,11 @@ AbletonOSC doit être installé sous :
 
 Après installation, redémarrer Ableton Live et sélectionner AbletonOSC comme surface de contrôle.
 
-L'installation active inspectée le 17 juillet 2026 est une copie de la branche `master` installée localement le 9 juillet 2026. Elle ne contient ni dossier `.git`, ni numéro de version, ni identifiant de commit vérifiable. **Son commit exact est donc inconnu et ne doit pas être déduit de sa date.** Avant toute nouvelle installation, choisir et documenter explicitement un commit ou une version d'AbletonOSC. Le script fourni dans `INSTALLER_AbletonOSC/` télécharge actuellement la branche mobile `master` et peut remplacer l'installation existante ; il ne doit pas être exécuté sans contrôle préalable.
-
-CL Audio Controller utilise également deux lectures `Song` non encore publiées par la version AbletonOSC inspectée : `/live/song/get/file_path` et `/live/song/get/name`. L'extension déclarative correspondante est conservée dans `INSTALLER_AbletonOSC/song-file-path-readonly.patch` en attendant son éventuelle intégration en amont.
+La distribution 2.2.0 embarque hors ligne la version CL d'AbletonOSC issue du
+dépôt voisin, identifiée par son commit et son tag dans `VERSIONS.txt`. Cette
+version fournit les lectures nécessaires `/live/song/get/file_path`,
+`/live/song/get/name` et `/live/song/get/selected_scene`. Le kit ne télécharge
+donc jamais une branche mobile au moment de l'installation.
 
 ### Cohérence lors d'un changement de Live Set
 
@@ -145,13 +147,37 @@ La configuration de référence est `CL Audio Controller.spec`. Elle doit être 
 
 Pour le premier build de validation, ne pas écraser les dossiers `build/` et `dist/` de référence. Utiliser une copie de validation ou des chemins de sortie distincts. Comparer ensuite le nouveau bundle à `dist/CL Audio Controller.app` et réaliser les tests fonctionnels décrits dans `BUILD_ENVIRONMENT.md`.
 
+### Distribution installable
+
+Le script reproductible suivant construit dans un espace temporaire :
+
+- un DMG complet ;
+- un ZIP complet transportable ;
+- un ZIP Max for Live séparé ;
+- les empreintes SHA-256 et les informations exactes des commits.
+
+```bash
+./scripts/build_release.sh 2.2.0
+```
+
+Le DMG et le ZIP complet contiennent l'application autonome, AbletonOSC CL,
+les périphériques Max for Live, un installateur sans privilèges administrateur
+et le guide `LISEZ_MOI_INSTALLATION.txt`. Aucun environnement Python n'est
+nécessaire sur le Mac de destination.
+
+Les sources Max for Live restent intégralement versionnées dans `M4L/Devices/`,
+mais ne sont plus dupliquées dans le bundle `.app`. Seuls les périphériques
+installables sont placés à côté de l'application dans le kit.
+
 ## Limitations connues
 
 - Une reconstruction fonctionnelle ne garantit pas un SHA-256 identique au bundle historique.
 - La version exacte de macOS et des outils Xcode du build original n'est pas prouvée.
 - Le bundle de référence est signé ad hoc et n'est pas notarisé.
-- AbletonOSC et le device `.amxd` sont des dépendances externes.
-- Au démarrage, `app.py` tente de libérer le port 5050 et peut arrêter un serveur existant sur ce port.
+- AbletonOSC et les périphériques `.amxd` restent des composants externes,
+  fournis séparément dans le kit d'installation.
+- Une instance inconnue utilisant déjà le port 5050 n'est jamais arrêtée
+  automatiquement ; le lanceur refuse de la réutiliser.
 - Ne pas lancer simultanément le bundle de validation et l'application de référence.
 - La compatibilité exacte avec chaque version d'Ableton Live doit être validée en conditions réelles.
 

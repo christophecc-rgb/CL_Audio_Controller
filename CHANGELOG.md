@@ -4,6 +4,29 @@ Toutes les évolutions notables de CL Audio Controller seront documentées dans 
 
 ## [Non publié]
 
+## [2.2.0] — 2026-07-25
+
+### Télécommandes
+
+- Détection plus rapide des scènes lancées directement depuis Ableton Live.
+- Publication du temps restant du titre en cours et de la durée réelle de la
+  prochaine scène depuis les clips Ableton.
+- Navigation Preview/Next au clavier et fiabilisation des commandes
+  Play/Pause et GO.
+- Refonte compacte de Session et A/B sur iPhone en portrait.
+- Ajout de dispositions paysage dédiées sans défilement pour Session et A/B.
+- Nouveau crossfader visuel de type console et animations professionnelles
+  cohérentes pour le titre en cours.
+
+### Distribution
+
+- Kit autonome comprenant l'application, AbletonOSC CL, les périphériques Max
+  for Live, la documentation et un installateur utilisateur.
+- Suppression de la duplication des 52 Mo de sources Max dans le bundle
+  applicatif ; les sources restent disponibles dans le dépôt Git.
+- Ajout d'une vérification SHA-256 du contenu et d'un guide d'installation sur
+  un nouveau Mac.
+
 ### Sources Max for Live
 
 - Organisation de chaque périphérique dans `M4L/Devices/` avec sa source
