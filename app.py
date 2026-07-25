@@ -88,7 +88,7 @@ mido = None
 # Aucun scan de durée/temps de clip n’est effectué.
 MAX_TRACKS_TO_SCAN = 32
 SCAN_PLAYING_SCENE_FROM_TRACKS = True
-PLAYING_SCAN_SECONDS = 2.0
+PLAYING_SCAN_SECONDS = 0.5
 TRACK_COUNT_CACHE_SECONDS = 10.0
 CHECK_MUTE_DURING_PLAYING_SCAN = False
 
@@ -376,6 +376,9 @@ state: Dict[str, Any] = {
     "has_show_started": False,
     "selected_scene": 0,
     "selected_scene_name": "—",
+    "selected_scene_duration_seconds": None,
+    "selected_scene_duration_index": None,
+    "selected_scene_duration_is_clip": False,
     "scenes": {},
     "is_paused": False,
     "play_mode": "stopped",
@@ -554,6 +557,7 @@ last_playing_scan = 0.0
 _track_count_cache: Tuple[float, int] = (0.0, MAX_TRACKS_TO_SCAN)
 _cue_points_cache: Tuple[float, list, str] = (0.0, [], "JSON")
 _bootstrap_generation: Optional[int] = None
+_selected_duration_request: Optional[Tuple[int, int]] = None
 _NOT_RECEIVED = object()
 
 
@@ -618,6 +622,9 @@ def state_snapshot_locked() -> Dict[str, Any]:
             "current_scene": None,
             "next_scene": None,
             "selected_scene_name": "—",
+            "selected_scene_duration_seconds": None,
+            "selected_scene_duration_index": None,
+            "selected_scene_duration_is_clip": False,
             "playing_scene": -1,
             "playing_scene_name": "—",
             "last_fired_scene": -1,
@@ -639,7 +646,7 @@ def generation_log(event: str, **details: Any) -> None:
 
 def reset_live_set_state_locked(set_id: Optional[str], reason: str) -> int:
     """Ouvre atomiquement une génération et efface tout état propre au Set précédent."""
-    global _track_count_cache, _cue_points_cache, _bootstrap_generation
+    global _track_count_cache, _cue_points_cache, _bootstrap_generation, _selected_duration_request
 
     previous_generation = int(state.get("set_generation", 0))
     previous_set_id = state.get("current_set_id")
@@ -654,6 +661,9 @@ def reset_live_set_state_locked(set_id: Optional[str], reason: str) -> int:
         "has_show_started": False,
         "selected_scene": 0,
         "selected_scene_name": "—",
+        "selected_scene_duration_seconds": None,
+        "selected_scene_duration_index": None,
+        "selected_scene_duration_is_clip": False,
         "scenes": {},
         "play_mode": "stopped",
         "playing_scene": -1,
@@ -680,6 +690,7 @@ def reset_live_set_state_locked(set_id: Optional[str], reason: str) -> int:
     ableton_transport.cancel_pending()
     completed_go_requests.clear()
     _bootstrap_generation = None
+    _selected_duration_request = None
     _track_count_cache = (0.0, MAX_TRACKS_TO_SCAN)
     _cue_points_cache = (0.0, [], "JSON")
     generation_log(
@@ -1526,6 +1537,9 @@ def apply_live_set_bootstrap_locked(
         "selected_scene": int(selected_scene),
         "next_scene": int(selected_scene),
         "selected_scene_name": selected_name,
+        "selected_scene_duration_seconds": parse_scene_duration_seconds(selected_name),
+        "selected_scene_duration_index": int(selected_scene),
+        "selected_scene_duration_is_clip": False,
         "scenes": new_scenes,
         "current_scene": None,
         "playing_scene": -1,
@@ -1766,9 +1780,22 @@ def refresh_names_and_transport() -> bool:
             with lock:
                 if int(state.get("set_generation", 0)) != generation:
                     return
+                selection_changed = int(state.get("selected_scene", -1)) != selected
                 state["selected_scene"] = selected
                 state["next_scene"] = selected
+                if selection_changed:
+                    selected_name = str(state.get("scenes", {}).get(selected, "") or "")
+                    state["selected_scene_duration_seconds"] = parse_scene_duration_seconds(selected_name)
+                    state["selected_scene_duration_index"] = selected
+                    state["selected_scene_duration_is_clip"] = False
+                should_refresh_selected_duration = (
+                    selection_changed
+                    or int(state.get("selected_scene_duration_index", -1)) != selected
+                    or not bool(state.get("selected_scene_duration_is_clip", False))
+                )
             query("/live/scene/get/name", selected, expected_generation=generation)
+            if should_refresh_selected_duration:
+                schedule_selected_scene_duration_refresh(selected, generation)
 
         query("/live/song/get/is_playing", expected_generation=generation)
 
@@ -1861,8 +1888,9 @@ def scan_playing_scene_from_tracks():
     """
     Détection rapide de la scène en lecture, même si elle a été lancée depuis Ableton.
 
-    Pour rester réactif, on évite le test mute piste par piste par défaut :
-    /live/track/get/playing_slot_index suffit généralement à savoir quel slot joue.
+    Une lecture groupée couvre toutes les pistes en une seule réponse, y compris
+    les pistes situées après la limite historique de 32. Le balayage séquentiel
+    reste disponible uniquement comme repli de compatibilité.
     """
     with lock:
         generation = int(state.get("set_generation", 0))
@@ -1870,34 +1898,58 @@ def scan_playing_scene_from_tracks():
             return
         current = int(state.get("playing_scene", -1))
 
-    candidate_tracks = list(range(get_track_count(expected_generation=generation)))
-
     detected_slot = -1
-    for track_index in candidate_tracks:
-        if not generation_is_current(generation):
-            return
-        if CHECK_MUTE_DURING_PLAYING_SCAN and not is_track_enabled(
-            track_index,
-            expected_generation=generation,
-        ):
-            continue
-
-        res = query(
-            "/live/track/get/playing_slot_index",
-            track_index,
-            expected_generation=generation,
-        )
-        if res and len(res) >= 2:
+    grouped = query(
+        "/live/song/get/track_data",
+        0,
+        -1,
+        "track.playing_slot_index",
+        "track.name",
+        timeout=0.25,
+        expected_generation=generation,
+        apply_response=False,
+    )
+    if grouped:
+        slot_counts: Dict[int, int] = {}
+        grouped_values = list(grouped)
+        for offset in range(0, len(grouped_values) - 1, 2):
             try:
-                slot = int(res[1])
-            except Exception:
+                slot = int(grouped_values[offset])
+            except (TypeError, ValueError):
                 continue
             if slot >= 0:
-                detected_slot = slot
-                break
+                slot_counts[slot] = slot_counts.get(slot, 0) + 1
+        if slot_counts:
+            detected_slot = max(slot_counts, key=slot_counts.get)
+    else:
+        candidate_tracks = list(range(get_track_count(expected_generation=generation)))
+        for track_index in candidate_tracks:
+            if not generation_is_current(generation):
+                return
+            if CHECK_MUTE_DURING_PLAYING_SCAN and not is_track_enabled(
+                track_index,
+                expected_generation=generation,
+            ):
+                continue
+
+            res = query(
+                "/live/track/get/playing_slot_index",
+                track_index,
+                expected_generation=generation,
+            )
+            if res and len(res) >= 2:
+                try:
+                    slot = int(res[1])
+                except Exception:
+                    continue
+                if slot >= 0:
+                    detected_slot = slot
+                    break
 
     if detected_slot >= 0:
         should_query_name = False
+        should_resolve_clip_duration = False
+        detected_at = time.time()
         with lock:
             if int(state.get("set_generation", 0)) != generation:
                 return
@@ -1908,15 +1960,27 @@ def scan_playing_scene_from_tracks():
                 and bool(state.get("is_playing"))
                 and detected_slot != current
             ):
+                cached_name = str(
+                    state.get("scenes", {}).get(detected_slot, "") or ""
+                ).strip()
+                duration_seconds = parse_scene_duration_seconds(cached_name)
                 state["playing_scene"] = detected_slot
                 state["last_fired_scene"] = detected_slot
-                state["playing_scene_name"] = f"Scène {detected_slot + 1}"
-                state["last_fired_scene_name"] = f"Scène {detected_slot + 1}"
+                state["playing_scene_name"] = cached_name or f"Scène {detected_slot + 1}"
+                state["last_fired_scene_name"] = cached_name or f"Scène {detected_slot + 1}"
                 state["current_scene"] = detected_slot
                 state["has_show_started"] = True
                 state["play_mode"] = "session"
+                state["scene_duration_seconds"] = duration_seconds
+                state["remaining_seconds"] = duration_seconds
+                state["playback_deadline"] = (
+                    detected_at + duration_seconds
+                    if duration_seconds is not None
+                    else None
+                )
                 state["sync_source"] = "Ableton direct"
-                should_query_name = True
+                should_query_name = not bool(cached_name)
+                should_resolve_clip_duration = duration_seconds is None
         # Nom réel demandé hors verrou.
         if should_query_name:
             query(
@@ -1925,6 +1989,12 @@ def scan_playing_scene_from_tracks():
                 timeout=0.05,
                 expected_generation=generation,
             )
+        if should_resolve_clip_duration:
+            threading.Thread(
+                target=resolve_scene_clip_duration_async,
+                args=(detected_slot, generation, detected_at),
+                daemon=True,
+            ).start()
 
 
 def background_refresh():
@@ -2295,6 +2365,124 @@ def clamp_scene_number(value: Any) -> Optional[int]:
     return scene_number - 1
 
 
+def read_scene_clip_duration_seconds(
+    scene_index: int,
+    expected_generation: int,
+) -> Optional[float]:
+    """Lit la durée réelle d'une scène depuis ses clips Ableton.
+
+    Les pistes TABLEAU restent prioritaires. Si elles ne portent aucun clip
+    dans cette scène, le clip actif le plus long fournit la durée de repli.
+    Les pistes sont lues par petits groupes afin d'éviter un gros datagramme
+    OSC lorsque le Live Set contient beaucoup de scènes.
+    """
+    with lock:
+        scene_count = max(
+            len(state.get("scenes", {})),
+            int(scene_index) + 1,
+        )
+    track_names_response = query(
+        "/live/song/get/track_names",
+        timeout=0.30,
+        expected_generation=expected_generation,
+        apply_response=False,
+    )
+    if not track_names_response or scene_count <= 0:
+        return None
+
+    track_names = [str(name or "") for name in track_names_response]
+    all_durations = []
+    tableaux_durations = []
+    chunk_size = 6
+
+    for start in range(0, len(track_names), chunk_size):
+        if not generation_is_current(expected_generation):
+            return None
+        end = min(len(track_names), start + chunk_size)
+        response = query(
+            "/live/song/get/track_data",
+            start,
+            end,
+            "clip.length",
+            timeout=0.45,
+            expected_generation=expected_generation,
+            apply_response=False,
+        )
+        if not response:
+            continue
+        values = list(response)
+        for offset, track_index in enumerate(range(start, end)):
+            value_index = offset * scene_count + int(scene_index)
+            if value_index >= len(values):
+                continue
+            length_beats = safe_float(values[value_index])
+            if length_beats is None or length_beats <= 0:
+                continue
+            all_durations.append(length_beats)
+            if "TABLEAU" in track_names[track_index].upper():
+                tableaux_durations.append(length_beats)
+
+    candidates = tableaux_durations or all_durations
+    if not candidates:
+        return None
+
+    tempo_response = query(
+        "/live/song/get/tempo",
+        timeout=0.20,
+        expected_generation=expected_generation,
+        apply_response=False,
+    )
+    tempo = safe_float(list(tempo_response)[-1]) if tempo_response else None
+    if tempo is None or tempo <= 0:
+        return None
+    return float(max(candidates)) * 60.0 / float(tempo)
+
+
+def refresh_selected_scene_duration_async(scene_index: int, expected_generation: int) -> None:
+    """Publie la durée réelle uniquement si la sélection est toujours courante."""
+    global _selected_duration_request
+    try:
+        duration_seconds = read_scene_clip_duration_seconds(scene_index, expected_generation)
+        if duration_seconds is None:
+            return
+        with lock:
+            if (
+                int(state.get("set_generation", 0)) != int(expected_generation)
+                or int(state.get("selected_scene", -1)) != int(scene_index)
+            ):
+                return
+            state["selected_scene_duration_seconds"] = duration_seconds
+            state["selected_scene_duration_index"] = int(scene_index)
+            state["selected_scene_duration_is_clip"] = True
+    finally:
+        with lock:
+            if _selected_duration_request == (int(expected_generation), int(scene_index)):
+                _selected_duration_request = None
+
+
+def schedule_selected_scene_duration_refresh(scene_index: int, expected_generation: int) -> None:
+    """Programme au plus une lecture de durée pour la sélection courante."""
+    global _selected_duration_request
+    request_key = (int(expected_generation), int(scene_index))
+    with lock:
+        if (
+            int(state.get("set_generation", 0)) != request_key[0]
+            or not state.get("set_ready", False)
+            or _selected_duration_request == request_key
+        ):
+            return
+        selected_name = str(state.get("scenes", {}).get(scene_index, "") or "")
+        state["selected_scene_duration_seconds"] = parse_scene_duration_seconds(selected_name)
+        state["selected_scene_duration_index"] = int(scene_index)
+        state["selected_scene_duration_is_clip"] = False
+        _selected_duration_request = request_key
+    threading.Thread(
+        target=refresh_selected_scene_duration_async,
+        args=(int(scene_index), int(expected_generation)),
+        daemon=True,
+    ).start()
+
+
 def select_scene(scene_index: int, source: str = "Télécommande"):
     """Sélectionne une scène sans la lancer, puis met le nom à jour en arrière-plan."""
     scene_index = max(0, int(scene_index))
@@ -2308,9 +2496,128 @@ def select_scene(scene_index: int, source: str = "Télécommande"):
             # immédiatement son titre évite d'afficher « Scène N » pendant
             # l'aller-retour OSC de confirmation.
             state["selected_scene_name"] = cached_name or f"Scène {scene_index + 1}"
+            state["selected_scene_duration_seconds"] = parse_scene_duration_seconds(cached_name)
+            state["selected_scene_duration_index"] = scene_index
+            state["selected_scene_duration_is_clip"] = False
             state["message"] = f"Scène {scene_index + 1} sélectionnée"
             state["sync_source"] = source
     threading.Thread(target=refresh_scene_name_async, args=(scene_index,), daemon=True).start()
+    with lock:
+        generation = int(state.get("set_generation", 0))
+    schedule_selected_scene_duration_refresh(scene_index, generation)
+
+
+def resolve_scene_clip_duration_async(
+    scene_index: int,
+    expected_generation: int,
+    playback_started_at: float,
+):
+    """Complète une durée absente depuis les clips réellement lancés.
+
+    La métadonnée placée à la fin du nom de scène reste prioritaire. En son
+    absence, la piste TABLEAU est privilégiée, puis le plus long clip actif de
+    la scène sert de repli.
+    """
+    try:
+        with lock:
+            if (
+                int(state.get("set_generation", 0)) != int(expected_generation)
+                or int(state.get("playing_scene", -1)) != int(scene_index)
+                or state.get("scene_duration_seconds") is not None
+            ):
+                return
+
+        candidate_tracks = []
+        tableaux_tracks = []
+
+        track_names = query(
+            "/live/song/get/track_names",
+            timeout=0.25,
+            expected_generation=expected_generation,
+            apply_response=False,
+        )
+        if track_names:
+            tableaux_tracks = [
+                index
+                for index, name in enumerate(track_names)
+                if "TABLEAU" in str(name or "").upper()
+            ]
+            candidate_tracks.extend(tableaux_tracks)
+
+        track_data = query(
+            "/live/song/get/track_data",
+            0,
+            -1,
+            "track.playing_slot_index",
+            "track.name",
+            timeout=0.30,
+            expected_generation=expected_generation,
+            apply_response=False,
+        )
+        if track_data:
+            values = list(track_data)
+            for offset in range(0, len(values) - 1, 2):
+                try:
+                    playing_slot = int(values[offset])
+                except (TypeError, ValueError):
+                    continue
+                if playing_slot == int(scene_index):
+                    track_index = offset // 2
+                    if track_index not in candidate_tracks:
+                        candidate_tracks.append(track_index)
+
+        durations = []
+        for track_index in candidate_tracks:
+            if not generation_is_current(expected_generation):
+                return
+            response = query(
+                "/live/clip/get/length",
+                int(track_index),
+                int(scene_index),
+                timeout=0.15,
+                expected_generation=expected_generation,
+                apply_response=False,
+            )
+            if not response:
+                continue
+            length_beats = safe_float(list(response)[-1])
+            if length_beats is not None and length_beats > 0:
+                durations.append((track_index, length_beats))
+
+        if not durations:
+            return
+
+        tempo_response = query(
+            "/live/song/get/tempo",
+            timeout=0.15,
+            expected_generation=expected_generation,
+            apply_response=False,
+        )
+        tempo = safe_float(list(tempo_response)[-1]) if tempo_response else None
+        if tempo is None or tempo <= 0:
+            return
+
+        preferred = [item for item in durations if item[0] in tableaux_tracks]
+        length_beats = max(preferred or durations, key=lambda item: item[1])[1]
+        duration_seconds = float(length_beats) * 60.0 / float(tempo)
+
+        with lock:
+            if (
+                int(state.get("set_generation", 0)) != int(expected_generation)
+                or int(state.get("playing_scene", -1)) != int(scene_index)
+                or state.get("scene_duration_seconds") is not None
+            ):
+                return
+            state["scene_duration_seconds"] = duration_seconds
+            state["playback_deadline"] = playback_started_at + duration_seconds
+            state["remaining_seconds"] = max(
+                0.0,
+                state["playback_deadline"] - time.time(),
+            )
+    except Exception:
+        # Une durée de clip est un enrichissement visuel : son absence ne doit
+        # jamais interrompre une commande GO déjà validée.
+        return
 
 
 def execute_go_transaction(request_id: str, expected_generation: int, scene_number: Any) -> Tuple[bool, str]:
@@ -2321,6 +2628,7 @@ def execute_go_transaction(request_id: str, expected_generation: int, scene_numb
 
     request_key = (int(expected_generation), request_id)
     with scene_transaction_lock:
+        should_resolve_clip_duration = False
         with lock:
             cached = completed_go_requests.get(request_key)
             if cached is not None:
@@ -2393,16 +2701,30 @@ def execute_go_transaction(request_id: str, expected_generation: int, scene_numb
             state["scene_duration_seconds"] = duration_seconds
             state["remaining_seconds"] = duration_seconds
             state["playback_deadline"] = (now + duration_seconds) if duration_seconds is not None else None
+            should_resolve_clip_duration = duration_seconds is None
             state["arrangement_marker"] = "—"
             state["selected_scene"] = next_scene
             state["next_scene"] = next_scene
             state["selected_scene_name"] = scenes_snapshot.get(next_scene, requested_name)
+            state["selected_scene_duration_seconds"] = parse_scene_duration_seconds(
+                state["selected_scene_name"]
+            )
+            state["selected_scene_duration_index"] = next_scene
+            state["selected_scene_duration_is_clip"] = False
             state["message"] = f"Scène {scene_index + 1} lancée"
             state["sync_source"] = "Télécommande"
             completed_go_requests[request_key] = {
                 "ok": True,
                 "message": state["message"],
             }
+
+        if should_resolve_clip_duration:
+            threading.Thread(
+                target=resolve_scene_clip_duration_async,
+                args=(scene_index, expected_generation, now),
+                daemon=True,
+            ).start()
+        schedule_selected_scene_duration_refresh(next_scene, expected_generation)
 
         return True, f"Scène {scene_index + 1} lancée"
 

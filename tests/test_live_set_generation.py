@@ -54,6 +54,7 @@ class LiveSetGenerationTests(unittest.TestCase):
             mock.patch.object(self.app, "show_session_view"),
             mock.patch.object(self.app, "send", side_effect=lambda address, *args: sent.append((address, args))),
             mock.patch.object(self.app, "_query_with_query_lock_held", side_effect=confirm_selected),
+            mock.patch.object(self.app, "resolve_scene_clip_duration_async"),
         ):
             return self.app.execute_go_transaction(request_id, generation, scene_number)
 
@@ -758,6 +759,8 @@ class LiveSetGenerationTests(unittest.TestCase):
         with (
             mock.patch.object(self.app, "show_session_view"),
             mock.patch.object(self.app, "send", side_effect=lambda address, *args: sent.append((address, args))),
+            mock.patch.object(self.app, "resolve_scene_clip_duration_async"),
+            mock.patch.object(self.app, "schedule_selected_scene_duration_refresh"),
             mock.patch.object(
                 self.app,
                 "_query_with_query_lock_held",
@@ -780,6 +783,7 @@ class LiveSetGenerationTests(unittest.TestCase):
         with (
             mock.patch.object(self.app, "show_session_view"),
             mock.patch.object(self.app, "send", side_effect=lambda address, *args: sent.append((address, args))),
+            mock.patch.object(self.app, "resolve_scene_clip_duration_async"),
             mock.patch.object(
                 self.app,
                 "_query_with_query_lock_held",
@@ -798,6 +802,8 @@ class LiveSetGenerationTests(unittest.TestCase):
         with (
             mock.patch.object(self.app, "show_session_view"),
             mock.patch.object(self.app, "send", side_effect=lambda address, *args: sent.append((address, args))),
+            mock.patch.object(self.app, "resolve_scene_clip_duration_async"),
+            mock.patch.object(self.app, "schedule_selected_scene_duration_refresh"),
             mock.patch.object(
                 self.app,
                 "_query_with_query_lock_held",
@@ -911,15 +917,33 @@ class LiveSetGenerationTests(unittest.TestCase):
         self.assertLess(selected_position, ltc_position)
         self.assertLess(ltc_position, go_position)
 
-    def test_ab_places_the_single_crossfader_slider_where_ltc_was_removed(self):
+    def test_ab_orders_scene_selection_transport_and_crossfader_below_titles(self):
         source = (PROJECT_ROOT / "templates/ab.html").read_text(encoding="utf-8")
 
         deck_position = source.index('class="card deck-screen"')
-        slider_position = source.index('class="crossfader-section" aria-live="polite"')
+        select_position = source.index('class="scene-select-panel"')
         transport_position = source.index('class="transport-dock"')
+        slider_position = source.index('class="crossfader-section" aria-live="polite"')
+        ab_buttons_position = source.index('class="buttons-dock"')
         self.assertEqual(source.count('id="xfader"'), 1)
-        self.assertLess(deck_position, slider_position)
-        self.assertLess(slider_position, transport_position)
+        self.assertLess(deck_position, select_position)
+        self.assertLess(select_position, transport_position)
+        self.assertLess(transport_position, slider_position)
+        self.assertLess(slider_position, ab_buttons_position)
+
+    def test_ab_hides_the_large_crossfader_position_without_removing_the_slider(self):
+        source = (PROJECT_ROOT / "templates/ab.html").read_text(encoding="utf-8")
+
+        self.assertIn('class="crossfader-position" id="position"', source)
+        self.assertRegex(
+            source,
+            r"\.crossfader-position\s*\{\s*display:\s*none\s*!important;",
+        )
+        self.assertIn('id="xfader"', source)
+        self.assertIn("<span>A</span><span>Centre</span><span>B</span>", source)
+        self.assertIn("min-height: 0 !important;", source)
+        self.assertIn("Crossfader de console", source)
+        self.assertIn("height: 34px !important;", source)
 
     def test_arrangement_navigation_requires_explicit_confirmation(self):
         session_page = self.app.app.test_client().get("/").get_data(as_text=True)
@@ -1043,7 +1067,22 @@ class LiveSetGenerationTests(unittest.TestCase):
         self.assertIn("currentTimerEl.textContent = 'Temps restant · --:--';", source)
         self.assertIn("Temps restant · ${formatted}", source)
         self.assertIn("state && state.remaining_seconds", source)
-        self.assertIn("Math.min(info.durationSeconds, publishedRemaining)", source)
+        self.assertIn("state && state.scene_duration_seconds", source)
+        self.assertIn("Math.min(effectiveDuration, publishedRemaining)", source)
+        self.assertIn("Number.isFinite(publishedDuration)", source)
+        self.assertIn("parts[parts.length - 1]", source)
+        self.assertNotIn("parts.length >= 3 ? parts[2]", source)
+
+    def test_session_next_duration_uses_the_same_blue_as_ab(self):
+        session_source = (PROJECT_ROOT / "templates/index.html").read_text(encoding="utf-8")
+        ab_source = (PROJECT_ROOT / "templates/ab.html").read_text(encoding="utf-8")
+        shared_styles = (PROJECT_ROOT / "static/remote-v2.css").read_text(encoding="utf-8")
+
+        self.assertIn("color: #9dd7ff;", session_source)
+        self.assertIn("color: #9dd7ff !important;", ab_source)
+        self.assertIn(".selected-card .selected-duration", shared_styles)
+        self.assertIn(".selected-card .selected-title", shared_styles)
+        self.assertIn("color: #9dd7ff !important;", shared_styles)
 
     def test_ab_displays_published_remaining_time_in_current_title(self):
         source = (PROJECT_ROOT / "templates/ab.html").read_text(encoding="utf-8")
@@ -1056,6 +1095,74 @@ class LiveSetGenerationTests(unittest.TestCase):
         self.assertIn("state && state.remaining_seconds", source)
         self.assertIn("Temps restant · ${formatRemainingSeconds(", source)
         self.assertIn("Temps restant · --:--", source)
+        self.assertIn("display: block !important;", source)
+        self.assertIn("color: #f4d58d !important;", source)
+
+    def test_ab_displays_selected_scene_duration_under_next_title(self):
+        source = (PROJECT_ROOT / "templates/ab.html").read_text(encoding="utf-8")
+
+        next_title_position = source.index('id="abNextTitle"')
+        next_duration_position = source.index('id="abNextDuration"')
+        self.assertLess(next_title_position, next_duration_position)
+        self.assertIn("function selectedSceneDuration(state, sceneNumber, rawName)", source)
+        self.assertIn("state && state.selected_scene_duration_seconds", source)
+        self.assertIn("state && state.selected_scene_duration_index", source)
+        self.assertIn(r"\d{1,2}:\d{2}(?::\d{2})?", source)
+        self.assertIn("color: #9dd7ff !important;", source)
+
+    def test_session_displays_the_published_selected_scene_duration(self):
+        source = (PROJECT_ROOT / "templates/index.html").read_text(encoding="utf-8")
+
+        self.assertIn("state && state.selected_scene_duration_seconds", source)
+        self.assertIn("state && state.selected_scene_duration_index", source)
+        self.assertIn("const duration = publishedDuration || selectedInfo.durationText;", source)
+
+    def test_session_and_ab_share_the_professional_current_title_animation(self):
+        source = (PROJECT_ROOT / "static/remote-v2.css").read_text(encoding="utf-8")
+
+        self.assertIn(".current-card .title,", source)
+        self.assertIn(".title-box-current .now-title", source)
+        self.assertIn("color: #f4d58d !important;", source)
+        self.assertIn("@keyframes v2-live-console-sweep", source)
+        self.assertIn(".current-card.session-playing::after,", source)
+        self.assertIn(".title-box-current.is-playing::after,", source)
+        self.assertIn("animation: v2-live-console-sweep 5.2s ease-in-out infinite !important;", source)
+        self.assertIn("@media (prefers-reduced-motion: reduce)", source)
+
+    def test_session_has_a_dedicated_single_screen_iphone_landscape_layout(self):
+        source = (PROJECT_ROOT / "static/remote-v2.css").read_text(encoding="utf-8")
+        landscape = source.split(
+            "@media (orientation: landscape) and (max-height: 500px)",
+            1,
+        )[1]
+
+        self.assertIn('.v2-app[data-module="session"]', landscape)
+        self.assertIn("grid-template-rows: 58px minmax(0, 1fr) !important;", landscape)
+        self.assertIn("grid-template-columns: 1fr 1fr !important;", landscape)
+        self.assertIn("grid-column: 1 / 4 !important;", landscape)
+        self.assertIn("grid-column: 4 / -1 !important;", landscape)
+        self.assertIn("font-size: clamp(14px, 2.2vw, 20px) !important;", landscape)
+        self.assertIn("letter-spacing: .01em !important;", landscape)
+        self.assertIn("grid-template-columns: .82fr .82fr 1.35fr .9fr .9fr !important;", landscape)
+        self.assertIn("grid-column: 1 / -1 !important;", landscape)
+        self.assertIn("overflow: hidden !important;", landscape)
+
+    def test_ab_has_a_dedicated_single_screen_iphone_landscape_layout(self):
+        source = (PROJECT_ROOT / "static/remote-v2.css").read_text(encoding="utf-8")
+        landscape = source.rsplit(
+            "@media (orientation: landscape) and (max-height: 500px)",
+            1,
+        )[1]
+
+        self.assertIn('.v2-app[data-module="ab"]', landscape)
+        self.assertIn("grid-template-rows: 58px minmax(0, 1fr) !important;", landscape)
+        self.assertIn("grid-template-columns: 1fr 1fr !important;", landscape)
+        self.assertIn("grid-column: 1 / 6 !important;", landscape)
+        self.assertIn("grid-column: 6 / 10 !important;", landscape)
+        self.assertIn("grid-column: 10 / -1 !important;", landscape)
+        self.assertIn("grid-row: 3 !important;", landscape)
+        self.assertIn("color: #72b7f2 !important;", landscape)
+        self.assertIn("overflow: hidden !important;", landscape)
 
     def test_ab_arrow_keys_keep_using_the_existing_scene_preview_handler(self):
         source = (PROJECT_ROOT / "templates/ab.html").read_text(encoding="utf-8")
@@ -1084,6 +1191,151 @@ class LiveSetGenerationTests(unittest.TestCase):
                 self.app.state["selected_scene_name"],
                 "Final ; 128 ; 03:45",
             )
+        self.assertEqual(thread_class.call_count, 2)
+        scheduled_targets = [call.kwargs.get("target") for call in thread_class.call_args_list]
+        self.assertIn(self.app.refresh_scene_name_async, scheduled_targets)
+        self.assertIn(self.app.refresh_selected_scene_duration_async, scheduled_targets)
+
+    def test_selected_scene_duration_prefers_the_tableaux_clip(self):
+        with self.app.lock:
+            self.app.state["set_generation"] = 3
+            self.app.state["set_ready"] = True
+            self.app.state["scenes"] = {0: "A", 1: "B", 2: "C"}
+
+        def query_duration(address, *args, **kwargs):
+            if address == "/live/song/get/track_names":
+                return ("TABLEAUX", "MUSIC")
+            if address == "/live/song/get/track_data":
+                return (None, 400.0, None, None, 800.0, None)
+            if address == "/live/song/get/tempo":
+                return (120.0,)
+            return None
+
+        with mock.patch.object(self.app, "query", side_effect=query_duration):
+            duration = self.app.read_scene_clip_duration_seconds(1, 3)
+
+        self.assertEqual(duration, 200.0)
+
+    def test_missing_scene_duration_is_resolved_from_tableaux_clip(self):
+        with self.app.lock:
+            self.app.state["set_generation"] = 3
+            self.app.state["set_ready"] = True
+            self.app.state["playing_scene"] = 38
+            self.app.state["scene_duration_seconds"] = None
+            self.app.state["remaining_seconds"] = None
+            self.app.state["playback_deadline"] = None
+
+        def query_duration(address, *args, **kwargs):
+            if address == "/live/song/get/track_names":
+                return ("PIANO", "66 TABLEAUX", "TOP infos")
+            if address == "/live/song/get/track_data":
+                return (-1, "PIANO", 38, "66 TABLEAUX", 38, "TOP infos")
+            if address == "/live/clip/get/length":
+                track_index, scene_index = args
+                self.assertEqual(scene_index, 38)
+                return (track_index, scene_index, 360.0 if track_index == 1 else 120.0)
+            if address == "/live/song/get/tempo":
+                return (120.0,)
+            self.fail(f"Requête inattendue : {address}")
+
+        started_at = self.app.time.time()
+        with mock.patch.object(self.app, "query", side_effect=query_duration):
+            self.app.resolve_scene_clip_duration_async(38, 3, started_at)
+
+        with self.app.lock:
+            self.assertEqual(self.app.state["scene_duration_seconds"], 180.0)
+            self.assertGreater(self.app.state["remaining_seconds"], 179.0)
+            self.assertLessEqual(self.app.state["remaining_seconds"], 180.0)
+
+    def test_scene_name_duration_remains_prioritary_over_clip_lookup(self):
+        with self.app.lock:
+            self.app.state["set_generation"] = 3
+            self.app.state["set_ready"] = True
+            self.app.state["playing_scene"] = 38
+            self.app.state["scene_duration_seconds"] = 95.0
+
+        with mock.patch.object(self.app, "query") as query_mock:
+            self.app.resolve_scene_clip_duration_async(
+                38,
+                3,
+                self.app.time.time(),
+            )
+
+        with self.app.lock:
+            self.assertEqual(self.app.state["scene_duration_seconds"], 95.0)
+        query_mock.assert_not_called()
+
+    def test_direct_ableton_launch_uses_grouped_scan_across_all_tracks(self):
+        with self.app.lock:
+            self.app.state["set_generation"] = 3
+            self.app.state["set_ready"] = True
+            self.app.state["is_playing"] = True
+            self.app.state["play_mode"] = "session"
+            self.app.state["playing_scene"] = -1
+            self.app.state["scenes"] = {
+                38: "AVA j'ai encore ; BPM ; KEY ; 3:00",
+            }
+
+        grouped = []
+        for track_index in range(67):
+            grouped.extend((38 if track_index in (65, 66) else -1, f"Piste {track_index + 1}"))
+
+        with (
+            mock.patch.object(
+                self.app,
+                "query",
+                return_value=tuple(grouped),
+            ) as query_mock,
+            mock.patch.object(self.app.threading, "Thread") as thread_class,
+        ):
+            self.app.scan_playing_scene_from_tracks()
+
+        query_mock.assert_called_once_with(
+            "/live/song/get/track_data",
+            0,
+            -1,
+            "track.playing_slot_index",
+            "track.name",
+            timeout=0.25,
+            expected_generation=3,
+            apply_response=False,
+        )
+        with self.app.lock:
+            self.assertEqual(self.app.state["playing_scene"], 38)
+            self.assertEqual(
+                self.app.state["playing_scene_name"],
+                "AVA j'ai encore ; BPM ; KEY ; 3:00",
+            )
+            self.assertEqual(self.app.state["scene_duration_seconds"], 180.0)
+        thread_class.assert_not_called()
+
+    def test_direct_ableton_launch_keeps_sequential_scan_as_fallback(self):
+        with self.app.lock:
+            self.app.state["set_generation"] = 3
+            self.app.state["set_ready"] = True
+            self.app.state["is_playing"] = True
+            self.app.state["play_mode"] = "session"
+            self.app.state["playing_scene"] = -1
+            self.app.state["scenes"] = {4: "Titre sans durée"}
+
+        def fallback_query(address, *args, **kwargs):
+            if address == "/live/song/get/track_data":
+                return None
+            if address == "/live/track/get/playing_slot_index":
+                track_index = args[0]
+                return (track_index, 4 if track_index == 2 else -1)
+            self.fail(f"Requête inattendue : {address}")
+
+        with (
+            mock.patch.object(self.app, "query", side_effect=fallback_query),
+            mock.patch.object(self.app, "get_track_count", return_value=3),
+            mock.patch.object(self.app.threading, "Thread") as thread_class,
+        ):
+            self.app.scan_playing_scene_from_tracks()
+
+        with self.app.lock:
+            self.assertEqual(self.app.state["playing_scene"], 4)
+            self.assertEqual(self.app.state["playing_scene_name"], "Titre sans durée")
         thread_class.assert_called_once()
 
     def test_space_shortcut_prevents_page_scrolling(self):
@@ -1134,8 +1386,17 @@ class LiveSetGenerationTests(unittest.TestCase):
         self.assertIn("overflow-y: hidden !important;", portrait_css)
         self.assertIn("height: 48px !important;", portrait_css)
         self.assertIn("min-height: 31px !important;", portrait_css)
-        self.assertIn("flex: 0 0 clamp(154px, 22dvh, 180px) !important;", portrait_css)
-        self.assertIn("min-height: 72px !important;", portrait_css)
+        self.assertIn("flex: 0 0 clamp(235px, 31dvh, 275px) !important;", portrait_css)
+        self.assertIn("font-size: clamp(30px, 9.3vw, 40px) !important;", portrait_css)
+        self.assertIn("font-size: clamp(27px, 8vw, 36px) !important;", portrait_css)
+        self.assertIn("color: #72b7f2 !important;", portrait_css)
+        self.assertIn("color: #9dd7ff !important;", portrait_css)
+        self.assertIn("width: 100% !important;", portrait_css)
+        self.assertIn("max-width: none !important;", portrait_css)
+        self.assertIn("margin-left: 0 !important;", portrait_css)
+        self.assertIn("margin-right: 0 !important;", portrait_css)
+        self.assertIn("min-height: 0 !important;", portrait_css)
+        self.assertNotIn("min-height: 72px !important;", portrait_css)
         self.assertIn("height: 42px !important;", portrait_css)
 
 

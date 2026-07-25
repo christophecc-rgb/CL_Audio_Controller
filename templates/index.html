@@ -191,10 +191,12 @@
     }
 
     .selected-title {
+      color: #9dd7ff;
       font-size: clamp(30px, 8vw, 62px);
       font-weight: 800;
       line-height: 1.02;
       word-break: break-word;
+      text-shadow: 0 0 12px rgba(157, 215, 255, .24);
     }
 
     .scene-countdown {
@@ -209,10 +211,11 @@
 
     .selected-duration {
       margin-top: 6px;
-      color: var(--muted);
+      color: #9dd7ff;
       font-size: clamp(12px, 3vw, 18px);
       font-weight: 900;
       line-height: 1;
+      text-shadow: 0 0 9px rgba(157, 215, 255, .20);
     }
 
     .grid {
@@ -730,6 +733,18 @@
       return null;
     }
 
+    function formatDurationSeconds(value) {
+      const seconds = Number(value);
+      if (!Number.isFinite(seconds) || seconds < 0) return '';
+      const rounded = Math.max(0, Math.round(seconds));
+      const hours = Math.floor(rounded / 3600);
+      const minutes = Math.floor((rounded % 3600) / 60);
+      const remainder = rounded % 60;
+      return hours > 0
+        ? `${hours}:${String(minutes).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`
+        : `${minutes}:${String(remainder).padStart(2, '0')}`;
+    }
+
     function parseSceneInfo(value) {
       const raw = value && value !== '—' ? String(value).trim() : '';
       if (!raw) return { raw: '', title: '—', bpm: '', durationText: '', durationSeconds: null };
@@ -737,7 +752,9 @@
       const parts = raw.split(';').map(part => part.trim()).filter(Boolean);
       const title = parts[0] || raw;
       const bpm = parts.length >= 2 ? parts[1] : '';
-      const durationText = parts.length >= 3 ? parts[2] : '';
+      // Les scènes du Builder peuvent contenir titre ; BPM ; tonalité ; durée.
+      // La durée est donc toujours recherchée dans le dernier champ.
+      const durationText = parts.length >= 2 ? parts[parts.length - 1] : '';
       const durationSeconds = parseDurationToSeconds(durationText);
 
       return { raw, title, bpm, durationText, durationSeconds };
@@ -803,9 +820,24 @@
       currentTimerEl.textContent = formatted ? `Temps restant · ${formatted}` : '';
     }
 
-    function setCountdownForScene(rawName, mode, serverRemaining = null) {
+    function setCountdownForScene(
+      rawName,
+      mode,
+      serverRemaining = null,
+      serverDuration = null
+    ) {
       const info = parseSceneInfo(rawName);
-      const hasDuration = Number.isFinite(info.durationSeconds) && info.durationSeconds > 0;
+      const publishedDuration = Number(serverDuration);
+      const effectiveDuration = (
+        Number.isFinite(info.durationSeconds) && info.durationSeconds > 0
+      )
+        ? info.durationSeconds
+        : (
+            Number.isFinite(publishedDuration) && publishedDuration > 0
+              ? publishedDuration
+              : null
+          );
+      const hasDuration = Number.isFinite(effectiveDuration) && effectiveDuration > 0;
       const publishedRemaining = Number(serverRemaining);
       const hasPublishedRemaining = (
         serverRemaining !== null &&
@@ -831,17 +863,17 @@
         return;
       }
 
-      if (currentSceneRawName !== info.raw || countdownDurationSeconds !== info.durationSeconds) {
+      if (currentSceneRawName !== info.raw || countdownDurationSeconds !== effectiveDuration) {
         currentSceneRawName = info.raw;
-        countdownDurationSeconds = info.durationSeconds;
-        countdownPausedRemaining = info.durationSeconds;
+        countdownDurationSeconds = effectiveDuration;
+        countdownPausedRemaining = effectiveDuration;
         countdownStartedAt = Date.now();
       }
 
       if (hasPublishedRemaining) {
-        countdownPausedRemaining = Math.min(info.durationSeconds, publishedRemaining);
+        countdownPausedRemaining = Math.min(effectiveDuration, publishedRemaining);
         countdownStartedAt = mode === 'playing'
-          ? Date.now() - ((info.durationSeconds - countdownPausedRemaining) * 1000)
+          ? Date.now() - ((effectiveDuration - countdownPausedRemaining) * 1000)
           : null;
       }
 
@@ -946,7 +978,13 @@
 
       selectedEl.textContent = previewName;
       if (selectedDurationEl) {
-        selectedDurationEl.textContent = info.durationText ? `Durée ${info.durationText}` : '';
+        const selectedIndex = Number(value) - 1;
+        const publishedIndex = Number(lastKnownState && lastKnownState.selected_scene_duration_index);
+        const publishedDuration = selectedIndex === publishedIndex
+          ? formatDurationSeconds(lastKnownState && lastKnownState.selected_scene_duration_seconds)
+          : '';
+        const duration = publishedDuration || info.durationText;
+        selectedDurationEl.textContent = duration ? `Durée ${duration}` : '';
       }
       pulseSelectedCard();
       setStatusText('● Prochaine scène : ' + previewName, true);
@@ -1017,14 +1055,21 @@
       selectedEl.textContent = selected;
 
       if (selectedDurationEl) {
-        selectedDurationEl.textContent = selectedInfo.durationText ? `Durée ${selectedInfo.durationText}` : '';
+        const selectedIndex = Number(state && state.selected_scene);
+        const publishedIndex = Number(state && state.selected_scene_duration_index);
+        const publishedDuration = selectedIndex === publishedIndex
+          ? formatDurationSeconds(state && state.selected_scene_duration_seconds)
+          : '';
+        const duration = publishedDuration || selectedInfo.durationText;
+        selectedDurationEl.textContent = duration ? `Durée ${duration}` : '';
       }
 
       if (sessionMode && current !== '—') {
         setCountdownForScene(
           currentRaw,
           playing ? 'playing' : paused ? 'paused' : 'stopped',
-          state && state.remaining_seconds
+          state && state.remaining_seconds,
+          state && state.scene_duration_seconds
         );
       } else {
         setCountdownForScene('', 'stopped');

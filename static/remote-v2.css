@@ -220,6 +220,15 @@ body.v2-error .v2-health-dot { background: var(--v2-red); box-shadow: 0 0 0 4px 
   line-height: 1.08 !important;
 }
 .small, .meta, .selected-duration, .scene-countdown { color: var(--v2-muted) !important; }
+.selected-card .selected-duration {
+  color: #9dd7ff !important;
+  opacity: .95;
+  text-shadow: 0 0 9px rgba(157, 215, 255, .20);
+}
+.selected-card .selected-title {
+  color: #9dd7ff !important;
+  text-shadow: 0 0 12px rgba(157, 215, 255, .24);
+}
 
 button {
   min-height: 48px;
@@ -341,8 +350,10 @@ select {
 }
 
 .current-card::before,
+.title-box-current::before,
 .card.current::before,
 .current-card::after,
+.title-box-current::after,
 .card.current::after {
   content: "";
   position: absolute;
@@ -352,18 +363,15 @@ select {
 }
 
 @keyframes v2-live-ambient {
-  0%, 100% { opacity: .16; }
-  50% { opacity: .46; }
+  0%, 100% { opacity: .20; }
+  50% { opacity: .38; }
 }
 
-@keyframes v2-live-rim {
-  0%, 100% { opacity: .38; box-shadow: inset 0 0 12px rgba(255,184,77,.10); }
-  50% { opacity: .94; box-shadow: inset 0 0 25px rgba(255,184,77,.28); }
-}
-
-@keyframes v2-live-text-breathe {
-  0%, 100% { transform: scale(1); filter: brightness(1); }
-  50% { transform: scale(1); filter: brightness(1.12); }
+@keyframes v2-live-console-sweep {
+  0%, 12% { opacity: 0; transform: translateX(-120%) skewX(-18deg); }
+  24% { opacity: .34; }
+  54% { opacity: .16; }
+  72%, 100% { opacity: 0; transform: translateX(420%) skewX(-18deg); }
 }
 
 .current-card.session-playing::before,
@@ -372,8 +380,10 @@ select {
 .card.current.is-playing::before,
 body.is-arrangement-playing .card.current::before {
   inset: 0;
-  background: linear-gradient(180deg, rgba(255,184,77,.28), rgba(255,151,38,.08));
-  animation: v2-live-ambient 1.9s ease-in-out infinite !important;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(255,194,92,.18), transparent 68%),
+    linear-gradient(180deg, rgba(255,184,77,.18), rgba(78,45,8,.06));
+  animation: v2-live-ambient 3.8s ease-in-out infinite !important;
 }
 
 .title-box-current.is-playing {
@@ -385,21 +395,35 @@ body.is-arrangement-playing .card.current::before {
 .title-box-current.is-playing::after,
 .card.current.is-playing::after,
 body.is-arrangement-playing .card.current::after {
-  inset: 4px;
-  width: auto;
-  border: 1px solid rgba(255,210,132,.68);
-  border-radius: calc(var(--v2-radius) - 4px);
-  background: transparent;
-  filter: none;
-  animation: v2-live-rim 1.9s ease-in-out infinite !important;
+  top: -18%;
+  bottom: -18%;
+  left: -42%;
+  width: 28%;
+  border: 0;
+  border-radius: 40%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255,225,170,.18) 42%,
+    rgba(255,244,218,.32) 50%,
+    rgba(255,225,170,.12) 58%,
+    transparent
+  );
+  filter: blur(5px);
+  animation: v2-live-console-sweep 5.2s ease-in-out infinite !important;
+}
+
+.current-card .title,
+.title-box-current .now-title {
+  color: #f4d58d !important;
+  text-shadow: 0 0 12px rgba(244,213,141,.20) !important;
 }
 
 .current-card.session-playing .title,
 .current-card.is-playing .title,
-.title-box-current.is-playing .now-title,
-.card.current.is-playing .scene-name,
-body.is-arrangement-playing .card.current .scene-name {
-  animation: v2-live-text-breathe 1.9s ease-in-out infinite !important;
+.title-box-current.is-playing .now-title {
+  animation: none !important;
+  filter: none !important;
 }
 
 /* État PRÊT : même langage visuel, en bleu, sans flash agressif. */
@@ -523,4 +547,452 @@ body.is-arrangement-playing .card.current .scene-name {
   .title-box { min-height: 88px !important; }
   button { min-height: 52px; }
   .v2-statusbar { min-height: 22px; padding: 2px 8px; }
+}
+
+/*
+ * Session sur iPhone en paysage.
+ * La disposition est volontairement dédiée aux écrans bas : aucune règle
+ * portrait ni aucune logique fonctionnelle n'est modifiée.
+ */
+@media (orientation: landscape) and (max-height: 500px) {
+  body:has(.v2-app[data-module="session"]) {
+    overflow: hidden !important;
+  }
+
+  .v2-app[data-module="session"] {
+    width: 100% !important;
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    padding:
+      max(4px, env(safe-area-inset-top))
+      max(8px, env(safe-area-inset-right))
+      max(4px, env(safe-area-inset-bottom))
+      max(8px, env(safe-area-inset-left)) !important;
+    grid-template-rows: 58px minmax(0, 1fr) !important;
+    gap: 5px !important;
+  }
+
+  .v2-app[data-module="session"] .v2-header {
+    position: relative !important;
+    height: 58px !important;
+    min-height: 58px !important;
+    grid-template-columns: minmax(106px, .62fr) minmax(330px, 1.65fr) minmax(130px, .72fr) !important;
+    gap: 7px !important;
+    padding: 4px 7px !important;
+    border-radius: 11px !important;
+  }
+
+  .v2-app[data-module="session"] .v2-brand {
+    gap: 0 !important;
+  }
+
+  .v2-app[data-module="session"] .v2-brand img {
+    width: 106px !important;
+    height: 44px !important;
+  }
+
+  .v2-app[data-module="session"] .v2-brand-copy,
+  .v2-app[data-module="session"] .v2-health-detail,
+  .v2-app[data-module="session"] .v2-statusbar {
+    display: none !important;
+  }
+
+  .v2-app[data-module="session"] .v2-tabs {
+    height: 46px !important;
+    padding: 3px !important;
+    border-radius: 10px !important;
+  }
+
+  .v2-app[data-module="session"] .v2-tabs a {
+    min-height: 38px !important;
+    padding: 0 8px !important;
+    border-radius: 7px !important;
+    font-size: 10px !important;
+  }
+
+  .v2-app[data-module="session"] .v2-health {
+    gap: 7px !important;
+  }
+
+  .v2-app[data-module="session"] .v2-health-label {
+    max-width: 150px !important;
+    overflow: hidden !important;
+    font-size: 11px !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .v2-app[data-module="session"] .v2-workspace {
+    min-height: 0 !important;
+    place-items: stretch !important;
+  }
+
+  .v2-app[data-module="session"] .v2-workspace > .wrap {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    max-height: 100% !important;
+    padding: 7px !important;
+    display: grid !important;
+    grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+    grid-template-rows: minmax(112px, 1fr) 58px 44px !important;
+    gap: 6px !important;
+    overflow: hidden !important;
+    border-radius: 13px !important;
+  }
+
+  .v2-app[data-module="session"] .scene-cards {
+    grid-column: 1 / -1 !important;
+    grid-row: 1 !important;
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 7px !important;
+  }
+
+  .v2-app[data-module="session"] .scene-cards .card {
+    min-height: 0 !important;
+    height: 100% !important;
+    padding: 8px 12px !important;
+    align-content: center !important;
+    border-radius: 11px !important;
+  }
+
+  .v2-app[data-module="session"] .scene-cards .label {
+    margin-bottom: 3px !important;
+    font-size: 9px !important;
+  }
+
+  .v2-app[data-module="session"] .scene-cards .title,
+  .v2-app[data-module="session"] .scene-cards .selected-title {
+    font-size: clamp(24px, 4.2vw, 38px) !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .v2-app[data-module="session"] .scene-countdown,
+  .v2-app[data-module="session"] .selected-duration {
+    margin-top: 4px !important;
+    font-size: 13px !important;
+    line-height: 1 !important;
+  }
+
+  .v2-app[data-module="session"] .ltc-display {
+    grid-column: 1 / 4 !important;
+    grid-row: 2 !important;
+    min-width: 0 !important;
+    height: 58px !important;
+    padding: 5px 8px !important;
+    display: grid !important;
+    place-content: center !important;
+    border-radius: 9px !important;
+  }
+
+  .v2-app[data-module="session"] .ltc-display__label {
+    margin-bottom: 1px !important;
+    font-size: 7px !important;
+  }
+
+  .v2-app[data-module="session"] .ltc-display__value {
+    min-width: 0 !important;
+    font-size: clamp(14px, 2.2vw, 20px) !important;
+    letter-spacing: .01em !important;
+  }
+
+  .v2-app[data-module="session"] .grid {
+    grid-column: 4 / -1 !important;
+    grid-row: 2 !important;
+    margin: 0 !important;
+    display: grid !important;
+    grid-template-columns: .82fr .82fr 1.35fr .9fr .9fr !important;
+    gap: 5px !important;
+  }
+
+  .v2-app[data-module="session"] .grid button {
+    min-height: 58px !important;
+    height: 58px !important;
+    padding: 0 6px !important;
+    border-radius: 9px !important;
+    font-size: 11px !important;
+  }
+
+  .v2-app[data-module="session"] .grid .go-button {
+    grid-column: 3 !important;
+    grid-row: 1 !important;
+    min-height: 58px !important;
+  }
+
+  .v2-app[data-module="session"] .go-button .go-main {
+    font-size: 28px !important;
+  }
+
+  .v2-app[data-module="session"] .go-button .go-sub {
+    font-size: 7px !important;
+  }
+
+  .v2-app[data-module="session"] .goto-panel {
+    grid-column: 1 / -1 !important;
+    grid-row: 3 !important;
+    margin: 0 !important;
+    min-height: 44px !important;
+    padding: 3px !important;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    gap: 5px !important;
+    border-radius: 9px !important;
+  }
+
+  .v2-app[data-module="session"] .goto-input,
+  .v2-app[data-module="session"] .goto-button {
+    min-height: 36px !important;
+    height: 36px !important;
+    font-size: 10px !important;
+    border-radius: 7px !important;
+  }
+}
+
+/* A/B sur iPhone en paysage : console complète sans défilement. */
+@media (orientation: landscape) and (max-height: 500px) {
+  body:has(.v2-app[data-module="ab"]) {
+    overflow: hidden !important;
+  }
+
+  .v2-app[data-module="ab"] {
+    width: 100% !important;
+    height: 100dvh !important;
+    min-height: 100dvh !important;
+    padding:
+      max(4px, env(safe-area-inset-top))
+      max(8px, env(safe-area-inset-right))
+      max(4px, env(safe-area-inset-bottom))
+      max(8px, env(safe-area-inset-left)) !important;
+    grid-template-rows: 58px minmax(0, 1fr) !important;
+    gap: 5px !important;
+  }
+
+  .v2-app[data-module="ab"] .v2-header {
+    position: relative !important;
+    height: 58px !important;
+    min-height: 58px !important;
+    grid-template-columns: minmax(106px, .62fr) minmax(330px, 1.65fr) minmax(130px, .72fr) !important;
+    gap: 7px !important;
+    padding: 4px 7px !important;
+    border-radius: 11px !important;
+  }
+
+  .v2-app[data-module="ab"] .v2-brand {
+    gap: 0 !important;
+  }
+
+  .v2-app[data-module="ab"] .v2-brand img {
+    width: 106px !important;
+    height: 44px !important;
+  }
+
+  .v2-app[data-module="ab"] .v2-brand-copy,
+  .v2-app[data-module="ab"] .v2-health-detail,
+  .v2-app[data-module="ab"] .v2-statusbar {
+    display: none !important;
+  }
+
+  .v2-app[data-module="ab"] .v2-tabs {
+    height: 46px !important;
+    padding: 3px !important;
+    border-radius: 10px !important;
+  }
+
+  .v2-app[data-module="ab"] .v2-tabs a {
+    min-height: 38px !important;
+    padding: 0 8px !important;
+    border-radius: 7px !important;
+    font-size: 10px !important;
+  }
+
+  .v2-app[data-module="ab"] .v2-health {
+    gap: 7px !important;
+  }
+
+  .v2-app[data-module="ab"] .v2-health-label {
+    max-width: 150px !important;
+    overflow: hidden !important;
+    font-size: 11px !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  .v2-app[data-module="ab"] .v2-workspace {
+    min-height: 0 !important;
+    place-items: stretch !important;
+  }
+
+  .v2-app[data-module="ab"] .v2-workspace > .wrap {
+    width: 100% !important;
+    height: 100% !important;
+    max-width: none !important;
+    max-height: 100% !important;
+    padding: 7px !important;
+    display: grid !important;
+    grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
+    grid-template-rows: minmax(112px, 1fr) 58px 54px !important;
+    gap: 6px !important;
+    overflow: hidden !important;
+    border-radius: 13px !important;
+  }
+
+  .v2-app[data-module="ab"] .card.deck-screen {
+    grid-column: 1 / -1 !important;
+    grid-row: 1 !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    padding: 7px !important;
+    border-radius: 11px !important;
+  }
+
+  .v2-app[data-module="ab"] .display-stack {
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    grid-template-rows: minmax(0, 1fr) !important;
+    gap: 7px !important;
+  }
+
+  .v2-app[data-module="ab"] .title-box {
+    width: 100% !important;
+    max-width: none !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 7px 10px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    border-radius: 10px !important;
+  }
+
+  .v2-app[data-module="ab"] .arrow,
+  .v2-app[data-module="ab"] .counter {
+    display: none !important;
+  }
+
+  .v2-app[data-module="ab"] .now-label {
+    margin-bottom: 3px !important;
+    font-size: 9px !important;
+  }
+
+  .v2-app[data-module="ab"] .now-title,
+  .v2-app[data-module="ab"] .next-title {
+    font-size: clamp(24px, 4.2vw, 38px) !important;
+    line-height: 1 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+
+  .v2-app[data-module="ab"] .next-title {
+    color: #72b7f2 !important;
+  }
+
+  .v2-app[data-module="ab"] .current-remaining,
+  .v2-app[data-module="ab"] .next-duration {
+    margin-top: 4px !important;
+    font-size: 13px !important;
+    line-height: 1 !important;
+  }
+
+  .v2-app[data-module="ab"] .scene-select-panel {
+    grid-column: 1 / 6 !important;
+    grid-row: 2 !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-height: 58px !important;
+    height: 58px !important;
+    margin: 0 !important;
+    padding: 5px !important;
+    border-radius: 9px !important;
+  }
+
+  .v2-app[data-module="ab"] .scene-select {
+    width: 100% !important;
+    height: 46px !important;
+    min-height: 46px !important;
+    font-size: 11px !important;
+  }
+
+  .v2-app[data-module="ab"] .transport-dock {
+    grid-column: 6 / 10 !important;
+    grid-row: 2 !important;
+    min-height: 58px !important;
+    height: 58px !important;
+    margin: 0 !important;
+    padding: 4px !important;
+    border-radius: 9px !important;
+  }
+
+  .v2-app[data-module="ab"] .transport-row,
+  .v2-app[data-module="ab"] .buttons-row {
+    height: 100% !important;
+    gap: 5px !important;
+  }
+
+  .v2-app[data-module="ab"] .transport-row button,
+  .v2-app[data-module="ab"] .buttons-row button {
+    min-height: 50px !important;
+    height: 50px !important;
+    padding: 0 6px !important;
+    border-radius: 8px !important;
+    font-size: 14px !important;
+  }
+
+  .v2-app[data-module="ab"] #abSceneConfirm {
+    font-size: 24px !important;
+  }
+
+  .v2-app[data-module="ab"] .buttons-dock {
+    grid-column: 10 / -1 !important;
+    grid-row: 2 !important;
+    min-height: 58px !important;
+    height: 58px !important;
+    margin: 0 !important;
+    padding: 4px !important;
+    border-radius: 9px !important;
+  }
+
+  .v2-app[data-module="ab"] .crossfader-section {
+    grid-column: 1 / -1 !important;
+    grid-row: 3 !important;
+    width: 100% !important;
+    max-width: none !important;
+    min-height: 54px !important;
+    height: 54px !important;
+    margin: 0 !important;
+    padding: 5px 9px !important;
+    border-radius: 9px !important;
+  }
+
+  .v2-app[data-module="ab"] .slider-panel {
+    height: 44px !important;
+    padding: 5px 14px 2px !important;
+    border-radius: 7px !important;
+  }
+
+  .v2-app[data-module="ab"] input[type="range"] {
+    height: 26px !important;
+  }
+
+  .v2-app[data-module="ab"] input[type="range"]::-webkit-slider-thumb {
+    width: 20px !important;
+    height: 28px !important;
+    margin-top: -11px !important;
+  }
+
+  .v2-app[data-module="ab"] .slider-panel .row {
+    margin-top: -2px !important;
+    font-size: 8px !important;
+  }
 }
