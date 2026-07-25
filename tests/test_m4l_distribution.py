@@ -18,7 +18,8 @@ def read_amxd(path: Path):
     payload = data[32 : 32 + payload_size]
     if len(payload) != payload_size or len(data) != 32 + payload_size:
         raise AssertionError(f"Taille AMXD incohérente : {path}")
-    return json.loads(payload.decode("utf-8"))
+    # Live 12.4 may terminate the JSON payload with one NUL byte.
+    return json.loads(payload.rstrip(b"\0").decode("utf-8"))
 
 
 def sha256(path: Path):
@@ -76,6 +77,26 @@ class MaxForLiveDistributionTests(unittest.TestCase):
                 self.assertTrue(source_file.is_file())
                 self.assertTrue(install_file.is_file())
                 self.assertEqual(sha256(source_file), sha256(install_file))
+
+    def test_autoscene_scene_menu_is_dark_opaque_and_readable(self):
+        device_dir = DEVICES / "Paradis Latin AutoScene"
+        for name in (
+            "Paradis Latin AutoScene",
+            "Paradis Latin AutoScene - Live 10",
+        ):
+            with self.subTest(device=name):
+                source = json.loads(
+                    (device_dir / f"{name}.maxpat").read_text(encoding="utf-8")
+                )
+                menu = next(
+                    entry["box"]
+                    for entry in source["patcher"]["boxes"]
+                    if entry["box"].get("id") == "scene-menu"
+                )
+                self.assertEqual(menu["bgcolor"], [0.055, 0.067, 0.086, 1.0])
+                self.assertEqual(menu["bgfillcolor_type"], "color")
+                self.assertEqual(menu["bgfillcolor_color"][-1], 1.0)
+                self.assertEqual(menu["textcolor"], [0.96, 0.96, 0.96, 1.0])
 
     def test_installable_autoscene_matches_versioned_device(self):
         device_dir = DEVICES / "Paradis Latin AutoScene"

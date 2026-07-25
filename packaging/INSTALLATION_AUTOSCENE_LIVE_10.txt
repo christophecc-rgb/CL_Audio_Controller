@@ -1,0 +1,29 @@
+PARADIS LATIN AUTOSCENE 2.2.0 — ABLETON LIVE 10
+================================================
+
+Contenu :
+
+- Paradis Latin AutoScene - Live 10.amxd
+- Paradis Latin AutoScene - Live 10.maxpat
+- ParadisLatin_AutoScene.js
+- paradis_latin_logo.jpg
+- SHA256SUMS.txt
+
+Installation :
+
+1. Fermer Ableton Live 10.
+2. Copier les quatre fichiers du périphérique dans un même dossier de la
+   bibliothèque utilisateur Ableton.
+3. Relancer Ableton Live 10.
+4. Charger « Paradis Latin AutoScene - Live 10.amxd » sur la piste souhaitée.
+5. Vérifier le fond sombre, les couleurs et le logo.
+6. Tester dans une copie du Live Set avant toute utilisation en production.
+
+Les fichiers JavaScript et logo doivent rester dans le même dossier que le
+fichier .amxd. Le fichier .maxpat est la source éditable et doit être conservé.
+
+Cette variante déclare :
+
+- Ableton Live minimum : 10.0.0
+- Max minimum : 8.0.0
+- présentation : 720 × 169
