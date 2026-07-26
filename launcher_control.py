@@ -882,14 +882,16 @@ PANEL_HTML_V2 = r'''
 html,body{margin:0;width:100%;height:100%;overflow:hidden}
 body{background:linear-gradient(180deg,#0e1015,#11141a);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif}
 button{font:inherit}
-.app{width:440px;max-width:calc(100% - 16px);height:100%;margin:auto;padding:12px;display:flex;flex-direction:column;gap:10px;overflow-y:auto}
-.brand{height:84px;border-radius:14px;background:#020304;border:1px solid #272a31;display:flex;align-items:center;justify-content:center;overflow:hidden;box-shadow:0 10px 24px rgba(0,0,0,.28)}
+.app{width:590px;max-width:calc(100% - 16px);height:100%;margin:auto;padding:9px;display:flex;flex-direction:column;gap:7px;overflow-y:auto}
+.topbar{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center}
+.brand{height:56px;border-radius:11px;background:#020304;border:1px solid #272a31;display:flex;align-items:center;justify-content:center;overflow:hidden;box-shadow:0 8px 18px rgba(0,0,0,.25)}
 .brand img{width:100%;height:100%;object-fit:contain}
-.product-row{display:flex;align-items:center;justify-content:space-between;min-height:24px}
-.product{font-size:13px;font-weight:760;letter-spacing:.04em;color:#d6dae3}
+.product-row{display:flex;align-items:center;justify-content:space-between;min-height:38px;padding:0 2px}
+.product{font-size:15px;font-weight:790;letter-spacing:.04em;color:#e6e9ef}
+.product-subtitle{font-size:10px;color:#858d9b;margin-top:3px;letter-spacing:.025em}
 .show-toggle{height:25px;padding:0 10px;border:1px solid #3a3f49;border-radius:8px;background:#21252d;color:#c7ccd6;font-size:11px;cursor:pointer}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;box-shadow:0 8px 20px rgba(0,0,0,.18)}
-.system{display:grid;grid-template-columns:14px 1fr auto;gap:10px;align-items:center;min-height:62px;transition:.2s}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px;box-shadow:0 7px 18px rgba(0,0,0,.17)}
+.system{display:grid;grid-template-columns:14px 1fr auto;gap:9px;align-items:center;min-height:54px;transition:.2s}
 .system .dot{width:11px;height:11px;border-radius:50%;background:#69707d;box-shadow:0 0 0 4px rgba(105,112,125,.10)}
 .system.ready{border-color:rgba(67,200,111,.58);background:linear-gradient(135deg,rgba(67,200,111,.12),var(--card))}
 .system.ready .dot{background:var(--green);box-shadow:0 0 12px rgba(67,200,111,.75)}
@@ -899,27 +901,31 @@ button{font:inherit}
 .system.error .dot{background:var(--red);box-shadow:0 0 12px rgba(217,88,88,.65)}
 .system.busy .dot{background:var(--blue);animation:pulse 1s infinite}
 @keyframes pulse{50%{opacity:.35;transform:scale(.75)}}
-.state-title{font-size:18px;font-weight:820;letter-spacing:.01em}
-.state-detail{font-size:12px;color:var(--muted);margin-top:3px}
+.state-title{font-size:16px;font-weight:820;letter-spacing:.01em}
+.state-detail{font-size:11px;color:var(--muted);margin-top:2px}
 .state-time{font-size:10px;color:#858c98;align-self:start;padding-top:3px}
-.primary{height:48px;width:100%;border:1px solid rgba(88,162,255,.72);border-radius:12px;background:linear-gradient(180deg,#408ce7,#2868b8);color:white;font-size:15px;font-weight:790;cursor:pointer;box-shadow:0 8px 18px rgba(32,101,190,.22)}
+.command-row{display:grid;grid-template-columns:1.45fr 1fr;gap:8px}
+.primary{height:41px;width:100%;border:1px solid rgba(88,162,255,.72);border-radius:10px;background:linear-gradient(180deg,#408ce7,#2868b8);color:white;font-size:13px;font-weight:790;cursor:pointer;box-shadow:0 8px 18px rgba(32,101,190,.22)}
 .primary:hover{filter:brightness(1.08)}
 .secondary-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.action{height:38px;border-radius:10px;border:1px solid #404651;background:#252a33;color:#e2e6ed;font-size:13px;font-weight:700;cursor:pointer}
+.action{height:41px;border-radius:9px;border:1px solid #404651;background:#252a33;color:#e2e6ed;font-size:11px;font-weight:700;cursor:pointer}
 .action.start{border-color:rgba(67,200,111,.55);background:rgba(67,200,111,.16)}
 .action.restart{border-color:rgba(229,166,59,.62);background:rgba(229,166,59,.17)}
 .action:hover{filter:brightness(1.12)}
-.action-status{min-height:18px;font-size:11px;color:var(--muted);padding:2px 3px 0}
+.action-status{min-height:13px;font-size:10px;color:var(--muted);padding:0 3px}
 .orphan{display:none;border-color:rgba(229,166,59,.62);background:rgba(229,166,59,.09)}
 .orphan.show{display:block}.orphan-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:8px}
-.access-head,.tech-head{font-size:11px;font-weight:780;text-transform:uppercase;letter-spacing:.08em;color:#c9ced8;margin-bottom:8px}
-.address-row{display:grid;grid-template-columns:1fr auto auto;gap:7px;align-items:center}
-.address{height:34px;display:flex;align-items:center;padding:0 10px;border-radius:9px;background:#11141a;border:1px solid #303540;font:12px Menlo,monospace;color:#e4e8ee;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.mini{height:34px;padding:0 10px;border-radius:9px;border:1px solid #424853;background:#272c35;color:#e5e8ee;font-size:11px;font-weight:700;cursor:pointer}
-.device-row{display:flex;justify-content:space-between;align-items:center;margin-top:9px;font-size:12px;color:var(--muted)}
-.network-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.network-grid label{font-size:10px;color:var(--muted)}
-.network-grid input,.network-grid select{width:100%;height:31px;margin-top:3px;border-radius:8px;border:1px solid #3b414c;background:#11141a;color:#e4e8ee;padding:0 8px}
-.network-buttons{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:8px}
+.content-grid{display:grid;grid-template-columns:.88fr 1.42fr;gap:7px;align-items:stretch}
+.content-grid>.card{height:100%}
+.access-head,.tech-head{font-size:9px;font-weight:780;text-transform:uppercase;letter-spacing:.075em;color:#c9ced8;margin-bottom:6px}
+.address-row{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center}
+.address-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.address{height:31px;display:flex;align-items:center;padding:0 8px;border-radius:8px;background:#11141a;border:1px solid #303540;font:10px Menlo,monospace;color:#e4e8ee;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mini{height:31px;padding:0 8px;border-radius:8px;border:1px solid #424853;background:#272c35;color:#e5e8ee;font-size:10px;font-weight:700;cursor:pointer}
+.device-row{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:11px;color:var(--muted)}
+.network-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}.network-grid label{font-size:8px;color:var(--muted)}
+.network-grid input,.network-grid select{width:100%;height:28px;margin-top:2px;border-radius:7px;border:1px solid #353b45;background:#11141a;color:#e4e8ee;padding:0 7px;font-size:10px}
+.network-buttons{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:6px}.network-buttons .action{height:31px;font-size:10px}
 .badge{padding:4px 8px;border-radius:999px;background:rgba(67,200,111,.12);color:#7ee39e;border:1px solid rgba(67,200,111,.28);font-size:10px}
 details{background:var(--card2);border:1px solid #292e37;border-radius:12px;overflow:hidden}
 summary{height:34px;padding:0 11px;display:flex;align-items:center;cursor:pointer;font-size:12px;color:#c5cad3;list-style:none}
@@ -935,16 +941,28 @@ details[open] summary::before{transform:rotate(90deg)}
 .local{height:30px;border:0;background:transparent;color:#91a9cb;font-size:11px;cursor:pointer}
 .stop{height:30px;padding:0 11px;border-radius:8px;border:1px solid rgba(217,88,88,.42);background:rgba(217,88,88,.10);color:#e68b8b;font-size:11px;cursor:pointer}
 .footer{font-size:9px;color:#707784;letter-spacing:.05em;text-align:center}
-body.show-mode .secondary-actions,body.show-mode details,body.show-mode .bottom,body.show-mode .network-card{display:none}
-body.show-mode .app{justify-content:center;max-height:470px}
-body.show-mode .brand{height:105px}
-body.show-mode .system{min-height:86px}
+body.show-mode .secondary-actions,body.show-mode details,body.show-mode .bottom,body.show-mode .network-card,body.show-mode .action-status{display:none}
+body.show-mode .app{justify-content:center;max-height:430px;max-width:600px}
+body.show-mode .topbar{grid-template-columns:190px 1fr}
+body.show-mode .brand{height:72px}
+body.show-mode .system{min-height:78px}
+body.show-mode .command-row{grid-template-columns:1fr}
+@media(max-width:520px){
+  .app{width:100%;max-width:100%;gap:7px;padding:7px}
+  .topbar{display:flex;flex-direction:column;gap:8px}
+  .brand{width:100%;height:78px}.product-row{width:100%;min-height:34px}.product{font-size:15px}
+  .command-row,.content-grid{grid-template-columns:1fr}
+  .network-grid{grid-template-columns:1fr 1fr}
+  .primary{height:42px}.action{height:38px}
+}
 </style>
 </head>
 <body>
 <main class="app">
-  <div class="brand"><img src="/paradis-logo" alt="Paradis Latin Cabaret"></div>
-  <div class="product-row"><div class="product">CL AUDIO SHOW CONTROL</div><button id="showMode" class="show-toggle" onclick="toggleShowMode()">Mode spectacle</button></div>
+  <div class="topbar">
+    <div class="brand"><img src="/paradis-logo" alt="Paradis Latin Cabaret"></div>
+    <div class="product-row"><div><div class="product">CL AUDIO SHOW CONTROL</div><div class="product-subtitle">Panneau de contrôle serveur</div></div><button id="showMode" class="show-toggle" onclick="toggleShowMode()">Mode spectacle</button></div>
+  </div>
 
   <section id="systemCard" class="card system warning">
     <span class="dot"></span>
@@ -952,13 +970,14 @@ body.show-mode .system{min-height:86px}
     <span id="stateTime" class="state-time">—</span>
   </section>
 
-  <button class="primary" onclick="runAction('/remote-window','Ouverture de la télécommande')">OUVRIR LA TÉLÉCOMMANDE</button>
-
-  <div class="secondary-actions">
-    <button class="action start" onclick="runAction('/start','Démarrage du serveur')">▶&nbsp;&nbsp;Démarrer</button>
-    <button class="action restart" onclick="runAction('/restart','Relance du serveur')">↻&nbsp;&nbsp;Relancer</button>
+  <div class="command-row">
+    <button class="primary" onclick="runAction('/remote-window','Ouverture de la télécommande')">OUVRIR LA TÉLÉCOMMANDE</button>
+    <div class="secondary-actions">
+      <button class="action start" onclick="runAction('/start','Démarrage du serveur')">▶&nbsp;&nbsp;Démarrer</button>
+      <button class="action restart" onclick="runAction('/restart','Relance du serveur')">↻&nbsp;&nbsp;Relancer</button>
+    </div>
   </div>
-  <div id="actionStatus" class="action-status">Prêt.</div>
+  <div id="actionStatus" class="action-status"></div>
 
   <section id="orphanCard" class="card orphan">
     <div class="access-head">Instance précédente détectée</div>
@@ -970,30 +989,31 @@ body.show-mode .system{min-height:86px}
     </div>
   </section>
 
-  <section class="card">
-    <div class="access-head">Accès distant</div>
-    <div class="address-row">
-      <div id="remoteAddress" class="address">—</div>
-      <button class="mini" onclick="copyAddress()">Copier</button>
-      <button class="mini" onclick="runAction('/local-page','Ouverture locale')">Ouvrir</button>
-    </div>
-    <div class="device-row"><span>Télécommande iPhone / iPad</span><span id="deviceBadge" class="badge">Disponible</span></div>
-  </section>
+  <div class="content-grid">
+    <section class="card">
+      <div class="access-head">Accès distant</div>
+      <div class="address-row">
+        <div id="remoteAddress" class="address">—</div>
+        <div class="address-actions"><button class="mini" onclick="copyAddress()">Copier</button><button class="mini" onclick="runAction('/local-page','Ouverture locale')">Ouvrir</button></div>
+      </div>
+      <div class="device-row"><span>Télécommande iPhone / iPad</span><span id="deviceBadge" class="badge">Disponible</span></div>
+    </section>
 
-  <section class="card network-card">
-    <div class="access-head">Connexion AbletonOSC</div>
-    <div class="network-grid">
-      <label>Mode<select id="abletonMode" onchange="updateNetworkFields()"><option value="local">Local</option><option value="remote">Ableton distant</option></select></label>
-      <label>Nom de la cible<input id="abletonName" placeholder="Mac Blue"></label>
-      <label>Adresse Ableton<input id="abletonHost" value="127.0.0.1"></label>
-      <label>Port émission<input id="abletonSendPort" type="number" value="11000"></label>
-      <label>Port retour<input id="abletonReplyPort" type="number" value="11001"></label>
-    </div>
-    <div class="network-buttons">
-      <button class="action" onclick="saveNetworkConfig()">Appliquer</button>
-      <button class="action" onclick="testAbletonConnection()">Tester la connexion</button>
-    </div>
-  </section>
+    <section class="card network-card">
+      <div class="access-head">Connexion AbletonOSC</div>
+      <div class="network-grid">
+        <label>Mode<select id="abletonMode" onchange="updateNetworkFields()"><option value="local">Local</option><option value="remote">Ableton distant</option></select></label>
+        <label>Nom de la cible<input id="abletonName" placeholder="Mac Blue"></label>
+        <label>Adresse Ableton<input id="abletonHost" value="127.0.0.1"></label>
+        <label>Port émission<input id="abletonSendPort" type="number" value="11000"></label>
+        <label>Port retour<input id="abletonReplyPort" type="number" value="11001"></label>
+      </div>
+      <div class="network-buttons">
+        <button class="action" onclick="saveNetworkConfig()">Appliquer</button>
+        <button class="action" onclick="testAbletonConnection()">Tester la connexion</button>
+      </div>
+    </section>
+  </div>
 
   <details>
     <summary>Détails techniques et événements</summary>
@@ -1093,13 +1113,36 @@ async function testAbletonConnection(){
 }
 function confirmStop(){if(confirm('Arrêter le serveur de télécommande ?\n\nLes appareils connectés perdront immédiatement l’accès.'))runAction('/stop','Arrêt du serveur');}
 async function copyAddress(){if(!latestState)return;try{await navigator.clipboard.writeText(latestState.lan_url);el('actionStatus').textContent='✓ Adresse copiée';}catch(e){el('actionStatus').textContent='Adresse : '+latestState.lan_url;}}
-function toggleShowMode(){document.body.classList.toggle('show-mode');el('showMode').textContent=document.body.classList.contains('show-mode')?'Quitter le mode spectacle':'Mode spectacle';}
+async function resizePanelWindow(width,height){
+  try{
+    if(window.pywebview&&window.pywebview.api&&window.pywebview.api.resize_panel){await window.pywebview.api.resize_panel(width,height);return;}
+    window.resizeTo(width,height);
+  }catch(e){console.warn('Redimensionnement natif indisponible',e);}
+}
+async function toggleShowMode(){
+  const enabled=document.body.classList.toggle('show-mode');
+  el('showMode').textContent=enabled?'Quitter le mode spectacle':'Mode spectacle';
+  await resizePanelWindow(500,enabled?500:900);
+}
 ['abletonName','abletonHost','abletonSendPort','abletonReplyPort'].forEach(id=>el(id).addEventListener('input',markNetworkDraftDirty));
 refresh();setInterval(refresh,1500);
 </script>
 </body>
 </html>
 '''
+
+
+class ControlPanelWindowApi:
+    """Pont minimal permettant au bouton Mode spectacle de redimensionner la fenêtre native."""
+
+    def __init__(self):
+        self.window = None
+
+    def resize_panel(self, width, height):
+        if self.window is None:
+            return False
+        self.window.resize(int(width), int(height))
+        return True
 
 
 @app.route("/")
@@ -1437,15 +1480,18 @@ if __name__ == "__main__":
         raise SystemExit(0)
 
     print("Ouverture du panneau de contrôle en fenêtre autonome :", CONTROL_URL, flush=True)
-    webview.create_window(
+    panel_api = ControlPanelWindowApi()
+    panel_window = webview.create_window(
         "CL AUDIO SHOW CONTROL",
         CONTROL_URL,
-        width=470,
-        height=580,
-        min_size=(440, 540),
+        width=500,
+        height=900,
+        min_size=(460, 420),
         resizable=True,
         confirm_close=False,
         text_select=True,
+        js_api=panel_api,
     )
+    panel_api.window = panel_window
     webview.start(gui="cocoa", debug=False)
     stop_owned_server()
