@@ -20,6 +20,7 @@ BUILDER_DIR="$GITHUB_DIR/CL_Arrangement_Builder_Live"
 ABLETONOSC_DIR="$GITHUB_DIR/AbletonOSC"
 RELEASES_DIR="$PROJECT_DIR/Releases"
 DESKTOP_DIR="$HOME/Desktop"
+ICLOUD_DRIVE_DIR="$HOME/Library/Mobile Documents/com~apple~CloudDocs"
 VERSION="${CL_AUDIO_VERSION:-2.2.0}"
 TIMESTAMP="$(date '+%Y-%m-%d_%H%M%S')"
 SUITE_NAME="CL_Suite_Transport_${TIMESTAMP}"
@@ -27,6 +28,7 @@ BUILD_ROOT="$(mktemp -d "/private/tmp/${SUITE_NAME}_XXXXXX")"
 SUITE_ROOT="$BUILD_ROOT/$SUITE_NAME"
 DEST_ZIP="$DESKTOP_DIR/${SUITE_NAME}.zip"
 DEST_SHA="$DESKTOP_DIR/${SUITE_NAME}_SHA256.txt"
+ICLOUD_DEST_ZIP="$ICLOUD_DRIVE_DIR/${SUITE_NAME}.zip"
 
 cleanup() {
   rm -rf "$BUILD_ROOT"
@@ -37,6 +39,13 @@ fail() {
   echo
   echo "ERREUR : $1" >&2
   echo "Aucun kit incomplet n'a été placé sur le Bureau." >&2
+  exit 1
+}
+
+fail_cloud() {
+  echo
+  echo "ERREUR ICLOUD : $1" >&2
+  echo "Le kit reste disponible sur le Bureau : $DEST_ZIP" >&2
   exit 1
 }
 
@@ -193,15 +202,26 @@ for expected in \
   LC_ALL=C grep -aFq "$expected" "$ZIP_LIST" || fail "contrôle final impossible, élément absent du ZIP : $expected"
 done
 
+[[ -d "$ICLOUD_DRIVE_DIR" ]] || fail_cloud "iCloud Drive n'est pas disponible sur ce Mac"
+
+echo
+echo "Copie du ZIP vers iCloud Drive…"
+ditto "$DEST_ZIP" "$ICLOUD_DEST_ZIP" || fail_cloud "la copie du ZIP a échoué"
+
+ICLOUD_ZIP_SHA="$(shasum -a 256 "$ICLOUD_DEST_ZIP" | awk '{print $1}')"
+[[ "$ICLOUD_ZIP_SHA" == "$ZIP_SHA" ]] || fail_cloud "la copie iCloud ne correspond pas au ZIP du Bureau"
+
 echo
 echo "============================================================"
 echo " KIT COMPLET PRÊT"
 echo "============================================================"
 echo "$DEST_ZIP"
+echo "$ICLOUD_DEST_ZIP"
 echo
 echo "SHA-256 : $ZIP_SHA"
 echo
 echo "Tous les composants obligatoires ont été contrôlés."
+echo "La copie iCloud a été vérifiée et sera synchronisée par iCloud Drive."
 
 open -R "$DEST_ZIP"
-osascript -e 'display notification "La suite CL complète est prête sur le Bureau." with title "CL Suite"' >/dev/null 2>&1 || true
+osascript -e 'display notification "La suite CL est prête sur le Bureau et dans iCloud Drive." with title "CL Suite"' >/dev/null 2>&1 || true
