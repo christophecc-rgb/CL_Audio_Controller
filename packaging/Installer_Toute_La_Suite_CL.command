@@ -9,8 +9,11 @@ REMOTE_SCRIPTS="$ABLETON_LIBRARY/Remote Scripts"
 M4L_REMOTE_TARGET="$ABLETON_LIBRARY/Presets/Audio Effects/Max Audio Effect/CL Audio Controller - Remote"
 M4L_AUTOSCENE_TARGET="$ABLETON_LIBRARY/Presets/Audio Effects/Max Audio Effect/CL Audio Controller - AutoScene"
 M4L_LIVE10_TARGET="$ABLETON_LIBRARY/Presets/Audio Effects/Max Audio Effect/CL Audio Controller - Live 10"
+SUPPORT_DIR="$INSTALL_HOME/Library/Application Support/CL Audio Controller"
+INSTALL_MANIFEST="$SUPPORT_DIR/CL_Suite_install_manifest.tsv"
 STAMP="$(date '+%Y-%m-%d_%H%M%S')"
 WORK_DIR="$(mktemp -d "/private/tmp/CL_Suite_Installer_XXXXXX")"
+MANIFEST_UPDATES="$WORK_DIR/manifest_updates.tsv"
 
 cleanup() {
   rm -rf "$WORK_DIR"
@@ -41,6 +44,7 @@ install_item() {
   local source="$1"
   local target="$2"
   local label="$3"
+  local component="$4"
   require_source "$source"
   echo
   echo "$label"
@@ -48,6 +52,25 @@ install_item() {
   mkdir -p "$(dirname "$target")"
   ditto "$source" "$target"
   echo "  Installé : $target"
+  printf '%s\t%s\t%s\n' "$component" "$target" "$STAMP" >> "$MANIFEST_UPDATES"
+}
+
+write_install_manifest() {
+  local combined="$WORK_DIR/manifest_combined.tsv"
+  mkdir -p "$SUPPORT_DIR"
+  chmod 700 "$SUPPORT_DIR"
+  if [[ -f "$INSTALL_MANIFEST" && ! -L "$INSTALL_MANIFEST" ]]; then
+    cat "$INSTALL_MANIFEST" > "$combined"
+  elif [[ -L "$INSTALL_MANIFEST" ]]; then
+    fail "le manifeste d'installation est un lien symbolique : $INSTALL_MANIFEST"
+  else
+    : > "$combined"
+  fi
+  cat "$MANIFEST_UPDATES" >> "$combined"
+  awk -F '\t' 'NF == 3 { latest[$1 FS $2] = $0 } END { for (key in latest) print latest[key] }' \
+    "$combined" | LC_ALL=C sort > "$INSTALL_MANIFEST.tmp"
+  chmod 600 "$INSTALL_MANIFEST.tmp"
+  mv "$INSTALL_MANIFEST.tmp" "$INSTALL_MANIFEST"
 }
 
 CONTROLLER_ZIP="$(find "$SCRIPT_DIR/01 - CL Audio Controller "* -maxdepth 1 -type f -name 'CL_Audio_Controller_*_Kit_Complet_macOS.zip' -print -quit 2>/dev/null || true)"
@@ -151,9 +174,9 @@ mkdir -p "$USER_APPS" "$REMOTE_SCRIPTS" "$(dirname "$M4L_REMOTE_TARGET")"
 
 if [[ "$INSTALL_REMOTE" == "1" ]]; then
   install_item "$CONTROLLER_ROOT/CL Audio Controller.app" \
-    "$USER_APPS/CL Audio Controller.app" "Télécommande — CL Audio Controller"
+    "$USER_APPS/CL Audio Controller.app" "Télécommande — CL Audio Controller" "remote"
   install_item "$CONTROLLER_ROOT/AbletonOSC CL/AbletonOSC" \
-    "$REMOTE_SCRIPTS/AbletonOSC" "Télécommande — AbletonOSC CL"
+    "$REMOTE_SCRIPTS/AbletonOSC" "Télécommande — AbletonOSC CL" "remote"
 
   REMOTE_M4L_SOURCE="$WORK_DIR/Max for Live - Remote"
   mkdir -p "$REMOTE_M4L_SOURCE"
@@ -165,16 +188,16 @@ if [[ "$INSTALL_REMOTE" == "1" ]]; then
     ditto "$CONTROLLER_ROOT/Max for Live à installer/$required" "$REMOTE_M4L_SOURCE/$required"
   done
   install_item "$REMOTE_M4L_SOURCE" "$M4L_REMOTE_TARGET" \
-    "Télécommande — LTC et X-Fader"
+    "Télécommande — LTC et X-Fader" "remote"
 fi
 
 if [[ "$INSTALL_BUILDER" == "1" ]]; then
   install_item "$BUILDER_ROOT/Applications/Arrangement Builder Live.app" \
-    "$USER_APPS/Arrangement Builder Live.app" "Builder — Application"
+    "$USER_APPS/Arrangement Builder Live.app" "Builder — Application" "builder"
   install_item \
     "$BUILDER_ROOT/Installation Ableton/Remote Scripts/CL_Arrangement_Builder_Live" \
     "$REMOTE_SCRIPTS/CL_Arrangement_Builder_Live" \
-    "Builder — Remote Script"
+    "Builder — Remote Script" "builder"
 fi
 
 if [[ "$INSTALL_AUTOSCENE" == "1" ]]; then
@@ -188,7 +211,7 @@ if [[ "$INSTALL_AUTOSCENE" == "1" ]]; then
     ditto "$CONTROLLER_ROOT/Max for Live à installer/$required" "$AUTOSCENE_SOURCE/$required"
   done
   install_item "$AUTOSCENE_SOURCE" "$M4L_AUTOSCENE_TARGET" \
-    "AutoScene — Version Live 11/12"
+    "AutoScene — Version Live 11/12" "autoscene"
 fi
 
 if [[ "$INSTALL_AUTOSCENE_LIVE10" == "1" ]]; then
@@ -202,8 +225,10 @@ if [[ "$INSTALL_AUTOSCENE_LIVE10" == "1" ]]; then
     ditto "$CONTROLLER_ROOT/Max for Live à installer/$required" "$LIVE10_SOURCE/$required"
   done
   install_item "$LIVE10_SOURCE" "$M4L_LIVE10_TARGET" \
-    "AutoScene — Version Live 10"
+    "AutoScene — Version Live 10" "autoscene-live10"
 fi
+
+write_install_manifest
 
 echo
 echo "============================================================"
@@ -212,6 +237,7 @@ echo "============================================================"
 echo "Applications : $USER_APPS"
 echo "Remote Scripts : $REMOTE_SCRIPTS"
 echo "Max for Live : $(dirname "$M4L_REMOTE_TARGET")"
+echo "Manifeste : $INSTALL_MANIFEST"
 if [[ "$LIVE_FAMILY" == "10" ]]; then
   echo "Max for Live : $M4L_LIVE10_TARGET"
 fi

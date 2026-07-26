@@ -108,7 +108,8 @@ cp "$PROJECT_DIR/README.md" "$SUITE_ROOT/Documentation/README_CL_Audio_Controlle
 cp "$PROJECT_DIR/packaging/INSTALLATION_NOUVEAU_MAC.txt" "$SUITE_ROOT/Documentation/INSTALLATION_NOUVEAU_MAC.txt"
 cp "$PROJECT_DIR/packaging/INSTALLATION_AUTOSCENE_LIVE_10.txt" "$SUITE_ROOT/Documentation/INSTALLATION_AUTOSCENE_LIVE_10.txt"
 cp "$PROJECT_DIR/packaging/Installer_Toute_La_Suite_CL.command" "$SUITE_ROOT/Installer_Toute_La_Suite_CL.command"
-chmod +x "$SUITE_ROOT/Installer_Toute_La_Suite_CL.command"
+cp "$PROJECT_DIR/packaging/Desinstaller_La_Suite_CL.command" "$SUITE_ROOT/Desinstaller_La_Suite_CL.command"
+chmod +x "$SUITE_ROOT/Installer_Toute_La_Suite_CL.command" "$SUITE_ROOT/Desinstaller_La_Suite_CL.command"
 
 cat > "$SUITE_ROOT/LISEZ_MOI_EN_PREMIER.txt" <<EOF
 SUITE CL TRANSPORTABLE — ${TIMESTAMP}
@@ -141,6 +142,12 @@ Double-cliquer sur Installer_Toute_La_Suite_CL.command puis choisir :
   installer la version AbletonOSC destinée à Live 11/12.
 
 Les installations existantes sont sauvegardées avec une date avant remplacement.
+
+DÉSINSTALLATION
+
+Double-cliquer sur Desinstaller_La_Suite_CL.command. Le désinstallateur propose
+les mêmes composants séparément et déplace uniquement les éléments enregistrés
+par l'installateur dans la Corbeille. Il ne touche jamais aux Live Sets.
 
 COMMITS
 
@@ -181,7 +188,8 @@ for expected in \
   "Paradis Latin AutoScene.amxd" \
   "Paradis Latin AutoScene - Live 10.amxd" \
   "AbletonOSC_CL_Live_11-12.zip" \
-  "Installer_Toute_La_Suite_CL.command"; do
+  "Installer_Toute_La_Suite_CL.command" \
+  "Desinstaller_La_Suite_CL.command"; do
   LC_ALL=C grep -aFq "$expected" "$ZIP_LIST" || fail "contrôle final impossible, élément absent du ZIP : $expected"
 done
 
