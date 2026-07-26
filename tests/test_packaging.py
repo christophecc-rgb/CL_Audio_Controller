@@ -48,6 +48,39 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("Ableton Live 10", guide)
         self.assertIn("clic droit > Ouvrir", guide)
 
+    def test_full_suite_installer_covers_apps_and_ableton_components(self):
+        script = (
+            PROJECT_ROOT / "packaging/Installer_Toute_La_Suite_CL.command"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("CL Audio Controller.app", script)
+        self.assertIn("Arrangement Builder Live.app", script)
+        self.assertIn("CL_Arrangement_Builder_Live", script)
+        self.assertIn("AbletonOSC", script)
+        self.assertIn("Max Audio Effect/CL Audio Controller", script)
+        self.assertIn("backup_existing", script)
+        self.assertIn("Live 10", script)
+        self.assertIn("Live 11", script)
+        self.assertIn("CL Audio Controller - Live 10", script)
+        self.assertIn("CL Audio Controller - Remote", script)
+        self.assertIn("CL Audio Controller - AutoScene", script)
+        self.assertIn("Télécommande CL Audio uniquement", script)
+        self.assertIn("Arrangement Builder uniquement", script)
+        self.assertIn("AutoScene uniquement", script)
+        self.assertIn("CL_SUITE_COMPONENTS", script)
+        self.assertIn('"Paradis Latin AutoScene - Live 10.amxd"', script)
+        self.assertNotIn("sudo", script)
+        self.assertNotIn("pkill", script)
+
+    def test_desktop_export_includes_full_suite_installer(self):
+        script = (
+            PROJECT_ROOT / "scripts/export_transport_kit.command"
+        ).read_text(encoding="utf-8")
+
+        self.assertIn("Installer_Toute_La_Suite_CL.command", script)
+        self.assertIn("Paradis Latin AutoScene - Live 10.amxd", script)
+        self.assertIn("Arrangement Builder Live.app/", script)
+
 
 if __name__ == "__main__":
     unittest.main()
