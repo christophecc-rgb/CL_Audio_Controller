@@ -17,9 +17,15 @@ function requested(value) {
     if (program === null) {
         return;
     }
+    if (confirmedProgram === program) {
+        expectedProgram = program;
+        outlet(0, ["✓", "CHARGÉE"]);
+        outlet(1, 1);
+        return;
+    }
     expectedProgram = program;
     confirmedProgram = null;
-    outlet(0, ["ATTENTE", "·", "Scène", expectedProgram]);
+    outlet(0, "ATTENTE");
     outlet(1, 0);
 }
 
@@ -30,10 +36,10 @@ function confirmed(value) {
     }
     confirmedProgram = program;
     if (expectedProgram === null) {
-        outlet(0, ["RETOUR", "·", "Scène", confirmedProgram]);
+        outlet(0, "RETOUR");
         outlet(1, 0);
     } else if (confirmedProgram === expectedProgram) {
-        outlet(0, ["✓", "CHARGÉE", "·", "Scène", confirmedProgram]);
+        outlet(0, ["✓", "CHARGÉE"]);
         outlet(1, 1);
     } else {
         outlet(0, ["⚠", "REÇUE", confirmedProgram, "·", "ATTENDUE", expectedProgram]);

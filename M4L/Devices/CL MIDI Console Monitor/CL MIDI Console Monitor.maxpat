@@ -132,7 +132,7 @@
           "id": "lookup-cl5",
           "maxclass": "newobj",
           "numinlets": 1,
-          "numoutlets": 1,
+          "numoutlets": 2,
           "patching_rect": [
             35.0,
             525.0,
@@ -147,7 +147,7 @@
           "id": "lookup-ql1-cc",
           "maxclass": "newobj",
           "numinlets": 1,
-          "numoutlets": 1,
+          "numoutlets": 2,
           "patching_rect": [
             200.0,
             525.0,
@@ -162,7 +162,7 @@
           "id": "lookup-ql1-pgm",
           "maxclass": "newobj",
           "numinlets": 1,
-          "numoutlets": 1,
+          "numoutlets": 2,
           "patching_rect": [
             365.0,
             525.0,
@@ -440,6 +440,51 @@
             22.0
           ],
           "text": "s CL_MIDI_MON_QL1"
+        }
+      },
+      {
+        "box": {
+          "id": "send-cl5-program",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            80.0,
+            575.0,
+            180.0,
+            22.0
+          ],
+          "text": "s CL_MIDI_MON_CL5_PROGRAM"
+        }
+      },
+      {
+        "box": {
+          "id": "send-ql1-cc-program",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            270.0,
+            575.0,
+            180.0,
+            22.0
+          ],
+          "text": "s CL_MIDI_MON_QL1_PROGRAM"
+        }
+      },
+      {
+        "box": {
+          "id": "send-ql1-pgm-program",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            460.0,
+            575.0,
+            180.0,
+            22.0
+          ],
+          "text": "s CL_MIDI_MON_QL1_PROGRAM"
         }
       },
       {
@@ -863,6 +908,126 @@
       },
       {
         "box": {
+          "id": "recv-cl5-program",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 1,
+          "patching_rect": [
+            350.0,
+            605.0,
+            180.0,
+            22.0
+          ],
+          "text": "r CL_MIDI_MON_CL5_PROGRAM"
+        }
+      },
+      {
+        "box": {
+          "id": "recv-ql1-program",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 1,
+          "patching_rect": [
+            540.0,
+            605.0,
+            180.0,
+            22.0
+          ],
+          "text": "r CL_MIDI_MON_QL1_PROGRAM"
+        }
+      },
+      {
+        "box": {
+          "id": "set-cl5-program",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 1,
+          "patching_rect": [
+            350.0,
+            630.0,
+            72.0,
+            22.0
+          ],
+          "text": "prepend set"
+        }
+      },
+      {
+        "box": {
+          "id": "set-ql1-program",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 1,
+          "patching_rect": [
+            540.0,
+            630.0,
+            72.0,
+            22.0
+          ],
+          "text": "prepend set"
+        }
+      },
+      {
+        "box": {
+          "id": "route-empty-cl5",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 1,
+          "patching_rect": [
+            35.0,
+            630.0,
+            135.0,
+            22.0
+          ],
+          "text": "route __CL_EMPTY__"
+        }
+      },
+      {
+        "box": {
+          "id": "route-empty-ql1",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 1,
+          "patching_rect": [
+            195.0,
+            630.0,
+            135.0,
+            22.0
+          ],
+          "text": "route __CL_EMPTY__"
+        }
+      },
+      {
+        "box": {
+          "id": "empty-cl5",
+          "maxclass": "message",
+          "numinlets": 1,
+          "numoutlets": 1,
+          "patching_rect": [
+            35.0,
+            655.0,
+            38.0,
+            22.0
+          ],
+          "text": "set"
+        }
+      },
+      {
+        "box": {
+          "id": "empty-ql1",
+          "maxclass": "message",
+          "numinlets": 1,
+          "numoutlets": 1,
+          "patching_rect": [
+            195.0,
+            655.0,
+            38.0,
+            22.0
+          ],
+          "text": "set"
+        }
+      },
+      {
+        "box": {
           "id": "set-cl5",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -889,6 +1054,74 @@
             22.0
           ],
           "text": "prepend set"
+        }
+      },
+      {
+        "box": {
+          "id": "floating-message",
+          "maxclass": "message",
+          "numinlets": 1,
+          "numoutlets": 1,
+          "patching_rect": [
+            610.0,
+            440.0,
+            500.0,
+            22.0
+          ],
+          "text": "window flags float nogrow close nozoom, window size 180 120 720 270, window exec, presentation 1, locked 1, front"
+        }
+      },
+      {
+        "box": {
+          "id": "thispatcher",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 2,
+          "patching_rect": [
+            610.0,
+            475.0,
+            76.0,
+            22.0
+          ],
+          "text": "thispatcher",
+          "save": [
+            "#N",
+            "thispatcher",
+            ";",
+            "#Q",
+            "end",
+            ";"
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "auto-window-select",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 1,
+          "patching_rect": [
+            700.0,
+            475.0,
+            36.0,
+            22.0
+          ],
+          "text": "sel 1"
+        }
+      },
+      {
+        "box": {
+          "id": "auto-window-delay",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 1,
+          "patching_rect": [
+            745.0,
+            475.0,
+            58.0,
+            22.0
+          ],
+          "text": "delay 800"
         }
       },
       {
@@ -1142,16 +1375,16 @@
           "numinlets": 1,
           "numoutlets": 1,
           "patching_rect": [
-            125.0,
+            95.0,
             43.0,
-            255.0,
+            245.0,
             22.0
           ],
           "presentation": 1,
           "presentation_rect": [
-            125.0,
+            95.0,
             42.0,
-            258.0,
+            245.0,
             22.0
           ],
           "text": "—",
@@ -1180,16 +1413,16 @@
           "numinlets": 1,
           "numoutlets": 1,
           "patching_rect": [
-            125.0,
+            95.0,
             76.0,
-            255.0,
+            245.0,
             22.0
           ],
           "presentation": 1,
           "presentation_rect": [
-            125.0,
+            95.0,
             75.0,
-            258.0,
+            245.0,
             22.0
           ],
           "text": "—",
@@ -1205,6 +1438,82 @@
             0.04,
             0.07,
             0.1,
+            1.0
+          ],
+          "border": 0,
+          "rounded": 5
+        }
+      },
+      {
+        "box": {
+          "id": "program-cl5",
+          "maxclass": "message",
+          "numinlets": 1,
+          "numoutlets": 1,
+          "patching_rect": [
+            345.0,
+            43.0,
+            38.0,
+            22.0
+          ],
+          "presentation": 1,
+          "presentation_rect": [
+            345.0,
+            42.0,
+            38.0,
+            22.0
+          ],
+          "text": "—",
+          "fontsize": 10.0,
+          "fontface": 1,
+          "textcolor": [
+            0.95,
+            0.78,
+            0.38,
+            1.0
+          ],
+          "bgcolor": [
+            0.06,
+            0.07,
+            0.09,
+            1.0
+          ],
+          "border": 0,
+          "rounded": 5
+        }
+      },
+      {
+        "box": {
+          "id": "program-ql1",
+          "maxclass": "message",
+          "numinlets": 1,
+          "numoutlets": 1,
+          "patching_rect": [
+            345.0,
+            76.0,
+            38.0,
+            22.0
+          ],
+          "presentation": 1,
+          "presentation_rect": [
+            345.0,
+            75.0,
+            38.0,
+            22.0
+          ],
+          "text": "—",
+          "fontsize": 10.0,
+          "fontface": 1,
+          "textcolor": [
+            0.95,
+            0.78,
+            0.38,
+            1.0
+          ],
+          "bgcolor": [
+            0.06,
+            0.07,
+            0.09,
             1.0
           ],
           "border": 0,
@@ -1296,14 +1605,14 @@
           "patching_rect": [
             14.0,
             106.0,
-            430.0,
+            286.0,
             22.0
           ],
           "presentation": 1,
           "presentation_rect": [
             14.0,
             104.0,
-            430.0,
+            286.0,
             20.0
           ],
           "text": "MIDI · en attente",
@@ -1325,25 +1634,120 @@
       },
       {
         "box": {
+          "id": "floating-button",
+          "maxclass": "textbutton",
+          "numinlets": 1,
+          "numoutlets": 1,
+          "patching_rect": [
+            310.0,
+            106.0,
+            75.0,
+            22.0
+          ],
+          "presentation": 1,
+          "presentation_rect": [
+            310.0,
+            104.0,
+            75.0,
+            20.0
+          ],
+          "text": "DÉTACHER",
+          "fontsize": 8.0,
+          "bgcolor": [
+            0.16,
+            0.26,
+            0.38,
+            1.0
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "auto-window",
+          "maxclass": "live.toggle",
+          "numinlets": 1,
+          "numoutlets": 1,
+          "patching_rect": [
+            395.0,
+            106.0,
+            20.0,
+            20.0
+          ],
+          "presentation": 1,
+          "presentation_rect": [
+            395.0,
+            104.0,
+            20.0,
+            20.0
+          ],
+          "parameter_enable": 1,
+          "varname": "auto_open_monitor",
+          "saved_attribute_attributes": {
+            "valueof": {
+              "parameter_longname": "Ouvrir automatiquement le moniteur",
+              "parameter_shortname": "Auto fenêtre",
+              "parameter_type": 0,
+              "parameter_mmin": 0.0,
+              "parameter_mmax": 1.0,
+              "parameter_initial": [
+                0.0
+              ],
+              "parameter_initial_enable": 1,
+              "parameter_invisible": 1
+            }
+          }
+        }
+      },
+      {
+        "box": {
+          "id": "auto-window-label",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            417.0,
+            106.0,
+            43.0,
+            18.0
+          ],
+          "presentation": 1,
+          "presentation_rect": [
+            417.0,
+            105.0,
+            43.0,
+            18.0
+          ],
+          "text": "AUTO",
+          "fontsize": 8.0,
+          "textcolor": [
+            0.58,
+            0.64,
+            0.72,
+            1.0
+          ]
+        }
+      },
+      {
+        "box": {
           "id": "clear-button",
           "maxclass": "textbutton",
           "numinlets": 1,
           "numoutlets": 1,
           "patching_rect": [
-            455.0,
+            465.0,
             106.0,
-            72.0,
+            62.0,
             22.0
           ],
           "presentation": 1,
           "presentation_rect": [
-            455.0,
+            465.0,
             104.0,
-            72.0,
+            62.0,
             20.0
           ],
           "text": "EFFACER",
-          "fontsize": 9.0
+          "fontsize": 8.0
         }
       },
       {
@@ -1572,6 +1976,18 @@
       {
         "patchline": {
           "source": [
+            "lookup-cl5",
+            1
+          ],
+          "destination": [
+            "send-cl5-program",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
             "event-gate",
             0
           ],
@@ -1656,6 +2072,18 @@
       {
         "patchline": {
           "source": [
+            "lookup-ql1-cc",
+            1
+          ],
+          "destination": [
+            "send-ql1-cc-program",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
             "event-gate",
             1
           ],
@@ -1733,6 +2161,18 @@
           ],
           "destination": [
             "send-ql1-pgm",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "lookup-ql1-pgm",
+            1
+          ],
+          "destination": [
+            "send-ql1-pgm-program",
             0
           ]
         }
@@ -2044,6 +2484,42 @@
             0
           ],
           "destination": [
+            "route-empty-cl5",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "route-empty-cl5",
+            0
+          ],
+          "destination": [
+            "empty-cl5",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "empty-cl5",
+            0
+          ],
+          "destination": [
+            "display-cl5",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "route-empty-cl5",
+            1
+          ],
+          "destination": [
             "set-cl5",
             0
           ]
@@ -2068,6 +2544,42 @@
             0
           ],
           "destination": [
+            "route-empty-ql1",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "route-empty-ql1",
+            0
+          ],
+          "destination": [
+            "empty-ql1",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "empty-ql1",
+            0
+          ],
+          "destination": [
+            "display-ql1",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "route-empty-ql1",
+            1
+          ],
+          "destination": [
             "set-ql1",
             0
           ]
@@ -2081,6 +2593,54 @@
           ],
           "destination": [
             "display-ql1",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "recv-cl5-program",
+            0
+          ],
+          "destination": [
+            "set-cl5-program",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "set-cl5-program",
+            0
+          ],
+          "destination": [
+            "program-cl5",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "recv-ql1-program",
+            0
+          ],
+          "destination": [
+            "set-ql1-program",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "set-ql1-program",
+            0
+          ],
+          "destination": [
+            "program-ql1",
             0
           ]
         }
@@ -2121,6 +2681,92 @@
             0
           ],
           "order": 1
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "clear-message",
+            0
+          ],
+          "destination": [
+            "program-cl5",
+            0
+          ],
+          "order": 2
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "clear-message",
+            0
+          ],
+          "destination": [
+            "program-ql1",
+            0
+          ],
+          "order": 3
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "floating-button",
+            0
+          ],
+          "destination": [
+            "floating-message",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "auto-window",
+            0
+          ],
+          "destination": [
+            "auto-window-select",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "auto-window-select",
+            0
+          ],
+          "destination": [
+            "auto-window-delay",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "auto-window-delay",
+            0
+          ],
+          "destination": [
+            "floating-message",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "floating-message",
+            0
+          ],
+          "destination": [
+            "thispatcher",
+            0
+          ]
         }
       },
       {

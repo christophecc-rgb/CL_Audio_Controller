@@ -96,6 +96,8 @@ class MidiConsoleMonitorTests(unittest.TestCase):
             self.assertGreater(sum(display["textcolor"][:3]), sum(display["bgcolor"][:3]))
         self.assertEqual(boxes["display-cl5"]["textcolor"], boxes["label-cl5"]["textcolor"])
         self.assertEqual(boxes["display-ql1"]["textcolor"], boxes["label-ql1"]["textcolor"])
+        self.assertEqual(boxes["program-cl5"]["presentation"], 1)
+        self.assertEqual(boxes["program-ql1"]["presentation"], 1)
         self.assertEqual(patcher["openinpresentation"], 1)
         self.assertEqual(boxes["subtitle"]["presentation"], 0)
         self.assertEqual(boxes["midi-status"]["presentation"], 1)
@@ -128,6 +130,7 @@ class MidiConsoleMonitorTests(unittest.TestCase):
         self.assertEqual(boxes["confirmation-ql1"]["presentation"], 1)
         source = CONFIRMATION.read_text()
         self.assertIn("confirmedProgram === expectedProgram", source)
+        self.assertIn("confirmedProgram === program", source)
         self.assertIn('["✓", "CHARGÉE"', source)
         self.assertIn('["⚠", "REÇUE"', source)
 
@@ -178,9 +181,11 @@ class MidiConsoleMonitorTests(unittest.TestCase):
     def test_lookup_cleans_ableton_metadata_and_places_program_last(self):
         source = DISPLAY.read_text()
         self.assertIn(";\\s*BPM\\s*;\\s*KEY", source)
-        self.assertIn('[cleanName(displayName), "/", "Scène", program]', source)
+        self.assertIn("outlet(0, cleanName(displayName).split(/\\s+/))", source)
+        self.assertIn("outlet(1, program)", source)
+        self.assertIn('" / $1"', source)
         self.assertIn('replace(/[\\"“”«»]/g, "")', source)
-        self.assertIn('["Scène", program]', source)
+        self.assertNotIn('["Scène", program]', source)
         self.assertNotIn('"PROGRAMME"', source)
         scene_body = source.split("function scene()", 1)[1].split("function reset()", 1)[0]
         self.assertNotIn('outlet(0, "—")', scene_body)
@@ -190,10 +195,15 @@ class MidiConsoleMonitorTests(unittest.TestCase):
 
     def test_manual_clip_uses_its_own_session_row_name(self):
         source = DISPLAY.read_text()
-        self.assertIn('"this_device canonical_parent"', source)
+        self.assertNotIn('"this_device canonical_parent"', source)
+        self.assertIn('"live_set tracks " + observedTrackIndex', source)
         self.assertIn('trackObserver.property = "playing_slot_index"', source)
         self.assertIn('"live_set scenes " + slotIndex', source)
-        self.assertIn("playingSlotSceneName || currentSceneName", source)
+        self.assertIn(
+            "playingSlotSceneName || selectedStoppedSceneName",
+            source,
+        )
+        self.assertIn("latchedProgramName || currentSceneName", source)
         self.assertIn("refreshPlayingSlotScene();", source)
         self.assertIn("if (!trackObserver)", source)
         self.assertIn("function bang()", source)
@@ -213,6 +223,31 @@ class MidiConsoleMonitorTests(unittest.TestCase):
                 lines,
             )
 
+    def test_each_console_lookup_observes_its_command_source_track(self):
+        source = DISPLAY.read_text()
+        self.assertIn('consoleName === "QL1 CC"', source)
+        self.assertIn("return sourceTracks.ql1cc", source)
+        self.assertIn('consoleName === "QL1 PGM"', source)
+        self.assertIn("return sourceTracks.ql1pgm", source)
+        self.assertIn("return sourceTracks.cl5", source)
+        self.assertIn("trackIndices[0]", source)
+        self.assertNotIn('new LiveAPI(playingSlotChanged, "this_device canonical_parent")', source)
+
+    def test_program_change_has_a_dedicated_display_box(self):
+        temporary, output = self.build_device()
+        self.addCleanup(temporary.cleanup)
+        patcher = json.loads((output / "CL MIDI Console Monitor.maxpat").read_text())["patcher"]
+        boxes = {item["box"]["id"]: item["box"] for item in patcher["boxes"]}
+        lines = [item["patchline"] for item in patcher["lines"]]
+        self.assertEqual(boxes["send-cl5-program"]["text"], "s CL_MIDI_MON_CL5_PROGRAM")
+        self.assertEqual(boxes["send-ql1-cc-program"]["text"], "s CL_MIDI_MON_QL1_PROGRAM")
+        self.assertEqual(boxes["send-ql1-pgm-program"]["text"], "s CL_MIDI_MON_QL1_PROGRAM")
+        self.assertIn({"source": ["lookup-cl5", 1], "destination": ["send-cl5-program", 0]}, lines)
+        self.assertEqual(boxes["set-cl5-program"]["text"], "prepend set")
+        self.assertEqual(boxes["set-ql1-program"]["text"], "prepend set")
+        self.assertIn({"source": ["recv-cl5-program", 0], "destination": ["set-cl5-program", 0]}, lines)
+        self.assertIn({"source": ["set-cl5-program", 0], "destination": ["program-cl5", 0]}, lines)
+
     def test_ql1_paths_share_the_last_resolved_title(self):
         source = DISPLAY.read_text()
         self.assertIn('new Global("CLMidiConsoleDisplayState")', source)
@@ -221,11 +256,102 @@ class MidiConsoleMonitorTests(unittest.TestCase):
         self.assertIn('displayName = String(sharedDisplay[nameKey])', source)
         self.assertIn('sharedDisplay[physicalConsole + "Name"] = ""', source)
 
-    def test_ql1_cc_keeps_the_current_song_title_when_memory_changes(self):
+    def test_ql1_cc_prefers_the_manually_triggered_session_row_name(self):
         source = DISPLAY.read_text()
-        self.assertIn('consoleName === "QL1 CC"', source)
-        self.assertIn('(currentSceneName || playingSlotSceneName)', source)
-        self.assertIn('(playingSlotSceneName || currentSceneName)', source)
+        render_body = source.split("function render(program)", 1)[1].split(
+            "function scalar", 1
+        )[0]
+        self.assertIn(
+            "playingSlotSceneName || selectedStoppedSceneName",
+            render_body,
+        )
+        self.assertNotIn("currentSceneName || playingSlotSceneName", render_body)
+
+    def test_ql1_uses_selected_scene_only_when_live_is_stopped(self):
+        source = DISPLAY.read_text()
+        self.assertIn('physicalConsole !== "ql1"', source)
+        self.assertIn('songApi.get("is_playing")', source)
+        self.assertIn('"live_set view selected_scene"', source)
+        self.assertIn('selectedSceneApi.get("name")', source)
+        self.assertIn(
+            "playingSlotSceneName || selectedStoppedSceneName",
+            source,
+        )
+
+    def test_resolved_program_name_is_latched_against_late_osc_context(self):
+        source = DISPLAY.read_text()
+        render_body = source.split("function render(program)", 1)[1].split(
+            "function refreshSelectedStoppedScene", 1
+        )[0]
+        self.assertIn("latchedProgramName = directlyResolvedName", render_body)
+        self.assertIn("latchedProgramName || currentSceneName", render_body)
+        show_body = source.split("function showProgram(value)", 1)[1].split(
+            "function scene()", 1
+        )[0]
+        self.assertIn('latchedProgramName = ""', show_body)
+
+    def test_source_tracks_are_discovered_without_manual_configuration(self):
+        source = DISPLAY.read_text()
+        self.assertIn('songApi.getcount("tracks")', source)
+        self.assertIn('trackApi.get("name")', source)
+        self.assertIn('name.indexOf("CL5")', source)
+        self.assertIn('name.indexOf("QL1")', source)
+        self.assertIn('name.indexOf("CC")', source)
+        self.assertIn('name.indexOf("PGM")', source)
+        self.assertIn('clip_slots " + sceneIndex', source)
+        self.assertIn('slotApi.get("has_clip")', source)
+
+    def test_empty_scene_clears_cl5_or_combined_ql1_only_when_sources_are_known(self):
+        source = DISPLAY.read_text()
+        self.assertIn("sourceTracks.cl5.length", source)
+        self.assertIn("sourceTracks.ql1cc.concat(sourceTracks.ql1pgm)", source)
+        self.assertIn("ql1Tracks.length", source)
+        self.assertIn('outlet(0, "__CL_EMPTY__")', source)
+        self.assertIn("Unknown source names are fail-safe", source)
+
+        temporary, output = self.build_device()
+        self.addCleanup(temporary.cleanup)
+        patcher = json.loads((output / "CL MIDI Console Monitor.maxpat").read_text())["patcher"]
+        boxes = {item["box"]["id"]: item["box"] for item in patcher["boxes"]}
+        lines = [item["patchline"] for item in patcher["lines"]]
+        self.assertEqual(boxes["route-empty-cl5"]["text"], "route __CL_EMPTY__")
+        self.assertEqual(boxes["route-empty-ql1"]["text"], "route __CL_EMPTY__")
+        self.assertIn(
+            {"source": ["route-empty-cl5", 0], "destination": ["empty-cl5", 0]},
+            lines,
+        )
+        self.assertIn(
+            {"source": ["route-empty-ql1", 0], "destination": ["empty-ql1", 0]},
+            lines,
+        )
+
+    def test_monitor_can_open_as_a_persistent_floating_presentation_window(self):
+        temporary, output = self.build_device()
+        self.addCleanup(temporary.cleanup)
+        patcher = json.loads((output / "CL MIDI Console Monitor.maxpat").read_text())["patcher"]
+        boxes = {item["box"]["id"]: item["box"] for item in patcher["boxes"]}
+        lines = [item["patchline"] for item in patcher["lines"]]
+        self.assertEqual(patcher["openinpresentation"], 1)
+        self.assertEqual(boxes["floating-button"]["text"], "DÉTACHER")
+        self.assertIn("window flags float", boxes["floating-message"]["text"])
+        self.assertIn("window size 180 120 720 270", boxes["floating-message"]["text"])
+        self.assertIn("presentation 1", boxes["floating-message"]["text"])
+        self.assertIn("locked 1", boxes["floating-message"]["text"])
+        self.assertEqual(boxes["thispatcher"]["text"], "thispatcher")
+        self.assertEqual(boxes["auto-window"]["varname"], "auto_open_monitor")
+        self.assertEqual(boxes["auto-window"]["parameter_enable"], 1)
+        self.assertEqual(
+            boxes["auto-window"]["saved_attribute_attributes"]["valueof"]["parameter_initial"],
+            [0.0],
+        )
+        self.assertIn(
+            {"source": ["floating-button", 0], "destination": ["floating-message", 0]},
+            lines,
+        )
+        self.assertIn(
+            {"source": ["auto-window-delay", 0], "destination": ["floating-message", 0]},
+            lines,
+        )
 
 
 if __name__ == "__main__":
