@@ -55,8 +55,39 @@ class LiveSetGenerationTests(unittest.TestCase):
             mock.patch.object(self.app, "send", side_effect=lambda address, *args: sent.append((address, args))),
             mock.patch.object(self.app, "_query_with_query_lock_held", side_effect=confirm_selected),
             mock.patch.object(self.app, "resolve_scene_clip_duration_async"),
+            mock.patch.object(self.app, "send_midi_monitor_scene_context"),
         ):
             return self.app.execute_go_transaction(request_id, generation, scene_number)
+
+    def test_midi_monitor_scene_context_uses_active_ableton_target(self):
+        with (
+            mock.patch.object(self.app.ableton_transport, "host", "192.168.1.22"),
+            mock.patch.object(self.app.ableton_transport, "send_to") as send_to,
+        ):
+            self.assertTrue(self.app.send_midi_monitor_scene_context(7, 31, "32 - SUPREME ; BPM ; KEY ; 3:40"))
+
+        send_to.assert_called_once_with(
+            "192.168.1.22",
+            9002,
+            "/cl/midi-monitor/scene",
+            7,
+            31,
+            "32 - SUPREME ; BPM ; KEY ; 3:40",
+        )
+
+    def test_current_midi_context_is_republished_for_late_monitor_instances(self):
+        with mock.patch.object(self.app, "send_midi_monitor_scene_context", return_value=True) as publish:
+            self.assertTrue(self.app.publish_current_midi_monitor_scene_context())
+        publish.assert_called_once_with(3, 7, "Ancienne en cours")
+
+    def test_current_midi_context_is_not_published_before_first_scene_launch(self):
+        with self.app.lock:
+            self.app.state["has_show_started"] = False
+            self.app.state["playing_scene"] = None
+            self.app.state["playing_scene_name"] = ""
+        with mock.patch.object(self.app, "send_midi_monitor_scene_context") as publish:
+            self.assertFalse(self.app.publish_current_midi_monitor_scene_context())
+        publish.assert_not_called()
 
     def post_action_with_playing_reply(self, action_name, playing, sent):
         with (

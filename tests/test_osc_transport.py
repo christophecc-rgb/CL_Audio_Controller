@@ -18,6 +18,17 @@ class FakeClient:
 
 
 class OSCTransportTests(unittest.TestCase):
+    def test_auxiliary_send_is_encapsulated_by_transport(self):
+        client = mock.Mock()
+        with mock.patch.object(osc_transport.udp_client, "SimpleUDPClient", return_value=client):
+            transport = osc_transport.OSCTransport()
+            transport.send_to("192.168.1.22", 9002, "/cl/midi-monitor/scene", 4, 31, "SUPREME")
+
+        client.send_message.assert_called_once_with(
+            "/cl/midi-monitor/scene",
+            [4, 31, "SUPREME"],
+        )
+
     def make_transport(self, handler=None):
         with mock.patch.object(osc_transport.udp_client, "SimpleUDPClient", FakeClient):
             return osc_transport.OSCTransport(unsolicited_handler=handler)

@@ -68,6 +68,11 @@ class OSCTransport:
     def send(self, address: str, *args: Any) -> None:
         self._client.send_message(address, list(args))
 
+    def send_to(self, host: str, port: int, address: str, *args: Any) -> None:
+        """Émet un message OSC auxiliaire sans exposer le client à la logique métier."""
+        client = udp_client.SimpleUDPClient(str(host), int(port))
+        client.send_message(address, list(args))
+
     def _receive(self, address: str, *args: Any) -> None:
         now = time.time()
         with self._state_lock:

@@ -76,6 +76,10 @@ M4L_IP = "127.0.0.1"
 M4L_PORT = 9001
 m4l_client = udp_client.SimpleUDPClient(M4L_IP, M4L_PORT)
 
+# Contexte de scène destiné au moniteur MIDI Max for Live. La destination
+# suit la cible Ableton active afin de fonctionner aussi en mode distant.
+MIDI_MONITOR_SCENE_PORT = 9002
+
 # Compatibilité diagnostic ancienne interface — non utilisé.
 MIDI_PORT_EXACT = "M4L_OSC_9001"
 MIDI_CHANNEL = 0
@@ -1949,6 +1953,7 @@ def scan_playing_scene_from_tracks():
     if detected_slot >= 0:
         should_query_name = False
         should_resolve_clip_duration = False
+        scene_context = None
         detected_at = time.time()
         with lock:
             if int(state.get("set_generation", 0)) != generation:
@@ -1979,8 +1984,15 @@ def scan_playing_scene_from_tracks():
                     else None
                 )
                 state["sync_source"] = "Ableton direct"
+                scene_context = (
+                    generation,
+                    detected_slot,
+                    state["playing_scene_name"],
+                )
                 should_query_name = not bool(cached_name)
                 should_resolve_clip_duration = duration_seconds is None
+        if scene_context is not None:
+            send_midi_monitor_scene_context(*scene_context)
         # Nom réel demandé hors verrou.
         if should_query_name:
             query(
@@ -2024,6 +2036,7 @@ def background_refresh():
 
             if full_refresh_due:
                 refresh_arrangement_time()
+                publish_current_midi_monitor_scene_context()
                 last_full_refresh = now
 
         time.sleep(BACKGROUND_REFRESH_SECONDS)
@@ -2033,6 +2046,38 @@ def background_refresh():
 # -----------------------------------------------------------------------------
 # Sortie Max for Live OSC pour piloter le vrai crossfader Ableton.
 # -----------------------------------------------------------------------------
+def send_midi_monitor_scene_context(generation: int, scene_index: int, scene_name: str) -> bool:
+    """Publie une frontière de scène confirmée au moniteur MIDI Max for Live."""
+    try:
+        target_host = str(ableton_transport.host or "127.0.0.1")
+        ableton_transport.send_to(
+            target_host,
+            MIDI_MONITOR_SCENE_PORT,
+            "/cl/midi-monitor/scene",
+            int(generation),
+            int(scene_index),
+            str(scene_name or ""),
+        )
+        return True
+    except Exception as error:
+        print(f"Contexte scène MIDI Monitor non envoyé : {error}", flush=True)
+        return False
+
+
+def publish_current_midi_monitor_scene_context() -> bool:
+    """Rejoue le dernier contexte confirmé pour les moniteurs chargés tardivement."""
+    with lock:
+        if not bool(state.get("set_ready")) or not bool(state.get("has_show_started")):
+            return False
+        generation = int(state.get("set_generation") or 0)
+        scene_index = state.get("playing_scene")
+        scene_name = str(state.get("playing_scene_name") or "").strip()
+        if scene_index is None or not scene_name:
+            return False
+        scene_index = int(scene_index)
+    return send_midi_monitor_scene_context(generation, scene_index, scene_name)
+
+
 def send_crossfader_m4l(value: float):
     """Envoie A/B/Centre ou une valeur continue au patch Max for Live sur UDP 9001."""
     value = max(-1.0, min(1.0, float(value)))
@@ -2724,6 +2769,11 @@ def execute_go_transaction(request_id: str, expected_generation: int, scene_numb
                 args=(scene_index, expected_generation, now),
                 daemon=True,
             ).start()
+        send_midi_monitor_scene_context(
+            expected_generation,
+            scene_index,
+            requested_name,
+        )
         schedule_selected_scene_duration_refresh(next_scene, expected_generation)
 
         return True, f"Scène {scene_index + 1} lancée"
