@@ -1,11 +1,12 @@
-CL AUDIO CONTROLLER 2.2.0 — INSTALLATION SUR UN NOUVEAU MAC
-================================================================
+SUITE CL — INSTALLATION SUR UN NOUVEAU MAC
+===========================================
 
 CE KIT CONTIENT
 
-1. CL Audio Controller.app
-   L'application complète. Python et les bibliothèques nécessaires sont déjà
-   inclus : aucune installation Python ou commande pip n'est nécessaire.
+1. Installer la Suite CL.app
+   Une application d'installation graphique. Python et les bibliothèques
+   nécessaires sont déjà inclus : aucune installation Python ou commande pip
+   n'est nécessaire sur le Mac cible.
 
 2. Max for Live à installer
    - XFADER OSC BRIDGE v8
@@ -16,21 +17,23 @@ CE KIT CONTIENT
 3. AbletonOSC CL — Live 11 et Live 12
    Version validée avec les routes utilisées par CL Audio Controller.
 
-4. Installer_CL_Audio_Controller.command
-   Installe les trois éléments ci-dessus dans le compte utilisateur.
+4. CL Arrangement Builder Live et CL MIDI Console Monitor
+   Proposés séparément dans l'écran de sélection de l'installateur.
 
 
 INSTALLATION AUTOMATIQUE RECOMMANDÉE
 
 1. Fermer complètement Ableton Live.
-2. Double-cliquer sur Installer_CL_Audio_Controller.command.
+2. Double-cliquer sur « Installer la Suite CL.app ».
 3. Si macOS refuse le premier lancement :
    clic droit sur le fichier > Ouvrir > Ouvrir.
-4. Relancer Ableton Live.
-5. Ouvrir Réglages > Link, Tempo et MIDI.
-6. Choisir AbletonOSC comme surface de contrôle.
-7. Ouvrir CL Audio Controller depuis le dossier Applications de votre compte.
-8. Conserver le profil Local pour une installation sur un seul Mac.
+4. Choisir Ableton Live 12, puis les composants souhaités.
+5. Relancer Ableton Live.
+6. Ouvrir Réglages > Link, Tempo et MIDI.
+7. Choisir AbletonOSC comme surface de contrôle si CL Audio Controller a été
+   installé.
+8. Ouvrir les applications depuis le dossier Applications de votre compte.
+9. Conserver le profil Local pour une installation sur un seul Mac.
 
 
 EMPLACEMENTS UTILISÉS
@@ -41,9 +44,9 @@ Application :
 AbletonOSC :
 ~/Music/Ableton/User Library/Remote Scripts/AbletonOSC
 
-Max for Live :
+Max for Live Live 12 :
 ~/Music/Ableton/User Library/Presets/Audio Effects/Max Audio Effect/
-CL Audio Controller
+et ~/Music/Ableton/User Library/Presets/MIDI Effects/Max MIDI Effect/
 
 L'installation dans le compte utilisateur évite de demander un mot de passe
 administrateur. Une ancienne installation n'est jamais supprimée : elle est
@@ -53,10 +56,10 @@ renommée avec la date et l'heure avant remplacement.
 COMPATIBILITÉ
 
 - macOS : Apple Silicon et Intel (application universal2)
-- Ableton Live 11 et 12 : AbletonOSC CL fourni et validé
+- Ableton Live 12 : configuration principale, AbletonOSC CL fourni et validé
+- Ableton Live 11 : utilise le même ensemble de composants que Live 12
 - Ableton Live 10 : ne pas installer l'AbletonOSC fourni sans validation ;
-  seul le périphérique « Paradis Latin AutoScene - Live 10 » est identifié
-  explicitement pour Live 10.
+  l'installateur ne propose que « Paradis Latin AutoScene - Live 10 ».
 - Max for Live est nécessaire pour les périphériques LTC et crossfader.
 
 
@@ -76,8 +79,7 @@ Mode Distant :
 
 VÉRIFICATION
 
-Le fichier SHA256SUMS.txt permet de contrôler l'intégrité des archives.
-Double-cliquer sur Verifier_SHA256.command depuis le dossier du kit.
+Le fichier SHA256SUMS.txt permet de contrôler l'intégrité du kit complet.
 
 
 SÉCURITÉ MACOS
@@ -89,6 +91,5 @@ Ne désactivez pas globalement les protections de macOS.
 
 CL ARRANGEMENT BUILDER LIVE
 
-CL Arrangement Builder Live est une application indépendante. Elle n'est pas
-nécessaire pour faire fonctionner CL Audio Controller et possède son propre
-DMG/ZIP. Elle pourra être ajoutée à un kit « CL Production Suite » distinct.
+CL Arrangement Builder Live reste une application indépendante. L'installateur
+graphique permet de l'installer seule ou avec le reste de la suite.

@@ -57,13 +57,20 @@ class MaxForLiveDistributionTests(unittest.TestCase):
                     (device_dir / f"{name}.maxpat").read_text(encoding="utf-8")
                 )
                 compiled = read_amxd(device_dir / f"{name}.amxd")
-                self.assertEqual(source, compiled)
-                texts = [
+                if name == "Paradis Latin AutoScene":
+                    self.assertEqual(source, compiled)
+                source_texts = [
                     entry["box"].get("text", "")
                     for entry in source["patcher"]["boxes"]
                 ]
-                self.assertIn("js ParadisLatin_AutoScene.js", texts)
+                compiled_texts = [
+                    entry["box"].get("text", "")
+                    for entry in compiled["patcher"]["boxes"]
+                ]
+                self.assertIn("js ParadisLatin_AutoScene.js", source_texts)
+                self.assertIn("js ParadisLatin_AutoScene.js", compiled_texts)
                 self.assertNotIn("/Users/", json.dumps(source))
+                self.assertNotIn("/Users/", json.dumps(compiled))
 
     def test_autoscene_dependencies_are_distributed(self):
         device_dir = DEVICES / "Paradis Latin AutoScene"
@@ -110,16 +117,31 @@ class MaxForLiveDistributionTests(unittest.TestCase):
                     sha256(INSTALL / f"{name}.amxd"),
                 )
 
-    def test_live_10_variant_keeps_explicit_compatibility_metadata(self):
+    def test_live_10_package_uses_validated_runtime_and_keeps_compatibility_source(self):
+        device_dir = DEVICES / "Paradis Latin AutoScene"
+        self.assertEqual(
+            sha256(device_dir / "Paradis Latin AutoScene.amxd"),
+            sha256(device_dir / "Paradis Latin AutoScene - Live 10.amxd"),
+        )
+        source = json.loads(
+            (
+                device_dir / "Paradis Latin AutoScene - Live 10.maxpat"
+            ).read_text(encoding="utf-8")
+        )
+        patcher = source["patcher"]
+        self.assertEqual(patcher["appversion"]["major"], 8)
+        self.assertEqual(patcher["minimum_live_version"], "10.0.0")
+        self.assertEqual(patcher["minimum_max_version"], "8.0.0")
+        self.assertTrue((INSTALL / "Paradis Latin AutoScene - Live 10.maxpat").is_file())
+
+    def test_live_10_install_runtime_matches_working_standard_device(self):
         device = read_amxd(
             DEVICES
             / "Paradis Latin AutoScene"
             / "Paradis Latin AutoScene - Live 10.amxd"
         )
         patcher = device["patcher"]
-        self.assertEqual(patcher["appversion"]["major"], 8)
-        self.assertEqual(patcher["minimum_live_version"], "10.0.0")
-        self.assertEqual(patcher["minimum_max_version"], "8.0.0")
+        self.assertGreaterEqual(patcher["appversion"]["major"], 9)
 
     def test_ltc_cache_script_is_distributed(self):
         source = DEVICES / "LTC Display v2.0 Remote Config" / "cache.js"

@@ -21,6 +21,7 @@ UNINSTALL_REMOTE=0
 UNINSTALL_BUILDER=0
 UNINSTALL_AUTOSCENE=0
 UNINSTALL_LIVE10=0
+UNINSTALL_MIDI_CONSOLE=0
 
 CHOICE="${CL_SUITE_UNINSTALL_COMPONENTS:-}"
 if [[ -z "$CHOICE" ]]; then
@@ -36,19 +37,21 @@ if [[ -z "$CHOICE" ]]; then
   echo "  3 — Arrangement Builder"
   echo "  4 — AutoScene Live 11/12"
   echo "  5 — AutoScene Live 10"
-  echo "  6 — Choix personnalisé"
-  echo "  7 — Annuler"
+  echo "  6 — CL MIDI Console"
+  echo "  7 — Choix personnalisé"
+  echo "  8 — Annuler"
   read -r -p "Votre choix : " CHOICE
 fi
 
 case "$CHOICE" in
   1|all|complete)
-    UNINSTALL_REMOTE=1; UNINSTALL_BUILDER=1; UNINSTALL_AUTOSCENE=1; UNINSTALL_LIVE10=1 ;;
+    UNINSTALL_REMOTE=1; UNINSTALL_BUILDER=1; UNINSTALL_AUTOSCENE=1; UNINSTALL_LIVE10=1; UNINSTALL_MIDI_CONSOLE=1 ;;
   2|remote) UNINSTALL_REMOTE=1 ;;
   3|builder) UNINSTALL_BUILDER=1 ;;
   4|autoscene) UNINSTALL_AUTOSCENE=1 ;;
   5|autoscene-live10|live10) UNINSTALL_LIVE10=1 ;;
-  6|custom)
+  6|midi-console) UNINSTALL_MIDI_CONSOLE=1 ;;
+  7|custom)
     read -r -p "Retirer la Télécommande CL Audio ? (o/n) " answer
     [[ "$answer" =~ ^([oOyY]|oui|OUI|yes|YES)$ ]] && UNINSTALL_REMOTE=1
     read -r -p "Retirer Arrangement Builder ? (o/n) " answer
@@ -57,8 +60,21 @@ case "$CHOICE" in
     [[ "$answer" =~ ^([oOyY]|oui|OUI|yes|YES)$ ]] && UNINSTALL_AUTOSCENE=1
     read -r -p "Retirer AutoScene Live 10 ? (o/n) " answer
     [[ "$answer" =~ ^([oOyY]|oui|OUI|yes|YES)$ ]] && UNINSTALL_LIVE10=1
+    read -r -p "Retirer CL MIDI Console ? (o/n) " answer
+    [[ "$answer" =~ ^([oOyY]|oui|OUI|yes|YES)$ ]] && UNINSTALL_MIDI_CONSOLE=1
     ;;
-  *) echo "Désinstallation annulée."; exit 0 ;;
+  *)
+    normalized=",${CHOICE},"
+    [[ "$normalized" == *,remote,* ]] && UNINSTALL_REMOTE=1
+    [[ "$normalized" == *,builder,* ]] && UNINSTALL_BUILDER=1
+    [[ "$normalized" == *,autoscene,* ]] && UNINSTALL_AUTOSCENE=1
+    [[ "$normalized" == *,autoscene-live10,* ]] && UNINSTALL_LIVE10=1
+    [[ "$normalized" == *,midi-console,* ]] && UNINSTALL_MIDI_CONSOLE=1
+    if [[ "$UNINSTALL_REMOTE$UNINSTALL_BUILDER$UNINSTALL_AUTOSCENE$UNINSTALL_LIVE10$UNINSTALL_MIDI_CONSOLE" == "00000" ]]; then
+      echo "Désinstallation annulée."
+      exit 0
+    fi
+    ;;
 esac
 
 is_selected() {
@@ -67,6 +83,7 @@ is_selected() {
     builder) [[ "$UNINSTALL_BUILDER" == "1" ]] ;;
     autoscene) [[ "$UNINSTALL_AUTOSCENE" == "1" ]] ;;
     autoscene-live10) [[ "$UNINSTALL_LIVE10" == "1" ]] ;;
+    midi-console) [[ "$UNINSTALL_MIDI_CONSOLE" == "1" ]] ;;
     *) return 1 ;;
   esac
 }
@@ -79,7 +96,10 @@ is_allowed_target() {
     "$INSTALL_HOME/Music/Ableton/User Library/Remote Scripts/CL_Arrangement_Builder_Live"|\
     "$INSTALL_HOME/Music/Ableton/User Library/Presets/Audio Effects/Max Audio Effect/CL Audio Controller - Remote"|\
     "$INSTALL_HOME/Music/Ableton/User Library/Presets/Audio Effects/Max Audio Effect/CL Audio Controller - AutoScene"|\
-    "$INSTALL_HOME/Music/Ableton/User Library/Presets/Audio Effects/Max Audio Effect/CL Audio Controller - Live 10") return 0 ;;
+    "$INSTALL_HOME/Music/Ableton/User Library/Presets/Audio Effects/Max Audio Effect/CL Audio Controller - Live 10"|\
+    "$INSTALL_HOME/Music/Ableton/User Library/Presets/MIDI Effects/Max MIDI Effect/CL MIDI Console Monitor"|\
+    "$INSTALL_HOME/Library/Application Support/CL MIDI Console/Network Tools"|\
+    "$INSTALL_HOME/Applications/CL MIDI Network Assistant.app") return 0 ;;
     *) return 1 ;;
   esac
 }

@@ -1,4 +1,4 @@
-2d0bf4715cb4d6d953180ca182fd99d2d081a6745fc428ec85fe46a4e49aa7dd  Paradis Latin AutoScene - Live 10.amxd
+a3489b0e6a0636736fc80d496480876035fe625c5c09987c06a1d8cf22192e8d  Paradis Latin AutoScene - Live 10.amxd
 a74ec072bd14e66e092cfbb138585e74759dbbf80afb6bb7e2d72c031a9f0d11  Paradis Latin AutoScene - Live 10.maxpat
 435af51b50934f7f224a99e5fe59183b30cd273497f327e17a447cb13e838217  ParadisLatin_AutoScene.js
 f504f9816cd57da418d16eca07c04ed90fb12ec43b55809cc27fd003c63517e3  paradis_latin_logo.jpg

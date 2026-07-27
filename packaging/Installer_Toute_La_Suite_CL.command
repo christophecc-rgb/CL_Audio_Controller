@@ -2,6 +2,12 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+COMPONENTS_ROOT="$SCRIPT_DIR/Composants"
+INTEGRITY_MANIFEST="$SCRIPT_DIR/COMPONENTS_SHA256.txt"
+APPLICATIONS_SOURCE="$COMPONENTS_ROOT/Applications"
+LIVE_CURRENT_SOURCE="$COMPONENTS_ROOT/Ableton Live 11-12"
+LIVE10_SOURCE_ROOT="$COMPONENTS_ROOT/Ableton Live 10"
+MIDI_TOOLS_SOURCE="$COMPONENTS_ROOT/Outils réseau MIDI"
 INSTALL_HOME="${CL_SUITE_INSTALL_HOME:-$HOME}"
 USER_APPS="$INSTALL_HOME/Applications"
 ABLETON_LIBRARY="$INSTALL_HOME/Music/Ableton/User Library"
@@ -9,6 +15,8 @@ REMOTE_SCRIPTS="$ABLETON_LIBRARY/Remote Scripts"
 M4L_REMOTE_TARGET="$ABLETON_LIBRARY/Presets/Audio Effects/Max Audio Effect/CL Audio Controller - Remote"
 M4L_AUTOSCENE_TARGET="$ABLETON_LIBRARY/Presets/Audio Effects/Max Audio Effect/CL Audio Controller - AutoScene"
 M4L_LIVE10_TARGET="$ABLETON_LIBRARY/Presets/Audio Effects/Max Audio Effect/CL Audio Controller - Live 10"
+M4L_MIDI_CONSOLE_TARGET="$ABLETON_LIBRARY/Presets/MIDI Effects/Max MIDI Effect/CL MIDI Console Monitor"
+MIDI_TOOLS_TARGET="$INSTALL_HOME/Library/Application Support/CL MIDI Console/Network Tools"
 SUPPORT_DIR="$INSTALL_HOME/Library/Application Support/CL Audio Controller"
 INSTALL_MANIFEST="$SUPPORT_DIR/CL_Suite_install_manifest.tsv"
 STAMP="$(date '+%Y-%m-%d_%H%M%S')"
@@ -73,12 +81,11 @@ write_install_manifest() {
   mv "$INSTALL_MANIFEST.tmp" "$INSTALL_MANIFEST"
 }
 
-CONTROLLER_ZIP="$(find "$SCRIPT_DIR/01 - CL Audio Controller "* -maxdepth 1 -type f -name 'CL_Audio_Controller_*_Kit_Complet_macOS.zip' -print -quit 2>/dev/null || true)"
-BUILDER_ROOT="$SCRIPT_DIR/02 - CL Arrangement Builder Live 1.2.2/Arrangement Builder Live 1.2.2"
-
-[[ -n "$CONTROLLER_ZIP" ]] || fail "ZIP complet de CL Audio Controller introuvable"
-require_source "$BUILDER_ROOT/Applications/Arrangement Builder Live.app"
-require_source "$BUILDER_ROOT/Installation Ableton/Remote Scripts/CL_Arrangement_Builder_Live"
+require_source "$COMPONENTS_ROOT"
+require_source "$INTEGRITY_MANIFEST"
+if ! (cd "$SCRIPT_DIR" && shasum -a 256 -c "$(basename "$INTEGRITY_MANIFEST")" >/dev/null); then
+  fail "le contrôle d'intégrité des composants a échoué"
+fi
 
 echo "============================================================"
 echo " INSTALLER TOUTE LA SUITE CL"
@@ -114,6 +121,7 @@ INSTALL_REMOTE=0
 INSTALL_BUILDER=0
 INSTALL_AUTOSCENE=0
 INSTALL_AUTOSCENE_LIVE10=0
+INSTALL_MIDI_CONSOLE=0
 
 if [[ "$LIVE_FAMILY" == "10" ]]; then
   INSTALL_AUTOSCENE_LIVE10=1
@@ -126,27 +134,32 @@ else
     echo "  2 — Télécommande CL Audio uniquement"
     echo "  3 — Arrangement Builder uniquement"
     echo "  4 — AutoScene uniquement"
-    echo "  5 — Choix personnalisé"
-    echo "  6 — Annuler"
+    echo "  5 — CL MIDI Console uniquement"
+    echo "  6 — Choix personnalisé"
+    echo "  7 — Annuler"
     read -r -p "Votre choix : " COMPONENT_CHOICE
   fi
 
   case "$COMPONENT_CHOICE" in
     1|all|complete)
-      INSTALL_REMOTE=1; INSTALL_BUILDER=1; INSTALL_AUTOSCENE=1 ;;
+      INSTALL_REMOTE=1; INSTALL_BUILDER=1; INSTALL_AUTOSCENE=1; INSTALL_MIDI_CONSOLE=1 ;;
     2|remote)
       INSTALL_REMOTE=1 ;;
     3|builder)
       INSTALL_BUILDER=1 ;;
     4|autoscene)
       INSTALL_AUTOSCENE=1 ;;
-    5|custom)
+    5|midi-console)
+      INSTALL_MIDI_CONSOLE=1 ;;
+    6|custom)
       read -r -p "Installer la Télécommande CL Audio ? (o/n) " choice
       [[ "$choice" =~ ^([oOyY]|oui|OUI|yes|YES)$ ]] && INSTALL_REMOTE=1
       read -r -p "Installer Arrangement Builder ? (o/n) " choice
       [[ "$choice" =~ ^([oOyY]|oui|OUI|yes|YES)$ ]] && INSTALL_BUILDER=1
       read -r -p "Installer AutoScene ? (o/n) " choice
       [[ "$choice" =~ ^([oOyY]|oui|OUI|yes|YES)$ ]] && INSTALL_AUTOSCENE=1
+      read -r -p "Installer CL MIDI Console ? (o/n) " choice
+      [[ "$choice" =~ ^([oOyY]|oui|OUI|yes|YES)$ ]] && INSTALL_MIDI_CONSOLE=1
       ;;
     remote,builder|builder,remote)
       INSTALL_REMOTE=1; INSTALL_BUILDER=1 ;;
@@ -154,78 +167,69 @@ else
       INSTALL_REMOTE=1; INSTALL_AUTOSCENE=1 ;;
     builder,autoscene|autoscene,builder)
       INSTALL_BUILDER=1; INSTALL_AUTOSCENE=1 ;;
-    *) echo "Installation annulée."; exit 0 ;;
+    *)
+      normalized=",${COMPONENT_CHOICE},"
+      [[ "$normalized" == *,remote,* ]] && INSTALL_REMOTE=1
+      [[ "$normalized" == *,builder,* ]] && INSTALL_BUILDER=1
+      [[ "$normalized" == *,autoscene,* ]] && INSTALL_AUTOSCENE=1
+      [[ "$normalized" == *,midi-console,* ]] && INSTALL_MIDI_CONSOLE=1
+      if [[ "$INSTALL_REMOTE$INSTALL_BUILDER$INSTALL_AUTOSCENE$INSTALL_MIDI_CONSOLE" == "0000" ]]; then
+        echo "Installation annulée."
+        exit 0
+      fi
+      ;;
   esac
 fi
 
 echo
-echo "Préparation des fichiers…"
-ditto -x -k "$CONTROLLER_ZIP" "$WORK_DIR/controller"
-CONTROLLER_ROOT="$(find "$WORK_DIR/controller" -maxdepth 1 -type d -name 'CL Audio Controller *' -print -quit)"
-[[ -n "$CONTROLLER_ROOT" ]] || fail "contenu de CL Audio Controller introuvable après extraction"
-
-require_source "$CONTROLLER_ROOT/Max for Live à installer"
+echo "Vérification des composants…"
 if [[ "$INSTALL_REMOTE" == "1" ]]; then
-  require_source "$CONTROLLER_ROOT/CL Audio Controller.app"
-  require_source "$CONTROLLER_ROOT/AbletonOSC CL/AbletonOSC"
+  require_source "$APPLICATIONS_SOURCE/CL Audio Controller.app"
+  require_source "$LIVE_CURRENT_SOURCE/Remote Scripts/AbletonOSC"
+  require_source "$LIVE_CURRENT_SOURCE/Max for Live/CL Audio Controller - Remote"
 fi
 
 mkdir -p "$USER_APPS" "$REMOTE_SCRIPTS" "$(dirname "$M4L_REMOTE_TARGET")"
 
 if [[ "$INSTALL_REMOTE" == "1" ]]; then
-  install_item "$CONTROLLER_ROOT/CL Audio Controller.app" \
+  install_item "$APPLICATIONS_SOURCE/CL Audio Controller.app" \
     "$USER_APPS/CL Audio Controller.app" "Télécommande — CL Audio Controller" "remote"
-  install_item "$CONTROLLER_ROOT/AbletonOSC CL/AbletonOSC" \
+  install_item "$LIVE_CURRENT_SOURCE/Remote Scripts/AbletonOSC" \
     "$REMOTE_SCRIPTS/AbletonOSC" "Télécommande — AbletonOSC CL" "remote"
-
-  REMOTE_M4L_SOURCE="$WORK_DIR/Max for Live - Remote"
-  mkdir -p "$REMOTE_M4L_SOURCE"
-  for required in \
-    "XFADER OSC BRIDGE v8.amxd" \
-    "LTC Display v2.0 Remote Config.amxd" \
-    "cache.js"; do
-    require_source "$CONTROLLER_ROOT/Max for Live à installer/$required"
-    ditto "$CONTROLLER_ROOT/Max for Live à installer/$required" "$REMOTE_M4L_SOURCE/$required"
-  done
-  install_item "$REMOTE_M4L_SOURCE" "$M4L_REMOTE_TARGET" \
+  install_item "$LIVE_CURRENT_SOURCE/Max for Live/CL Audio Controller - Remote" \
+    "$M4L_REMOTE_TARGET" \
     "Télécommande — LTC et X-Fader" "remote"
 fi
 
 if [[ "$INSTALL_BUILDER" == "1" ]]; then
-  install_item "$BUILDER_ROOT/Applications/Arrangement Builder Live.app" \
+  install_item "$APPLICATIONS_SOURCE/Arrangement Builder Live.app" \
     "$USER_APPS/Arrangement Builder Live.app" "Builder — Application" "builder"
-  install_item \
-    "$BUILDER_ROOT/Installation Ableton/Remote Scripts/CL_Arrangement_Builder_Live" \
+  install_item "$LIVE_CURRENT_SOURCE/Remote Scripts/CL_Arrangement_Builder_Live" \
     "$REMOTE_SCRIPTS/CL_Arrangement_Builder_Live" \
     "Builder — Remote Script" "builder"
 fi
 
 if [[ "$INSTALL_AUTOSCENE" == "1" ]]; then
-  AUTOSCENE_SOURCE="$WORK_DIR/Max for Live - AutoScene"
-  mkdir -p "$AUTOSCENE_SOURCE"
-  for required in \
-    "Paradis Latin AutoScene.amxd" \
-    "ParadisLatin_AutoScene.js" \
-    "paradis_latin_logo.jpg"; do
-    require_source "$CONTROLLER_ROOT/Max for Live à installer/$required"
-    ditto "$CONTROLLER_ROOT/Max for Live à installer/$required" "$AUTOSCENE_SOURCE/$required"
-  done
-  install_item "$AUTOSCENE_SOURCE" "$M4L_AUTOSCENE_TARGET" \
+  install_item "$LIVE_CURRENT_SOURCE/Max for Live/Paradis Latin AutoScene" \
+    "$M4L_AUTOSCENE_TARGET" \
     "AutoScene — Version Live 11/12" "autoscene"
 fi
 
 if [[ "$INSTALL_AUTOSCENE_LIVE10" == "1" ]]; then
-  LIVE10_SOURCE="$WORK_DIR/Max for Live - Live 10"
-  mkdir -p "$LIVE10_SOURCE"
-  for required in \
-    "Paradis Latin AutoScene - Live 10.amxd" \
-    "ParadisLatin_AutoScene.js" \
-    "paradis_latin_logo.jpg"; do
-    require_source "$CONTROLLER_ROOT/Max for Live à installer/$required"
-    ditto "$CONTROLLER_ROOT/Max for Live à installer/$required" "$LIVE10_SOURCE/$required"
-  done
-  install_item "$LIVE10_SOURCE" "$M4L_LIVE10_TARGET" \
+  install_item "$LIVE10_SOURCE_ROOT/Max for Live/Paradis Latin AutoScene - Live 10" \
+    "$M4L_LIVE10_TARGET" \
     "AutoScene — Version Live 10" "autoscene-live10"
+fi
+
+if [[ "$INSTALL_MIDI_CONSOLE" == "1" ]]; then
+  install_item "$LIVE_CURRENT_SOURCE/Max for Live/CL MIDI Console Monitor" \
+    "$M4L_MIDI_CONSOLE_TARGET" \
+    "MIDI Console — Périphérique Max for Live" "midi-console"
+  install_item "$MIDI_TOOLS_SOURCE" "$MIDI_TOOLS_TARGET" \
+    "MIDI Console — Outils réseau" "midi-console"
+  install_item "$APPLICATIONS_SOURCE/CL MIDI Network Assistant.app" \
+    "$USER_APPS/CL MIDI Network Assistant.app" \
+    "MIDI Console — Assistant réseau" "midi-console"
 fi
 
 write_install_manifest

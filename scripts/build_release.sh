@@ -4,12 +4,14 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION="${1:-2.2.0}"
 STAMP="$(date +"%Y-%m-%d_%H-%M-%S")"
-RELEASE_ROOT="$PROJECT_ROOT/Releases"
+RELEASE_ROOT="${CL_RELEASE_OUTPUT_ROOT:-$PROJECT_ROOT/Releases}"
 RELEASE_DIR="$RELEASE_ROOT/CL_Audio_Controller_${VERSION}_${STAMP}"
 BUILD_ROOT="$(mktemp -d "/private/tmp/CL_Audio_Controller_release_${VERSION}_XXXXXX")"
 APP_PATH="$BUILD_ROOT/dist/CL Audio Controller.app"
 KIT_ROOT="$BUILD_ROOT/kit/CL Audio Controller $VERSION"
 M4L_SOURCE="$PROJECT_ROOT/M4L/Install"
+MIDI_DEVICE_SOURCE="$PROJECT_ROOT/M4L/Devices/CL MIDI Console Monitor"
+MIDI_TOOLS_SOURCE="$PROJECT_ROOT/tools/cl_midi_network"
 ABLETONOSC_ROOT="$(cd "$PROJECT_ROOT/../AbletonOSC" 2>/dev/null && pwd || true)"
 PACKAGING_SOURCE="$PROJECT_ROOT/packaging"
 DMG_NAME="CL_Audio_Controller_${VERSION}.dmg"
@@ -64,6 +66,10 @@ if [[ ! -d "$M4L_SOURCE" ]]; then
   echo "Dossier Max for Live introuvable : $M4L_SOURCE" >&2
   exit 1
 fi
+if [[ ! -f "$MIDI_DEVICE_SOURCE/CL MIDI Console Monitor.amxd" ]]; then
+  echo "CL MIDI Console Monitor introuvable : $MIDI_DEVICE_SOURCE" >&2
+  exit 1
+fi
 
 echo
 echo "========== KIT D'INSTALLATION =========="
@@ -73,6 +79,37 @@ mkdir -p \
 
 ditto "$APP_PATH" "$KIT_ROOT/CL Audio Controller.app"
 ditto "$M4L_SOURCE" "$KIT_ROOT/Max for Live à installer"
+ditto "$MIDI_DEVICE_SOURCE" "$KIT_ROOT/Max for Live à installer/CL MIDI Console Monitor"
+
+"$MIDI_TOOLS_SOURCE/build.sh" "$BUILD_ROOT/midi-tools"
+mkdir -p \
+  "$KIT_ROOT/CL MIDI Network Tools" \
+  "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/MacOS" \
+  "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Resources/Network Tools"
+for tool in CLMIDINetworkGuardian CLMIDIRoundTripTester CLYamahaConsoleSimulator; do
+  ditto "$BUILD_ROOT/midi-tools/$tool" "$KIT_ROOT/CL MIDI Network Tools/$tool"
+  ditto "$BUILD_ROOT/midi-tools/$tool" "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Resources/Network Tools/$tool"
+done
+ditto "$MIDI_TOOLS_SOURCE/reconnect_legacy_rtp.applescript" "$KIT_ROOT/CL MIDI Network Tools/reconnect_legacy_rtp.applescript"
+ditto "$MIDI_TOOLS_SOURCE/reconnect_legacy_rtp.applescript" "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Resources/Network Tools/reconnect_legacy_rtp.applescript"
+ditto "$PACKAGING_SOURCE/CL_MIDI_Network_Assistant.sh" "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/MacOS/CL MIDI Network Assistant"
+ditto "$PROJECT_ROOT/assets/CL_MIDI_Network_Assistant.icns" "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Resources/CL_MIDI_Network_Assistant.icns"
+chmod +x "$KIT_ROOT/CL MIDI Network Tools"/CLMIDI* "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/MacOS/CL MIDI Network Assistant"
+cat > "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Info.plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleDisplayName</key><string>CL MIDI Network Assistant</string>
+<key>CFBundleExecutable</key><string>CL MIDI Network Assistant</string>
+<key>CFBundleIdentifier</key><string>com.claudio.midi-network-assistant</string>
+<key>CFBundleIconFile</key><string>CL_MIDI_Network_Assistant.icns</string>
+<key>CFBundleName</key><string>CL MIDI Network Assistant</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleShortVersionString</key><string>$VERSION</string>
+<key>LSMinimumSystemVersion</key><string>10.15</string>
+<key>NSHighResolutionCapable</key><true/>
+</dict></plist>
+EOF
 
 # git archive n'inclut ni .git, ni caches, ni journaux, ni fichiers locaux.
 git -C "$ABLETONOSC_ROOT" archive --format=tar HEAD |
@@ -112,6 +149,9 @@ EOF
     "Max for Live à installer/LTC Display v2.0 Remote Config.amxd" \
     "Max for Live à installer/Paradis Latin AutoScene.amxd" \
     "Max for Live à installer/Paradis Latin AutoScene - Live 10.amxd" \
+    "Max for Live à installer/Paradis Latin AutoScene - Live 10.maxpat" \
+    "Max for Live à installer/CL MIDI Console Monitor/CL MIDI Console Monitor.amxd" \
+    "CL MIDI Network Tools/CLMIDIRoundTripTester" \
     > CONTENU_SHA256.txt
 )
 
@@ -149,7 +189,7 @@ Built at: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
 Build workspace: $BUILD_ROOT
 Architecture: $(uname -m)
 AbletonOSC commit: $(git -C "$ABLETONOSC_ROOT" rev-parse HEAD)
-Contenu: application autonome + AbletonOSC CL + Max for Live + documentation
+Contenu: application autonome + AbletonOSC CL + Max for Live + CL MIDI Console + documentation
 Python requis sur le Mac cible: non
 EOF
 

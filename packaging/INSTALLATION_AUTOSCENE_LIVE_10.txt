@@ -22,7 +22,9 @@ Installation :
 Les fichiers JavaScript et logo doivent rester dans le même dossier que le
 fichier .amxd. Le fichier .maxpat est la source éditable et doit être conservé.
 
-Cette variante déclare :
+Le fichier AMXD fourni utilise le même moteur validé que la version standard,
+qui a été testé avec succès dans Ableton Live 10. Le fichier MAXPAT conserve
+les métadonnées de compatibilité suivantes :
 
 - Ableton Live minimum : 10.0.0
 - Max minimum : 8.0.0

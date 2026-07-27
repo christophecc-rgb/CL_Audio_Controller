@@ -9,8 +9,10 @@ transportable sur un autre Mac.
   Master et à utiliser avec le port UDP 9001.
 - `Paradis Latin AutoScene.amxd` : périphérique AutoScene pour les versions
   actuelles d'Ableton Live.
-- `Paradis Latin AutoScene - Live 10.amxd` : variante destinée aux Live Sets qui
-  nécessitent la compatibilité Ableton Live 10.
+- `Paradis Latin AutoScene - Live 10.amxd` : copie du moteur AutoScene validé
+  sur Live 10, conservée sous un nom explicite pour l'installation.
+- `Paradis Latin AutoScene - Live 10.maxpat` : source éditable de compatibilité
+  Max 8 / Ableton Live 10.
 - `LTC Display v2.0 Remote Config.amxd` : affichage et émission du LTC. Le port
   attendu par défaut est 63123 ; en mode distant, renseigner l'adresse du Mac
   exécutant CL Audio Controller.

@@ -24,6 +24,7 @@ class MidiNetworkToolsTests(unittest.TestCase):
 
     def test_build_script_targets_native_tools(self):
         source = (TOOLS / "build.sh").read_text()
+        self.assertIn('${1:-$SCRIPT_DIR/build}', source)
         self.assertIn("-framework CoreMIDI", source)
         self.assertIn("-arch arm64 -arch x86_64", source)
         self.assertIn("CLMIDINetworkGuardian", source)

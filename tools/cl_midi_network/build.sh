@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="${0:A:h}"
-OUTPUT_DIR="$SCRIPT_DIR/build"
+OUTPUT_DIR="${1:-$SCRIPT_DIR/build}"
 mkdir -p "$OUTPUT_DIR"
 
 clang -arch arm64 -arch x86_64 -fobjc-arc -fblocks \
