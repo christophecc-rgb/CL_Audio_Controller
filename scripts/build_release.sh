@@ -119,6 +119,7 @@ cat > "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Info.plist" <<EOF
 <key>NSAppleEventsUsageDescription</key><string>CL MIDI Network Assistant utilise Configuration audio et MIDI et Événements système pour ouvrir et reconnecter la cible RTP sélectionnée.</string>
 </dict></plist>
 EOF
+xattr -cr "$KIT_ROOT/CL MIDI Network Assistant.app"
 codesign --force --deep --sign - "$KIT_ROOT/CL MIDI Network Assistant.app"
 
 # git archive n'inclut ni .git, ni caches, ni journaux, ni fichiers locaux.

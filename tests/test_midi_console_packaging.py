@@ -86,6 +86,7 @@ class MidiConsolePackagingTests(unittest.TestCase):
             self.assertIn("NSHighResolutionCapable", source)
             self.assertIn("NSAppleEventsUsageDescription", source)
             self.assertIn('codesign --force --deep --sign -', source)
+            self.assertIn('xattr -cr', source)
 
     def test_network_assistant_uses_the_native_dashboard(self):
         for relative_path in (

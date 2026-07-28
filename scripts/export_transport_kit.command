@@ -30,6 +30,7 @@ DEST_ZIP="$DESKTOP_DIR/${SUITE_NAME}.zip"
 DEST_SHA="$DESKTOP_DIR/${SUITE_NAME}_SHA256.txt"
 ICLOUD_DEST_ZIP="$ICLOUD_DRIVE_DIR/${SUITE_NAME}.zip"
 SKIP_ICLOUD="${CL_SUITE_SKIP_ICLOUD:-0}"
+REVEAL_OUTPUT="${CL_SUITE_REVEAL_OUTPUT:-1}"
 
 cleanup() {
   rm -rf "$BUILD_ROOT"
@@ -323,5 +324,7 @@ else
   echo "La copie iCloud a été vérifiée et sera synchronisée par iCloud Drive."
 fi
 
-open -R "$DEST_ZIP"
-osascript -e 'display notification "La suite CL est prête sur le Bureau et dans iCloud Drive." with title "CL Suite"' >/dev/null 2>&1 || true
+if [[ "$REVEAL_OUTPUT" == "1" ]]; then
+  open -R "$DEST_ZIP"
+  osascript -e 'display notification "La suite CL est prête." with title "CL Suite"' >/dev/null 2>&1 || true
+fi
