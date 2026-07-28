@@ -181,7 +181,7 @@ class MidiConsoleMonitorTests(unittest.TestCase):
     def test_lookup_cleans_ableton_metadata_and_places_program_last(self):
         source = DISPLAY.read_text()
         self.assertIn(";\\s*BPM\\s*;\\s*KEY", source)
-        self.assertIn("outlet(0, cleanName(displayName).split(/\\s+/))", source)
+        self.assertIn("cleanName(displayName).split(/\\s+/)", source)
         self.assertIn("outlet(1, program)", source)
         self.assertIn('" / $1"', source)
         self.assertIn('replace(/[\\"“”«»]/g, "")', source)
@@ -190,48 +190,19 @@ class MidiConsoleMonitorTests(unittest.TestCase):
         scene_body = source.split("function scene()", 1)[1].split("function reset()", 1)[0]
         self.assertNotIn('outlet(0, "—")', scene_body)
         self.assertNotIn("launchGraceMs", source)
-        self.assertIn("programAwaitingSceneContext", source)
+        self.assertIn("if (lastProgram !== null)", source)
         self.assertIn("render(lastProgram)", scene_body)
 
-    def test_manual_clip_uses_its_own_session_row_name(self):
+    def test_display_path_never_calls_liveapi(self):
         source = DISPLAY.read_text()
-        self.assertNotIn('"this_device canonical_parent"', source)
-        self.assertIn('"live_set tracks " + observedTrackIndex', source)
-        self.assertIn('trackObserver.property = "playing_slot_index"', source)
-        self.assertIn('"live_set scenes " + slotIndex', source)
-        self.assertIn(
-            "playingSlotSceneName || selectedStoppedSceneName",
-            source,
-        )
-        self.assertIn("latchedProgramName || currentSceneName", source)
-        self.assertIn("refreshPlayingSlotScene();", source)
-        self.assertIn("if (!trackObserver)", source)
-        self.assertIn("function bang()", source)
-        refresh_body = source.split("function refreshPlayingSlotScene()", 1)[1].split(
-            "function playingSlotChanged()", 1
-        )[0]
-        self.assertIn("slotIndex >= 0", refresh_body)
-        self.assertNotIn('playingSlotSceneName = ""', refresh_body)
-
-        temporary, output = self.build_device()
-        self.addCleanup(temporary.cleanup)
-        patcher = json.loads((output / "CL MIDI Console Monitor.maxpat").read_text())["patcher"]
-        lines = [item["patchline"] for item in patcher["lines"]]
-        for lookup in ("lookup-cl5", "lookup-ql1-cc", "lookup-ql1-pgm"):
-            self.assertIn(
-                {"source": ["role-defer", 0], "destination": [lookup, 0]},
-                lines,
-            )
-
-    def test_each_console_lookup_observes_its_command_source_track(self):
-        source = DISPLAY.read_text()
-        self.assertIn('consoleName === "QL1 CC"', source)
-        self.assertIn("return sourceTracks.ql1cc", source)
-        self.assertIn('consoleName === "QL1 PGM"', source)
-        self.assertIn("return sourceTracks.ql1pgm", source)
-        self.assertIn("return sourceTracks.cl5", source)
-        self.assertIn("trackIndices[0]", source)
-        self.assertNotIn('new LiveAPI(playingSlotChanged, "this_device canonical_parent")', source)
+        self.assertNotIn("new LiveAPI", source)
+        self.assertNotIn("trackObserver", source)
+        self.assertNotIn("playing_slot_index", source)
+        self.assertNotIn("getcount", source)
+        self.assertIn("Identical packets must remain a no-op", source)
+        scene_body = source.split("function scene()", 1)[1].split("function reset()", 1)[0]
+        self.assertIn("sceneName === currentSceneName", scene_body)
+        self.assertIn("return;", scene_body)
 
     def test_program_change_has_a_dedicated_display_box(self):
         temporary, output = self.build_device()
@@ -256,58 +227,34 @@ class MidiConsoleMonitorTests(unittest.TestCase):
         self.assertIn('displayName = String(sharedDisplay[nameKey])', source)
         self.assertIn('sharedDisplay[physicalConsole + "Name"] = ""', source)
 
-    def test_ql1_cc_prefers_the_manually_triggered_session_row_name(self):
+    def test_display_uses_the_controller_scene_context(self):
         source = DISPLAY.read_text()
         render_body = source.split("function render(program)", 1)[1].split(
-            "function scalar", 1
+            "function showProgram", 1
         )[0]
-        self.assertIn(
-            "playingSlotSceneName || selectedStoppedSceneName",
-            render_body,
-        )
-        self.assertNotIn("currentSceneName || playingSlotSceneName", render_body)
+        self.assertIn("var displayName = currentSceneName", render_body)
+        self.assertNotIn("LiveAPI", render_body)
 
-    def test_ql1_uses_selected_scene_only_when_live_is_stopped(self):
+    def test_scene_context_updates_the_latched_program_without_live_queries(self):
         source = DISPLAY.read_text()
-        self.assertIn('physicalConsole !== "ql1"', source)
-        self.assertIn('songApi.get("is_playing")', source)
-        self.assertIn('"live_set view selected_scene"', source)
-        self.assertIn('selectedSceneApi.get("name")', source)
-        self.assertIn(
-            "playingSlotSceneName || selectedStoppedSceneName",
-            source,
-        )
+        scene_body = source.split("function scene()", 1)[1].split("function reset()", 1)[0]
+        self.assertIn("currentSceneName = sceneName", scene_body)
+        self.assertIn("if (lastProgram !== null)", scene_body)
+        self.assertIn("render(lastProgram)", scene_body)
+        self.assertNotIn("LiveAPI", scene_body)
 
-    def test_resolved_program_name_is_latched_against_late_osc_context(self):
+    def test_source_tracks_are_not_scanned_on_the_audio_session_thread(self):
         source = DISPLAY.read_text()
-        render_body = source.split("function render(program)", 1)[1].split(
-            "function refreshSelectedStoppedScene", 1
-        )[0]
-        self.assertIn("latchedProgramName = directlyResolvedName", render_body)
-        self.assertIn("latchedProgramName || currentSceneName", render_body)
-        show_body = source.split("function showProgram(value)", 1)[1].split(
-            "function scene()", 1
-        )[0]
-        self.assertIn('latchedProgramName = ""', show_body)
+        self.assertNotIn('getcount("tracks")', source)
+        self.assertNotIn('get("name")', source)
+        self.assertNotIn("clip_slots", source)
+        self.assertNotIn("has_clip", source)
 
-    def test_source_tracks_are_discovered_without_manual_configuration(self):
+    def test_display_does_not_inspect_empty_clip_slots(self):
         source = DISPLAY.read_text()
-        self.assertIn('songApi.getcount("tracks")', source)
-        self.assertIn('trackApi.get("name")', source)
-        self.assertIn('name.indexOf("CL5")', source)
-        self.assertIn('name.indexOf("QL1")', source)
-        self.assertIn('name.indexOf("CC")', source)
-        self.assertIn('name.indexOf("PGM")', source)
-        self.assertIn('clip_slots " + sceneIndex', source)
-        self.assertIn('slotApi.get("has_clip")', source)
-
-    def test_empty_scene_clears_cl5_or_combined_ql1_only_when_sources_are_known(self):
-        source = DISPLAY.read_text()
-        self.assertIn("sourceTracks.cl5.length", source)
-        self.assertIn("sourceTracks.ql1cc.concat(sourceTracks.ql1pgm)", source)
-        self.assertIn("ql1Tracks.length", source)
-        self.assertIn('outlet(0, "__CL_EMPTY__")', source)
-        self.assertIn("Unknown source names are fail-safe", source)
+        self.assertNotIn("sourceTracks", source)
+        self.assertNotIn("trackHasClip", source)
+        self.assertNotIn("clearWhenSceneHasNoProgram", source)
 
         temporary, output = self.build_device()
         self.addCleanup(temporary.cleanup)

@@ -390,6 +390,55 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
         self.assertIn("restoreNetworkDraft(networkVisibleMode);", page)
         self.assertNotIn("if(local)el('abletonHost').value='127.0.0.1'", page)
 
+    def test_panel_integrates_the_published_midi_console_state(self):
+        page = launcher.app.test_client().get("/").get_data(as_text=True)
+        self.assertIn("MIDI &amp; CONSOLES", page)
+        self.assertIn("CL5 · N° —", page)
+        self.assertIn("QL1 · N° —", page)
+        self.assertIn("s.midi_console", page)
+        self.assertIn("s.ltc_connected", page)
+        self.assertIn("setInterval(refreshTelemetry,100)", page)
+        self.assertIn("MODE LOCAL", page)
+        self.assertIn("ABLETON DISTANT", page)
+        self.assertIn("Ports AbletonOSC fixes", page)
+        self.assertNotIn('id="abletonName"', page)
+        self.assertNotIn('type="number" value="11000"', page)
+
+    def test_panel_uses_the_requested_top_to_bottom_command_order(self):
+        page = launcher.app.test_client().get("/").get_data(as_text=True)
+        self.assertIn('class="product-copy"', page)
+        self.assertLess(page.index("Panneau de contrôle serveur"), page.index('id="systemCard"'))
+        self.assertLess(page.index("Démarrer"), page.index("OUVRIR LA TÉLÉCOMMANDE"))
+        self.assertLess(page.index("Relancer"), page.index("OUVRIR LA TÉLÉCOMMANDE"))
+
+    def test_ableton_mode_badge_is_visually_prominent(self):
+        page = launcher.app.test_client().get("/").get_data(as_text=True)
+        self.assertIn(".mode-badge{justify-self:center;min-width:102px", page)
+        self.assertIn('id="networkLtc"', page)
+        self.assertNotIn('id="consoleLtc"', page)
+        self.assertIn("grid-template-columns:1fr auto 1fr", page)
+        self.assertIn(".network-timecode{justify-self:end;min-width:116px", page)
+        self.assertIn("font:14px Menlo", page)
+        self.assertIn("border-color:rgba(217,88,88,.76)", page)
+        self.assertIn("background:#89dfa6", page)
+        self.assertIn("background:#e5a63b", page)
+
+    def test_telemetry_route_exposes_only_ltc_fields(self):
+        with mock.patch.object(
+            launcher,
+            "read_remote_state_diagnostic",
+            return_value={"ltc_connected": True, "ltc_timecode": "12:34:56:12", "scenes": [1, 2]},
+        ):
+            response = launcher.app.test_client().get("/telemetry")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json(), {"ltc_connected": True, "ltc_timecode": "12:34:56:12"})
+
+    def test_midi_console_state_reader_rejects_unknown_publishers(self):
+        with mock.patch.object(launcher, "MIDI_CONSOLE_STATE_PATH") as path:
+            path.stat.return_value.st_size = 100
+            path.read_text.return_value = '{"service":"unknown","cl5":{"program":41}}'
+            self.assertEqual(launcher.read_midi_console_state(), {})
+
 
 if __name__ == "__main__":
     unittest.main()

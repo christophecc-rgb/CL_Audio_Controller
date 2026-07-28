@@ -4,6 +4,7 @@
 static MIDIPortRef outputPort = 0;
 static MIDIEndpointRef destination = 0;
 static UInt8 expectedProgram = 41;
+static UInt8 expectedChannel = 1;
 static BOOL received = NO;
 static CFAbsoluteTime sentAt = 0;
 
@@ -41,9 +42,9 @@ static void midiRead(const MIDIPacketList *packetList, void *readProcRefCon, voi
                 double latencyMs = (CFAbsoluteTimeGetCurrent() - sentAt) * 1000.0;
                 fprintf(stdout, "RETURN channel=%u program=%u scene=%u latency_ms=%.1f match=%s\n",
                         (status & 0x0F) + 1, program, program + 1, latencyMs,
-                        program == expectedProgram ? "yes" : "no");
+                        program == expectedProgram && ((status & 0x0F) + 1) == expectedChannel ? "yes" : "no");
                 fflush(stdout);
-                if (program == expectedProgram) received = YES;
+                if (program == expectedProgram && ((status & 0x0F) + 1) == expectedChannel) received = YES;
                 index += 1;
             }
         }
@@ -55,7 +56,7 @@ int main(int argc, const char *argv[]) {
     @autoreleasepool {
         NSArray<NSString *> *arguments = NSProcessInfo.processInfo.arguments;
         if ([arguments containsObject:@"--help"]) {
-            puts("Usage: CLMIDIRoundTripTester [--endpoint NAME] [--program 42] [--timeout 5]");
+            puts("Usage: CLMIDIRoundTripTester [--endpoint NAME] [--program 42] [--channel 1] [--timeout 5]");
             return 0;
         }
         NSString *endpointSearchName = @"Session RTP 1";
@@ -65,10 +66,16 @@ int main(int argc, const char *argv[]) {
         if (position != NSNotFound && position + 1 < arguments.count) endpointSearchName = arguments[position + 1];
         position = [arguments indexOfObject:@"--program"];
         if (position != NSNotFound && position + 1 < arguments.count) sceneNumber = [arguments[position + 1] integerValue];
+        position = [arguments indexOfObject:@"--channel"];
+        if (position != NSNotFound && position + 1 < arguments.count) expectedChannel = (UInt8)[arguments[position + 1] integerValue];
         position = [arguments indexOfObject:@"--timeout"];
         if (position != NSNotFound && position + 1 < arguments.count) timeout = [arguments[position + 1] doubleValue];
         if (sceneNumber < 1 || sceneNumber > 128) {
             fputs("Program must be in the user-facing range 1...128\n", stderr);
+            return 2;
+        }
+        if (expectedChannel < 1 || expectedChannel > 16) {
+            fputs("Channel must be in the range 1...16\n", stderr);
             return 2;
         }
         expectedProgram = (UInt8)(sceneNumber - 1);
@@ -94,12 +101,12 @@ int main(int argc, const char *argv[]) {
         Byte storage[1024];
         MIDIPacketList *packetList = (MIDIPacketList *)storage;
         MIDIPacket *packet = MIDIPacketListInit(packetList);
-        UInt8 message[2] = {0xC0, expectedProgram};
+        UInt8 message[2] = {(UInt8)(0xC0 | (expectedChannel - 1)), expectedProgram};
         MIDIPacketListAdd(packetList, sizeof(storage), packet, 0, 2, message);
         sentAt = CFAbsoluteTimeGetCurrent();
         OSStatus sendStatus = MIDISend(outputPort, destination, packetList);
-        fprintf(stdout, "SENT channel=1 program=%u scene=%lu status=%d\n",
-                expectedProgram, (unsigned long)sceneNumber, (int)sendStatus);
+        fprintf(stdout, "SENT channel=%u program=%u scene=%lu status=%d\n",
+                expectedChannel, expectedProgram, (unsigned long)sceneNumber, (int)sendStatus);
         fflush(stdout);
 
         NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];

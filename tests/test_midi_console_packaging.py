@@ -62,6 +62,7 @@ class MidiConsolePackagingTests(unittest.TestCase):
             "CLMIDINetworkGuardian",
             "CLMIDIRoundTripTester",
             "CLYamahaConsoleSimulator",
+            "CLYamahaSimulatorDashboard",
             "CLMIDINetworkDashboard",
             "connect_rtp_peer.applescript",
             "list_rtp_peers.applescript",

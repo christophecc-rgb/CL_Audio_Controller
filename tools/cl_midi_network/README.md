@@ -3,7 +3,7 @@
 Trois outils natifs macOS fondés sur CoreMIDI :
 
 - `CLMIDINetworkGuardian` active la session RTP-MIDI et reconnecte un correspondant Bonjour.
-- `CLMIDINetworkDashboard` affiche l'etat RTP, les ports CoreMIDI visibles et le resultat d'un aller-retour MIDI reel.
+- `CLMIDINetworkDashboard` affiche l'état RTP, les ports CoreMIDI visibles, le résultat d'un aller-retour MIDI réel et surveille directement les retours Program Change CL5/QL1 hors de Live.
 - `connect_rtp_peer.applescript` connecte explicitement un correspondant Bonjour choisi, sans cible codee en dur et sans deconnexion globale.
 - `CLYamahaConsoleSimulator` reçoit les Program Change de la session RTP et les renvoie après un délai configurable, comme confirmation simulée d'une Yamaha CL/QL.
 - `CLMIDIRoundTripTester` envoie une scène témoin et mesure sa confirmation aller-retour.
@@ -68,6 +68,14 @@ Sur le Mac contrôleur, lorsque le simulateur tourne sur le second Mac :
 
 Le test réussit uniquement si la scène reçue en retour correspond exactement à
 la scène envoyée. Il affiche aussi la latence mesurée.
+
+## Moniteur autonome des retours
+
+`CL MIDI Network Assistant` écoute directement l'entrée RTP sélectionnée avec
+CoreMIDI. Un Program Change reçu sur le canal 1 met à jour la ligne CL5 ; le
+canal 2 met à jour la ligne QL1. Le numéro affiché est corrigé en 1–128 et
+l'heure du dernier retour est indiquée. Ce moniteur ne charge aucun périphérique
+Max for Live et n'intervient donc pas dans le moteur audio de Live.
 
 Ces outils ne s'installent pas encore au démarrage. Le simulateur et le test ne
 modifient pas Configuration Audio et MIDI. Le gardien utilise uniquement l'API

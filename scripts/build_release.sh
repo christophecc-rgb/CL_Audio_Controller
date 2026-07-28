@@ -86,7 +86,7 @@ mkdir -p \
   "$KIT_ROOT/CL MIDI Network Tools" \
   "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/MacOS" \
   "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Resources/Network Tools"
-for tool in CLMIDINetworkGuardian CLMIDIRoundTripTester CLYamahaConsoleSimulator CLMIDINetworkDashboard; do
+for tool in CLMIDINetworkGuardian CLMIDIRoundTripTester CLYamahaConsoleSimulator CLMIDINetworkDashboard CLYamahaSimulatorDashboard; do
   ditto "$BUILD_ROOT/midi-tools/$tool" "$KIT_ROOT/CL MIDI Network Tools/$tool"
   ditto "$BUILD_ROOT/midi-tools/$tool" "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Resources/Network Tools/$tool"
 done

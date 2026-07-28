@@ -75,6 +75,7 @@ LOGO = bundled_resource("cl_audio_logo.png")
 PARADIS_LOGO = bundled_resource("assets", "paradis latin.jpg")
 
 WEB_PORT = 5050
+MIDI_CONSOLE_STATE_PATH = Path("/private/tmp/CL_MIDI_Console_State.json")
 OSC_PORT = 11000
 RETURN_PORT = 11001
 LAUNCHER_PORT = 5055
@@ -88,6 +89,16 @@ server_ownership_lock = threading.RLock()
 owned_server = None
 claimable_server = None
 ignored_orphan_instance_id = None
+
+
+def read_midi_console_state():
+    try:
+        if MIDI_CONSOLE_STATE_PATH.stat().st_size > 65536:
+            return {}
+        payload = json.loads(MIDI_CONSOLE_STATE_PATH.read_text(encoding="utf-8"))
+        return payload if isinstance(payload, dict) and payload.get("service") == "cl-midi-console-monitor" else {}
+    except (OSError, ValueError, TypeError):
+        return {}
 
 
 def ownership_headers(record):
@@ -886,9 +897,10 @@ button{font:inherit}
 .topbar{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center}
 .brand{height:56px;border-radius:11px;background:#020304;border:1px solid #272a31;display:flex;align-items:center;justify-content:center;overflow:hidden;box-shadow:0 8px 18px rgba(0,0,0,.25)}
 .brand img{width:100%;height:100%;object-fit:contain}
-.product-row{display:flex;align-items:center;justify-content:space-between;min-height:38px;padding:0 2px}
+.product-row{display:flex;align-items:center;justify-content:space-between;min-height:38px;padding:0 2px;gap:10px}
+.product-copy{display:flex;align-items:baseline;gap:8px;min-width:0;white-space:nowrap}
 .product{font-size:15px;font-weight:790;letter-spacing:.04em;color:#e6e9ef}
-.product-subtitle{font-size:10px;color:#858d9b;margin-top:3px;letter-spacing:.025em}
+.product-subtitle{font-size:10px;color:#858d9b;letter-spacing:.025em}
 .show-toggle{height:25px;padding:0 10px;border:1px solid #3a3f49;border-radius:8px;background:#21252d;color:#c7ccd6;font-size:11px;cursor:pointer}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px;box-shadow:0 7px 18px rgba(0,0,0,.17)}
 .system{display:grid;grid-template-columns:14px 1fr auto;gap:9px;align-items:center;min-height:54px;transition:.2s}
@@ -904,7 +916,7 @@ button{font:inherit}
 .state-title{font-size:16px;font-weight:820;letter-spacing:.01em}
 .state-detail{font-size:11px;color:var(--muted);margin-top:2px}
 .state-time{font-size:10px;color:#858c98;align-self:start;padding-top:3px}
-.command-row{display:grid;grid-template-columns:1.45fr 1fr;gap:8px}
+.command-row{display:flex;flex-direction:column;gap:8px}
 .primary{height:41px;width:100%;border:1px solid rgba(88,162,255,.72);border-radius:10px;background:linear-gradient(180deg,#408ce7,#2868b8);color:white;font-size:13px;font-weight:790;cursor:pointer;box-shadow:0 8px 18px rgba(32,101,190,.22)}
 .primary:hover{filter:brightness(1.08)}
 .secondary-actions{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -918,15 +930,21 @@ button{font:inherit}
 .content-grid{display:grid;grid-template-columns:.88fr 1.42fr;gap:7px;align-items:stretch}
 .content-grid>.card{height:100%}
 .access-head,.tech-head{font-size:9px;font-weight:780;text-transform:uppercase;letter-spacing:.075em;color:#c9ced8;margin-bottom:6px}
+.access-card{border-color:#3a4453;background:linear-gradient(145deg,#1b2028,#171a20)}
+.access-card .access-head{color:#a9c9f4}
 .address-row{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center}
 .address-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .address{height:31px;display:flex;align-items:center;padding:0 8px;border-radius:8px;background:#11141a;border:1px solid #303540;font:10px Menlo,monospace;color:#e4e8ee;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mini{height:31px;padding:0 8px;border-radius:8px;border:1px solid #424853;background:#272c35;color:#e5e8ee;font-size:10px;font-weight:700;cursor:pointer}
 .device-row{display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:11px;color:var(--muted)}
-.network-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px}.network-grid label{font-size:8px;color:var(--muted)}
+.network-card{border-width:2px;transition:.2s;box-shadow:0 0 0 1px rgba(255,255,255,.035),0 8px 20px rgba(0,0,0,.20)}.network-card.local{border-color:rgba(105,217,143,.72);background:linear-gradient(145deg,rgba(67,200,111,.11),#171b21)}.network-card.remote{border-color:rgba(229,166,59,.78);background:linear-gradient(145deg,rgba(229,166,59,.14),#1a1b20)}
+.network-title-row{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;margin-bottom:9px}.network-title-row .access-head{margin:0;justify-self:start}.mode-badge{justify-self:center;min-width:102px;padding:6px 10px;border-radius:8px;text-align:center;font-size:11px;font-weight:880;letter-spacing:.045em;box-shadow:0 4px 12px rgba(0,0,0,.20)}.network-card.local .mode-badge{color:#092015;border:1px solid #a4edbc;background:#89dfa6}.network-card.remote .mode-badge{color:#211605;border:1px solid #f2c56f;background:#e5a63b}.network-timecode{justify-self:end;min-width:116px;padding:6px 9px;border-radius:8px;border:1px solid rgba(84,224,132,.62);background:rgba(46,154,84,.18);color:#72e49a;text-align:center;font:14px Menlo,monospace;font-weight:820;letter-spacing:.015em;box-shadow:0 4px 12px rgba(0,0,0,.18)}.network-timecode.offline{color:#7c8490;border-color:#3a414c;background:#171b21}
+.network-grid{display:grid;grid-template-columns:.85fr 1.25fr;gap:7px}.network-grid label{font-size:8px;color:var(--muted)}
 .network-grid input,.network-grid select{width:100%;height:28px;margin-top:2px;border-radius:7px;border:1px solid #353b45;background:#11141a;color:#e4e8ee;padding:0 7px;font-size:10px}
+.ports-readonly{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;min-height:28px;padding:0 8px;border-radius:7px;background:#11141a;border:1px solid #353b45;font-size:9px;color:var(--muted)}.ports-readonly strong{font:11px Menlo,monospace;color:#d6dbe4}
 .network-buttons{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:6px}.network-buttons .action{height:31px;font-size:10px}
 .badge{padding:4px 8px;border-radius:999px;background:rgba(67,200,111,.12);color:#7ee39e;border:1px solid rgba(67,200,111,.28);font-size:10px}
+.console-card{padding:10px}.console-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}.console-head strong{font-size:10px;letter-spacing:.075em}.console-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.console-return{border:1px solid #343b47;border-radius:9px;background:#12161c;padding:8px}.console-program{font-size:15px;font-weight:800;color:#edc65b}.console-title{font-size:10px;color:#c4cad4;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.console-state{font-size:9px;color:#7d8592;margin-top:4px}.console-return.ok{border-color:rgba(217,88,88,.76);box-shadow:inset 0 0 0 1px rgba(217,88,88,.16)}.console-return.ok .console-state{color:#eb8585}
 details{background:var(--card2);border:1px solid #292e37;border-radius:12px;overflow:hidden}
 summary{height:34px;padding:0 11px;display:flex;align-items:center;cursor:pointer;font-size:12px;color:#c5cad3;list-style:none}
 summary::-webkit-details-marker{display:none}
@@ -946,12 +964,12 @@ body.show-mode .app{justify-content:center;max-height:430px;max-width:600px}
 body.show-mode .topbar{grid-template-columns:190px 1fr}
 body.show-mode .brand{height:72px}
 body.show-mode .system{min-height:78px}
-body.show-mode .command-row{grid-template-columns:1fr}
 @media(max-width:520px){
   .app{width:100%;max-width:100%;gap:7px;padding:7px}
   .topbar{display:flex;flex-direction:column;gap:8px}
   .brand{width:100%;height:78px}.product-row{width:100%;min-height:34px}.product{font-size:15px}
-  .command-row,.content-grid{grid-template-columns:1fr}
+  .product-copy{gap:6px}.product-subtitle{font-size:9px}
+  .content-grid{grid-template-columns:1fr}
   .network-grid{grid-template-columns:1fr 1fr}
   .primary{height:42px}.action{height:38px}
 }
@@ -961,7 +979,7 @@ body.show-mode .command-row{grid-template-columns:1fr}
 <main class="app">
   <div class="topbar">
     <div class="brand"><img src="/paradis-logo" alt="Paradis Latin Cabaret"></div>
-    <div class="product-row"><div><div class="product">CL AUDIO SHOW CONTROL</div><div class="product-subtitle">Panneau de contrôle serveur</div></div><button id="showMode" class="show-toggle" onclick="toggleShowMode()">Mode spectacle</button></div>
+    <div class="product-row"><div class="product-copy"><div class="product">CL AUDIO SHOW CONTROL</div><div class="product-subtitle">Panneau de contrôle serveur</div></div><button id="showMode" class="show-toggle" onclick="toggleShowMode()">Mode spectacle</button></div>
   </div>
 
   <section id="systemCard" class="card system warning">
@@ -971,11 +989,11 @@ body.show-mode .command-row{grid-template-columns:1fr}
   </section>
 
   <div class="command-row">
-    <button class="primary" onclick="runAction('/remote-window','Ouverture de la télécommande')">OUVRIR LA TÉLÉCOMMANDE</button>
     <div class="secondary-actions">
       <button class="action start" onclick="runAction('/start','Démarrage du serveur')">▶&nbsp;&nbsp;Démarrer</button>
       <button class="action restart" onclick="runAction('/restart','Relance du serveur')">↻&nbsp;&nbsp;Relancer</button>
     </div>
+    <button class="primary" onclick="runAction('/remote-window','Ouverture de la télécommande')">OUVRIR LA TÉLÉCOMMANDE</button>
   </div>
   <div id="actionStatus" class="action-status"></div>
 
@@ -990,7 +1008,7 @@ body.show-mode .command-row{grid-template-columns:1fr}
   </section>
 
   <div class="content-grid">
-    <section class="card">
+    <section class="card access-card">
       <div class="access-head">Accès distant</div>
       <div class="address-row">
         <div id="remoteAddress" class="address">—</div>
@@ -999,14 +1017,12 @@ body.show-mode .command-row{grid-template-columns:1fr}
       <div class="device-row"><span>Télécommande iPhone / iPad</span><span id="deviceBadge" class="badge">Disponible</span></div>
     </section>
 
-    <section class="card network-card">
-      <div class="access-head">Connexion AbletonOSC</div>
+    <section id="networkCard" class="card network-card local">
+      <div class="network-title-row"><div class="access-head">Connexion AbletonOSC</div><span id="modeBadge" class="mode-badge">MODE LOCAL</span><span id="networkLtc" class="network-timecode offline">--:--:--:--</span></div>
       <div class="network-grid">
         <label>Mode<select id="abletonMode" onchange="updateNetworkFields()"><option value="local">Local</option><option value="remote">Ableton distant</option></select></label>
-        <label>Nom de la cible<input id="abletonName" placeholder="Mac Blue"></label>
         <label>Adresse Ableton<input id="abletonHost" value="127.0.0.1"></label>
-        <label>Port émission<input id="abletonSendPort" type="number" value="11000"></label>
-        <label>Port retour<input id="abletonReplyPort" type="number" value="11001"></label>
+        <div class="ports-readonly"><span>Ports AbletonOSC fixes</span><strong><span id="abletonSendPort">11000</span> → <span id="abletonReplyPort">11001</span></strong></div>
       </div>
       <div class="network-buttons">
         <button class="action" onclick="saveNetworkConfig()">Appliquer</button>
@@ -1014,6 +1030,14 @@ body.show-mode .command-row{grid-template-columns:1fr}
       </div>
     </section>
   </div>
+
+  <section class="card console-card">
+    <div class="console-head"><strong>MIDI &amp; CONSOLES</strong></div>
+    <div class="console-grid">
+      <div id="cl5Return" class="console-return"><div id="cl5Program" class="console-program">CL5 · N° —</div><div id="cl5Title" class="console-title">Titre en attente</div><div id="cl5State" class="console-state">Aucun retour Program Change</div></div>
+      <div id="ql1Return" class="console-return"><div id="ql1Program" class="console-program">QL1 · N° —</div><div id="ql1Title" class="console-title">Titre en attente</div><div id="ql1State" class="console-state">Aucun retour Program Change</div></div>
+    </div>
+  </section>
 
   <details>
     <summary>Détails techniques et événements</summary>
@@ -1058,6 +1082,13 @@ function render(s){
   if(!networkFormInitialized&&s.ableton_profiles)initializeNetworkForm(s);
   if(s.ableton_config){el('techAbletonMode').textContent='Ableton · '+(s.ableton_config.mode==='local'?'Local':'Distant');el('techAbletonAddress').textContent=s.ableton_config.host+':'+s.ableton_config.send_port+' → '+s.ableton_config.reply_port;el('techOscLabel').textContent='OSC aller · '+s.ableton_config.send_port;el('techReturnLabel').textContent='OSC retour · '+s.ableton_config.reply_port;}
   if(s.osc_transport){el('techAbletonLatency').textContent='Dernière réponse · '+(s.osc_transport.last_latency_ms==null?'—':Math.round(s.osc_transport.last_latency_ms)+' ms');el('techAbletonTimeouts').textContent='Timeouts · '+s.osc_transport.timeout_count;}
+  const midi=s.midi_console||{},cl5=midi.cl5||{},ql1=midi.ql1||{};
+  el('cl5Return').className='console-return '+(cl5.received?'ok':'');el('ql1Return').className='console-return '+(ql1.received?'ok':'');
+  el('cl5Program').textContent='CL5 · N° '+(cl5.program??'—');el('ql1Program').textContent='QL1 · N° '+(ql1.program??'—');
+  el('cl5Title').textContent=cl5.title||s.playing_scene_name||'Titre en attente';el('ql1Title').textContent=ql1.title||s.playing_scene_name||'Titre en attente';
+  el('cl5State').textContent=cl5.received?'✓ Retour Program Change':'Aucun retour Program Change';el('ql1State').textContent=ql1.received?'✓ Retour Program Change':'Aucun retour Program Change';
+  const ltc=s.ltc_connected?s.ltc_timecode:'--:--:--:--';
+  el('networkLtc').textContent=ltc;el('networkLtc').className='network-timecode'+(s.ltc_connected?'':' offline');
 }
 async function refresh(){try{render(await(await fetch('/state')).json());}catch(e){el('systemCard').className='card system error';el('stateTitle').textContent='PANNEAU HORS LIGNE';el('stateDetail').textContent=String(e);}}
 async function runAction(path,label){setBusy(label);el('actionStatus').textContent=label+'…';try{const response=await fetch(path);const r=await response.json();el('actionStatus').textContent=response.ok?('✓ '+(r.message||'Action terminée')):('! Refus : '+(r.error||response.status));}catch(e){el('actionStatus').textContent='! '+e;}setTimeout(refresh,450);}
@@ -1076,22 +1107,23 @@ function initializeNetworkForm(s){
 }
 function captureVisibleNetworkDraft(){
   if(!networkVisibleMode)return;
+  const previous=networkDrafts[networkVisibleMode]||copyNetworkDraft(null,networkVisibleMode);
   networkDrafts[networkVisibleMode]={
-    name:el('abletonName').value,
+    name:previous.name||'',
     host:networkVisibleMode==='local'?'127.0.0.1':el('abletonHost').value,
-    send_port:Number(el('abletonSendPort').value),
-    reply_port:Number(el('abletonReplyPort').value)
+    send_port:Number(previous.send_port||11000),
+    reply_port:Number(previous.reply_port||11001)
   };
 }
 function restoreNetworkDraft(mode){
   const draft=networkDrafts[mode]||copyNetworkDraft(null,mode),local=mode==='local';
-  el('abletonName').value=local?'':draft.name;
-  el('abletonName').disabled=local;
   el('abletonHost').value=local?'127.0.0.1':draft.host;
   el('abletonHost').disabled=local;
-  el('abletonSendPort').value=draft.send_port;
-  el('abletonReplyPort').value=draft.reply_port;
+  el('abletonSendPort').textContent=draft.send_port;
+  el('abletonReplyPort').textContent=draft.reply_port;
+  applyNetworkCardMode(mode);
 }
+function applyNetworkCardMode(mode){const remote=mode==='remote';el('networkCard').className='card network-card '+(remote?'remote':'local');el('modeBadge').textContent=remote?'ABLETON DISTANT':'MODE LOCAL';}
 function updateNetworkFields(){
   captureVisibleNetworkDraft();
   networkVisibleMode=el('abletonMode').value;
@@ -1124,8 +1156,10 @@ async function toggleShowMode(){
   el('showMode').textContent=enabled?'Quitter le mode spectacle':'Mode spectacle';
   await resizePanelWindow(500,enabled?500:900);
 }
-['abletonName','abletonHost','abletonSendPort','abletonReplyPort'].forEach(id=>el(id).addEventListener('input',markNetworkDraftDirty));
-refresh();setInterval(refresh,1500);
+['abletonHost'].forEach(id=>el(id).addEventListener('input',markNetworkDraftDirty));
+let telemetryBusy=false;
+async function refreshTelemetry(){if(telemetryBusy)return;telemetryBusy=true;try{const t=await(await fetch('/telemetry')).json();const ltc=t.ltc_connected?t.ltc_timecode:'--:--:--:--';el('networkLtc').textContent=ltc;el('networkLtc').className='network-timecode'+(t.ltc_connected?'':' offline');}catch(e){}finally{telemetryBusy=false;}}
+refresh();refreshTelemetry();setInterval(refresh,1500);setInterval(refreshTelemetry,100);
 </script>
 </body>
 </html>
@@ -1223,6 +1257,10 @@ def state():
         ableton_server_target=remote_state.get("ableton_target"),
         network_config_error=network_config_error,
         osc_transport=remote_state.get("osc_transport"),
+        playing_scene_name=remote_state.get("playing_scene_name"),
+        ltc_connected=remote_state.get("ltc_connected", False),
+        ltc_timecode=remote_state.get("ltc_timecode", "--:--:--:--"),
+        midi_console=read_midi_console_state(),
         orphan_actions_available=identity["code"] == "orphan-claimable",
         orphan_instance_id=(remote_state.get("server_instance_id") or "")[:8] or None,
         orphan_process_id=remote_state.get("server_process_id") if identity["code"] == "orphan-claimable" else None,
@@ -1250,6 +1288,16 @@ def state():
         "oscReturnPortPresent": response_payload["ret"],
     })
     return jsonify(response_payload)
+
+
+@app.route("/telemetry")
+def telemetry():
+    """Relais minimal et non bloquant pour l'affichage fluide du LTC."""
+    remote_state = read_remote_state_diagnostic(timeout=0.12)
+    return jsonify(
+        ltc_connected=bool(remote_state.get("ltc_connected")),
+        ltc_timecode=remote_state.get("ltc_timecode", "--:--:--:--"),
+    )
 
 
 @app.route("/network-config", methods=["GET", "POST"])

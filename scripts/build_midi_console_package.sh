@@ -41,7 +41,7 @@ ditto "$DEVICE_SOURCE/CLMidiConsoleDisplay.js" "$KIT_ROOT/Max for Live/CL MIDI C
 ditto "$DEVICE_SOURCE/CLMidiConsoleConfirmation.js" "$KIT_ROOT/Max for Live/CL MIDI Console Monitor/CLMidiConsoleConfirmation.js"
 ditto "$DEVICE_SOURCE/paradis_latin_logo.jpg" "$KIT_ROOT/Max for Live/CL MIDI Console Monitor/paradis_latin_logo.jpg"
 
-for tool in CLMIDINetworkGuardian CLMIDIRoundTripTester CLYamahaConsoleSimulator CLMIDINetworkDashboard; do
+for tool in CLMIDINetworkGuardian CLMIDIRoundTripTester CLYamahaConsoleSimulator CLMIDINetworkDashboard CLYamahaSimulatorDashboard; do
   ditto "$WORK_DIR/native-tools/$tool" "$KIT_ROOT/Network Tools/$tool"
   ditto "$WORK_DIR/native-tools/$tool" "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Resources/Network Tools/$tool"
 done

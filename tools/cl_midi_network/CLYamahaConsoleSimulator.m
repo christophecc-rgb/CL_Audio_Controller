@@ -8,6 +8,7 @@ static MIDIEndpointRef networkDestination = 0;
 static NSUInteger echoDelayMs = 80;
 static BOOL echoEnabled = YES;
 static NSString *consoleLabel = @"QL1";
+static NSUInteger acceptedChannel = 0;
 static volatile sig_atomic_t keepRunning = 1;
 static UInt8 lastSentStatus = 0;
 static UInt8 lastSentProgram = 0;
@@ -103,6 +104,11 @@ static void midiRead(const MIDIPacketList *packetList, void *readProcRefCon, voi
             UInt8 status = packet->data[index];
             if ((status & 0xF0) == 0xC0 && index + 1 < packet->length) {
                 UInt8 program = packet->data[index + 1];
+                NSUInteger channel = (status & 0x0F) + 1;
+                if (acceptedChannel > 0 && channel != acceptedChannel) {
+                    index += 2;
+                    continue;
+                }
                 if (consumeSelfEcho(status, program)) {
                     index += 2;
                     continue;
@@ -129,12 +135,14 @@ int main(int argc, const char *argv[]) {
     @autoreleasepool {
         NSArray<NSString *> *arguments = NSProcessInfo.processInfo.arguments;
         if ([arguments containsObject:@"--help"]) {
-            puts("Usage: CLYamahaConsoleSimulator [--label QL1] [--delay-ms 80] [--no-echo]");
+            puts("Usage: CLYamahaConsoleSimulator [--label QL1] [--endpoint name] [--channel 1-16] [--delay-ms 80] [--no-echo]");
             return 0;
         }
         consoleLabel = argumentValue(arguments, @"--label", @"QL1");
         NSString *endpointSearchName = argumentValue(arguments, @"--endpoint", @"mb pro");
         echoDelayMs = (NSUInteger)[argumentValue(arguments, @"--delay-ms", @"80") integerValue];
+        acceptedChannel = (NSUInteger)[argumentValue(arguments, @"--channel", @"0") integerValue];
+        if (acceptedChannel > 16) acceptedChannel = 0;
         echoEnabled = ![arguments containsObject:@"--no-echo"];
         signal(SIGINT, stopHandler);
         signal(SIGTERM, stopHandler);
