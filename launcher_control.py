@@ -78,6 +78,7 @@ WEB_PORT = 5050
 MIDI_CONSOLE_STATE_PATH = Path("/private/tmp/CL_MIDI_Console_State.json")
 OSC_PORT = 11000
 RETURN_PORT = 11001
+LTC_PORT = 63123
 LAUNCHER_PORT = 5055
 REMOTE_WINDOW_SCRIPT = ROOT / "remote_window.py"
 REMOTE_ROOT_URL = f"http://127.0.0.1:{WEB_PORT}/"
@@ -901,7 +902,8 @@ button{font:inherit}
 .product-copy{display:flex;align-items:baseline;gap:8px;min-width:0;white-space:nowrap}
 .product{font-size:15px;font-weight:790;letter-spacing:.04em;color:#e6e9ef}
 .product-subtitle{font-size:10px;color:#858d9b;letter-spacing:.025em}
-.show-toggle{height:25px;padding:0 10px;border:1px solid #3a3f49;border-radius:8px;background:#21252d;color:#c7ccd6;font-size:11px;cursor:pointer}
+.show-toggle{height:32px;padding:0 14px;border:1px solid rgba(88,162,255,.68);border-radius:9px;background:linear-gradient(180deg,rgba(64,140,231,.28),rgba(40,104,184,.20));color:#dceaff;font-size:11px;font-weight:760;cursor:pointer;box-shadow:0 5px 14px rgba(32,101,190,.16)}
+.show-toggle:hover{filter:brightness(1.14)}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px;box-shadow:0 7px 18px rgba(0,0,0,.17)}
 .system{display:grid;grid-template-columns:14px 1fr auto;gap:9px;align-items:center;min-height:54px;transition:.2s}
 .system .dot{width:11px;height:11px;border-radius:50%;background:#69707d;box-shadow:0 0 0 4px rgba(105,112,125,.10)}
@@ -915,7 +917,11 @@ button{font:inherit}
 @keyframes pulse{50%{opacity:.35;transform:scale(.75)}}
 .state-title{font-size:16px;font-weight:820;letter-spacing:.01em}
 .state-detail{font-size:11px;color:var(--muted);margin-top:2px}
-.state-time{font-size:10px;color:#858c98;align-self:start;padding-top:3px}
+.state-time{font:18px Menlo,monospace;font-weight:780;line-height:1;color:#f1f4f8;letter-spacing:.015em;font-variant-numeric:tabular-nums}
+.system-side{display:grid;grid-template-rows:1fr 1fr;align-items:center;justify-items:end;align-self:stretch;min-width:142px}
+.system-ltc{min-width:0;padding:0;color:#70dc94;text-align:right;font:18px Menlo,monospace;font-weight:780;line-height:1;letter-spacing:.015em;font-variant-numeric:tabular-nums}
+.system-ltc::before{content:'LTC  ';font:7px -apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif;font-weight:760;letter-spacing:.11em;color:#68717d}
+.system-ltc.offline{color:#707985}
 .command-row{display:flex;flex-direction:column;gap:8px}
 .primary{height:41px;width:100%;border:1px solid rgba(88,162,255,.72);border-radius:10px;background:linear-gradient(180deg,#408ce7,#2868b8);color:white;font-size:13px;font-weight:790;cursor:pointer;box-shadow:0 8px 18px rgba(32,101,190,.22)}
 .primary:hover{filter:brightness(1.08)}
@@ -942,9 +948,10 @@ button{font:inherit}
 .network-grid{display:grid;grid-template-columns:.85fr 1.25fr;gap:7px}.network-grid label{font-size:8px;color:var(--muted)}
 .network-grid input,.network-grid select{width:100%;height:28px;margin-top:2px;border-radius:7px;border:1px solid #353b45;background:#11141a;color:#e4e8ee;padding:0 7px;font-size:10px}
 .ports-readonly{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;min-height:28px;padding:0 8px;border-radius:7px;background:#11141a;border:1px solid #353b45;font-size:9px;color:var(--muted)}.ports-readonly strong{font:11px Menlo,monospace;color:#d6dbe4}
+.ltc-destination{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;min-height:30px;padding:0 8px;border-radius:7px;border:1px solid rgba(84,224,132,.42);background:rgba(46,154,84,.10);font-size:9px;color:#9aa2ae}.ltc-destination strong{font:11px Menlo,monospace;color:#72e49a}.ltc-destination span:first-child{font-weight:760;letter-spacing:.035em}
 .network-buttons{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:6px}.network-buttons .action{height:31px;font-size:10px}
 .badge{padding:4px 8px;border-radius:999px;background:rgba(67,200,111,.12);color:#7ee39e;border:1px solid rgba(67,200,111,.28);font-size:10px}
-.console-card{padding:10px}.console-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}.console-head strong{font-size:10px;letter-spacing:.075em}.console-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.console-return{border:1px solid #343b47;border-radius:9px;background:#12161c;padding:8px}.console-program{font-size:15px;font-weight:800;color:#edc65b}.console-title{font-size:10px;color:#c4cad4;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.console-state{font-size:9px;color:#7d8592;margin-top:4px}.console-return.ok{border-color:rgba(217,88,88,.76);box-shadow:inset 0 0 0 1px rgba(217,88,88,.16)}.console-return.ok .console-state{color:#eb8585}
+.console-card{padding:10px}.console-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}.console-head strong{font-size:10px;letter-spacing:.075em}.console-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.console-return{border:1px solid #343b47;border-radius:9px;background:#12161c;padding:8px}.console-program{font-size:15px;font-weight:800;color:#edc65b}.console-title{font-size:10px;color:#c4cad4;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.console-state{font-size:9px;color:#7d8592;margin-top:4px}.console-return.ok{border-color:rgba(80,196,123,.76);box-shadow:inset 0 0 0 1px rgba(80,196,123,.16)}.console-return.ok .console-state{color:#70d89a}.console-return.stale{border-color:rgba(235,171,61,.55)}.console-return.stale .console-state{color:#d5a64f}
 details{background:var(--card2);border:1px solid #292e37;border-radius:12px;overflow:hidden}
 summary{height:34px;padding:0 11px;display:flex;align-items:center;cursor:pointer;font-size:12px;color:#c5cad3;list-style:none}
 summary::-webkit-details-marker{display:none}
@@ -964,6 +971,8 @@ body.show-mode .app{justify-content:center;max-height:430px;max-width:600px}
 body.show-mode .topbar{grid-template-columns:190px 1fr}
 body.show-mode .brand{height:72px}
 body.show-mode .system{min-height:78px}
+body.show-mode .state-time,body.show-mode .system-ltc{font-size:22px}
+body.show-mode .show-toggle{border-color:rgba(229,166,59,.72);background:rgba(229,166,59,.18);color:#f3ce85}
 @media(max-width:520px){
   .app{width:100%;max-width:100%;gap:7px;padding:7px}
   .topbar{display:flex;flex-direction:column;gap:8px}
@@ -985,7 +994,7 @@ body.show-mode .system{min-height:78px}
   <section id="systemCard" class="card system warning">
     <span class="dot"></span>
     <div><div id="stateTitle" class="state-title">VÉRIFICATION…</div><div id="stateDetail" class="state-detail">Contrôle des services en cours</div></div>
-    <span id="stateTime" class="state-time">—</span>
+    <div class="system-side"><span id="stateTime" class="state-time">—</span><span id="systemLtc" class="system-ltc offline">--:--:--:--</span></div>
   </section>
 
   <div class="command-row">
@@ -1023,6 +1032,7 @@ body.show-mode .system{min-height:78px}
         <label>Mode<select id="abletonMode" onchange="updateNetworkFields()"><option value="local">Local</option><option value="remote">Ableton distant</option></select></label>
         <label>Adresse Ableton<input id="abletonHost" value="127.0.0.1"></label>
         <div class="ports-readonly"><span>Ports AbletonOSC fixes</span><strong><span id="abletonSendPort">11000</span> → <span id="abletonReplyPort">11001</span></strong></div>
+        <div class="ltc-destination"><span>Destination à saisir dans LTC Display v2</span><strong id="ltcDestination">127.0.0.1:63123</strong></div>
       </div>
       <div class="network-buttons">
         <button class="action" onclick="saveNetworkConfig()">Appliquer</button>
@@ -1034,8 +1044,8 @@ body.show-mode .system{min-height:78px}
   <section class="card console-card">
     <div class="console-head"><strong>MIDI &amp; CONSOLES</strong></div>
     <div class="console-grid">
-      <div id="cl5Return" class="console-return"><div id="cl5Program" class="console-program">CL5 · N° —</div><div id="cl5Title" class="console-title">Titre en attente</div><div id="cl5State" class="console-state">Aucun retour Program Change</div></div>
-      <div id="ql1Return" class="console-return"><div id="ql1Program" class="console-program">QL1 · N° —</div><div id="ql1Title" class="console-title">Titre en attente</div><div id="ql1State" class="console-state">Aucun retour Program Change</div></div>
+      <div id="cl5Return" class="console-return"><div id="cl5Program" class="console-program">CL5 · scène n° —</div><div id="cl5Title" class="console-title">Contexte Ableton en attente</div><div id="cl5State" class="console-state">Aucun retour Program Change</div></div>
+      <div id="ql1Return" class="console-return"><div id="ql1Program" class="console-program">QL1 · scène n° —</div><div id="ql1Title" class="console-title">Contexte Ableton en attente</div><div id="ql1State" class="console-state">Aucun retour Program Change</div></div>
     </div>
   </section>
 
@@ -1081,13 +1091,17 @@ function render(s){
   if(s.orphan_actions_available)el('orphanDetail').textContent='Instance '+s.orphan_instance_id+' · PID '+s.orphan_process_id+' · '+s.build_id;
   if(!networkFormInitialized&&s.ableton_profiles)initializeNetworkForm(s);
   if(s.ableton_config){el('techAbletonMode').textContent='Ableton · '+(s.ableton_config.mode==='local'?'Local':'Distant');el('techAbletonAddress').textContent=s.ableton_config.host+':'+s.ableton_config.send_port+' → '+s.ableton_config.reply_port;el('techOscLabel').textContent='OSC aller · '+s.ableton_config.send_port;el('techReturnLabel').textContent='OSC retour · '+s.ableton_config.reply_port;}
+  el('ltcDestination').textContent=s.ltc_destination+':'+s.ltc_port;
   if(s.osc_transport){el('techAbletonLatency').textContent='Dernière réponse · '+(s.osc_transport.last_latency_ms==null?'—':Math.round(s.osc_transport.last_latency_ms)+' ms');el('techAbletonTimeouts').textContent='Timeouts · '+s.osc_transport.timeout_count;}
   const midi=s.midi_console||{},cl5=midi.cl5||{},ql1=midi.ql1||{};
-  el('cl5Return').className='console-return '+(cl5.received?'ok':'');el('ql1Return').className='console-return '+(ql1.received?'ok':'');
-  el('cl5Program').textContent='CL5 · N° '+(cl5.program??'—');el('ql1Program').textContent='QL1 · N° '+(ql1.program??'—');
+  const returnPresentation=(value)=>{const at=Number(value.received_at||0),age=at?Math.max(0,Date.now()/1000-at):Infinity,fresh=value.received&&age<=5;return {className:fresh?'ok':(value.received?'stale':''),text:fresh?'✓ Retour confirmé':(value.received?(at?'Dernier retour · il y a '+Math.floor(age)+' s':'Dernier retour · ancien'):'Aucun retour Program Change')};};
+  const cl5Return=returnPresentation(cl5),ql1Return=returnPresentation(ql1);
+  el('cl5Return').className='console-return '+cl5Return.className;el('ql1Return').className='console-return '+ql1Return.className;
+  el('cl5Program').textContent='CL5 · scène n° '+(cl5.program??'—');el('ql1Program').textContent='QL1 · scène n° '+(ql1.program??'—');
   el('cl5Title').textContent=cl5.title||s.playing_scene_name||'Titre en attente';el('ql1Title').textContent=ql1.title||s.playing_scene_name||'Titre en attente';
-  el('cl5State').textContent=cl5.received?'✓ Retour Program Change':'Aucun retour Program Change';el('ql1State').textContent=ql1.received?'✓ Retour Program Change':'Aucun retour Program Change';
+  el('cl5State').textContent=cl5Return.text;el('ql1State').textContent=ql1Return.text;
   const ltc=s.ltc_connected?s.ltc_timecode:'--:--:--:--';
+  el('systemLtc').textContent=ltc;el('systemLtc').className='system-ltc'+(s.ltc_connected?'':' offline');
   el('networkLtc').textContent=ltc;el('networkLtc').className='network-timecode'+(s.ltc_connected?'':' offline');
 }
 async function refresh(){try{render(await(await fetch('/state')).json());}catch(e){el('systemCard').className='card system error';el('stateTitle').textContent='PANNEAU HORS LIGNE';el('stateDetail').textContent=String(e);}}
@@ -1158,7 +1172,7 @@ async function toggleShowMode(){
 }
 ['abletonHost'].forEach(id=>el(id).addEventListener('input',markNetworkDraftDirty));
 let telemetryBusy=false;
-async function refreshTelemetry(){if(telemetryBusy)return;telemetryBusy=true;try{const t=await(await fetch('/telemetry')).json();const ltc=t.ltc_connected?t.ltc_timecode:'--:--:--:--';el('networkLtc').textContent=ltc;el('networkLtc').className='network-timecode'+(t.ltc_connected?'':' offline');}catch(e){}finally{telemetryBusy=false;}}
+async function refreshTelemetry(){if(telemetryBusy)return;telemetryBusy=true;try{const t=await(await fetch('/telemetry')).json();const ltc=t.ltc_connected?t.ltc_timecode:'--:--:--:--';el('systemLtc').textContent=ltc;el('systemLtc').className='system-ltc'+(t.ltc_connected?'':' offline');el('networkLtc').textContent=ltc;el('networkLtc').className='network-timecode'+(t.ltc_connected?'':' offline');}catch(e){}finally{telemetryBusy=false;}}
 refresh();refreshTelemetry();setInterval(refresh,1500);setInterval(refreshTelemetry,100);
 </script>
 </body>
@@ -1217,6 +1231,7 @@ def state():
         public_profiles = None
         active_mode = None
         network_config_error = str(exc)
+    ltc_destination = "127.0.0.1" if active_mode == "local" else get_lan_ip()
     live_set_ready = bool(remote_state.get("set_ready")) if server_valid else False
     reply_port = int((configured_target or {}).get("reply_port", RETURN_PORT))
     send_port = int((configured_target or {}).get("send_port", OSC_PORT))
@@ -1260,6 +1275,8 @@ def state():
         playing_scene_name=remote_state.get("playing_scene_name"),
         ltc_connected=remote_state.get("ltc_connected", False),
         ltc_timecode=remote_state.get("ltc_timecode", "--:--:--:--"),
+        ltc_destination=ltc_destination,
+        ltc_port=LTC_PORT,
         midi_console=read_midi_console_state(),
         orphan_actions_available=identity["code"] == "orphan-claimable",
         orphan_instance_id=(remote_state.get("server_instance_id") or "")[:8] or None,

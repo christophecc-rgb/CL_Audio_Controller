@@ -1,23 +1,5 @@
 #import <AppKit/AppKit.h>
 #import <CoreMIDI/CoreMIDI.h>
-#import <arpa/inet.h>
-#import <fcntl.h>
-#import <sys/socket.h>
-#import <unistd.h>
-
-static const UInt16 CLSceneContextPort = 9002;
-
-static NSString *CLReadOSCString(NSData *data, NSUInteger *offset) {
-    const UInt8 *bytes = data.bytes;
-    NSUInteger length = data.length;
-    if (*offset >= length) return nil;
-    NSUInteger end = *offset;
-    while (end < length && bytes[end] != 0) end++;
-    if (end >= length) return nil;
-    NSString *value = [[NSString alloc] initWithBytes:bytes + *offset length:end - *offset encoding:NSUTF8StringEncoding];
-    *offset = (end + 4) & ~((NSUInteger)3);
-    return value;
-}
 
 static NSString *EndpointName(MIDIEndpointRef endpoint) {
     CFStringRef value = NULL;
@@ -40,6 +22,22 @@ static NSArray<NSString *> *EndpointNames(BOOL sources) {
 
 @interface CLNetworkDelegate : NSObject <NSApplicationDelegate, NSNetServiceBrowserDelegate>
 @property NSWindow *window;
+@property NSView *headerPanel;
+@property NSView *statusPanel;
+@property NSView *targetPanel;
+@property NSView *testPanel;
+@property NSView *technicalPanel;
+@property NSTextField *appTitleLabel;
+@property NSTextField *appSubtitleLabel;
+@property NSTextField *compactSummary;
+@property NSTextField *footerLabel;
+@property NSButton *showModeButton;
+@property NSButton *settingsButton;
+@property NSButton *refreshButton;
+@property NSButton *simulatorButton;
+@property BOOL showModeEnabled;
+@property NSString *lastCL5Test;
+@property NSString *lastQL1Test;
 @property NSView *lamp;
 @property NSTextField *headline;
 @property NSTextField *detail;
@@ -52,43 +50,36 @@ static NSArray<NSString *> *EndpointNames(BOOL sources) {
 @property NSPopUpButton *targetMenu;
 @property NSButton *connectButton;
 @property NSTimer *timer;
-@property NSTimer *statusTimer;
-@property BOOL statusRequestRunning;
 @property NSNetServiceBrowser *serviceBrowser;
 @property NSMutableOrderedSet<NSString *> *discoveredPeers;
 @property NSString *localNetworkName;
 @property BOOL peerInspectionRunning;
 @property NSString *validatedEndpoint;
 @property NSDate *validatedAt;
+@property NSString *loopDetectedEndpoint;
 @property NSTask *simulatorDashboardTask;
-@property NSTextField *monitorStatus;
-@property NSTextField *cl5Program;
-@property NSTextField *cl5Detail;
-@property NSTextField *cl5Scene;
-@property NSTextField *ql1Program;
-@property NSTextField *ql1Detail;
-@property NSTextField *ql1Scene;
-@property NSTextField *ltcTimecode;
-@property MIDIClientRef monitorClient;
-@property MIDIPortRef monitorInputPort;
-@property MIDIEndpointRef monitorSource;
+@property NSTask *guardianTask;
+@property NSString *guardianPeer;
+@property NSTextField *technicalSession;
+@property NSTextField *technicalEndpoints;
+@property NSTextField *technicalPeers;
+@property NSTextField *technicalSelection;
+@property NSPopUpButton *policyMenu;
+@property NSButton *sessionToggleButton;
+@property MIDIClientRef returnMonitorClient;
+@property MIDIPortRef returnMonitorInputPort;
+@property MIDIEndpointRef returnMonitorSource;
 @property NSInteger pendingCL5Program;
 @property NSInteger pendingQL1Program;
 @property NSInteger lastCL5Program;
 @property NSInteger lastQL1Program;
-@property CFAbsoluteTime lastCL5ProgramAt;
-@property CFAbsoluteTime lastQL1ProgramAt;
+@property NSDate *lastCL5ProgramAt;
+@property NSDate *lastQL1ProgramAt;
 @property BOOL returnUpdateScheduled;
-@property int sceneSocket;
-@property dispatch_source_t sceneSource;
-@property NSString *currentSceneName;
-- (void)writePublishedConsoleState;
-- (void)queueProgram:(UInt8)program channel:(UInt8)channel;
-- (void)handleProgram:(UInt8)program channel:(UInt8)channel;
-- (void)handleSceneDatagram:(NSData *)data;
+- (void)queueReturnedProgram:(UInt8)program channel:(UInt8)channel;
 @end
 
-static void CLReturnMonitorRead(const MIDIPacketList *packetList, void *readProcRefCon, void *srcConnRefCon) {
+static void CLPassiveReturnRead(const MIDIPacketList *packetList, void *readProcRefCon, void *srcConnRefCon) {
     (void)srcConnRefCon;
     CLNetworkDelegate *delegate = (__bridge CLNetworkDelegate *)readProcRefCon;
     const MIDIPacket *packet = &packetList->packet[0];
@@ -97,9 +88,7 @@ static void CLReturnMonitorRead(const MIDIPacketList *packetList, void *readProc
         while (index < packet->length) {
             UInt8 status = packet->data[index];
             if ((status & 0xF0) == 0xC0 && index + 1 < packet->length) {
-                UInt8 program = packet->data[index + 1];
-                UInt8 channel = (status & 0x0F) + 1;
-                [delegate queueProgram:program channel:channel];
+                [delegate queueReturnedProgram:packet->data[index + 1] channel:(status & 0x0F) + 1];
                 index += 2;
             } else {
                 index += 1;
@@ -168,17 +157,24 @@ static void CLReturnMonitorRead(const MIDIPacketList *packetList, void *readProc
 
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
     (void)notification;
-    self.window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 780, 500)
+    self.window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 500, 900)
                                               styleMask:(NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable)
                                                 backing:NSBackingStoreBuffered defer:NO];
     self.window.title = @"CL MIDI Network Assistant";
+    self.lastCL5Test = @"non testé";
+    self.lastQL1Test = @"non testé";
+    self.pendingCL5Program = -1;
+    self.pendingQL1Program = -1;
+    self.lastCL5Program = -1;
+    self.lastQL1Program = -1;
+    MIDINetworkSession.defaultSession.enabled = YES;
     self.window.backgroundColor = [NSColor colorWithRed:0.035 green:0.045 blue:0.060 alpha:1.0];
     [self.window center];
     [self.window makeKeyAndOrderFront:nil];
 
     NSView *content = self.window.contentView;
 
-    NSView *header = [[NSView alloc] initWithFrame:NSMakeRect(16, 414, 448, 70)];
+    NSView *header = self.headerPanel = [[NSView alloc] initWithFrame:NSMakeRect(16, 796, 468, 88)];
     header.wantsLayer = YES;
     header.layer.backgroundColor = [NSColor colorWithRed:0.018 green:0.023 blue:0.032 alpha:1.0].CGColor;
     header.layer.cornerRadius = 12.0;
@@ -188,322 +184,182 @@ static void CLReturnMonitorRead(const MIDIPacketList *packetList, void *readProc
 
     NSString *logoPath = [NSBundle.mainBundle.resourcePath stringByAppendingPathComponent:@"paradis_latin_logo.jpg"];
     NSImage *logo = [[NSImage alloc] initWithContentsOfFile:logoPath];
-    NSImageView *logoView = [[NSImageView alloc] initWithFrame:NSMakeRect(12, 10, 155, 50)];
+    NSImageView *logoView = [[NSImageView alloc] initWithFrame:NSMakeRect(12, 8, 444, 72)];
     logoView.image = logo;
     logoView.imageScaling = NSImageScaleProportionallyUpOrDown;
     [header addSubview:logoView];
-    NSTextField *appTitle = [self label:@"CL MIDI NETWORK ASSISTANT" frame:NSMakeRect(182, 32, 250, 22) size:13 bold:YES];
-    NSTextField *appSubtitle = [self label:@"Connexion RTP · validation Yamaha" frame:NSMakeRect(182, 13, 250, 18) size:10 bold:NO];
+    NSTextField *appTitle = self.appTitleLabel = [self label:@"CL MIDI NETWORK ASSISTANT" frame:NSMakeRect(20, 744, 270, 24) size:15 bold:YES];
+    NSTextField *appSubtitle = self.appSubtitleLabel = [self label:@"Technique RTP · CoreMIDI" frame:NSMakeRect(286, 746, 94, 20) size:9 bold:NO];
     appSubtitle.textColor = [NSColor colorWithWhite:0.62 alpha:1.0];
-    [header addSubview:appTitle];
-    [header addSubview:appSubtitle];
+    NSShadow *silverShadow = [[NSShadow alloc] init];
+    silverShadow.shadowColor = [NSColor colorWithWhite:1.0 alpha:0.22];
+    silverShadow.shadowOffset = NSMakeSize(0, -1);
+    silverShadow.shadowBlurRadius = 1.0;
+    appTitle.attributedStringValue = [[NSAttributedString alloc] initWithString:@"CL MIDI NETWORK ASSISTANT" attributes:@{
+        NSForegroundColorAttributeName: [NSColor colorWithRed:0.76 green:0.79 blue:0.84 alpha:1.0],
+        NSFontAttributeName: [NSFont boldSystemFontOfSize:15.0],
+        NSShadowAttributeName: silverShadow
+    }];
+    [content addSubview:appTitle];
+    [content addSubview:appSubtitle];
+    self.showModeButton = [self accentButton:@"Mode spectacle" frame:NSMakeRect(384, 741, 100, 30) action:@selector(toggleShowMode:) color:[NSColor colorWithRed:0.24 green:0.28 blue:0.35 alpha:1.0]];
+    [content addSubview:self.showModeButton];
 
-    self.lamp = [[NSView alloc] initWithFrame:NSMakeRect(24, 338, 34, 34)];
+    NSView *statusPanel = self.statusPanel = [[NSView alloc] initWithFrame:NSMakeRect(16, 651, 468, 84)];
+    statusPanel.wantsLayer = YES; statusPanel.layer.cornerRadius = 12; statusPanel.layer.borderWidth = 1;
+    statusPanel.layer.backgroundColor = [NSColor colorWithRed:0.055 green:0.075 blue:0.095 alpha:1.0].CGColor;
+    statusPanel.layer.borderColor = [NSColor colorWithRed:0.22 green:0.55 blue:0.78 alpha:0.7].CGColor;
+    [content addSubview:statusPanel];
+    self.lamp = [[NSView alloc] initWithFrame:NSMakeRect(18, 27, 22, 22)];
     self.lamp.wantsLayer = YES;
-    self.lamp.layer.cornerRadius = 17;
-    [content addSubview:self.lamp];
-    self.headline = [self label:@"Analyse de la connexion RTP…" frame:NSMakeRect(70, 346, 385, 25) size:17 bold:YES];
-    self.detail = [self label:@"" frame:NSMakeRect(70, 320, 385, 22) size:11 bold:NO];
-    [content addSubview:self.headline];
-    [content addSubview:self.detail];
+    self.lamp.layer.cornerRadius = 11;
+    [statusPanel addSubview:self.lamp];
+    self.headline = [self label:@"Analyse de la connexion RTP…" frame:NSMakeRect(54, 43, 394, 25) size:17 bold:YES];
+    self.detail = [self label:@"" frame:NSMakeRect(54, 17, 394, 22) size:11 bold:NO];
+    [statusPanel addSubview:self.headline]; [statusPanel addSubview:self.detail];
 
-    [content addSubview:[self label:@"CIBLE RTP DISTANTE" frame:NSMakeRect(24, 278, 190, 20) size:10 bold:YES]];
-    self.targetMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(24, 244, 300, 30) pullsDown:NO];
+    NSView *targetPanel = self.targetPanel = [[NSView alloc] initWithFrame:NSMakeRect(16, 543, 468, 100)];
+    targetPanel.wantsLayer = YES; targetPanel.layer.cornerRadius = 12; targetPanel.layer.borderWidth = 1;
+    targetPanel.layer.backgroundColor = [NSColor colorWithRed:0.075 green:0.088 blue:0.11 alpha:1.0].CGColor;
+    targetPanel.layer.borderColor = [NSColor colorWithWhite:0.24 alpha:1.0].CGColor; [content addSubview:targetPanel];
+    [targetPanel addSubview:[self label:@"CONNEXION À LA CIBLE RTP" frame:NSMakeRect(16, 68, 220, 20) size:10 bold:YES]];
+    self.targetMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(16, 24, 308, 34) pullsDown:NO];
     self.targetMenu.target = self;
     self.targetMenu.action = @selector(targetChanged:);
     [self.targetMenu addItemWithTitle:@"Recherche des correspondants…"];
     [self stylePopup:self.targetMenu accent:[NSColor colorWithRed:0.34 green:0.72 blue:1.0 alpha:1.0]];
-    [content addSubview:self.targetMenu];
-    self.connectButton = [self accentButton:@"Connecter" frame:NSMakeRect(334, 243, 122, 32) action:@selector(connectSelectedPeer:) color:[NSColor colorWithRed:0.12 green:0.42 blue:0.82 alpha:1.0]];
-    [content addSubview:self.connectButton];
+    [targetPanel addSubview:self.targetMenu];
+    self.connectButton = [self accentButton:@"Connecter" frame:NSMakeRect(334, 23, 118, 36) action:@selector(connectSelectedPeer:) color:[NSColor colorWithRed:0.12 green:0.42 blue:0.82 alpha:1.0]];
+    [targetPanel addSubview:self.connectButton];
 
-    [content addSubview:[self label:@"PORT RTP À TESTER" frame:NSMakeRect(24, 218, 190, 20) size:10 bold:YES]];
-    self.endpointMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(24, 184, 184, 30) pullsDown:NO];
+    NSView *testPanel = self.testPanel = [[NSView alloc] initWithFrame:NSMakeRect(16, 390, 468, 145)];
+    testPanel.wantsLayer = YES; testPanel.layer.cornerRadius = 12; testPanel.layer.borderWidth = 1;
+    testPanel.layer.backgroundColor = [NSColor colorWithRed:0.065 green:0.073 blue:0.09 alpha:1.0].CGColor;
+    testPanel.layer.borderColor = [NSColor colorWithRed:0.38 green:0.30 blue:0.65 alpha:0.7].CGColor; [content addSubview:testPanel];
+    [testPanel addSubview:[self label:@"TEST ALLER-RETOUR MIDI" frame:NSMakeRect(16, 115, 190, 20) size:10 bold:YES]];
+    self.endpointMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(16, 76, 194, 32) pullsDown:NO];
     self.endpointMenu.target = self;
     self.endpointMenu.action = @selector(endpointChanged:);
     [self stylePopup:self.endpointMenu accent:[NSColor colorWithRed:0.67 green:0.53 blue:1.0 alpha:1.0]];
-    [content addSubview:self.endpointMenu];
-    [content addSubview:[self label:@"CONSOLE" frame:NSMakeRect(220, 218, 100, 20) size:10 bold:YES]];
-    self.testTargetMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(216, 184, 108, 30) pullsDown:NO];
+    [testPanel addSubview:self.endpointMenu];
+    self.testTargetMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(218, 76, 108, 32) pullsDown:NO];
     [self.testTargetMenu addItemsWithTitles:@[@"CL5 · Ch.1", @"QL1 · Ch.2"]];
     [self stylePopup:self.testTargetMenu accent:[NSColor colorWithRed:0.35 green:0.72 blue:1.0 alpha:1.0]];
-    [content addSubview:self.testTargetMenu];
-    [content addSubview:[self label:@"PGM" frame:NSMakeRect(338, 218, 50, 20) size:10 bold:YES]];
-    self.programField = [[NSTextField alloc] initWithFrame:NSMakeRect(334, 184, 60, 30)];
+    [testPanel addSubview:self.testTargetMenu];
+    self.programField = [[NSTextField alloc] initWithFrame:NSMakeRect(334, 76, 52, 32)];
     self.programField.stringValue = @"42";
     self.programField.alignment = NSTextAlignmentCenter;
     self.programField.font = [NSFont boldSystemFontOfSize:14.0];
     self.programField.textColor = [NSColor colorWithRed:0.55 green:0.90 blue:0.68 alpha:1.0];
     self.programField.backgroundColor = [NSColor colorWithRed:0.055 green:0.070 blue:0.095 alpha:1.0];
-    [content addSubview:self.programField];
-    self.testButton = [self accentButton:@"Tester" frame:NSMakeRect(402, 183, 54, 32) action:@selector(runTest:) color:[NSColor colorWithRed:0.08 green:0.58 blue:0.32 alpha:1.0]];
-    [content addSubview:self.testButton];
+    [testPanel addSubview:self.programField];
+    self.testButton = [self accentButton:@"Tester" frame:NSMakeRect(394, 75, 58, 34) action:@selector(runTest:) color:[NSColor colorWithRed:0.08 green:0.58 blue:0.32 alpha:1.0]];
+    [testPanel addSubview:self.testButton];
 
-    self.sessionInfo = [self label:@"" frame:NSMakeRect(24, 137, 432, 38) size:11 bold:NO];
+    self.sessionInfo = [self label:@"SÉCURITÉ : entrée RTP « Piste » désactivée · sortie « Piste » activée\nRoutages actifs : Aucun · une seule paire RTP" frame:NSMakeRect(16, 38, 436, 34) size:10 bold:NO];
+    self.sessionInfo.textColor = [NSColor colorWithRed:1.0 green:0.72 blue:0.30 alpha:1.0];
     self.sessionInfo.maximumNumberOfLines = 2;
-    self.lastTest = [self label:@"Aucun aller-retour validé" frame:NSMakeRect(24, 97, 432, 30) size:12 bold:YES];
-    [content addSubview:self.sessionInfo];
-    [content addSubview:self.lastTest];
+    self.lastTest = [self label:@"Aucun aller-retour validé" frame:NSMakeRect(16, 10, 436, 24) size:11 bold:YES];
+    [testPanel addSubview:self.sessionInfo]; [testPanel addSubview:self.lastTest];
 
-    [content addSubview:[self accentButton:@"Réglages MIDI" frame:NSMakeRect(24, 35, 124, 36) action:@selector(openMidiSetup:) color:[NSColor colorWithRed:0.16 green:0.25 blue:0.39 alpha:1.0]]];
-    [content addSubview:[self accentButton:@"Actualiser" frame:NSMakeRect(158, 35, 100, 36) action:@selector(refreshNow:) color:[NSColor colorWithRed:0.20 green:0.25 blue:0.33 alpha:1.0]]];
-    [content addSubview:[self accentButton:@"Console Simulator" frame:NSMakeRect(268, 35, 188, 36) action:@selector(startSimulator:) color:[NSColor colorWithRed:0.68 green:0.35 blue:0.08 alpha:1.0]]];
+    NSView *technicalPanel = self.technicalPanel = [[NSView alloc] initWithFrame:NSMakeRect(16, 132, 468, 250)];
+    technicalPanel.wantsLayer = YES;
+    technicalPanel.layer.backgroundColor = [NSColor colorWithRed:0.018 green:0.027 blue:0.038 alpha:1.0].CGColor;
+    technicalPanel.layer.cornerRadius = 12.0;
+    technicalPanel.layer.borderWidth = 1.0;
+    technicalPanel.layer.borderColor = [NSColor colorWithRed:0.20 green:0.44 blue:0.60 alpha:0.75].CGColor;
+    [content addSubview:technicalPanel];
 
-    NSTextField *footer = [self label:@"CL AUDIO · MIDI NETWORK · 2026" frame:NSMakeRect(24, 8, 432, 18) size:9 bold:YES];
-    footer.alignment = NSTextAlignmentCenter;
-    footer.textColor = [NSColor colorWithWhite:0.38 alpha:1.0];
-    [content addSubview:footer];
+    NSTextField *technicalTitle = [self label:@"DIAGNOSTIC RÉSEAU MIDI" frame:NSMakeRect(16, 216, 250, 24) size:13 bold:YES];
+    technicalTitle.textColor = [NSColor colorWithRed:0.40 green:0.78 blue:1.0 alpha:1.0];
+    [technicalPanel addSubview:technicalTitle];
+    NSTextField *technicalSubtitle = [self label:@"Actualisation automatique toutes les 2 secondes" frame:NSMakeRect(252, 218, 200, 18) size:8 bold:NO];
+    technicalSubtitle.alignment = NSTextAlignmentRight;
+    [technicalPanel addSubview:technicalSubtitle];
 
-    NSView *monitorPanel = [[NSView alloc] initWithFrame:NSMakeRect(488, 16, 276, 468)];
-    monitorPanel.wantsLayer = YES;
-    monitorPanel.layer.backgroundColor = [NSColor colorWithRed:0.018 green:0.027 blue:0.038 alpha:1.0].CGColor;
-    monitorPanel.layer.cornerRadius = 12.0;
-    monitorPanel.layer.borderWidth = 1.0;
-    monitorPanel.layer.borderColor = [NSColor colorWithRed:0.20 green:0.44 blue:0.60 alpha:0.75].CGColor;
-    [content addSubview:monitorPanel];
+    [technicalPanel addSubview:[self label:@"SESSION RTP" frame:NSMakeRect(16, 186, 110, 18) size:9 bold:YES]];
+    self.technicalSession = [self label:@"Analyse…" frame:NSMakeRect(16, 140, 208, 44) size:10 bold:NO];
+    self.technicalSession.maximumNumberOfLines = 3;
+    [technicalPanel addSubview:self.technicalSession];
 
-    NSTextField *monitorTitle = [self label:@"RETOURS CONSOLES" frame:NSMakeRect(18, 424, 240, 24) size:14 bold:YES];
-    monitorTitle.textColor = [NSColor colorWithRed:0.40 green:0.78 blue:1.0 alpha:1.0];
-    [monitorPanel addSubview:monitorTitle];
-    self.monitorStatus = [self label:@"Initialisation de l’écoute MIDI…" frame:NSMakeRect(18, 395, 240, 30) size:10 bold:NO];
-    self.monitorStatus.maximumNumberOfLines = 2;
-    [monitorPanel addSubview:self.monitorStatus];
+    self.sessionToggleButton = [self accentButton:@"Activer la session" frame:NSMakeRect(16, 36, 208, 34) action:@selector(toggleNetworkSession:) color:[NSColor colorWithRed:0.08 green:0.50 blue:0.31 alpha:1.0]];
+    [technicalPanel addSubview:self.sessionToggleButton];
+    self.policyMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(236, 37, 216, 32) pullsDown:NO];
+    [self.policyMenu addItemsWithTitles:@[@"Accès : aucun", @"Accès : contacts", @"Accès : tous"]];
+    self.policyMenu.target = self;
+    self.policyMenu.action = @selector(changeConnectionPolicy:);
+    [self stylePopup:self.policyMenu accent:[NSColor colorWithRed:0.44 green:0.72 blue:1.0 alpha:1.0]];
+    [technicalPanel addSubview:self.policyMenu];
 
-    NSView *cl5Panel = [[NSView alloc] initWithFrame:NSMakeRect(16, 258, 244, 120)];
-    cl5Panel.wantsLayer = YES;
-    cl5Panel.layer.backgroundColor = [NSColor colorWithRed:0.035 green:0.09 blue:0.13 alpha:1.0].CGColor;
-    cl5Panel.layer.cornerRadius = 10.0;
-    cl5Panel.layer.borderWidth = 1.0;
-    cl5Panel.layer.borderColor = [NSColor colorWithRed:0.22 green:0.65 blue:0.94 alpha:0.8].CGColor;
-    [monitorPanel addSubview:cl5Panel];
-    NSTextField *cl5Title = [self label:@"RETOUR PROGRAM CHANGE · CANAL 1" frame:NSMakeRect(14, 94, 218, 16) size:8 bold:YES];
-    cl5Title.textColor = [NSColor colorWithRed:0.35 green:0.72 blue:1.0 alpha:1.0];
-    [cl5Panel addSubview:cl5Title];
-    self.cl5Program = [self label:@"CL5 · N° —" frame:NSMakeRect(14, 61, 210, 29) size:18 bold:YES];
-    self.cl5Program.alignment = NSTextAlignmentCenter;
-    self.cl5Program.textColor = [NSColor colorWithRed:0.95 green:0.78 blue:0.30 alpha:1.0];
-    [cl5Panel addSubview:self.cl5Program];
-    self.cl5Scene = [self label:@"Titre en attente" frame:NSMakeRect(12, 37, 220, 20) size:10 bold:YES];
-    self.cl5Scene.alignment = NSTextAlignmentCenter;
-    self.cl5Scene.lineBreakMode = NSLineBreakByTruncatingTail;
-    self.cl5Scene.textColor = [NSColor colorWithRed:0.65 green:0.84 blue:1.0 alpha:1.0];
-    [cl5Panel addSubview:self.cl5Scene];
-    self.cl5Detail = [self label:@"En attente d’un retour" frame:NSMakeRect(14, 10, 216, 18) size:8 bold:YES];
-    self.cl5Detail.alignment = NSTextAlignmentCenter;
-    [cl5Panel addSubview:self.cl5Detail];
+    [technicalPanel addSubview:[self label:@"PORTS COREMIDI" frame:NSMakeRect(236, 186, 150, 18) size:9 bold:YES]];
+    self.technicalEndpoints = [self label:@"Analyse…" frame:NSMakeRect(236, 140, 216, 44) size:10 bold:NO];
+    self.technicalEndpoints.maximumNumberOfLines = 4;
+    [technicalPanel addSubview:self.technicalEndpoints];
 
-    NSView *ql1Panel = [[NSView alloc] initWithFrame:NSMakeRect(16, 128, 244, 120)];
-    ql1Panel.wantsLayer = YES;
-    ql1Panel.layer.backgroundColor = [NSColor colorWithRed:0.055 green:0.075 blue:0.105 alpha:1.0].CGColor;
-    ql1Panel.layer.cornerRadius = 10.0;
-    ql1Panel.layer.borderWidth = 1.0;
-    ql1Panel.layer.borderColor = [NSColor colorWithRed:0.38 green:0.60 blue:0.94 alpha:0.8].CGColor;
-    [monitorPanel addSubview:ql1Panel];
-    NSTextField *ql1Title = [self label:@"RETOUR PROGRAM CHANGE · CANAL 2" frame:NSMakeRect(14, 94, 218, 16) size:8 bold:YES];
-    ql1Title.textColor = [NSColor colorWithRed:0.60 green:0.82 blue:1.0 alpha:1.0];
-    [ql1Panel addSubview:ql1Title];
-    self.ql1Program = [self label:@"QL1 · N° —" frame:NSMakeRect(14, 61, 210, 29) size:18 bold:YES];
-    self.ql1Program.alignment = NSTextAlignmentCenter;
-    self.ql1Program.textColor = [NSColor colorWithRed:0.95 green:0.78 blue:0.30 alpha:1.0];
-    [ql1Panel addSubview:self.ql1Program];
-    self.ql1Scene = [self label:@"Titre en attente" frame:NSMakeRect(12, 37, 220, 20) size:10 bold:YES];
-    self.ql1Scene.alignment = NSTextAlignmentCenter;
-    self.ql1Scene.lineBreakMode = NSLineBreakByTruncatingTail;
-    self.ql1Scene.textColor = [NSColor colorWithRed:0.70 green:0.84 blue:1.0 alpha:1.0];
-    [ql1Panel addSubview:self.ql1Scene];
-    self.ql1Detail = [self label:@"En attente d’un retour" frame:NSMakeRect(14, 10, 216, 18) size:8 bold:YES];
-    self.ql1Detail.alignment = NSTextAlignmentCenter;
-    [ql1Panel addSubview:self.ql1Detail];
+    [technicalPanel addSubview:[self label:@"PORT SÉLECTIONNÉ" frame:NSMakeRect(16, 112, 150, 18) size:9 bold:YES]];
+    self.technicalSelection = [self label:@"Aucun" frame:NSMakeRect(16, 74, 208, 36) size:10 bold:NO];
+    self.technicalSelection.maximumNumberOfLines = 2;
+    [technicalPanel addSubview:self.technicalSelection];
 
-    NSView *ltcPanel = [[NSView alloc] initWithFrame:NSMakeRect(16, 54, 244, 64)];
-    ltcPanel.wantsLayer = YES;
-    ltcPanel.layer.backgroundColor = [NSColor colorWithRed:0.035 green:0.055 blue:0.065 alpha:1.0].CGColor;
-    ltcPanel.layer.cornerRadius = 10.0;
-    ltcPanel.layer.borderWidth = 1.0;
-    ltcPanel.layer.borderColor = [NSColor colorWithRed:0.24 green:0.62 blue:0.42 alpha:0.75].CGColor;
-    [monitorPanel addSubview:ltcPanel];
-    NSTextField *ltcTitle = [self label:@"LTC TIMECODE" frame:NSMakeRect(12, 42, 220, 14) size:8 bold:YES];
-    ltcTitle.alignment = NSTextAlignmentCenter;
-    ltcTitle.textColor = [NSColor colorWithWhite:0.62 alpha:1.0];
-    [ltcPanel addSubview:ltcTitle];
-    self.ltcTimecode = [self label:@"--:--:--:--" frame:NSMakeRect(12, 10, 220, 30) size:18 bold:YES];
-    self.ltcTimecode.alignment = NSTextAlignmentCenter;
-    self.ltcTimecode.font = [NSFont monospacedDigitSystemFontOfSize:18 weight:NSFontWeightBold];
-    self.ltcTimecode.textColor = [NSColor colorWithWhite:0.58 alpha:1.0];
-    [ltcPanel addSubview:self.ltcTimecode];
+    [technicalPanel addSubview:[self label:@"CORRESPONDANTS BONJOUR" frame:NSMakeRect(236, 112, 190, 18) size:9 bold:YES]];
+    self.technicalPeers = [self label:@"Recherche…" frame:NSMakeRect(236, 74, 216, 36) size:10 bold:NO];
+    self.technicalPeers.maximumNumberOfLines = 3;
+    [technicalPanel addSubview:self.technicalPeers];
 
-    NSTextField *monitorFooter = [self label:@"Écoute native CoreMIDI · hors de Live" frame:NSMakeRect(18, 30, 240, 18) size:9 bold:YES];
-    monitorFooter.alignment = NSTextAlignmentCenter;
-    monitorFooter.textColor = [NSColor colorWithWhite:0.42 alpha:1.0];
-    [monitorPanel addSubview:monitorFooter];
+    self.settingsButton = [self accentButton:@"Réglages réseau MIDI" frame:NSMakeRect(16, 88, 228, 36) action:@selector(openMidiSetup:) color:[NSColor colorWithRed:0.27 green:0.36 blue:0.49 alpha:1.0]]; [content addSubview:self.settingsButton];
+    self.refreshButton = [self accentButton:@"Actualiser le diagnostic" frame:NSMakeRect(256, 88, 228, 36) action:@selector(refreshNow:) color:[NSColor colorWithRed:0.30 green:0.35 blue:0.43 alpha:1.0]]; [content addSubview:self.refreshButton];
+    self.simulatorButton = [self accentButton:@"OUVRIR LE SIMULATEUR YAMAHA" frame:NSMakeRect(16, 38, 468, 42) action:@selector(startSimulator:) color:[NSColor colorWithRed:0.55 green:0.39 blue:0.28 alpha:1.0]]; [content addSubview:self.simulatorButton];
+    NSTextField *footer = self.footerLabel = [self label:@"CL AUDIO · MIDI NETWORK · 2026" frame:NSMakeRect(16, 10, 468, 18) size:8 bold:YES];
+    footer.alignment = NSTextAlignmentCenter; footer.textColor = [NSColor colorWithWhite:0.38 alpha:1.0]; [content addSubview:footer];
+    self.compactSummary = [self label:@"Aucun test aller-retour validé" frame:NSMakeRect(24, 66, 452, 54) size:12 bold:YES];
+    self.compactSummary.maximumNumberOfLines = 3; self.compactSummary.hidden = YES; [content addSubview:self.compactSummary];
 
-    [self setupReturnMonitor];
-    [self setupSceneContextListener];
     [self refreshEndpoints];
     self.discoveredPeers = [NSMutableOrderedSet orderedSet];
     self.serviceBrowser = [[NSNetServiceBrowser alloc] init];
     self.serviceBrowser.delegate = self;
     [self.serviceBrowser searchForServicesOfType:@"_apple-midi._udp." inDomain:@"local."];
     self.timer = [NSTimer scheduledTimerWithTimeInterval:2.0 target:self selector:@selector(refreshTimer:) userInfo:nil repeats:YES];
-    self.statusTimer = [NSTimer scheduledTimerWithTimeInterval:0.1 target:self selector:@selector(refreshPublishedStatus:) userInfo:nil repeats:YES];
-    [self refreshPublishedStatus:nil];
+    [self ensureGuardianRunning];
+    [self setupPassiveReturnMonitor];
     [NSApp activateIgnoringOtherApps:YES];
 }
 
-- (void)refreshPublishedStatus:(NSTimer *)timer {
-    (void)timer;
-    if (self.statusRequestRunning) return;
-    self.statusRequestRunning = YES;
-    NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:[NSURL URLWithString:@"http://127.0.0.1:5050/status"]];
-    request.timeoutInterval = 0.5;
-    [[[NSURLSession sharedSession] dataTaskWithRequest:request completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-        (void)response;
-        NSString *timecode = nil;
-        BOOL connected = NO;
-        if (data.length && !error) {
-            NSDictionary *status = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
-            connected = [status[@"ltc_connected"] boolValue];
-            NSString *candidate = [status[@"ltc_timecode"] isKindOfClass:NSString.class] ? status[@"ltc_timecode"] : nil;
-            if (connected && candidate.length == 11) timecode = candidate;
-        }
-        dispatch_async(dispatch_get_main_queue(), ^{
-            self.statusRequestRunning = NO;
-            NSString *display = timecode ?: @"--:--:--:--";
-            NSColor *color = timecode
-                ? [NSColor colorWithRed:0.35 green:0.95 blue:0.58 alpha:1.0]
-                : [NSColor colorWithWhite:0.58 alpha:1.0];
-            self.ltcTimecode.stringValue = display;
-            self.ltcTimecode.textColor = color;
-        });
-    }] resume];
-}
-
-- (void)setupSceneContextListener {
-    self.sceneSocket = socket(AF_INET, SOCK_DGRAM, 0);
-    if (self.sceneSocket < 0) return;
-    int reuse = 1;
-    setsockopt(self.sceneSocket, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
-    fcntl(self.sceneSocket, F_SETFL, O_NONBLOCK);
-    struct sockaddr_in address = {0};
-    address.sin_len = sizeof(address);
-    address.sin_family = AF_INET;
-    address.sin_port = htons(CLSceneContextPort);
-    address.sin_addr.s_addr = htonl(INADDR_ANY);
-    if (bind(self.sceneSocket, (struct sockaddr *)&address, sizeof(address)) != 0) {
-        close(self.sceneSocket);
-        self.sceneSocket = -1;
-        return;
-    }
-    self.sceneSource = dispatch_source_create(DISPATCH_SOURCE_TYPE_READ, (uintptr_t)self.sceneSocket, 0,
-                                               dispatch_get_global_queue(QOS_CLASS_UTILITY, 0));
-    __weak typeof(self) weakSelf = self;
-    dispatch_source_set_event_handler(self.sceneSource, ^{
-        UInt8 buffer[4096];
-        ssize_t count = 0;
-        while ((count = recv(weakSelf.sceneSocket, buffer, sizeof(buffer), 0)) > 0) {
-            NSData *packet = [NSData dataWithBytes:buffer length:(NSUInteger)count];
-            [weakSelf handleSceneDatagram:packet];
-        }
-    });
-    dispatch_resume(self.sceneSource);
-}
-
-- (void)handleSceneDatagram:(NSData *)data {
-    NSUInteger offset = 0;
-    NSString *address = CLReadOSCString(data, &offset);
-    NSString *types = CLReadOSCString(data, &offset);
-    if (![address isEqualToString:@"/cl/midi-monitor/scene"] || ![types hasPrefix:@","]) return;
-    NSString *sceneName = nil;
-    const UInt8 *bytes = data.bytes;
-    for (NSUInteger index = 1; index < types.length; index++) {
-        unichar type = [types characterAtIndex:index];
-        if (type == 'i' || type == 'f') {
-            if (offset + 4 > data.length) return;
-            offset += 4;
-        } else if (type == 's') {
-            sceneName = CLReadOSCString(data, &offset);
-            if (!sceneName) return;
-        }
-    }
-    if (!sceneName.length) return;
-    dispatch_async(dispatch_get_main_queue(), ^{
-        self.currentSceneName = sceneName;
-    });
-}
-
-- (void)setupReturnMonitor {
-    self.pendingCL5Program = -1;
-    self.pendingQL1Program = -1;
-    self.lastCL5Program = -1;
-    self.lastQL1Program = -1;
-    [self writePublishedConsoleState];
-    OSStatus clientStatus = MIDIClientCreate(CFSTR("CL Console Return Monitor"), NULL, NULL, &_monitorClient);
-    OSStatus portStatus = clientStatus == noErr
-        ? MIDIInputPortCreate(self.monitorClient, CFSTR("Console returns"), CLReturnMonitorRead,
-                              (__bridge void *)self, &_monitorInputPort)
-        : clientStatus;
-    if (clientStatus != noErr || portStatus != noErr) {
-        self.monitorStatus.stringValue = @"Écoute CoreMIDI indisponible";
-        self.monitorStatus.textColor = NSColor.systemRedColor;
-    }
-}
-
-- (void)writePublishedConsoleState {
+- (void)writeConsoleReturnState {
     NSDictionary *payload = @{
         @"service": @"cl-midi-console-monitor",
         @"updated_at": @([[NSDate date] timeIntervalSince1970]),
         @"cl5": @{
             @"program": self.lastCL5Program >= 0 ? @(self.lastCL5Program + 1) : NSNull.null,
-            @"title": self.cl5Scene.stringValue ?: @"",
+            @"title": @"",
             @"received": @(self.lastCL5Program >= 0),
+            @"received_at": self.lastCL5ProgramAt ? @([self.lastCL5ProgramAt timeIntervalSince1970]) : NSNull.null,
         },
         @"ql1": @{
             @"program": self.lastQL1Program >= 0 ? @(self.lastQL1Program + 1) : NSNull.null,
-            @"title": self.ql1Scene.stringValue ?: @"",
+            @"title": @"",
             @"received": @(self.lastQL1Program >= 0),
+            @"received_at": self.lastQL1ProgramAt ? @([self.lastQL1ProgramAt timeIntervalSince1970]) : NSNull.null,
         },
     };
     NSData *data = [NSJSONSerialization dataWithJSONObject:payload options:0 error:nil];
     [data writeToFile:@"/private/tmp/CL_MIDI_Console_State.json" options:NSDataWritingAtomic error:nil];
 }
 
-- (void)queueProgram:(UInt8)program channel:(UInt8)channel {
-    if (channel != 1 && channel != 2) return;
-    CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
-    @synchronized (self) {
-        if (channel == 1) {
-            if (self.lastCL5Program == program && now - self.lastCL5ProgramAt < 1.0) return;
-            self.lastCL5Program = program;
-            self.lastCL5ProgramAt = now;
-            self.pendingCL5Program = program;
-        } else {
-            if (self.lastQL1Program == program && now - self.lastQL1ProgramAt < 1.0) return;
-            self.lastQL1Program = program;
-            self.lastQL1ProgramAt = now;
-            self.pendingQL1Program = program;
-        }
-        if (self.returnUpdateScheduled) return;
-        self.returnUpdateScheduled = YES;
+- (void)setupPassiveReturnMonitor {
+    OSStatus clientStatus = MIDIClientCreate(CFSTR("CL Passive Console Return Monitor"), NULL, NULL, &_returnMonitorClient);
+    OSStatus portStatus = clientStatus == noErr
+        ? MIDIInputPortCreate(self.returnMonitorClient, CFSTR("Console return input"), CLPassiveReturnRead,
+                              (__bridge void *)self, &_returnMonitorInputPort)
+        : clientStatus;
+    if (clientStatus != noErr || portStatus != noErr) {
+        self.lastTest.stringValue = @"Écoute passive des retours consoles indisponible";
     }
-
-    // Never enqueue one AppKit update per MIDI packet. A network feedback storm
-    // must not be able to starve the application's main event loop.
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 100 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
-        NSInteger cl5 = -1;
-        NSInteger ql1 = -1;
-        @synchronized (self) {
-            cl5 = self.pendingCL5Program;
-            ql1 = self.pendingQL1Program;
-            self.pendingCL5Program = -1;
-            self.pendingQL1Program = -1;
-            self.returnUpdateScheduled = NO;
-        }
-        if (cl5 >= 0) [self handleProgram:(UInt8)cl5 channel:1];
-        if (ql1 >= 0) [self handleProgram:(UInt8)ql1 channel:2];
-    });
+    [self writeConsoleReturnState];
+    [self selectPassiveReturnSourceNamed:self.endpointMenu.selectedItem.title ?: @""];
 }
 
-- (void)selectReturnMonitorSourceNamed:(NSString *)name {
+- (void)selectPassiveReturnSourceNamed:(NSString *)name {
     MIDIEndpointRef selectedSource = 0;
     for (ItemCount index = 0; index < MIDIGetNumberOfSources(); index++) {
         MIDIEndpointRef source = MIDIGetSource(index);
@@ -512,44 +368,79 @@ static void CLReturnMonitorRead(const MIDIPacketList *packetList, void *readProc
             break;
         }
     }
-    if (selectedSource == self.monitorSource) return;
-    if (self.monitorSource && self.monitorInputPort) {
-        MIDIPortDisconnectSource(self.monitorInputPort, self.monitorSource);
+    if (selectedSource == self.returnMonitorSource) return;
+    if (self.returnMonitorSource && self.returnMonitorInputPort) {
+        MIDIPortDisconnectSource(self.returnMonitorInputPort, self.returnMonitorSource);
     }
-    self.monitorSource = 0;
-    if (!selectedSource || !self.monitorInputPort) {
-        self.monitorStatus.stringValue = @"Aucune entrée RTP sélectionnée";
-        self.monitorStatus.textColor = NSColor.systemOrangeColor;
-        return;
-    }
-    OSStatus status = MIDIPortConnectSource(self.monitorInputPort, selectedSource, NULL);
-    if (status == noErr) {
-        self.monitorSource = selectedSource;
-        self.monitorStatus.stringValue = [NSString stringWithFormat:@"Écoute active sur %@", name];
-        self.monitorStatus.textColor = NSColor.systemGreenColor;
-    } else {
-        self.monitorStatus.stringValue = [NSString stringWithFormat:@"Impossible d’écouter %@", name];
-        self.monitorStatus.textColor = NSColor.systemRedColor;
+    self.returnMonitorSource = 0;
+    if (selectedSource && self.returnMonitorInputPort &&
+        MIDIPortConnectSource(self.returnMonitorInputPort, selectedSource, NULL) == noErr) {
+        self.returnMonitorSource = selectedSource;
     }
 }
 
-- (void)handleProgram:(UInt8)program channel:(UInt8)channel {
-    NSInteger displayedProgram = (NSInteger)program + 1;
-    NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
-    formatter.dateFormat = @"HH:mm:ss.SSS";
-    NSString *detail = [NSString stringWithFormat:@"✓ RETOUR REÇU · %@", [formatter stringFromDate:NSDate.date]];
-    if (channel == 1) {
-        self.cl5Program.stringValue = [NSString stringWithFormat:@"CL5 · N° %ld", (long)displayedProgram];
-        self.cl5Detail.stringValue = detail;
-        self.cl5Detail.textColor = NSColor.systemGreenColor;
-        self.cl5Scene.stringValue = self.currentSceneName.length ? self.currentSceneName : @"Titre non reçu";
-        [self writePublishedConsoleState];
-    } else if (channel == 2) {
-        self.ql1Program.stringValue = [NSString stringWithFormat:@"QL1 · N° %ld", (long)displayedProgram];
-        self.ql1Detail.stringValue = detail;
-        self.ql1Detail.textColor = NSColor.systemGreenColor;
-        self.ql1Scene.stringValue = self.currentSceneName.length ? self.currentSceneName : @"Titre non reçu";
-        [self writePublishedConsoleState];
+- (void)queueReturnedProgram:(UInt8)program channel:(UInt8)channel {
+    if (channel != 1 && channel != 2) return;
+    @synchronized (self) {
+        if (channel == 1) self.pendingCL5Program = program;
+        else self.pendingQL1Program = program;
+        if (self.returnUpdateScheduled) return;
+        self.returnUpdateScheduled = YES;
+    }
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 60 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
+        @synchronized (self) {
+            if (self.pendingCL5Program >= 0) {
+                self.lastCL5Program = self.pendingCL5Program;
+                self.lastCL5ProgramAt = [NSDate date];
+            }
+            if (self.pendingQL1Program >= 0) {
+                self.lastQL1Program = self.pendingQL1Program;
+                self.lastQL1ProgramAt = [NSDate date];
+            }
+            self.pendingCL5Program = -1;
+            self.pendingQL1Program = -1;
+            self.returnUpdateScheduled = NO;
+        }
+        [self writeConsoleReturnState];
+    });
+}
+
+- (void)updateCompactSummary {
+    NSString *peers = self.technicalPeers.stringValue.length ? self.technicalPeers.stringValue : @"Aucun réseau détecté";
+    peers = [peers stringByReplacingOccurrencesOfString:@"\n" withString:@" · "];
+    self.compactSummary.stringValue = [NSString stringWithFormat:@"RÉSEAUX CONSOLES · %@\nCL5 · %@\nQL1 · %@",
+        peers, self.lastCL5Test ?: @"non testé", self.lastQL1Test ?: @"non testé"];
+}
+
+- (void)toggleShowMode:(id)sender {
+    (void)sender;
+    self.showModeEnabled = !self.showModeEnabled;
+    [self updateCompactSummary];
+    self.targetPanel.hidden = self.showModeEnabled;
+    self.testPanel.hidden = self.showModeEnabled;
+    self.technicalPanel.hidden = self.showModeEnabled;
+    self.settingsButton.hidden = self.showModeEnabled;
+    self.refreshButton.hidden = self.showModeEnabled;
+    self.simulatorButton.hidden = self.showModeEnabled;
+    self.compactSummary.hidden = !self.showModeEnabled;
+    self.showModeButton.title = self.showModeEnabled ? @"Panneau complet" : @"Mode spectacle";
+    if (self.showModeEnabled) {
+        [self.window setContentSize:NSMakeSize(500, 430)];
+        self.headerPanel.frame = NSMakeRect(16, 326, 468, 88);
+        self.appTitleLabel.frame = NSMakeRect(20, 286, 270, 24);
+        self.appSubtitleLabel.frame = NSMakeRect(286, 288, 94, 20);
+        self.showModeButton.frame = NSMakeRect(384, 283, 100, 30);
+        self.statusPanel.frame = NSMakeRect(16, 190, 468, 84);
+        self.compactSummary.frame = NSMakeRect(24, 104, 452, 62);
+        self.footerLabel.frame = NSMakeRect(16, 18, 468, 18);
+    } else {
+        [self.window setContentSize:NSMakeSize(500, 900)];
+        self.headerPanel.frame = NSMakeRect(16, 796, 468, 88);
+        self.appTitleLabel.frame = NSMakeRect(20, 744, 270, 24);
+        self.appSubtitleLabel.frame = NSMakeRect(286, 746, 94, 20);
+        self.showModeButton.frame = NSMakeRect(384, 741, 100, 30);
+        self.statusPanel.frame = NSMakeRect(16, 651, 468, 84);
+        self.footerLabel.frame = NSMakeRect(16, 10, 468, 18);
     }
 }
 
@@ -562,15 +453,60 @@ static void CLReturnMonitorRead(const MIDIPacketList *packetList, void *readProc
     self.detail.stringValue = detail;
 }
 
-- (void)refreshTimer:(NSTimer *)timer { (void)timer; [self refreshEndpoints]; }
+- (void)refreshTimer:(NSTimer *)timer { (void)timer; [self refreshEndpoints]; [self ensureGuardianRunning]; }
 - (void)refreshNow:(id)sender { (void)sender; [self refreshEndpoints]; [self inspectMidiDirectory]; }
-- (void)endpointChanged:(id)sender { (void)sender; self.validatedEndpoint = nil; [self refreshEndpoints]; }
+- (void)endpointChanged:(id)sender { (void)sender; self.validatedEndpoint = nil; self.loopDetectedEndpoint = nil; [self refreshEndpoints]; }
 - (void)targetChanged:(id)sender {
     (void)sender;
     NSString *target = self.targetMenu.selectedItem.title;
     if (target.length && ![target hasPrefix:@"Recherche"] && ![target hasPrefix:@"Aucun"]) {
         [[NSUserDefaults standardUserDefaults] setObject:target forKey:@"preferredRtpPeer"];
+        [self restartGuardianForPeer:target];
     }
+}
+
+- (void)startGuardianForPeer:(NSString *)peer {
+    if (!peer.length || [peer hasPrefix:@"Aucun"] || [peer hasPrefix:@"Recherche"]) return;
+    NSString *tool = [self toolPath:@"CLMIDINetworkGuardian"];
+    if (![NSFileManager.defaultManager isExecutableFileAtPath:tool]) {
+        self.lastTest.stringValue = @"Gardien RTP introuvable dans l’application";
+        return;
+    }
+    NSTask *task = [[NSTask alloc] init];
+    task.executableURL = [NSURL fileURLWithPath:tool];
+    task.arguments = @[@"--peer-name", peer, @"--interval", @"2"];
+    task.standardOutput = NSFileHandle.fileHandleWithNullDevice;
+    task.standardError = NSFileHandle.fileHandleWithNullDevice;
+    __weak typeof(self) weakSelf = self;
+    task.terminationHandler = ^(NSTask *finished) {
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (weakSelf.guardianTask == finished) {
+                weakSelf.guardianTask = nil;
+                weakSelf.guardianPeer = nil;
+            }
+        });
+    };
+    NSError *error = nil;
+    if (![task launchAndReturnError:&error]) {
+        self.lastTest.stringValue = [NSString stringWithFormat:@"Gardien RTP non démarré : %@", error.localizedDescription];
+        return;
+    }
+    self.guardianTask = task;
+    self.guardianPeer = peer;
+}
+
+- (void)restartGuardianForPeer:(NSString *)peer {
+    if (self.guardianTask.running) [self.guardianTask terminate];
+    self.guardianTask = nil;
+    self.guardianPeer = nil;
+    [self startGuardianForPeer:peer];
+}
+
+- (void)ensureGuardianRunning {
+    NSString *peer = [[NSUserDefaults standardUserDefaults] stringForKey:@"preferredRtpPeer"];
+    if (!peer.length) return;
+    if (self.guardianTask.running && [self.guardianPeer isEqualToString:peer]) return;
+    [self restartGuardianForPeer:peer];
 }
 
 - (void)refreshTargetMenu {
@@ -584,6 +520,22 @@ static void CLReturnMonitorRead(const MIDIPacketList *packetList, void *readProc
     if (selected.length && [names containsObject:selected]) [self.targetMenu selectItemWithTitle:selected];
     [self stylePopup:self.targetMenu accent:[NSColor colorWithRed:0.34 green:0.72 blue:1.0 alpha:1.0]];
     self.connectButton.enabled = names.count > 0;
+    self.technicalPeers.stringValue = names.count
+        ? [NSString stringWithFormat:@"%lu détecté(s)\n%@", (unsigned long)names.count, [names componentsJoinedByString:@" · "]]
+        : @"Aucun correspondant _apple-midi._udp détecté";
+}
+
+- (void)toggleNetworkSession:(id)sender {
+    (void)sender;
+    MIDINetworkSession *session = MIDINetworkSession.defaultSession;
+    session.enabled = !session.isEnabled;
+    [self refreshEndpoints];
+}
+
+- (void)changeConnectionPolicy:(id)sender {
+    (void)sender;
+    MIDINetworkSession.defaultSession.connectionPolicy = (MIDINetworkConnectionPolicy)self.policyMenu.indexOfSelectedItem;
+    [self refreshEndpoints];
 }
 
 - (void)inspectMidiDirectory {
@@ -671,15 +623,26 @@ static void CLReturnMonitorRead(const MIDIPacketList *packetList, void *readProc
     [self stylePopup:self.endpointMenu accent:[NSColor colorWithRed:0.67 green:0.53 blue:1.0 alpha:1.0]];
 
     NSString *endpoint = self.endpointMenu.selectedItem.title ?: @"";
-    [self selectReturnMonitorSourceNamed:endpoint];
+    [self selectPassiveReturnSourceNamed:endpoint];
     BOOL hasSource = [sources containsObject:endpoint];
     BOOL hasDestination = [destinations containsObject:endpoint];
     MIDINetworkSession *session = [MIDINetworkSession defaultSession];
-    self.sessionInfo.stringValue = [NSString stringWithFormat:@"Session API : %@ · port %lu · connexions déclarées : %lu\nEntrée : %@ · sortie : %@",
-        session.isEnabled ? @"active" : @"indisponible", (unsigned long)session.networkPort,
-        (unsigned long)session.connections.count, hasSource ? @"visible" : @"absente", hasDestination ? @"visible" : @"absente"];
+    self.technicalSession.stringValue = [NSString stringWithFormat:@"État : %@\nPort UDP : %lu\nConnexions actives : %lu",
+        session.isEnabled ? @"ACTIVE" : @"DÉSACTIVÉE", (unsigned long)session.networkPort,
+        (unsigned long)session.connections.count];
+    self.sessionToggleButton.title = session.isEnabled ? @"Désactiver" : @"Activer la session";
+    NSInteger policy = (NSInteger)session.connectionPolicy;
+    if (policy >= 0 && policy < self.policyMenu.numberOfItems) [self.policyMenu selectItemAtIndex:policy];
+    self.technicalEndpoints.stringValue = [NSString stringWithFormat:@"Entrées : %lu   Sorties : %lu\nPorts RTP détectés : %lu\nCoreMIDI : %@",
+        (unsigned long)sources.count, (unsigned long)destinations.count, (unsigned long)candidates.count,
+        (sources.count || destinations.count) ? @"opérationnel" : @"aucun port"];
+    self.technicalSelection.stringValue = [NSString stringWithFormat:@"%@\nEntrée : %@   Sortie : %@",
+        endpoint.length ? endpoint : @"Aucun port", hasSource ? @"OUI" : @"NON", hasDestination ? @"OUI" : @"NON"];
+    if (self.showModeEnabled) [self updateCompactSummary];
 
-    if (self.validatedEndpoint && [self.validatedEndpoint isEqualToString:endpoint]) {
+    if (self.loopDetectedEndpoint && [self.loopDetectedEndpoint isEqualToString:endpoint]) {
+        [self setLamp:[NSColor systemRedColor] title:@"BOUCLE MIDI DÉTECTÉE" detail:@"Dans Ableton : désactivez Entrée RTP > Piste, puis relancez le test."];
+    } else if (self.validatedEndpoint && [self.validatedEndpoint isEqualToString:endpoint]) {
         NSTimeInterval age = -[self.validatedAt timeIntervalSinceNow];
         [self setLamp:[NSColor systemGreenColor] title:@"RTP VALIDÉ" detail:[NSString stringWithFormat:@"Aller-retour confirmé il y a %.0f s sur %@", age, endpoint]];
     } else if (hasSource && hasDestination) {
@@ -724,13 +687,21 @@ static void CLReturnMonitorRead(const MIDIPacketList *packetList, void *readProc
                 NSTextCheckingResult *match = [regex firstMatchInString:output options:0 range:NSMakeRange(0, output.length)];
                 NSString *latency = match ? [output substringWithRange:[match rangeAtIndex:1]] : @"?";
                 self.validatedEndpoint = endpoint;
+                self.loopDetectedEndpoint = nil;
                 self.validatedAt = [NSDate date];
                 self.lastTest.stringValue = [NSString stringWithFormat:@"✓ %@ · canal %ld · PGM %ld confirmé · %@ ms", console, (long)channel, (long)program, latency];
+                NSString *compactResult = [NSString stringWithFormat:@"PGM %ld confirmé · %@ ms", (long)program, latency];
+                if (channel == 1) self.lastCL5Test = compactResult; else self.lastQL1Test = compactResult;
             } else {
                 self.validatedEndpoint = nil;
-                NSString *reason = [output rangeOfString:@"TIMEOUT"].location != NSNotFound ? @"aucun retour reçu" : @"test impossible";
+                BOOL loopDetected = [output rangeOfString:@"LOOP_DETECTED"].location != NSNotFound;
+                if (loopDetected) self.loopDetectedEndpoint = endpoint;
+                NSString *reason = loopDetected ? @"boucle MIDI détectée · désactivez Entrée RTP > Piste dans Ableton"
+                    : ([output rangeOfString:@"TIMEOUT"].location != NSNotFound ? @"aucun retour reçu" : @"test impossible");
                 self.lastTest.stringValue = [NSString stringWithFormat:@"Échec : %@", reason];
+                if (channel == 1) self.lastCL5Test = reason; else self.lastQL1Test = reason;
             }
+            if (self.showModeEnabled) [self updateCompactSummary];
             [self refreshEndpoints];
         });
     };
@@ -783,12 +754,14 @@ static void CLReturnMonitorRead(const MIDIPacketList *packetList, void *readProc
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender { (void)sender; return YES; }
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender {
     (void)sender;
-    if (self.monitorSource && self.monitorInputPort) MIDIPortDisconnectSource(self.monitorInputPort, self.monitorSource);
-    [self.statusTimer invalidate];
-    if (self.monitorInputPort) MIDIPortDispose(self.monitorInputPort);
-    if (self.monitorClient) MIDIClientDispose(self.monitorClient);
-    if (self.sceneSource) dispatch_source_cancel(self.sceneSource);
-    if (self.sceneSocket >= 0) close(self.sceneSocket);
+    [self.timer invalidate];
+    [self.serviceBrowser stop];
+    if (self.guardianTask.running) [self.guardianTask terminate];
+    if (self.returnMonitorSource && self.returnMonitorInputPort) {
+        MIDIPortDisconnectSource(self.returnMonitorInputPort, self.returnMonitorSource);
+    }
+    if (self.returnMonitorInputPort) MIDIPortDispose(self.returnMonitorInputPort);
+    if (self.returnMonitorClient) MIDIClientDispose(self.returnMonitorClient);
     return NSTerminateNow;
 }
 @end

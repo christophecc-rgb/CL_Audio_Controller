@@ -118,6 +118,9 @@ ableton_transport = OSCTransport(
     send_port=ableton_target.send_port,
     reply_port=ableton_target.reply_port,
 )
+# Donne momentanément la priorité au test de connexion demandé par
+# l'opérateur, sans modifier le transport ni annuler le bootstrap courant.
+transport_test_requested = threading.Event()
 
 KEYBOARD_LOG_PATH = Path("/private/tmp/CL_Audio_Controller_keyboard.log")
 keyboard_log_lock = threading.Lock()
@@ -1735,6 +1738,7 @@ def refresh_names_and_transport() -> bool:
     """
     try:
         initial_generation = None
+        recovery_generation = None
         wait_for_initial_bootstrap = False
         with lock:
             generation = int(state.get("set_generation", 0))
@@ -1751,12 +1755,23 @@ def refresh_names_and_transport() -> bool:
                 wait_for_initial_bootstrap = True
             elif state.get("current_set_id") is None:
                 initial_generation = reset_live_set_state_locked(None, "initial bootstrap")
+            elif not state.get("set_ready", False):
+                # Une erreur réseau peut annuler la transaction tout en laissant
+                # l'identité temporaire pending:<génération>. La reprise doit
+                # alors repasser directement par le bootstrap transactionnel :
+                # les prélectures courtes d'identité ne doivent pas devenir une
+                # condition de récupération.
+                recovery_generation = generation
 
         # Le premier instantané est confié directement à la transaction.
         # Il ne dépend donc ni d'un /live/startup spontané, ni des trois
         # prélectures historiques aux timeouts adaptés au seul mode local.
         if initial_generation is not None:
             start_live_set_bootstrap(initial_generation)
+            return False
+
+        if recovery_generation is not None:
+            start_live_set_bootstrap(recovery_generation)
             return False
 
         # Une transaction initiale déjà active reste l'unique propriétaire
@@ -2014,6 +2029,9 @@ def background_refresh():
     global last_playing_scan
 
     while True:
+        if transport_test_requested.is_set():
+            time.sleep(BACKGROUND_REFRESH_SECONDS)
+            continue
         now = time.time()
         full_refresh_due = now - last_full_refresh >= FULL_REFRESH_SECONDS
         playing_scan_due = now - last_playing_scan >= PLAYING_SCAN_SECONDS
@@ -2185,7 +2203,10 @@ def info():
 
 @app.route("/")
 def index():
-    show_session_view()
+    try:
+        show_session_view()
+    except OSError as exc:
+        print(f"OSC Session view unavailable while opening remote: {exc}")
     return render_template("index.html")
 
 
@@ -2267,12 +2288,16 @@ def status():
 @app.route("/transport/test", methods=["POST"])
 def test_ableton_transport():
     """Teste le transport sans appliquer la réponse à l'état métier."""
+    transport_test_requested.set()
     started = time.monotonic()
-    response = ableton_transport.query(
-        "/live/application/get/version",
-        timeout=0.5,
-        context={"purpose": "connection-test"},
-    )
+    try:
+        response = ableton_transport.query(
+            "/live/application/get/version",
+            timeout=0.5,
+            context={"purpose": "connection-test"},
+        )
+    finally:
+        transport_test_requested.clear()
     elapsed_ms = int((time.monotonic() - started) * 1000)
     if response is None:
         return jsonify(

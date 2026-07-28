@@ -10,25 +10,97 @@ static BOOL echoEnabled = YES;
 static NSString *consoleLabel = @"QL1";
 static NSUInteger acceptedChannel = 0;
 static volatile sig_atomic_t keepRunning = 1;
-static UInt8 lastSentStatus = 0;
-static UInt8 lastSentProgram = 0;
-static CFAbsoluteTime lastSentAt = 0;
-static NSUInteger selfEchoBudget = 0;
+
+// CoreMIDI does not expose the origin of a packet received from a network
+// session. Keep a short history of our own confirmations so every reflected
+// copy is discarded, even if another Program Change was sent in between.
+typedef struct {
+    UInt8 status;
+    UInt8 program;
+    CFAbsoluteTime sentAt;
+} CLSentConfirmation;
+
+enum {
+    CLSentHistorySize = 64,
+    CLMaxPendingConfirmations = 32,
+    CLMaxReceivedPerSecond = 64
+};
+
+static CLSentConfirmation sentHistory[CLSentHistorySize];
+static NSUInteger sentHistoryCursor = 0;
+static BOOL pendingConfirmations[16][128];
+static NSUInteger pendingConfirmationCount = 0;
+static CFAbsoluteTime receiveWindowStartedAt = 0;
+static NSUInteger receiveWindowCount = 0;
+static CFAbsoluteTime echoMutedUntil = 0;
+
+static void markConfirmationSent(UInt8 status, UInt8 program) {
+    @synchronized (consoleLabel) {
+        sentHistory[sentHistoryCursor].status = status;
+        sentHistory[sentHistoryCursor].program = program;
+        sentHistory[sentHistoryCursor].sentAt = CFAbsoluteTimeGetCurrent();
+        sentHistoryCursor = (sentHistoryCursor + 1) % CLSentHistorySize;
+    }
+}
 
 static BOOL consumeSelfEcho(UInt8 status, UInt8 program) {
     @synchronized (consoleLabel) {
-        CFAbsoluteTime age = CFAbsoluteTimeGetCurrent() - lastSentAt;
-        if (selfEchoBudget > 0 && age >= 0 && age <= 0.5 &&
-            status == lastSentStatus && program == lastSentProgram) {
-            selfEchoBudget -= 1;
-            fprintf(stdout, "IGNORED_SELF_ECHO console=%s channel=%u program=%u scene=%u\n",
-                    consoleLabel.UTF8String, (status & 0x0F) + 1, program, program + 1);
-            fflush(stdout);
-            return YES;
+        CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
+        for (NSUInteger index = 0; index < CLSentHistorySize; index++) {
+            CFAbsoluteTime age = now - sentHistory[index].sentAt;
+            if (sentHistory[index].sentAt > 0 && age >= 0 && age <= 2.0 &&
+                status == sentHistory[index].status && program == sentHistory[index].program) {
+                fprintf(stdout, "IGNORED_SELF_ECHO console=%s channel=%u program=%u scene=%u age_ms=%.1f\n",
+                        consoleLabel.UTF8String, (status & 0x0F) + 1, program, program + 1,
+                        age * 1000.0);
+                fflush(stdout);
+                return YES;
+            }
         }
-        if (age > 0.5) selfEchoBudget = 0;
     }
     return NO;
+}
+
+static BOOL reserveConfirmation(UInt8 status, UInt8 program) {
+    NSUInteger channel = status & 0x0F;
+    CFAbsoluteTime now = CFAbsoluteTimeGetCurrent();
+    @synchronized (consoleLabel) {
+        if (now < echoMutedUntil) return NO;
+        if (receiveWindowStartedAt == 0 || now - receiveWindowStartedAt >= 1.0) {
+            receiveWindowStartedAt = now;
+            receiveWindowCount = 0;
+        }
+        receiveWindowCount += 1;
+        if (receiveWindowCount > CLMaxReceivedPerSecond ||
+            pendingConfirmationCount >= CLMaxPendingConfirmations) {
+            echoMutedUntil = now + 2.0;
+            fprintf(stderr, "ECHO_CIRCUIT_OPEN console=%s received_per_second=%lu pending=%lu mute_ms=2000\n",
+                    consoleLabel.UTF8String, (unsigned long)receiveWindowCount,
+                    (unsigned long)pendingConfirmationCount);
+            fflush(stderr);
+            return NO;
+        }
+        if (pendingConfirmations[channel][program]) {
+            fprintf(stdout, "COALESCED_DUPLICATE console=%s channel=%lu program=%u scene=%u\n",
+                    consoleLabel.UTF8String, (unsigned long)channel + 1, program, program + 1);
+            fflush(stdout);
+            return NO;
+        }
+        pendingConfirmations[channel][program] = YES;
+        pendingConfirmationCount += 1;
+        return YES;
+    }
+}
+
+static BOOL releaseConfirmation(UInt8 status, UInt8 program) {
+    NSUInteger channel = status & 0x0F;
+    @synchronized (consoleLabel) {
+        if (pendingConfirmations[channel][program]) {
+            pendingConfirmations[channel][program] = NO;
+            if (pendingConfirmationCount > 0) pendingConfirmationCount -= 1;
+        }
+        return CFAbsoluteTimeGetCurrent() >= echoMutedUntil;
+    }
 }
 
 static void stopHandler(int signalValue) {
@@ -78,16 +150,8 @@ static void sendProgramChange(UInt8 status, UInt8 program) {
     UInt8 bytes[2] = {status, program};
     packet = MIDIPacketListAdd(packetList, sizeof(storage), packet, 0, 2, bytes);
     if (packet != NULL && outputPort != 0 && networkDestination != 0) {
-        @synchronized (consoleLabel) {
-            lastSentStatus = status;
-            lastSentProgram = program;
-            lastSentAt = CFAbsoluteTimeGetCurrent();
-            selfEchoBudget = 1;
-        }
+        markConfirmationSent(status, program);
         OSStatus result = MIDISend(outputPort, networkDestination, packetList);
-        if (result != noErr) {
-            @synchronized (consoleLabel) { selfEchoBudget = 0; }
-        }
         fprintf(stdout, "CONFIRMED console=%s channel=%u program=%u scene=%u status=%d\n",
                 consoleLabel.UTF8String, (status & 0x0F) + 1, program, program + 1, (int)result);
         fflush(stdout);
@@ -116,10 +180,16 @@ static void midiRead(const MIDIPacketList *packetList, void *readProcRefCon, voi
                 fprintf(stdout, "RECEIVED console=%s channel=%u program=%u scene=%u\n",
                         consoleLabel.UTF8String, (status & 0x0F) + 1, program, program + 1);
                 fflush(stdout);
-                if (echoEnabled) {
+                if (echoEnabled && reserveConfirmation(status, program)) {
                     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(echoDelayMs * NSEC_PER_MSEC)),
                                    dispatch_get_main_queue(), ^{
-                        sendProgramChange(status, program);
+                        if (releaseConfirmation(status, program)) {
+                            sendProgramChange(status, program);
+                        } else {
+                            fprintf(stderr, "SUPPRESSED_PENDING_CONFIRMATION console=%s channel=%u program=%u scene=%u\n",
+                                    consoleLabel.UTF8String, (status & 0x0F) + 1, program, program + 1);
+                            fflush(stderr);
+                        }
                     });
                 }
                 index += 2;

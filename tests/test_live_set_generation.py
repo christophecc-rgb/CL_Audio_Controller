@@ -59,6 +59,17 @@ class LiveSetGenerationTests(unittest.TestCase):
         ):
             return self.app.execute_go_transaction(request_id, generation, scene_number)
 
+    def test_session_page_remains_available_when_view_osc_send_is_refused(self):
+        with mock.patch.object(
+            self.app,
+            "show_session_view",
+            side_effect=PermissionError(1, "Operation not permitted"),
+        ):
+            response = self.app.app.test_client().get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("Ableton Web Remote", response.get_data(as_text=True))
+
     def test_midi_monitor_scene_context_uses_active_ableton_target(self):
         with (
             mock.patch.object(self.app.ableton_transport, "host", "192.168.1.22"),
@@ -749,6 +760,26 @@ class LiveSetGenerationTests(unittest.TestCase):
         self.assertEqual(len(created_threads), 1)
         start_bootstrap.assert_called_once_with(4)
         query.assert_not_called()
+
+    def test_cancelled_initial_bootstrap_restarts_same_generation_transactionally(self):
+        with self.app.lock:
+            self.app._bootstrap_generation = None
+            self.app._bootstrap_transaction = None
+            self.app.state["set_generation"] = 7
+            self.app.state["set_ready"] = False
+            self.app.state["current_set_id"] = "pending:7"
+            self.app.state["bootstrap_running"] = False
+
+        with (
+            mock.patch.object(self.app, "refresh_live_set_identity") as refresh_identity,
+            mock.patch.object(self.app, "start_live_set_bootstrap") as start_bootstrap,
+        ):
+            ready = self.app.refresh_names_and_transport()
+
+        self.assertFalse(ready)
+        start_bootstrap.assert_called_once_with(7)
+        refresh_identity.assert_not_called()
+        self.assertEqual(self.app.state["set_generation"], 7)
 
     def test_all_web_interfaces_reject_older_generations(self):
         reset_helpers = {

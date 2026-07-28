@@ -3,10 +3,18 @@
 Trois outils natifs macOS fondés sur CoreMIDI :
 
 - `CLMIDINetworkGuardian` active la session RTP-MIDI et reconnecte un correspondant Bonjour.
-- `CLMIDINetworkDashboard` affiche l'état RTP, les ports CoreMIDI visibles, le résultat d'un aller-retour MIDI réel et surveille directement les retours Program Change CL5/QL1 hors de Live.
+- `CLMIDINetworkDashboard` est un panneau technique autonome : état et activation de la session RTP, politique d'accès, port UDP, connexions actives, inventaire CoreMIDI, correspondants Bonjour et test d'aller-retour MIDI réel.
 - `connect_rtp_peer.applescript` connecte explicitement un correspondant Bonjour choisi, sans cible codee en dur et sans deconnexion globale.
 - `CLYamahaConsoleSimulator` reçoit les Program Change de la session RTP et les renvoie après un délai configurable, comme confirmation simulée d'une Yamaha CL/QL.
+  Il ignore toutes les copies réfléchies de ses propres confirmations, regroupe
+  les doublons en attente et coupe temporairement l'écho si une rafale anormale
+  est détectée, afin qu'une boucle RTP ne puisse pas perturber l'audio.
 - `CLMIDIRoundTripTester` envoie une scène témoin et mesure sa confirmation aller-retour.
+  Après le premier retour, il observe encore le flux pendant 500 ms. Plus de quatre
+  confirmations identiques ou plus de seize Program Change pendant cette fenêtre
+  sont classés comme une boucle MIDI. L'Assistant affiche alors la consigne sûre :
+  dans Ableton, désactiver **Piste** sur l'entrée RTP, conserver **Piste** sur la
+  sortie RTP, laisser les routages actifs à **Aucun** et n'établir qu'une paire RTP.
 - `reconnect_legacy_rtp.applescript` reconnecte explicitement une ancienne
   session Apple MIDI visible dans Configuration Audio et MIDI.
 
@@ -69,13 +77,12 @@ Sur le Mac contrôleur, lorsque le simulateur tourne sur le second Mac :
 Le test réussit uniquement si la scène reçue en retour correspond exactement à
 la scène envoyée. Il affiche aussi la latence mesurée.
 
-## Moniteur autonome des retours
+## Assistant réseau autonome
 
-`CL MIDI Network Assistant` écoute directement l'entrée RTP sélectionnée avec
-CoreMIDI. Un Program Change reçu sur le canal 1 met à jour la ligne CL5 ; le
-canal 2 met à jour la ligne QL1. Le numéro affiché est corrigé en 1–128 et
-l'heure du dernier retour est indiquée. Ce moniteur ne charge aucun périphérique
-Max for Live et n'intervient donc pas dans le moteur audio de Live.
+`CL MIDI Network Assistant` conserve une écoute passive des retours CL5/QL1 afin
+de publier leurs derniers numéros de Program Change pour CL Audio Show Control.
+Cette écoute n'émet aucun message MIDI et ne peut donc pas créer de boucle. Le
+reste du panneau sert à configurer, inspecter et tester le transport RTP-MIDI.
 
 Ces outils ne s'installent pas encore au démarrage. Le simulateur et le test ne
 modifient pas Configuration Audio et MIDI. Le gardien utilise uniquement l'API

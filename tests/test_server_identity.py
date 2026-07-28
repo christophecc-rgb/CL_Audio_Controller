@@ -276,13 +276,16 @@ class ServerStatusContractTests(unittest.TestCase):
         with mock.patch.object(
             self.module.ableton_transport,
             "query",
-            return_value=(12, 1),
+            side_effect=lambda *args, **kwargs: (
+                self.assertTrue(self.module.transport_test_requested.is_set()) or (12, 1)
+            ),
         ):
             response = self.module.app.test_client().post("/transport/test")
         with self.module.lock:
             after = self.module.state_snapshot_locked()
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.get_json()["ok"])
+        self.assertFalse(self.module.transport_test_requested.is_set())
         for key in ("set_generation", "set_ready", "current_set_id", "scenes"):
             self.assertEqual(after[key], before[key])
 
@@ -393,9 +396,12 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
     def test_panel_integrates_the_published_midi_console_state(self):
         page = launcher.app.test_client().get("/").get_data(as_text=True)
         self.assertIn("MIDI &amp; CONSOLES", page)
-        self.assertIn("CL5 · N° —", page)
-        self.assertIn("QL1 · N° —", page)
+        self.assertIn("CL5 · scène n° —", page)
+        self.assertIn("QL1 · scène n° —", page)
         self.assertIn("s.midi_console", page)
+        self.assertIn("returnPresentation", page)
+        self.assertIn("age<=5", page)
+        self.assertIn("Dernier retour · il y a", page)
         self.assertIn("s.ltc_connected", page)
         self.assertIn("setInterval(refreshTelemetry,100)", page)
         self.assertIn("MODE LOCAL", page)
@@ -419,7 +425,7 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
         self.assertIn("grid-template-columns:1fr auto 1fr", page)
         self.assertIn(".network-timecode{justify-self:end;min-width:116px", page)
         self.assertIn("font:14px Menlo", page)
-        self.assertIn("border-color:rgba(217,88,88,.76)", page)
+        self.assertIn(".console-return.stale{border-color:rgba(235,171,61,.55)", page)
         self.assertIn("background:#89dfa6", page)
         self.assertIn("background:#e5a63b", page)
 
@@ -432,6 +438,27 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
             response = launcher.app.test_client().get("/telemetry")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {"ltc_connected": True, "ltc_timecode": "12:34:56:12"})
+
+    def test_control_panel_keeps_ltc_visible_in_system_card(self):
+        self.assertIn('id="systemLtc"', launcher.PANEL_HTML_V2)
+        self.assertIn("el('systemLtc').textContent=ltc", launcher.PANEL_HTML_V2)
+        self.assertNotIn("body.show-mode .system-ltc{display:none", launcher.PANEL_HTML_V2)
+        self.assertIn(".state-time{font:18px Menlo", launcher.PANEL_HTML_V2)
+        self.assertIn(".system-ltc::before{content:'LTC  '", launcher.PANEL_HTML_V2)
+        self.assertIn("body.show-mode .state-time,body.show-mode .system-ltc{font-size:22px}", launcher.PANEL_HTML_V2)
+        self.assertIn(".show-toggle{height:32px", launcher.PANEL_HTML_V2)
+
+    def test_control_panel_publishes_the_ltc_device_destination(self):
+        self.assertIn('id="ltcDestination"', launcher.PANEL_HTML_V2)
+        self.assertIn("Destination à saisir dans LTC Display v2", launcher.PANEL_HTML_V2)
+        profiles = self.remote_profiles()
+        with (
+            mock.patch.object(launcher, "load_profiles", return_value=profiles),
+            mock.patch.object(launcher, "get_lan_ip", return_value="192.168.1.99"),
+        ):
+            payload = launcher.app.test_client().get("/state").get_json()
+        self.assertEqual(payload["ltc_destination"], "192.168.1.99")
+        self.assertEqual(payload["ltc_port"], 63123)
 
     def test_midi_console_state_reader_rejects_unknown_publishers(self):
         with mock.patch.object(launcher, "MIDI_CONSOLE_STATE_PATH") as path:

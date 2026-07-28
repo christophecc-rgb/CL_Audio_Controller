@@ -6,6 +6,9 @@ static MIDIEndpointRef destination = 0;
 static UInt8 expectedProgram = 41;
 static UInt8 expectedChannel = 1;
 static BOOL received = NO;
+static NSUInteger matchingReturnCount = 0;
+static NSUInteger totalProgramChangeCount = 0;
+static CFAbsoluteTime firstMatchAt = 0;
 static CFAbsoluteTime sentAt = 0;
 
 static NSString *endpointName(MIDIEndpointRef endpoint) {
@@ -39,12 +42,19 @@ static void midiRead(const MIDIPacketList *packetList, void *readProcRefCon, voi
             UInt8 status = packet->data[index];
             UInt8 program = packet->data[index + 1];
             if ((status & 0xF0) == 0xC0) {
+                totalProgramChangeCount += 1;
                 double latencyMs = (CFAbsoluteTimeGetCurrent() - sentAt) * 1000.0;
-                fprintf(stdout, "RETURN channel=%u program=%u scene=%u latency_ms=%.1f match=%s\n",
-                        (status & 0x0F) + 1, program, program + 1, latencyMs,
-                        program == expectedProgram && ((status & 0x0F) + 1) == expectedChannel ? "yes" : "no");
-                fflush(stdout);
-                if (program == expectedProgram && ((status & 0x0F) + 1) == expectedChannel) received = YES;
+                if (totalProgramChangeCount <= 16) {
+                    fprintf(stdout, "RETURN channel=%u program=%u scene=%u latency_ms=%.1f match=%s\n",
+                            (status & 0x0F) + 1, program, program + 1, latencyMs,
+                            program == expectedProgram && ((status & 0x0F) + 1) == expectedChannel ? "yes" : "no");
+                    fflush(stdout);
+                }
+                if (program == expectedProgram && ((status & 0x0F) + 1) == expectedChannel) {
+                    matchingReturnCount += 1;
+                    if (!received) firstMatchAt = CFAbsoluteTimeGetCurrent();
+                    received = YES;
+                }
                 index += 1;
             }
         }
@@ -113,6 +123,12 @@ int main(int argc, const char *argv[]) {
         while (!received && deadline.timeIntervalSinceNow > 0) {
             [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
         }
+        if (received) {
+            NSDate *observationDeadline = [NSDate dateWithTimeIntervalSinceNow:0.50];
+            while (observationDeadline.timeIntervalSinceNow > 0) {
+                [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.02]];
+            }
+        }
         MIDIPortDisconnectSource(inputPort, source);
         MIDIPortDispose(inputPort);
         MIDIPortDispose(outputPort);
@@ -120,6 +136,14 @@ int main(int argc, const char *argv[]) {
         if (!received) {
             fprintf(stderr, "TIMEOUT scene=%lu timeout_s=%.1f\n", (unsigned long)sceneNumber, timeout);
             return 5;
+        }
+        double firstLatencyMs = (firstMatchAt - sentAt) * 1000.0;
+        fprintf(stdout, "SUMMARY matching_returns=%lu total_program_changes=%lu observation_ms=500 first_latency_ms=%.1f\n",
+                (unsigned long)matchingReturnCount, (unsigned long)totalProgramChangeCount, firstLatencyMs);
+        if (matchingReturnCount > 4 || totalProgramChangeCount > 16) {
+            fprintf(stderr, "LOOP_DETECTED matching_returns=%lu total_program_changes=%lu\n",
+                    (unsigned long)matchingReturnCount, (unsigned long)totalProgramChangeCount);
+            return 6;
         }
     }
     return 0;
