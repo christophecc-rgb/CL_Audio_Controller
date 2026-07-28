@@ -62,6 +62,10 @@ class MidiConsolePackagingTests(unittest.TestCase):
             "CLMIDINetworkGuardian",
             "CLMIDIRoundTripTester",
             "CLYamahaConsoleSimulator",
+            "CLMIDINetworkDashboard",
+            "connect_rtp_peer.applescript",
+            "list_rtp_peers.applescript",
+            "open_rtp_settings.applescript",
         ):
             self.assertIn(required, source)
 
@@ -77,8 +81,21 @@ class MidiConsolePackagingTests(unittest.TestCase):
         ):
             source = (ROOT / relative_path).read_text()
             self.assertIn("CL_MIDI_Network_Assistant.icns", source)
+            self.assertIn("paradis_latin_logo.jpg", source)
             self.assertIn("CFBundleIconFile", source)
             self.assertIn("NSHighResolutionCapable", source)
+            self.assertIn("NSAppleEventsUsageDescription", source)
+            self.assertIn('codesign --force --deep --sign -', source)
+
+    def test_network_assistant_uses_the_native_dashboard(self):
+        for relative_path in (
+            "scripts/build_release.sh",
+            "scripts/build_midi_console_package.sh",
+        ):
+            source = (ROOT / relative_path).read_text()
+            self.assertIn("CLMIDINetworkDashboard", source)
+            self.assertIn("Contents/MacOS/CL MIDI Network Assistant", source)
+            self.assertIn("Contents/Resources/LegacyAssistant.sh", source)
 
 
 if __name__ == "__main__":

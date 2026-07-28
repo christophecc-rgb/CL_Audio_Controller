@@ -3,6 +3,8 @@
 Trois outils natifs macOS fondés sur CoreMIDI :
 
 - `CLMIDINetworkGuardian` active la session RTP-MIDI et reconnecte un correspondant Bonjour.
+- `CLMIDINetworkDashboard` affiche l'etat RTP, les ports CoreMIDI visibles et le resultat d'un aller-retour MIDI reel.
+- `connect_rtp_peer.applescript` connecte explicitement un correspondant Bonjour choisi, sans cible codee en dur et sans deconnexion globale.
 - `CLYamahaConsoleSimulator` reçoit les Program Change de la session RTP et les renvoie après un délai configurable, comme confirmation simulée d'une Yamaha CL/QL.
 - `CLMIDIRoundTripTester` envoie une scène témoin et mesure sa confirmation aller-retour.
 - `reconnect_legacy_rtp.applescript` reconnecte explicitement une ancienne

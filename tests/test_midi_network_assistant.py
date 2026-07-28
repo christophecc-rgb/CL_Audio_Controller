@@ -18,6 +18,12 @@ class MidiNetworkAssistantLauncherTests(unittest.TestCase):
         self.assertIn("do script (item 1 of argv)", source)
         self.assertNotIn('do script \\"$command', source)
 
+    def test_rtp_reconnection_uses_the_native_guardian(self):
+        source = LAUNCHER.read_text(encoding="utf-8")
+        self.assertIn('"$TOOLS/CLMIDINetworkGuardian" --peer-name "$peer"', source)
+        self.assertIn('--peer-host "$host" --peer-port "$port"', source)
+        self.assertNotIn('osascript "$TOOLS/reconnect_legacy_rtp.applescript"', source)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -9,6 +9,26 @@ static NSUInteger echoDelayMs = 80;
 static BOOL echoEnabled = YES;
 static NSString *consoleLabel = @"QL1";
 static volatile sig_atomic_t keepRunning = 1;
+static UInt8 lastSentStatus = 0;
+static UInt8 lastSentProgram = 0;
+static CFAbsoluteTime lastSentAt = 0;
+static NSUInteger selfEchoBudget = 0;
+
+static BOOL consumeSelfEcho(UInt8 status, UInt8 program) {
+    @synchronized (consoleLabel) {
+        CFAbsoluteTime age = CFAbsoluteTimeGetCurrent() - lastSentAt;
+        if (selfEchoBudget > 0 && age >= 0 && age <= 0.5 &&
+            status == lastSentStatus && program == lastSentProgram) {
+            selfEchoBudget -= 1;
+            fprintf(stdout, "IGNORED_SELF_ECHO console=%s channel=%u program=%u scene=%u\n",
+                    consoleLabel.UTF8String, (status & 0x0F) + 1, program, program + 1);
+            fflush(stdout);
+            return YES;
+        }
+        if (age > 0.5) selfEchoBudget = 0;
+    }
+    return NO;
+}
 
 static void stopHandler(int signalValue) {
     (void)signalValue;
@@ -57,7 +77,16 @@ static void sendProgramChange(UInt8 status, UInt8 program) {
     UInt8 bytes[2] = {status, program};
     packet = MIDIPacketListAdd(packetList, sizeof(storage), packet, 0, 2, bytes);
     if (packet != NULL && outputPort != 0 && networkDestination != 0) {
+        @synchronized (consoleLabel) {
+            lastSentStatus = status;
+            lastSentProgram = program;
+            lastSentAt = CFAbsoluteTimeGetCurrent();
+            selfEchoBudget = 1;
+        }
         OSStatus result = MIDISend(outputPort, networkDestination, packetList);
+        if (result != noErr) {
+            @synchronized (consoleLabel) { selfEchoBudget = 0; }
+        }
         fprintf(stdout, "CONFIRMED console=%s channel=%u program=%u scene=%u status=%d\n",
                 consoleLabel.UTF8String, (status & 0x0F) + 1, program, program + 1, (int)result);
         fflush(stdout);
@@ -74,6 +103,10 @@ static void midiRead(const MIDIPacketList *packetList, void *readProcRefCon, voi
             UInt8 status = packet->data[index];
             if ((status & 0xF0) == 0xC0 && index + 1 < packet->length) {
                 UInt8 program = packet->data[index + 1];
+                if (consumeSelfEcho(status, program)) {
+                    index += 2;
+                    continue;
+                }
                 fprintf(stdout, "RECEIVED console=%s channel=%u program=%u scene=%u\n",
                         consoleLabel.UTF8String, (status & 0x0F) + 1, program, program + 1);
                 fflush(stdout);

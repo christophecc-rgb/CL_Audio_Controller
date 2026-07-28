@@ -41,17 +41,25 @@ ditto "$DEVICE_SOURCE/CLMidiConsoleDisplay.js" "$KIT_ROOT/Max for Live/CL MIDI C
 ditto "$DEVICE_SOURCE/CLMidiConsoleConfirmation.js" "$KIT_ROOT/Max for Live/CL MIDI Console Monitor/CLMidiConsoleConfirmation.js"
 ditto "$DEVICE_SOURCE/paradis_latin_logo.jpg" "$KIT_ROOT/Max for Live/CL MIDI Console Monitor/paradis_latin_logo.jpg"
 
-for tool in CLMIDINetworkGuardian CLMIDIRoundTripTester CLYamahaConsoleSimulator; do
+for tool in CLMIDINetworkGuardian CLMIDIRoundTripTester CLYamahaConsoleSimulator CLMIDINetworkDashboard; do
   ditto "$WORK_DIR/native-tools/$tool" "$KIT_ROOT/Network Tools/$tool"
   ditto "$WORK_DIR/native-tools/$tool" "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Resources/Network Tools/$tool"
 done
 ditto "$TOOLS_SOURCE/reconnect_legacy_rtp.applescript" "$KIT_ROOT/Network Tools/reconnect_legacy_rtp.applescript"
 ditto "$TOOLS_SOURCE/reconnect_legacy_rtp.applescript" "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Resources/Network Tools/reconnect_legacy_rtp.applescript"
+ditto "$TOOLS_SOURCE/connect_rtp_peer.applescript" "$KIT_ROOT/Network Tools/connect_rtp_peer.applescript"
+ditto "$TOOLS_SOURCE/connect_rtp_peer.applescript" "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Resources/Network Tools/connect_rtp_peer.applescript"
+ditto "$TOOLS_SOURCE/list_rtp_peers.applescript" "$KIT_ROOT/Network Tools/list_rtp_peers.applescript"
+ditto "$TOOLS_SOURCE/list_rtp_peers.applescript" "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Resources/Network Tools/list_rtp_peers.applescript"
+ditto "$TOOLS_SOURCE/open_rtp_settings.applescript" "$KIT_ROOT/Network Tools/open_rtp_settings.applescript"
+ditto "$TOOLS_SOURCE/open_rtp_settings.applescript" "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Resources/Network Tools/open_rtp_settings.applescript"
 ditto "$TOOLS_SOURCE/README.md" "$KIT_ROOT/Documentation/OUTILS_RESEAU.md"
 
-ditto "$PROJECT_ROOT/packaging/CL_MIDI_Network_Assistant.sh" "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/MacOS/CL MIDI Network Assistant"
+ditto "$WORK_DIR/native-tools/CLMIDINetworkDashboard" "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/MacOS/CL MIDI Network Assistant"
+ditto "$PROJECT_ROOT/packaging/CL_MIDI_Network_Assistant.sh" "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Resources/LegacyAssistant.sh"
 ditto "$PROJECT_ROOT/assets/CL_MIDI_Network_Assistant.icns" "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Resources/CL_MIDI_Network_Assistant.icns"
-chmod +x "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/MacOS/CL MIDI Network Assistant" "$KIT_ROOT/Network Tools"/CLMIDI*
+ditto "$DEVICE_SOURCE/paradis_latin_logo.jpg" "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Resources/paradis_latin_logo.jpg"
+chmod +x "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/MacOS/CL MIDI Network Assistant" "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Resources/LegacyAssistant.sh" "$KIT_ROOT/Network Tools"/CLMIDI*
 
 cat > "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -66,8 +74,10 @@ cat > "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Info.plist" <<EOF
 <key>CFBundleShortVersionString</key><string>$VERSION</string>
 <key>LSMinimumSystemVersion</key><string>10.15</string>
 <key>NSHighResolutionCapable</key><true/>
+<key>NSAppleEventsUsageDescription</key><string>CL MIDI Network Assistant utilise Configuration audio et MIDI et Événements système pour ouvrir et reconnecter la cible RTP sélectionnée.</string>
 </dict></plist>
 EOF
+codesign --force --deep --sign - "$KIT_ROOT/CL MIDI Network Assistant.app"
 
 cp "$PROJECT_ROOT/packaging/Installer_CL_MIDI_Console.command" "$KIT_ROOT/Installer_CL_MIDI_Console.command"
 cp "$PROJECT_ROOT/packaging/Desinstaller_CL_MIDI_Console.command" "$KIT_ROOT/Desinstaller_CL_MIDI_Console.command"

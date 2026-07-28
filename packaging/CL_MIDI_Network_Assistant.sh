@@ -29,7 +29,7 @@ open_terminal_command() {
 }
 
 choice="$(osascript \
-  -e 'set picked to choose from list {"Ouvrir les réglages MIDI réseau", "Tester un aller-retour", "Lancer le simulateur Yamaha", "Reconnecter une ancienne session RTP"} with title "CL MIDI Network Assistant" with prompt "Choisissez une opération"' \
+  -e 'set picked to choose from list {"Ouvrir les réglages MIDI réseau", "Tester un aller-retour", "Lancer le simulateur Yamaha", "Reconnecter une session RTP"} with title "CL MIDI Network Assistant" with prompt "Choisissez une opération"' \
   -e 'if picked is false then return ""' \
   -e 'return item 1 of picked')"
 printf '%s CHOICE=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$choice" >>"$LOG_FILE"
@@ -50,11 +50,17 @@ case "$choice" in
     printf '%s LAUNCH simulator endpoint=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$endpoint" >>"$LOG_FILE"
     open_terminal_command "$command"
     ;;
-  "Reconnecter une ancienne session RTP")
-    peer="$(osascript -e 'text returned of (display dialog "Nom du correspondant dans le répertoire" default answer "MacBook Pro de Mb")')"
-    connected="$(osascript -e 'text returned of (display dialog "Nom réseau attendu après connexion" default answer "MB Pro")')"
-    osascript "$TOOLS/reconnect_legacy_rtp.applescript" "$peer" "$connected"
-    osascript -e 'display notification "Vérification RTP terminée" with title "CL MIDI Network Assistant"'
+  "Reconnecter une session RTP")
+    peer="$(osascript -e 'text returned of (display dialog "Nom de la session RTP distante" default answer "MB Pro")')"
+    host="$(osascript -e 'text returned of (display dialog "Adresse IP facultative (laisser vide pour Bonjour)" default answer "")')"
+    if [[ -n "$host" ]]; then
+      port="$(osascript -e 'text returned of (display dialog "Port RTP MIDI" default answer "5004")')"
+      command="$(printf '%q ' "$TOOLS/CLMIDINetworkGuardian" --peer-name "$peer" --peer-host "$host" --peer-port "$port")"
+    else
+      command="$(printf '%q ' "$TOOLS/CLMIDINetworkGuardian" --peer-name "$peer")"
+    fi
+    printf '%s LAUNCH guardian peer=%s host=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$peer" "${host:-Bonjour}" >>"$LOG_FILE"
+    open_terminal_command "$command"
     ;;
   *) exit 0 ;;
 esac
