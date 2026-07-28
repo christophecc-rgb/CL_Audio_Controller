@@ -83,6 +83,10 @@ la scène envoyée. Il affiche aussi la latence mesurée.
 de publier leurs derniers numéros de Program Change pour CL Audio Show Control.
 Cette écoute n'émet aucun message MIDI et ne peut donc pas créer de boucle. Le
 reste du panneau sert à configurer, inspecter et tester le transport RTP-MIDI.
+L'activation de la session RTP et sa politique d'accès restent gérées par la
+fenêtre **Réglages de réseau MIDI** de macOS. L'Assistant n'affiche plus l'état
+ambigu de la session CoreMIDI par défaut : il s'appuie sur les ports réellement
+visibles, les correspondants détectés et le test aller-retour.
 
 Ces outils ne s'installent pas encore au démarrage. Le simulateur et le test ne
 modifient pas Configuration Audio et MIDI. Le gardien utilise uniquement l'API

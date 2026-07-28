@@ -988,7 +988,7 @@ body.show-mode .show-toggle{border-color:rgba(229,166,59,.72);background:rgba(22
 <main class="app">
   <div class="topbar">
     <div class="brand"><img src="/paradis-logo" alt="Paradis Latin Cabaret"></div>
-    <div class="product-row"><div class="product-copy"><div class="product">CL AUDIO SHOW CONTROL</div><div class="product-subtitle">Panneau de contrôle serveur</div></div><button id="showMode" class="show-toggle" onclick="toggleShowMode()">Mode spectacle</button></div>
+    <div class="product-row"><div class="product-copy"><div class="product">CL AUDIO SHOW CONTROL</div></div><button id="showMode" class="show-toggle" onclick="toggleShowMode()">Mode spectacle</button></div>
   </div>
 
   <section id="systemCard" class="card system warning">

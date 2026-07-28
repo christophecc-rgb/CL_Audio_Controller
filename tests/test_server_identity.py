@@ -413,7 +413,7 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
     def test_panel_uses_the_requested_top_to_bottom_command_order(self):
         page = launcher.app.test_client().get("/").get_data(as_text=True)
         self.assertIn('class="product-copy"', page)
-        self.assertLess(page.index("Panneau de contrôle serveur"), page.index('id="systemCard"'))
+        self.assertNotIn("Panneau de contrôle serveur", page)
         self.assertLess(page.index("Démarrer"), page.index("OUVRIR LA TÉLÉCOMMANDE"))
         self.assertLess(page.index("Relancer"), page.index("OUVRIR LA TÉLÉCOMMANDE"))
 

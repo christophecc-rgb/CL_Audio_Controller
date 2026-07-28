@@ -64,8 +64,6 @@ static NSArray<NSString *> *EndpointNames(BOOL sources) {
 @property NSTextField *technicalEndpoints;
 @property NSTextField *technicalPeers;
 @property NSTextField *technicalSelection;
-@property NSPopUpButton *policyMenu;
-@property NSButton *sessionToggleButton;
 @property MIDIClientRef returnMonitorClient;
 @property MIDIPortRef returnMonitorInputPort;
 @property MIDIEndpointRef returnMonitorSource;
@@ -167,7 +165,6 @@ static void CLPassiveReturnRead(const MIDIPacketList *packetList, void *readProc
     self.pendingQL1Program = -1;
     self.lastCL5Program = -1;
     self.lastQL1Program = -1;
-    MIDINetworkSession.defaultSession.enabled = YES;
     self.window.backgroundColor = [NSColor colorWithRed:0.035 green:0.045 blue:0.060 alpha:1.0];
     [self.window center];
     [self.window makeKeyAndOrderFront:nil];
@@ -277,19 +274,15 @@ static void CLPassiveReturnRead(const MIDIPacketList *packetList, void *readProc
     technicalSubtitle.alignment = NSTextAlignmentRight;
     [technicalPanel addSubview:technicalSubtitle];
 
-    [technicalPanel addSubview:[self label:@"SESSION RTP" frame:NSMakeRect(16, 186, 110, 18) size:9 bold:YES]];
+    [technicalPanel addSubview:[self label:@"SESSION RTP OBSERVÉE" frame:NSMakeRect(16, 186, 160, 18) size:9 bold:YES]];
     self.technicalSession = [self label:@"Analyse…" frame:NSMakeRect(16, 140, 208, 44) size:10 bold:NO];
     self.technicalSession.maximumNumberOfLines = 3;
     [technicalPanel addSubview:self.technicalSession];
 
-    self.sessionToggleButton = [self accentButton:@"Activer la session" frame:NSMakeRect(16, 36, 208, 34) action:@selector(toggleNetworkSession:) color:[NSColor colorWithRed:0.08 green:0.50 blue:0.31 alpha:1.0]];
-    [technicalPanel addSubview:self.sessionToggleButton];
-    self.policyMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(236, 37, 216, 32) pullsDown:NO];
-    [self.policyMenu addItemsWithTitles:@[@"Accès : aucun", @"Accès : contacts", @"Accès : tous"]];
-    self.policyMenu.target = self;
-    self.policyMenu.action = @selector(changeConnectionPolicy:);
-    [self stylePopup:self.policyMenu accent:[NSColor colorWithRed:0.44 green:0.72 blue:1.0 alpha:1.0]];
-    [technicalPanel addSubview:self.policyMenu];
+    NSTextField *systemSettingsNotice = [self label:@"Activation et autorisations gérées dans Réglages de réseau MIDI macOS" frame:NSMakeRect(16, 36, 436, 34) size:10 bold:NO];
+    systemSettingsNotice.alignment = NSTextAlignmentCenter;
+    systemSettingsNotice.textColor = [NSColor colorWithRed:0.55 green:0.70 blue:0.86 alpha:1.0];
+    [technicalPanel addSubview:systemSettingsNotice];
 
     [technicalPanel addSubview:[self label:@"PORTS COREMIDI" frame:NSMakeRect(236, 186, 150, 18) size:9 bold:YES]];
     self.technicalEndpoints = [self label:@"Analyse…" frame:NSMakeRect(236, 140, 216, 44) size:10 bold:NO];
@@ -525,19 +518,6 @@ static void CLPassiveReturnRead(const MIDIPacketList *packetList, void *readProc
         : @"Aucun correspondant _apple-midi._udp détecté";
 }
 
-- (void)toggleNetworkSession:(id)sender {
-    (void)sender;
-    MIDINetworkSession *session = MIDINetworkSession.defaultSession;
-    session.enabled = !session.isEnabled;
-    [self refreshEndpoints];
-}
-
-- (void)changeConnectionPolicy:(id)sender {
-    (void)sender;
-    MIDINetworkSession.defaultSession.connectionPolicy = (MIDINetworkConnectionPolicy)self.policyMenu.indexOfSelectedItem;
-    [self refreshEndpoints];
-}
-
 - (void)inspectMidiDirectory {
     if (self.peerInspectionRunning) return;
     self.peerInspectionRunning = YES;
@@ -627,12 +607,8 @@ static void CLPassiveReturnRead(const MIDIPacketList *packetList, void *readProc
     BOOL hasSource = [sources containsObject:endpoint];
     BOOL hasDestination = [destinations containsObject:endpoint];
     MIDINetworkSession *session = [MIDINetworkSession defaultSession];
-    self.technicalSession.stringValue = [NSString stringWithFormat:@"État : %@\nPort UDP : %lu\nConnexions actives : %lu",
-        session.isEnabled ? @"ACTIVE" : @"DÉSACTIVÉE", (unsigned long)session.networkPort,
+    self.technicalSession.stringValue = [NSString stringWithFormat:@"Réglages : gérés par macOS\nCorrespondants API détectés : %lu\nValidation : test aller-retour",
         (unsigned long)session.connections.count];
-    self.sessionToggleButton.title = session.isEnabled ? @"Désactiver" : @"Activer la session";
-    NSInteger policy = (NSInteger)session.connectionPolicy;
-    if (policy >= 0 && policy < self.policyMenu.numberOfItems) [self.policyMenu selectItemAtIndex:policy];
     self.technicalEndpoints.stringValue = [NSString stringWithFormat:@"Entrées : %lu   Sorties : %lu\nPorts RTP détectés : %lu\nCoreMIDI : %@",
         (unsigned long)sources.count, (unsigned long)destinations.count, (unsigned long)candidates.count,
         (sources.count || destinations.count) ? @"opérationnel" : @"aucun port"];
