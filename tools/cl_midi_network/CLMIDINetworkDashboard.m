@@ -1,5 +1,9 @@
 #import <AppKit/AppKit.h>
 #import <CoreMIDI/CoreMIDI.h>
+#import <arpa/inet.h>
+#import <netdb.h>
+#import <sys/socket.h>
+#import <unistd.h>
 
 static NSString *EndpointName(MIDIEndpointRef endpoint) {
     CFStringRef value = NULL;
@@ -20,7 +24,7 @@ static NSArray<NSString *> *EndpointNames(BOOL sources) {
     return names.array;
 }
 
-@interface CLNetworkDelegate : NSObject <NSApplicationDelegate, NSNetServiceBrowserDelegate>
+@interface CLNetworkDelegate : NSObject <NSApplicationDelegate, NSNetServiceBrowserDelegate, NSNetServiceDelegate>
 @property NSWindow *window;
 @property NSView *headerPanel;
 @property NSView *statusPanel;
@@ -41,7 +45,6 @@ static NSArray<NSString *> *EndpointNames(BOOL sources) {
 @property NSView *lamp;
 @property NSTextField *headline;
 @property NSTextField *detail;
-@property NSTextField *sessionInfo;
 @property NSTextField *lastTest;
 @property NSPopUpButton *endpointMenu;
 @property NSTextField *programField;
@@ -52,6 +55,9 @@ static NSArray<NSString *> *EndpointNames(BOOL sources) {
 @property NSTimer *timer;
 @property NSNetServiceBrowser *serviceBrowser;
 @property NSMutableOrderedSet<NSString *> *discoveredPeers;
+@property NSMutableDictionary<NSString *, NSNetService *> *peerServices;
+@property NSMutableDictionary<NSString *, NSString *> *peerHosts;
+@property BOOL remoteSimulatorRunning;
 @property NSString *localNetworkName;
 @property BOOL peerInspectionRunning;
 @property NSString *validatedEndpoint;
@@ -60,6 +66,9 @@ static NSArray<NSString *> *EndpointNames(BOOL sources) {
 @property NSTask *simulatorDashboardTask;
 @property NSTask *guardianTask;
 @property NSString *guardianPeer;
+@property NSTask *legacyWakeTask;
+@property BOOL legacyWakeRunning;
+@property BOOL legacyWakeCompleted;
 @property NSTextField *technicalSession;
 @property NSTextField *technicalEndpoints;
 @property NSTextField *technicalPeers;
@@ -253,11 +262,9 @@ static void CLPassiveReturnRead(const MIDIPacketList *packetList, void *readProc
     self.testButton = [self accentButton:@"Tester" frame:NSMakeRect(394, 75, 58, 34) action:@selector(runTest:) color:[NSColor colorWithRed:0.08 green:0.58 blue:0.32 alpha:1.0]];
     [testPanel addSubview:self.testButton];
 
-    self.sessionInfo = [self label:@"SÉCURITÉ : entrée RTP « Piste » désactivée · sortie « Piste » activée\nRoutages actifs : Aucun · une seule paire RTP" frame:NSMakeRect(16, 38, 436, 34) size:10 bold:NO];
-    self.sessionInfo.textColor = [NSColor colorWithRed:1.0 green:0.72 blue:0.30 alpha:1.0];
-    self.sessionInfo.maximumNumberOfLines = 2;
-    self.lastTest = [self label:@"Aucun aller-retour validé" frame:NSMakeRect(16, 10, 436, 24) size:11 bold:YES];
-    [testPanel addSubview:self.sessionInfo]; [testPanel addSubview:self.lastTest];
+    self.lastTest = [self label:@"Aucun aller-retour validé" frame:NSMakeRect(16, 18, 436, 36) size:11 bold:YES];
+    self.lastTest.maximumNumberOfLines = 2;
+    [testPanel addSubview:self.lastTest];
 
     NSView *technicalPanel = self.technicalPanel = [[NSView alloc] initWithFrame:NSMakeRect(16, 132, 468, 250)];
     technicalPanel.wantsLayer = YES;
@@ -301,7 +308,7 @@ static void CLPassiveReturnRead(const MIDIPacketList *packetList, void *readProc
 
     self.settingsButton = [self accentButton:@"Réglages réseau MIDI" frame:NSMakeRect(16, 88, 228, 36) action:@selector(openMidiSetup:) color:[NSColor colorWithRed:0.27 green:0.36 blue:0.49 alpha:1.0]]; [content addSubview:self.settingsButton];
     self.refreshButton = [self accentButton:@"Actualiser le diagnostic" frame:NSMakeRect(256, 88, 228, 36) action:@selector(refreshNow:) color:[NSColor colorWithRed:0.30 green:0.35 blue:0.43 alpha:1.0]]; [content addSubview:self.refreshButton];
-    self.simulatorButton = [self accentButton:@"OUVRIR LE SIMULATEUR YAMAHA" frame:NSMakeRect(16, 38, 468, 42) action:@selector(startSimulator:) color:[NSColor colorWithRed:0.55 green:0.39 blue:0.28 alpha:1.0]]; [content addSubview:self.simulatorButton];
+    self.simulatorButton = [self accentButton:@"DÉMARRER LE SIMULATEUR DISTANT" frame:NSMakeRect(16, 38, 468, 42) action:@selector(startSimulator:) color:[NSColor colorWithRed:0.55 green:0.39 blue:0.28 alpha:1.0]]; [content addSubview:self.simulatorButton];
     NSTextField *footer = self.footerLabel = [self label:@"CL AUDIO · MIDI NETWORK · 2026" frame:NSMakeRect(16, 10, 468, 18) size:8 bold:YES];
     footer.alignment = NSTextAlignmentCenter; footer.textColor = [NSColor colorWithWhite:0.38 alpha:1.0]; [content addSubview:footer];
     self.compactSummary = [self label:@"Aucun test aller-retour validé" frame:NSMakeRect(24, 66, 452, 54) size:12 bold:YES];
@@ -309,19 +316,32 @@ static void CLPassiveReturnRead(const MIDIPacketList *packetList, void *readProc
 
     [self refreshEndpoints];
     self.discoveredPeers = [NSMutableOrderedSet orderedSet];
+    self.peerServices = [NSMutableDictionary dictionary];
+    self.peerHosts = [NSMutableDictionary dictionary];
     self.serviceBrowser = [[NSNetServiceBrowser alloc] init];
     self.serviceBrowser.delegate = self;
     [self.serviceBrowser searchForServicesOfType:@"_apple-midi._udp." inDomain:@"local."];
     self.timer = [NSTimer scheduledTimerWithTimeInterval:2.0 target:self selector:@selector(refreshTimer:) userInfo:nil repeats:YES];
     [self ensureGuardianRunning];
+    [self ensureLegacyWakeIfNeeded];
     [self setupPassiveReturnMonitor];
     [NSApp activateIgnoringOtherApps:YES];
 }
 
 - (void)writeConsoleReturnState {
+    NSString *endpoint = self.endpointMenu.selectedItem.title ?: @"";
+    NSString *peer = self.targetMenu.selectedItem.title ?: @"";
     NSDictionary *payload = @{
         @"service": @"cl-midi-console-monitor",
         @"updated_at": @([[NSDate date] timeIntervalSince1970]),
+        @"rtp": @{
+            @"peer": peer,
+            @"endpoint": endpoint,
+            @"available": @(![endpoint hasPrefix:@"Aucun"] && endpoint.length > 0),
+            @"validated": @(self.validatedEndpoint && [self.validatedEndpoint isEqualToString:endpoint]),
+            @"loop_detected": @(self.loopDetectedEndpoint && [self.loopDetectedEndpoint isEqualToString:endpoint]),
+            @"last_test": self.lastTest.stringValue ?: @"",
+        },
         @"cl5": @{
             @"program": self.lastCL5Program >= 0 ? @(self.lastCL5Program + 1) : NSNull.null,
             @"title": @"",
@@ -446,8 +466,8 @@ static void CLPassiveReturnRead(const MIDIPacketList *packetList, void *readProc
     self.detail.stringValue = detail;
 }
 
-- (void)refreshTimer:(NSTimer *)timer { (void)timer; [self refreshEndpoints]; [self ensureGuardianRunning]; }
-- (void)refreshNow:(id)sender { (void)sender; [self refreshEndpoints]; [self inspectMidiDirectory]; }
+- (void)refreshTimer:(NSTimer *)timer { (void)timer; [self refreshEndpoints]; [self ensureGuardianRunning]; [self ensureLegacyWakeIfNeeded]; }
+- (void)refreshNow:(id)sender { (void)sender; self.legacyWakeCompleted = NO; [self refreshEndpoints]; [self inspectMidiDirectory]; [self ensureLegacyWakeIfNeeded]; }
 - (void)endpointChanged:(id)sender { (void)sender; self.validatedEndpoint = nil; self.loopDetectedEndpoint = nil; [self refreshEndpoints]; }
 - (void)targetChanged:(id)sender {
     (void)sender;
@@ -502,12 +522,91 @@ static void CLPassiveReturnRead(const MIDIPacketList *packetList, void *readProc
     [self restartGuardianForPeer:peer];
 }
 
+- (void)ensureLegacyWakeIfNeeded {
+    if (self.legacyWakeRunning || self.legacyWakeCompleted) return;
+    NSString *peer = [[NSUserDefaults standardUserDefaults] stringForKey:@"preferredRtpPeer"];
+    if (!peer.length) return;
+    NSString *openScript = [self toolPath:@"open_rtp_settings.applescript"];
+    NSString *reconnectScript = [self toolPath:@"reconnect_legacy_rtp.applescript"];
+    if (![NSFileManager.defaultManager fileExistsAtPath:openScript] ||
+        ![NSFileManager.defaultManager fileExistsAtPath:reconnectScript]) return;
+
+    self.legacyWakeRunning = YES;
+    self.lastTest.stringValue = [NSString stringWithFormat:@"Réveil de la session RTP historique vers %@…", peer];
+    NSTask *openTask = [[NSTask alloc] init];
+    openTask.executableURL = [NSURL fileURLWithPath:@"/usr/bin/osascript"];
+    openTask.arguments = @[openScript];
+    openTask.standardOutput = NSFileHandle.fileHandleWithNullDevice;
+    openTask.standardError = NSFileHandle.fileHandleWithNullDevice;
+    self.legacyWakeTask = openTask;
+    __weak typeof(self) weakSelf = self;
+    openTask.terminationHandler = ^(NSTask *finished) {
+        if (finished.terminationStatus != 0) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                weakSelf.legacyWakeRunning = NO;
+                weakSelf.legacyWakeCompleted = YES;
+                weakSelf.lastTest.stringValue = @"Réveil RTP historique impossible · ouvrez Réglages réseau MIDI";
+            });
+            return;
+        }
+        NSTask *reconnectTask = [[NSTask alloc] init];
+        reconnectTask.executableURL = [NSURL fileURLWithPath:@"/usr/bin/osascript"];
+        reconnectTask.arguments = @[reconnectScript, peer, peer];
+        NSPipe *pipe = [NSPipe pipe];
+        reconnectTask.standardOutput = pipe;
+        reconnectTask.standardError = pipe;
+        weakSelf.legacyWakeTask = reconnectTask;
+        reconnectTask.terminationHandler = ^(NSTask *reconnected) {
+            NSData *data = [pipe.fileHandleForReading readDataToEndOfFile];
+            NSString *output = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] ?: @"";
+            dispatch_async(dispatch_get_main_queue(), ^{
+                weakSelf.legacyWakeRunning = NO;
+                weakSelf.legacyWakeCompleted = YES;
+                if (reconnected.terminationStatus == 0) {
+                    weakSelf.lastTest.stringValue = [NSString stringWithFormat:@"✓ Session RTP historique réveillée · %@", peer];
+                } else {
+                    weakSelf.lastTest.stringValue = [NSString stringWithFormat:@"Réveil RTP historique incomplet · %@", output];
+                }
+                if (weakSelf.showModeEnabled) [weakSelf updateCompactSummary];
+            });
+        };
+        NSError *reconnectError = nil;
+        if (![reconnectTask launchAndReturnError:&reconnectError]) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                weakSelf.legacyWakeRunning = NO;
+                weakSelf.legacyWakeCompleted = YES;
+                weakSelf.lastTest.stringValue = @"Impossible de lancer la reconnexion RTP historique";
+            });
+        }
+    };
+    NSError *openError = nil;
+    if (![openTask launchAndReturnError:&openError]) {
+        self.legacyWakeRunning = NO;
+        self.legacyWakeCompleted = YES;
+        self.lastTest.stringValue = @"Impossible d’ouvrir les réglages réseau MIDI";
+    }
+}
+
 - (void)refreshTargetMenu {
     NSString *selected = [[NSUserDefaults standardUserDefaults] stringForKey:@"preferredRtpPeer"];
     NSMutableArray<NSString *> *available = [self.discoveredPeers.array mutableCopy];
     if (self.localNetworkName.length) [available removeObject:self.localNetworkName];
-    if (selected.length && ![available containsObject:selected]) [available addObject:selected];
+    NSString *computerName = NSHost.currentHost.localizedName;
+    if (computerName.length) [available removeObject:computerName];
     NSArray<NSString *> *names = [available sortedArrayUsingSelector:@selector(localizedCaseInsensitiveCompare:)];
+    // The RTP peer is a computer/session name, not a Yamaha console identity.
+    // Forget stale machine names and adopt the currently advertised peer.
+    // CL5 and QL1 remain MIDI channel labels.
+    BOOL adoptedPeer = NO;
+    if (!selected.length || ![names containsObject:selected]) {
+        selected = names.firstObject;
+        if (selected.length) {
+            [[NSUserDefaults standardUserDefaults] setObject:selected forKey:@"preferredRtpPeer"];
+            adoptedPeer = YES;
+        } else {
+            [[NSUserDefaults standardUserDefaults] removeObjectForKey:@"preferredRtpPeer"];
+        }
+    }
     [self.targetMenu removeAllItems];
     [self.targetMenu addItemsWithTitles:names.count ? names : @[@"Aucun correspondant découvert"]];
     if (selected.length && [names containsObject:selected]) [self.targetMenu selectItemWithTitle:selected];
@@ -516,6 +615,12 @@ static void CLPassiveReturnRead(const MIDIPacketList *packetList, void *readProc
     self.technicalPeers.stringValue = names.count
         ? [NSString stringWithFormat:@"%lu détecté(s)\n%@", (unsigned long)names.count, [names componentsJoinedByString:@" · "]]
         : @"Aucun correspondant _apple-midi._udp détecté";
+    if (adoptedPeer) {
+        self.legacyWakeCompleted = NO;
+        [self restartGuardianForPeer:selected];
+        [self ensureLegacyWakeIfNeeded];
+    }
+    [self writeConsoleReturnState];
 }
 
 - (void)inspectMidiDirectory {
@@ -546,13 +651,23 @@ static void CLPassiveReturnRead(const MIDIPacketList *packetList, void *readProc
 
 - (void)netServiceBrowser:(NSNetServiceBrowser *)browser didFindService:(NSNetService *)service moreComing:(BOOL)moreComing {
     (void)browser;
-    if (service.name.length) [self.discoveredPeers addObject:service.name];
+    if (service.name.length) {
+        [self.discoveredPeers addObject:service.name];
+        self.peerServices[service.name] = service;
+        service.delegate = self;
+        [service resolveWithTimeout:3.0];
+    }
     if (!moreComing) [self refreshTargetMenu];
+}
+
+- (void)netServiceDidResolveAddress:(NSNetService *)sender {
+    if (sender.name.length && sender.hostName.length) self.peerHosts[sender.name] = sender.hostName;
 }
 
 - (void)netServiceBrowser:(NSNetServiceBrowser *)browser didRemoveService:(NSNetService *)service moreComing:(BOOL)moreComing {
     (void)browser;
     if (service.name.length) [self.discoveredPeers removeObject:service.name];
+    if (service.name.length) { [self.peerServices removeObjectForKey:service.name]; [self.peerHosts removeObjectForKey:service.name]; }
     if (!moreComing) [self refreshTargetMenu];
 }
 
@@ -626,6 +741,7 @@ static void CLPassiveReturnRead(const MIDIPacketList *packetList, void *readProc
     } else {
         [self setLamp:[NSColor systemRedColor] title:@"RTP HORS LIGNE" detail:@"Aucune paire entrée/sortie RTP exploitable n’est visible."];
     }
+    [self writeConsoleReturnState];
 }
 
 - (NSString *)toolPath:(NSString *)name {
@@ -700,31 +816,46 @@ static void CLPassiveReturnRead(const MIDIPacketList *packetList, void *readProc
 
 - (void)startSimulator:(id)sender {
     (void)sender;
-    if (self.simulatorDashboardTask.running) {
-        [[NSRunningApplication runningApplicationWithProcessIdentifier:self.simulatorDashboardTask.processIdentifier]
-            activateWithOptions:NSApplicationActivateIgnoringOtherApps];
+    NSString *peer = self.targetMenu.selectedItem.title ?: @"";
+    NSString *host = self.peerHosts[peer];
+    if (!host.length) {
+        self.lastTest.stringValue = @"Adresse du Mac distant indisponible · actualisez le diagnostic.";
         return;
     }
-    NSString *tool = [self toolPath:@"CLYamahaSimulatorDashboard"];
-    if (![NSFileManager.defaultManager isExecutableFileAtPath:tool]) {
-        self.lastTest.stringValue = @"Console Simulator introuvable dans l’application.";
-        return;
+    BOOL shouldStop = self.remoteSimulatorRunning;
+    if (!shouldStop) {
+        NSAlert *alert = [[NSAlert alloc] init];
+        alert.messageText = @"Démarrer le simulateur sur l’autre Mac ?";
+        alert.informativeText = [NSString stringWithFormat:@"Le simulateur sera lancé sur %@ pour le test aller-retour. Ne l’utilisez pas en même temps qu’une vraie console et arrêtez-le après le test.", peer];
+        [alert addButtonWithTitle:@"Démarrer"];
+        [alert addButtonWithTitle:@"Annuler"];
+        if ([alert runModal] != NSAlertFirstButtonReturn) return;
     }
-    NSTask *task = [[NSTask alloc] init];
-    task.executableURL = [NSURL fileURLWithPath:tool];
-    __weak typeof(self) weakSelf = self;
-    task.terminationHandler = ^(NSTask *finished) {
+    self.simulatorButton.enabled = NO;
+    self.lastTest.stringValue = shouldStop ? @"Arrêt du simulateur distant…" : @"Démarrage du simulateur distant…";
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        int fd = socket(AF_INET, SOCK_DGRAM, 0);
+        struct timeval timeout = {.tv_sec = 2, .tv_usec = 0};
+        if (fd >= 0) setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+        struct addrinfo hints = {0}, *results = NULL;
+        hints.ai_family = AF_INET; hints.ai_socktype = SOCK_DGRAM;
+        int lookup = getaddrinfo(host.UTF8String, "50022", &hints, &results);
+        NSDictionary *command = @{@"service": @"cl-midi-rtp-control", @"action": shouldStop ? @"stop-simulator" : @"start-simulator"};
+        NSData *encoded = [NSJSONSerialization dataWithJSONObject:command options:0 error:nil];
+        ssize_t sent = (lookup == 0 && fd >= 0) ? sendto(fd, encoded.bytes, encoded.length, 0, results->ai_addr, results->ai_addrlen) : -1;
+        UInt8 buffer[2048]; ssize_t received = sent >= 0 ? recv(fd, buffer, sizeof(buffer), 0) : -1;
+        NSDictionary *reply = received > 0 ? [NSJSONSerialization JSONObjectWithData:[NSData dataWithBytes:buffer length:(NSUInteger)received] options:0 error:nil] : nil;
+        if (results) freeaddrinfo(results); if (fd >= 0) close(fd);
         dispatch_async(dispatch_get_main_queue(), ^{
-            if (weakSelf.simulatorDashboardTask == finished) weakSelf.simulatorDashboardTask = nil;
+            self.simulatorButton.enabled = YES;
+            BOOL ok = [reply[@"ok"] boolValue];
+            self.lastTest.stringValue = reply[@"message"] ?: @"Aucune réponse de l’agent RTP distant";
+            if (ok) {
+                self.remoteSimulatorRunning = !shouldStop;
+                self.simulatorButton.title = self.remoteSimulatorRunning ? @"ARRÊTER LE SIMULATEUR DISTANT" : @"DÉMARRER LE SIMULATEUR DISTANT";
+            }
         });
-    };
-    NSError *error = nil;
-    if (![task launchAndReturnError:&error]) {
-        self.lastTest.stringValue = [NSString stringWithFormat:@"Impossible d’ouvrir Console Simulator : %@", error.localizedDescription ?: @"erreur inconnue"];
-        return;
-    }
-    self.simulatorDashboardTask = task;
-    self.lastTest.stringValue = @"Console Simulator ouvert.";
+    });
 }
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender { (void)sender; return YES; }
@@ -733,6 +864,7 @@ static void CLPassiveReturnRead(const MIDIPacketList *packetList, void *readProc
     [self.timer invalidate];
     [self.serviceBrowser stop];
     if (self.guardianTask.running) [self.guardianTask terminate];
+    if (self.legacyWakeTask.running) [self.legacyWakeTask terminate];
     if (self.returnMonitorSource && self.returnMonitorInputPort) {
         MIDIPortDisconnectSource(self.returnMonitorInputPort, self.returnMonitorSource);
     }

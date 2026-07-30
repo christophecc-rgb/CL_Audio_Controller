@@ -10,41 +10,69 @@ on run argv
 		tell process "Audio MIDI Setup"
 			set networkWindow to missing value
 			repeat with candidateWindow in windows
-				if exists static text "Sessions et répertoires" of candidateWindow then
+				set windowName to name of candidateWindow as text
+				if windowName contains "réseau MIDI" or windowName contains "MIDI Network" then
 					set networkWindow to candidateWindow
 					exit repeat
 				end if
 			end repeat
 			if networkWindow is missing value then error "Fenêtre Réglages de réseau MIDI introuvable"
 
-			tell networkWindow
-				if exists button "Se déconnecter" of group 2 then
-					set activeName to value of text field 2 of group 2 as text
-					if activeName is connectedName then return "already-connected:" & activeName
-					error "Une autre session RTP est déjà active: " & activeName
-				end if
+			set rootGroup to UI element 1 of networkWindow
+			set splitGroup to UI element 1 of rootGroup
+			set leftPanel to UI element 1 of splitGroup
 
-				set directoryTable to table 1 of scroll area 1 of group 3
-				set matchingRow to missing value
-				repeat with candidateRow in rows of directoryTable
-					if exists static text peerName of UI element 1 of candidateRow then
+			set sessionsGroup to UI element 1 of leftPanel
+			set sessionsScroll to UI element 2 of sessionsGroup
+			set sessionsTable to UI element 1 of sessionsScroll
+			if (count of rows of sessionsTable) is 0 then error "Aucune session RTP configurée"
+			set sessionRow to row 1 of sessionsTable
+			select sessionRow
+			set sessionCell to UI element 1 of sessionRow
+			set sessionContents to UI element 1 of sessionCell
+			set sessionCheckbox to UI element 1 of sessionContents
+			if (value of sessionCheckbox as integer) is 0 then click sessionCheckbox
+
+			set activeName to ""
+			repeat with sessionElement in UI elements of sessionContents
+				try
+					set candidateValue to value of sessionElement as text
+					if candidateValue is connectedName then set activeName to candidateValue
+				end try
+			end repeat
+			if activeName is connectedName then return "already-connected:" & activeName
+
+			set directoryGroup to UI element 2 of leftPanel
+			set directoryScroll to UI element 2 of directoryGroup
+			set directoryTable to UI element 1 of directoryScroll
+			set matchingRow to missing value
+			repeat with candidateRow in rows of directoryTable
+				set directoryCell to UI element 1 of candidateRow
+				set rowContents to UI element 1 of directoryCell
+				try
+					if exists static text peerName of rowContents then
 						set matchingRow to candidateRow
 						exit repeat
 					end if
-				end repeat
-				if matchingRow is missing value then error "Correspondant RTP introuvable: " & peerName
+				end try
+			end repeat
+			if matchingRow is missing value then error "Correspondant RTP introuvable: " & peerName
 
-				select matchingRow
-				click button "Se connecter" of group 3
-				repeat 20 times
-					delay 0.5
-					if exists button "Se déconnecter" of group 2 then
-						set activeName to value of text field 2 of group 2 as text
-						if activeName is connectedName then return "connected:" & activeName
-					end if
+			select matchingRow
+			set connectButton to UI element 3 of directoryGroup
+			click connectButton
+			repeat 20 times
+				delay 0.5
+				set activeName to ""
+				repeat with sessionElement in UI elements of sessionContents
+					try
+						set candidateValue to value of sessionElement as text
+						if candidateValue is connectedName then set activeName to candidateValue
+					end try
 				end repeat
-				error "Timeout de reconnexion RTP vers " & peerName
-			end tell
+				if activeName is connectedName then return "connected:" & activeName
+			end repeat
+			error "Timeout de reconnexion RTP vers " & peerName
 		end tell
 	end tell
 end run

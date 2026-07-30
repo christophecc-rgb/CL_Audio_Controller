@@ -8,8 +8,10 @@ static UInt8 expectedChannel = 1;
 static BOOL received = NO;
 static NSUInteger matchingReturnCount = 0;
 static NSUInteger totalProgramChangeCount = 0;
+static NSUInteger ignoredLocalEchoCount = 0;
 static CFAbsoluteTime firstMatchAt = 0;
 static CFAbsoluteTime sentAt = 0;
+static double minimumReturnLatencyMs = 35.0;
 
 static NSString *endpointName(MIDIEndpointRef endpoint) {
     CFStringRef value = NULL;
@@ -42,15 +44,29 @@ static void midiRead(const MIDIPacketList *packetList, void *readProcRefCon, voi
             UInt8 status = packet->data[index];
             UInt8 program = packet->data[index + 1];
             if ((status & 0xF0) == 0xC0) {
-                totalProgramChangeCount += 1;
                 double latencyMs = (CFAbsoluteTimeGetCurrent() - sentAt) * 1000.0;
+                BOOL exactMatch = program == expectedProgram && ((status & 0x0F) + 1) == expectedChannel;
+                // CoreMIDI may mirror the packet just written to the paired
+                // source before it crosses the network. This is not a remote
+                // console confirmation and must not count as a MIDI loop.
+                if (exactMatch && latencyMs >= 0 && latencyMs < minimumReturnLatencyMs) {
+                    ignoredLocalEchoCount += 1;
+                    if (ignoredLocalEchoCount <= 16) {
+                        fprintf(stdout, "IGNORED_LOCAL_ECHO channel=%u program=%u latency_ms=%.1f\n",
+                                (status & 0x0F) + 1, program, latencyMs);
+                        fflush(stdout);
+                    }
+                    index += 1;
+                    continue;
+                }
+                totalProgramChangeCount += 1;
                 if (totalProgramChangeCount <= 16) {
                     fprintf(stdout, "RETURN channel=%u program=%u scene=%u latency_ms=%.1f match=%s\n",
                             (status & 0x0F) + 1, program, program + 1, latencyMs,
-                            program == expectedProgram && ((status & 0x0F) + 1) == expectedChannel ? "yes" : "no");
+                            exactMatch ? "yes" : "no");
                     fflush(stdout);
                 }
-                if (program == expectedProgram && ((status & 0x0F) + 1) == expectedChannel) {
+                if (exactMatch) {
                     matchingReturnCount += 1;
                     if (!received) firstMatchAt = CFAbsoluteTimeGetCurrent();
                     received = YES;
@@ -138,8 +154,9 @@ int main(int argc, const char *argv[]) {
             return 5;
         }
         double firstLatencyMs = (firstMatchAt - sentAt) * 1000.0;
-        fprintf(stdout, "SUMMARY matching_returns=%lu total_program_changes=%lu observation_ms=500 first_latency_ms=%.1f\n",
-                (unsigned long)matchingReturnCount, (unsigned long)totalProgramChangeCount, firstLatencyMs);
+        fprintf(stdout, "SUMMARY matching_returns=%lu total_program_changes=%lu ignored_local_echoes=%lu observation_ms=500 first_latency_ms=%.1f\n",
+                (unsigned long)matchingReturnCount, (unsigned long)totalProgramChangeCount,
+                (unsigned long)ignoredLocalEchoCount, firstLatencyMs);
         if (matchingReturnCount > 4 || totalProgramChangeCount > 16) {
             fprintf(stderr, "LOOP_DETECTED matching_returns=%lu total_program_changes=%lu\n",
                     (unsigned long)matchingReturnCount, (unsigned long)totalProgramChangeCount);

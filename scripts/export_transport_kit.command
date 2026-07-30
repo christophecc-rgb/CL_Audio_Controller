@@ -125,6 +125,8 @@ echo
 echo "Assemblage des applications et composants…"
 ditto "$CONTROLLER_ROOT/CL Audio Controller.app" "$COMPONENTS_ROOT/Applications/CL Audio Controller.app"
 ditto "$CONTROLLER_ROOT/CL MIDI Network Assistant.app" "$COMPONENTS_ROOT/Applications/CL MIDI Network Assistant.app"
+ditto "$CONTROLLER_ROOT/CL MIDI RTP Agent.app" "$COMPONENTS_ROOT/Applications/CL MIDI RTP Agent.app"
+ditto "$CONTROLLER_ROOT/CL MIDI RTP Simulator.app" "$COMPONENTS_ROOT/Applications/CL MIDI RTP Simulator.app"
 ditto "$BUILDER_DIR/release/Arrangement Builder Live 1.2.2/Applications/Arrangement Builder Live.app" "$COMPONENTS_ROOT/Applications/Arrangement Builder Live.app"
 
 ditto "$CONTROLLER_ROOT/AbletonOSC CL/AbletonOSC" "$COMPONENTS_ROOT/Ableton Live 11-12/Remote Scripts/AbletonOSC"
@@ -289,6 +291,8 @@ for expected in \
   "Paradis Latin AutoScene - Live 10.amxd" \
   "CL MIDI Console Monitor.amxd" \
   "CL MIDI Network Assistant.app/" \
+  "CL MIDI RTP Agent.app/" \
+  "CL MIDI RTP Simulator.app/" \
   "CLMIDIRoundTripTester"; do
   LC_ALL=C grep -aFq "$expected" "$ZIP_LIST" || fail "contrôle final impossible, élément absent du ZIP : $expected"
 done

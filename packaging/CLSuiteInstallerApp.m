@@ -5,6 +5,7 @@
 @property NSMutableDictionary<NSString *, NSButton *> *checks;
 @property NSMutableDictionary<NSString *, NSView *> *cards;
 @property NSSegmentedControl *liveSelector;
+@property NSSegmentedControl *roleSelector;
 @property NSButton *actionButton;
 @property NSProgressIndicator *progress;
 @property NSTextField *statusLabel;
@@ -79,7 +80,7 @@
 
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
-    CGFloat height = self.uninstaller ? 710 : 690;
+    CGFloat height = self.uninstaller ? 930 : 900;
     NSRect frame = NSMakeRect(0, 0, 760, height);
     self.window = [[NSWindow alloc] initWithContentRect:frame
                                               styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable
@@ -120,6 +121,14 @@
 
     NSMutableArray<NSView *> *mainViews = [NSMutableArray arrayWithObject:header];
     if (!self.uninstaller) {
+        self.roleSelector = [NSSegmentedControl segmentedControlWithLabels:@[@"Mac Télécommande", @"Mac Ableton Lecteur", @"Simulateur console", @"Personnalisé"]
+                                                               trackingMode:NSSegmentSwitchTrackingSelectOne
+                                                                     target:self
+                                                                     action:@selector(roleChanged:)];
+        self.roleSelector.selectedSegment = 0;
+        self.roleSelector.segmentStyle = NSSegmentStyleRounded;
+        [self.roleSelector.heightAnchor constraintEqualToConstant:36].active = YES;
+        [mainViews addObject:self.roleSelector];
         self.liveSelector = [NSSegmentedControl segmentedControlWithLabels:@[@"Ableton Live 12", @"Ableton Live 10"]
                                                                trackingMode:NSSegmentSwitchTrackingSelectOne
                                                                      target:self
@@ -136,14 +145,18 @@
     NSArray<NSArray<NSString *> *> *components = self.uninstaller ? @[
         @[@"autoscene", @"Paradis Latin AutoScene — Live 11/12", @"Périphérique Max for Live AutoScene.", @"ParadisLatin.jpg"],
         @[@"autoscene-live10", @"Paradis Latin AutoScene — Live 10", @"Variante dédiée à Ableton Live 10.", @"ParadisLatin.jpg"],
-        @[@"remote", @"CL Audio Controller", @"Application, AbletonOSC, télécommande, LTC et X-Fader.", @"Controller.png"],
+        @[@"controller", @"Mac Télécommande", @"Show Control, serveur web et télécommandes distantes.", @"Controller.png"],
+        @[@"ableton-reader", @"Mac Ableton Lecteur", @"AbletonOSC, LTC, X-Fader et agent RTP léger.", @"Controller.png"],
         @[@"builder", @"CL Arrangement Builder Live", @"Application Builder et Remote Script Ableton.", @"Builder.png"],
-        @[@"midi-console", @"CL MIDI Console Monitor", @"Moniteur Max for Live et outils réseau MIDI.", @"MIDIConsole.png"]
+        @[@"midi-console", @"CL MIDI Console Monitor", @"Moniteur Max for Live et outils réseau MIDI.", @"MIDIConsole.png"],
+        @[@"simulator", @"Simulateur de console RTP", @"Répondant Program Change réservé aux essais sans console.", @"MIDIConsole.png"]
     ] : @[
         @[@"autoscene", @"Paradis Latin AutoScene", @"Périphérique Max for Live pour Ableton Live 11 et 12.", @"ParadisLatin.jpg"],
-        @[@"remote", @"CL Audio Controller", @"Application, AbletonOSC, télécommande, LTC et X-Fader.", @"Controller.png"],
+        @[@"controller", @"Mac Télécommande", @"Show Control, serveur web et télécommandes distantes.", @"Controller.png"],
+        @[@"ableton-reader", @"Mac Ableton Lecteur", @"AbletonOSC, LTC, X-Fader et agent RTP léger.", @"Controller.png"],
         @[@"builder", @"CL Arrangement Builder Live", @"Application Builder et Remote Script Ableton.", @"Builder.png"],
-        @[@"midi-console", @"CL MIDI Console Monitor", @"Moniteur Max for Live et outils réseau MIDI.", @"MIDIConsole.png"]
+        @[@"midi-console", @"CL MIDI Console Monitor", @"Assistant technique du Mac serveur et retours consoles.", @"MIDIConsole.png"],
+        @[@"simulator", @"Simulateur de console RTP", @"Répondant Program Change réservé aux essais sans console.", @"MIDIConsole.png"]
     ];
     for (NSArray<NSString *> *item in components) {
         [componentStack addArrangedSubview:[self componentCard:item[0] title:item[1] subtitle:item[2] iconName:item[3]]];
@@ -193,19 +206,33 @@
     ]];
     [self.window makeKeyAndOrderFront:nil];
     [NSApp activateIgnoringOtherApps:YES];
+    if (!self.uninstaller) [self roleChanged:self.roleSelector];
 }
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender { return YES; }
 
 - (void)liveChanged:(id)sender {
     BOOL live10 = self.liveSelector.selectedSegment == 1;
-    [self.checks enumerateKeysAndObjectsUsingBlock:^(NSString *key, NSButton *check, BOOL *stop) {
-        BOOL enabled = !live10 || [key isEqualToString:@"autoscene"];
-        check.enabled = enabled;
-        check.state = enabled ? NSControlStateValueOn : NSControlStateValueOff;
-        self.cards[key].alphaValue = enabled ? 1 : 0.38;
-    }];
     self.checks[@"autoscene"].title = live10 ? @"Paradis Latin AutoScene — Live 10" : @"Paradis Latin AutoScene";
+}
+
+- (void)roleChanged:(id)sender {
+    (void)sender;
+    NSInteger role = self.roleSelector.selectedSegment;
+    if (role == 3) {
+        [self.checks enumerateKeysAndObjectsUsingBlock:^(NSString *key, NSButton *check, BOOL *stop) { check.enabled = YES; }];
+        self.liveSelector.enabled = YES;
+        return;
+    }
+    [self.checks enumerateKeysAndObjectsUsingBlock:^(NSString *key, NSButton *check, BOOL *stop) {
+        BOOL selected = (role == 0 && [key isEqualToString:@"controller"]) ||
+                        (role == 1 && ([key isEqualToString:@"ableton-reader"] || [key isEqualToString:@"builder"] || [key isEqualToString:@"autoscene"])) ||
+                        (role == 2 && [key isEqualToString:@"simulator"]);
+        check.state = selected ? NSControlStateValueOn : NSControlStateValueOff;
+        check.enabled = NO;
+        self.cards[key].alphaValue = selected ? 1.0 : 0.38;
+    }];
+    self.liveSelector.enabled = role == 1;
 }
 
 - (void)cancelPressed:(id)sender { [NSApp terminate:nil]; }
@@ -258,7 +285,7 @@
     } else {
         BOOL live10 = self.liveSelector.selectedSegment == 1;
         environment[@"CL_SUITE_LIVE_FAMILY"] = live10 ? @"10" : @"12";
-        environment[@"CL_SUITE_COMPONENTS"] = live10 ? @"autoscene-live10" : [selected componentsJoinedByString:@","];
+        environment[@"CL_SUITE_COMPONENTS"] = [selected componentsJoinedByString:@","];
     }
     task.environment = environment;
     task.standardOutput = output;
@@ -276,8 +303,15 @@
             selfRef.actionButton.enabled = YES;
             if (finished.terminationStatus == 0) {
                 selfRef.statusLabel.stringValue = @"Opération terminée";
+                BOOL installedNetworkAssistant = !selfRef.uninstaller && [selected containsObject:@"midi-console"];
+                BOOL installedReceiver = !selfRef.uninstaller && [selected containsObject:@"simulator"];
+                NSString *successMessage = installedNetworkAssistant
+                    ? @"CL MIDI Network Assistant a été installé comme outil de diagnostic à lancer à la demande. Acceptez l’autorisation Accessibilité si macOS la demande. Fermez puis relancez Ableton Live s’il était ouvert."
+                    : (installedReceiver
+                       ? @"Le répondant RTP léger a été installé et configuré pour démarrer automatiquement sur ce Mac receveur. Il fonctionne en arrière-plan, sans fenêtre."
+                       : (selfRef.uninstaller ? @"Les éléments retirés restent récupérables dans la Corbeille." : @"Fermez complètement Ableton Live si celui-ci était ouvert, puis relancez-le."));
                 [selfRef showAlert:(selfRef.uninstaller ? @"Désinstallation terminée" : @"Installation terminée")
-                              message:(selfRef.uninstaller ? @"Les éléments retirés restent récupérables dans la Corbeille." : @"Fermez complètement Ableton Live si celui-ci était ouvert, puis relancez-le.")
+                              message:successMessage
                                 style:NSAlertStyleInformational];
             } else {
                 selfRef.statusLabel.stringValue = @"Échec — consultez le rapport";

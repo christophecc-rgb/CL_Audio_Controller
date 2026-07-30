@@ -204,11 +204,15 @@ static void midiRead(const MIDIPacketList *packetList, void *readProcRefCon, voi
 int main(int argc, const char *argv[]) {
     @autoreleasepool {
         NSArray<NSString *> *arguments = NSProcessInfo.processInfo.arguments;
+        NSString *processName = NSProcessInfo.processInfo.processName;
+        BOOL responderMode = [processName containsString:@"RTPResponder"] ||
+                             [processName containsString:@"RTP Receiver"] ||
+                             [processName containsString:@"RTP Simulator"];
         if ([arguments containsObject:@"--help"]) {
             puts("Usage: CLYamahaConsoleSimulator [--label QL1] [--endpoint name] [--channel 1-16] [--delay-ms 80] [--no-echo]");
             return 0;
         }
-        consoleLabel = argumentValue(arguments, @"--label", @"QL1");
+        consoleLabel = argumentValue(arguments, @"--label", responderMode ? @"RTP RESPONDER" : @"QL1");
         NSString *endpointSearchName = argumentValue(arguments, @"--endpoint", @"mb pro");
         echoDelayMs = (NSUInteger)[argumentValue(arguments, @"--delay-ms", @"80") integerValue];
         acceptedChannel = (NSUInteger)[argumentValue(arguments, @"--channel", @"0") integerValue];
@@ -221,7 +225,8 @@ int main(int argc, const char *argv[]) {
         session.enabled = YES;
         session.connectionPolicy = MIDINetworkConnectionPolicy_Anyone;
         MIDIEndpointRef networkSource = 0;
-        for (NSUInteger attempt = 0; attempt < 50; attempt++) {
+        NSUInteger endpointAttempts = responderMode ? 600 : 50;
+        for (NSUInteger attempt = 0; attempt < endpointAttempts; attempt++) {
             networkSource = session.sourceEndpoint;
             networkDestination = session.destinationEndpoint;
             if (networkSource != 0 && networkDestination != 0) break;

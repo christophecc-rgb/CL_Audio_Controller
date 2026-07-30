@@ -75,6 +75,12 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("CL_SUITE_COMPONENTS", script)
         self.assertIn("Ableton Live 10", script)
         self.assertIn("Paradis Latin AutoScene - Live 10", script)
+        self.assertIn("CL MIDI RTP Agent.app", script)
+        self.assertIn("CL MIDI RTP Simulator.app", script)
+        self.assertIn("INSTALL_MIDI_RECEIVER", script)
+        self.assertIn("detect_live", script)
+        self.assertIn("resolve_user_library", script)
+        self.assertIn("verify_copy", script)
         self.assertIn('COMPONENTS_ROOT="$SCRIPT_DIR/Composants"', script)
         self.assertNotIn("sudo", script)
         self.assertNotIn("pkill", script)
@@ -89,6 +95,8 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("Paradis Latin AutoScene - Live 10.amxd", script)
         self.assertIn("Paradis Latin AutoScene - Live 10.maxpat", script)
         self.assertIn("Arrangement Builder Live.app/", script)
+        self.assertIn('"CL MIDI RTP Agent.app/"', script)
+        self.assertIn('"CL MIDI RTP Simulator.app/"', script)
         self.assertIn("CFBundleIconFile", script)
         self.assertIn("CL_RELEASE_OUTPUT_ROOT", script)
         self.assertIn("CLSuiteInstallerApp.m", script)
@@ -123,10 +131,14 @@ class PackagingTests(unittest.TestCase):
 
     def test_native_installer_has_branded_component_cards_and_keeps_the_existing_engines(self):
         source = (PROJECT_ROOT / "packaging" / "CLSuiteInstallerApp.m").read_text(encoding="utf-8")
-        self.assertIn("CL Audio Controller", source)
+        self.assertIn("Mac Télécommande", source)
         self.assertIn("CL Arrangement Builder Live", source)
         self.assertIn("Paradis Latin AutoScene", source)
         self.assertIn("CL MIDI Console Monitor", source)
+        self.assertIn("Mac Ableton Lecteur", source)
+        self.assertIn("Simulateur console", source)
+        self.assertIn("agent RTP léger", source)
+        self.assertIn("roleChanged:", source)
         self.assertIn("Installer_Toute_La_Suite_CL.command", source)
         self.assertIn("Desinstaller_La_Suite_CL.command", source)
         self.assertIn("CL_SUITE_COMPONENTS", source)
@@ -134,8 +146,8 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("NSProgressIndicatorStyleBar", source)
         self.assertIn("Installation terminée", source)
         installer_section = source.split("] : @[", 1)[1]
-        self.assertLess(installer_section.index("Paradis Latin AutoScene"), installer_section.index("CL Audio Controller"))
-        self.assertLess(installer_section.index("CL Audio Controller"), installer_section.index("CL Arrangement Builder Live"))
+        self.assertLess(installer_section.index("Paradis Latin AutoScene"), installer_section.index("Mac Télécommande"))
+        self.assertLess(installer_section.index("Mac Télécommande"), installer_section.index("CL Arrangement Builder Live"))
         self.assertLess(installer_section.index("CL Arrangement Builder Live"), installer_section.index("CL MIDI Console Monitor"))
 
     def test_desktop_kit_builder_is_a_macos_app_with_the_cl_icon(self):
@@ -198,6 +210,9 @@ class PackagingTests(unittest.TestCase):
                 directory.mkdir(parents=True)
                 (directory / "payload.txt").write_text(relative)
 
+            fake_live = home / "Applications/Ableton Live 12 Suite.app"
+            fake_live.mkdir(parents=True)
+
             manifest_lines = []
             for payload in sorted(components.rglob("payload.txt")):
                 digest = hashlib.sha256(payload.read_bytes()).hexdigest()
@@ -213,6 +228,8 @@ class PackagingTests(unittest.TestCase):
                     "CL_SUITE_LIVE_FAMILY": "12",
                     "CL_SUITE_COMPONENTS": "remote,builder,autoscene,midi-console",
                     "CL_SUITE_INSTALL_HOME": str(home),
+                    "CL_SUITE_LIVE_APPS": str(fake_live),
+                    "CL_SUITE_ASSUME_M4L": "1",
                 }
             )
             subprocess.run([str(engine)], check=True, env=environment, capture_output=True)

@@ -14,6 +14,13 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn("addConnection", source)
         self.assertNotIn("osascript", source)
 
+    def test_round_trip_ignores_immediate_coremidi_local_echoes(self):
+        source = (TOOLS / "CLMIDIRoundTripTester.m").read_text()
+        self.assertIn("minimumReturnLatencyMs = 35.0", source)
+        self.assertIn("IGNORED_LOCAL_ECHO", source)
+        self.assertIn("ignored_local_echoes=", source)
+        self.assertIn("latencyMs < minimumReturnLatencyMs", source)
+
     def test_simulator_echoes_only_program_changes(self):
         source = (TOOLS / "CLYamahaConsoleSimulator.m").read_text()
         self.assertIn("(status & 0xF0) == 0xC0", source)
@@ -32,6 +39,13 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn("COALESCED_DUPLICATE", source)
         self.assertIn("SUPPRESSED_PENDING_CONFIRMATION", source)
         self.assertNotIn("selfEchoBudget", source)
+        self.assertIn('containsString:@"RTPResponder"', source)
+        self.assertIn('containsString:@"RTP Receiver"', source)
+        build = (TOOLS / "build.sh").read_text()
+        self.assertIn("CLMIDIRTPResponder", build)
+        self.assertIn("CLMIDIRTPAgent", build)
+        agent = (TOOLS / "CLMIDIRTPAgent.m").read_text()
+        self.assertIn("NSHost.currentHost.localizedName", agent)
 
     def test_round_trip_tester_sends_and_matches_the_selected_channel(self):
         source = (TOOLS / "CLMIDIRoundTripTester.m").read_text()
@@ -50,7 +64,7 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('${1:-$SCRIPT_DIR/build}', source)
         self.assertIn("-framework CoreMIDI", source)
         self.assertIn("-arch arm64 -arch x86_64", source)
-        self.assertEqual(source.count("-mmacosx-version-min=10.15"), 5)
+        self.assertEqual(source.count("-mmacosx-version-min=10.15"), 7)
         self.assertIn("CLMIDINetworkGuardian", source)
         self.assertIn("CLYamahaConsoleSimulator", source)
         self.assertIn("CLMIDIRoundTripTester", source)
@@ -71,7 +85,13 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('latency_ms=', source)
         self.assertIn('BOUCLE MIDI DÉTECTÉE', source)
         self.assertIn('désactivez Entrée RTP > Piste', source)
-        self.assertIn('Routages actifs : Aucun · une seule paire RTP', source)
+        self.assertNotIn('Routages actifs : Aucun · une seule paire RTP', source)
+        self.assertIn('DÉMARRER LE SIMULATEUR DISTANT', source)
+        self.assertIn('ARRÊTER LE SIMULATEUR DISTANT', source)
+        self.assertIn('cl-midi-rtp-control', source)
+        self.assertIn('start-simulator', source)
+        self.assertIn('stop-simulator', source)
+        self.assertIn('50022', source)
         self.assertIn('loopDetectedEndpoint', source)
         self.assertIn('MIDINetworkSession', source)
         self.assertIn('open_rtp_settings.applescript', source)
@@ -85,9 +105,9 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('connect_rtp_peer.applescript', source)
         self.assertIn('executeAndReturnError', source)
         simulator_method = source.split('- (void)startSimulator:', 1)[1].split('- (BOOL)applicationShouldTerminateAfterLastWindowClosed:', 1)[0]
-        self.assertIn('CLYamahaSimulatorDashboard', simulator_method)
-        self.assertIn('isExecutableFileAtPath:', simulator_method)
-        self.assertIn('Console Simulator ouvert.', simulator_method)
+        self.assertIn('Démarrer le simulateur sur l’autre Mac ?', simulator_method)
+        self.assertIn('sendto(', simulator_method)
+        self.assertIn('Aucune réponse de l’agent RTP distant', simulator_method)
         self.assertNotIn('tell application', simulator_method)
         connect_method = source.split('- (void)connectSelectedPeer:', 1)[1].split('- (void)refreshEndpoints', 1)[0]
         self.assertNotIn('/usr/bin/osascript', connect_method)
@@ -144,6 +164,18 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('@"CLMIDINetworkGuardian"', source)
         self.assertIn('@[@"--peer-name", peer, @"--interval", @"2"]', source)
         self.assertIn('if (self.guardianTask.running) [self.guardianTask terminate]', source)
+        self.assertIn('ensureLegacyWakeIfNeeded', source)
+        self.assertIn('@"reconnect_legacy_rtp.applescript"', source)
+        self.assertIn('Session RTP historique réveillée', source)
+
+    def test_dashboard_adopts_the_real_discovered_machine_name(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text()
+        self.assertIn("selected = names.firstObject", source)
+        self.assertIn('removeObjectForKey:@"preferredRtpPeer"', source)
+        self.assertIn("NSHost.currentHost.localizedName", source)
+        self.assertIn("[available removeObject:computerName]", source)
+        self.assertNotIn("if (selected.length && ![available containsObject:selected]) [available addObject:selected]", source)
+        self.assertIn("CL5 and QL1 remain MIDI channel labels", source)
 
     def test_yamaha_simulator_dashboard_supports_independent_consoles(self):
         source = (TOOLS / "CLYamahaSimulatorDashboard.m").read_text()
@@ -194,9 +226,9 @@ class MidiNetworkToolsTests(unittest.TestCase):
 
     def test_legacy_reconnect_never_disconnects_an_unknown_session(self):
         source = (TOOLS / "reconnect_legacy_rtp.applescript").read_text()
-        self.assertIn('button "Se connecter"', source)
-        self.assertIn('button "Se déconnecter"', source)
-        self.assertIn("Une autre session RTP est déjà active", source)
+        self.assertIn('set sessionCheckbox to UI element 1 of sessionContents', source)
+        self.assertIn('set connectButton to UI element 3 of directoryGroup', source)
+        self.assertIn('if activeName is connectedName then return "already-connected:"', source)
         self.assertNotIn('click button "Se déconnecter"', source)
 
 

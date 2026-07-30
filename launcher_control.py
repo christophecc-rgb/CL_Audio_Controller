@@ -90,16 +90,76 @@ server_ownership_lock = threading.RLock()
 owned_server = None
 claimable_server = None
 ignored_orphan_instance_id = None
+rtp_agent_lock = threading.RLock()
+rtp_agent_state = {}
+rtp_agent_listener_started = False
 
 
-def read_midi_console_state():
+def _rtp_agent_listener():
+    global rtp_agent_state
+    listener = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        listener.bind(("", 50021))
+        while True:
+            data, address = listener.recvfrom(65536)
+            try:
+                payload = json.loads(data.decode("utf-8"))
+            except (ValueError, UnicodeDecodeError):
+                continue
+            if payload.get("service") != "cl-midi-rtp-agent":
+                continue
+            payload["address"] = address[0]
+            payload["received_at"] = time.time()
+            with rtp_agent_lock:
+                rtp_agent_state = payload
+    except OSError:
+        return
+    finally:
+        listener.close()
+
+
+def read_rtp_agent_state(expected_host=None):
+    global rtp_agent_listener_started
+    with rtp_agent_lock:
+        if not rtp_agent_listener_started:
+            rtp_agent_listener_started = True
+            threading.Thread(target=_rtp_agent_listener, daemon=True, name="rtp-agent-listener").start()
+        payload = dict(rtp_agent_state)
+    if not payload or time.time() - float(payload.get("received_at", 0)) > 6:
+        return {}
+    if expected_host not in (None, "", "127.0.0.1", "localhost") and payload.get("address") != expected_host:
+        return {}
+    connections = payload.get("connections") or []
+    targets = payload.get("targets") or []
+    return {
+        "peer": payload.get("host") or payload.get("address") or "Mac Ableton Lecteur",
+        "available": True,
+        "validated": bool(connections),
+        "connections": connections,
+        "targets": targets,
+        "last_test": "Agent RTP Ableton actif",
+    }
+
+
+def read_midi_console_state(expected_agent_host=None):
     try:
         if MIDI_CONSOLE_STATE_PATH.stat().st_size > 65536:
             return {}
         payload = json.loads(MIDI_CONSOLE_STATE_PATH.read_text(encoding="utf-8"))
-        return payload if isinstance(payload, dict) and payload.get("service") == "cl-midi-console-monitor" else {}
+        if not (isinstance(payload, dict) and payload.get("service") == "cl-midi-console-monitor"):
+            payload = {}
+        agent = read_rtp_agent_state(expected_agent_host)
+        if agent:
+            payload = dict(payload)
+            payload["rtp"] = agent
+        elif expected_agent_host not in (None, "", "127.0.0.1", "localhost"):
+            payload = dict(payload)
+            payload.pop("rtp", None)
+        return payload
     except (OSError, ValueError, TypeError):
-        return {}
+        agent = read_rtp_agent_state(expected_agent_host)
+        return {"rtp": agent} if agent else {}
 
 
 def ownership_headers(record):
@@ -894,7 +954,12 @@ PANEL_HTML_V2 = r'''
 html,body{margin:0;width:100%;height:100%;overflow:hidden}
 body{background:linear-gradient(180deg,#0e1015,#11141a);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif}
 button{font:inherit}
-.app{width:590px;max-width:calc(100% - 16px);height:100%;margin:auto;padding:9px;display:flex;flex-direction:column;gap:7px;overflow-y:auto}
+.app{width:590px;max-width:calc(100% - 16px);height:100%;margin:auto;padding:9px;display:flex;flex-direction:column;gap:7px;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable}
+.app>*{flex-shrink:0}
+.app::-webkit-scrollbar{width:9px}
+.app::-webkit-scrollbar-track{background:#11141a;border-radius:8px}
+.app::-webkit-scrollbar-thumb{background:#4a5260;border:2px solid #11141a;border-radius:8px}
+.app::-webkit-scrollbar-thumb:hover{background:#657082}
 .topbar{display:grid;grid-template-columns:150px 1fr;gap:10px;align-items:center}
 .brand{height:56px;border-radius:11px;background:#020304;border:1px solid #272a31;display:flex;align-items:center;justify-content:center;overflow:hidden;box-shadow:0 8px 18px rgba(0,0,0,.25)}
 .brand img{width:100%;height:100%;object-fit:contain}
@@ -951,8 +1016,9 @@ button{font:inherit}
 .ltc-destination{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;min-height:30px;padding:0 8px;border-radius:7px;border:1px solid rgba(84,224,132,.42);background:rgba(46,154,84,.10);font-size:9px;color:#9aa2ae}.ltc-destination strong{font:11px Menlo,monospace;color:#72e49a}.ltc-destination span:first-child{font-weight:760;letter-spacing:.035em}
 .network-buttons{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:6px}.network-buttons .action{height:31px;font-size:10px}
 .badge{padding:4px 8px;border-radius:999px;background:rgba(67,200,111,.12);color:#7ee39e;border:1px solid rgba(67,200,111,.28);font-size:10px}
-.console-card{padding:10px}.console-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}.console-head strong{font-size:10px;letter-spacing:.075em}.console-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.console-return{border:1px solid #343b47;border-radius:9px;background:#12161c;padding:8px}.console-program{font-size:15px;font-weight:800;color:#edc65b}.console-title{font-size:10px;color:#c4cad4;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.console-state{font-size:9px;color:#7d8592;margin-top:4px}.console-return.ok{border-color:rgba(80,196,123,.76);box-shadow:inset 0 0 0 1px rgba(80,196,123,.16)}.console-return.ok .console-state{color:#70d89a}.console-return.stale{border-color:rgba(235,171,61,.55)}.console-return.stale .console-state{color:#d5a64f}
+.console-card{padding:10px}.console-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}.console-head strong{font-size:10px;letter-spacing:.075em}.rtp-control{display:flex;align-items:center;gap:6px}.rtp-badge{font-size:9px;color:#d7a64c}.rtp-badge.ok{color:#70d89a}.rtp-badge.error{color:#ed7e7e}.rtp-open{height:24px;padding:0 8px;border:1px solid #3f4b5d;border-radius:7px;background:#242b35;color:#cfd6e1;font-size:9px;cursor:pointer}.console-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.console-return{border:1px solid #343b47;border-radius:9px;background:#12161c;padding:8px}.console-program{font-size:15px;font-weight:800;color:#edc65b}.console-title{font-size:10px;color:#c4cad4;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.console-state{font-size:9px;color:#7d8592;margin-top:4px}.console-return.ok{border-color:rgba(80,196,123,.76);box-shadow:inset 0 0 0 1px rgba(80,196,123,.16)}.console-return.ok .console-state{color:#70d89a}.console-return.stale{border-color:rgba(235,171,61,.55)}.console-return.stale .console-state{color:#d5a64f}
 details{background:var(--card2);border:1px solid #292e37;border-radius:12px;overflow:hidden}
+details[open]{overflow:visible}
 summary{height:34px;padding:0 11px;display:flex;align-items:center;cursor:pointer;font-size:12px;color:#c5cad3;list-style:none}
 summary::-webkit-details-marker{display:none}
 summary::before{content:'›';font-size:18px;margin-right:7px;transition:.15s}
@@ -961,7 +1027,7 @@ details[open] summary::before{transform:rotate(90deg)}
 .tech-item{display:grid;grid-template-columns:8px 1fr;gap:6px;align-items:center;font-size:10px;color:#aeb4bf}
 .tech-led{width:6px;height:6px;border-radius:50%;background:#555d69}
 .tech-item.on .tech-led{background:var(--green);box-shadow:0 0 7px rgba(67,200,111,.65)}
-.event-list{grid-column:1/-1;border-top:1px solid #292e37;padding-top:7px;font-size:10px;color:#8f97a5;line-height:1.45;max-height:45px;overflow:hidden}
+.event-list{grid-column:1/-1;border-top:1px solid #292e37;padding-top:7px;font-size:10px;color:#8f97a5;line-height:1.45;max-height:140px;overflow-y:auto}
 .bottom{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto}
 .local{height:30px;border:0;background:transparent;color:#91a9cb;font-size:11px;cursor:pointer}
 .stop{height:30px;padding:0 11px;border-radius:8px;border:1px solid rgba(217,88,88,.42);background:rgba(217,88,88,.10);color:#e68b8b;font-size:11px;cursor:pointer}
@@ -1042,7 +1108,7 @@ body.show-mode .show-toggle{border-color:rgba(229,166,59,.72);background:rgba(22
   </div>
 
   <section class="card console-card">
-    <div class="console-head"><strong>MIDI &amp; CONSOLES</strong></div>
+    <div class="console-head"><strong>MIDI &amp; CONSOLES</strong><div class="rtp-control"><span id="rtpBadge" class="rtp-badge">RTP · attente</span><button class="rtp-open" onclick="runAction('/midi-network-assistant','Ouverture du diagnostic RTP')">Diagnostic</button></div></div>
     <div class="console-grid">
       <div id="cl5Return" class="console-return"><div id="cl5Program" class="console-program">CL5 · scène n° —</div><div id="cl5Title" class="console-title">Contexte Ableton en attente</div><div id="cl5State" class="console-state">Aucun retour Program Change</div></div>
       <div id="ql1Return" class="console-return"><div id="ql1Program" class="console-program">QL1 · scène n° —</div><div id="ql1Title" class="console-title">Contexte Ableton en attente</div><div id="ql1State" class="console-state">Aucun retour Program Change</div></div>
@@ -1094,6 +1160,9 @@ function render(s){
   el('ltcDestination').textContent=s.ltc_destination+':'+s.ltc_port;
   if(s.osc_transport){el('techAbletonLatency').textContent='Dernière réponse · '+(s.osc_transport.last_latency_ms==null?'—':Math.round(s.osc_transport.last_latency_ms)+' ms');el('techAbletonTimeouts').textContent='Timeouts · '+s.osc_transport.timeout_count;}
   const midi=s.midi_console||{},cl5=midi.cl5||{},ql1=midi.ql1||{};
+  const rtp=midi.rtp||{},rtpBadge=el('rtpBadge');
+  rtpBadge.textContent=rtp.validated?('RTP VALIDÉ · '+(rtp.peer||'cible')):(rtp.loop_detected?'RTP · BOUCLE':(rtp.available?('RTP DISPONIBLE · '+(rtp.peer||'cible')):'RTP HORS LIGNE'));
+  rtpBadge.className='rtp-badge '+(rtp.validated?'ok':(rtp.loop_detected?'error':''));
   const returnPresentation=(value)=>{const at=Number(value.received_at||0),age=at?Math.max(0,Date.now()/1000-at):Infinity,fresh=value.received&&age<=5;return {className:fresh?'ok':(value.received?'stale':''),text:fresh?'✓ Retour confirmé':(value.received?(at?'Dernier retour · il y a '+Math.floor(age)+' s':'Dernier retour · ancien'):'Aucun retour Program Change')};};
   const cl5Return=returnPresentation(cl5),ql1Return=returnPresentation(ql1);
   el('cl5Return').className='console-return '+cl5Return.className;el('ql1Return').className='console-return '+ql1Return.className;
@@ -1277,7 +1346,7 @@ def state():
         ltc_timecode=remote_state.get("ltc_timecode", "--:--:--:--"),
         ltc_destination=ltc_destination,
         ltc_port=LTC_PORT,
-        midi_console=read_midi_console_state(),
+        midi_console=read_midi_console_state((configured_target or {}).get("host")),
         orphan_actions_available=identity["code"] == "orphan-claimable",
         orphan_instance_id=(remote_state.get("server_instance_id") or "")[:8] or None,
         orphan_process_id=remote_state.get("server_process_id") if identity["code"] == "orphan-claimable" else None,
@@ -1507,6 +1576,20 @@ def remote_window():
     mode = open_remote_app_window(REMOTE_ROOT_URL, "Télécommande Ableton")
     event("Télécommande ouverte sur Session")
     return jsonify(message=f"Télécommande ouverte sur Session en {mode}", url=REMOTE_ROOT_URL)
+
+
+@app.route("/midi-network-assistant")
+def open_midi_network_assistant():
+    candidates = [
+        Path.home() / "Applications" / "CL MIDI Network Assistant.app",
+        Path("/Applications/CL MIDI Network Assistant.app"),
+    ]
+    assistant = next((candidate for candidate in candidates if candidate.exists()), None)
+    if assistant is None:
+        return jsonify(error="CL MIDI Network Assistant n’est pas installé"), 404
+    subprocess.Popen(["/usr/bin/open", str(assistant)])
+    event("Diagnostic RTP ouvert depuis Show Control")
+    return jsonify(message="Diagnostic RTP ouvert")
 
 @app.route("/quit")
 def quit_launcher():

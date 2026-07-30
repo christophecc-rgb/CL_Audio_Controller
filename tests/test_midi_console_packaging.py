@@ -43,6 +43,16 @@ class MidiConsolePackagingTests(unittest.TestCase):
         self.assertIn("Presets/MIDI Effects/Max MIDI Effect/CL MIDI Console Monitor", source)
         self.assertIn("CL MIDI Network Assistant.app", source)
         self.assertIn('"midi-console"', source)
+        self.assertIn("detect_live", source)
+        self.assertIn("resolve_user_library", source)
+        self.assertIn("verify_copy", source)
+        self.assertIn("INSTALLATION TERMINÉE ET VÉRIFIÉE", source)
+        self.assertNotIn('login item "CL MIDI Network Assistant"', source)
+        self.assertIn("verify_selected_components", source)
+        self.assertIn("composants sélectionnés", source)
+        self.assertIn("CL MIDI RTP Agent.app", source)
+        self.assertIn("CL MIDI RTP Simulator.app", source)
+        self.assertIn('"midi-receiver"', source)
 
     def test_complete_suite_uninstaller_limits_midi_console_removal_to_known_targets(self):
         source = (ROOT / "packaging" / "Desinstaller_La_Suite_CL.command").read_text()
@@ -51,6 +61,7 @@ class MidiConsolePackagingTests(unittest.TestCase):
         self.assertIn("Application Support/CL MIDI Console/Network Tools", source)
         self.assertIn("Applications/CL MIDI Network Assistant.app", source)
         self.assertIn('midi-console)', source)
+        self.assertIn('delete login item "CL MIDI Network Assistant"', source)
         self.assertNotIn("pkill", source)
 
     def test_complete_release_contains_device_assistant_and_native_tools(self):
