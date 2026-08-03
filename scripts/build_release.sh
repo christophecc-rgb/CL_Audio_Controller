@@ -109,8 +109,9 @@ cat > "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/Info.plist" <<EOF
 </dict></plist>
 EOF
 codesign --force --deep --sign - "$KIT_ROOT/CL MIDI RTP Agent.app"
-ditto "$BUILD_ROOT/midi-tools/CLMIDIRTPResponder" "$KIT_ROOT/CL MIDI RTP Simulator.app/Contents/MacOS/CL MIDI RTP Simulator"
-chmod +x "$KIT_ROOT/CL MIDI RTP Simulator.app/Contents/MacOS/CL MIDI RTP Simulator"
+ditto "$BUILD_ROOT/midi-tools/CLYamahaSimulatorDashboard" "$KIT_ROOT/CL MIDI RTP Simulator.app/Contents/MacOS/CL MIDI RTP Simulator"
+ditto "$BUILD_ROOT/midi-tools/CLYamahaConsoleSimulator" "$KIT_ROOT/CL MIDI RTP Simulator.app/Contents/MacOS/CLYamahaConsoleSimulator"
+chmod +x "$KIT_ROOT/CL MIDI RTP Simulator.app/Contents/MacOS/CL MIDI RTP Simulator" "$KIT_ROOT/CL MIDI RTP Simulator.app/Contents/MacOS/CLYamahaConsoleSimulator"
 cat > "$KIT_ROOT/CL MIDI RTP Simulator.app/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -121,7 +122,6 @@ cat > "$KIT_ROOT/CL MIDI RTP Simulator.app/Contents/Info.plist" <<EOF
 <key>CFBundleName</key><string>CL MIDI RTP Simulator</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>$VERSION</string>
-<key>LSBackgroundOnly</key><true/>
 <key>LSMinimumSystemVersion</key><string>10.15</string>
 </dict></plist>
 EOF

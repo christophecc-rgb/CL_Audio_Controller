@@ -106,22 +106,43 @@ int main(int argc, const char *argv[]) {
         }
         expectedProgram = (UInt8)(sceneNumber - 1);
 
-        MIDIEndpointRef source = findEndpoint(YES, endpointSearchName);
-        destination = findEndpoint(NO, endpointSearchName);
-        if (source == 0 || destination == 0) {
-            fprintf(stderr, "RTP endpoints not found for name: %s\n", endpointSearchName.UTF8String);
+        // Initialise CoreMIDI before enumerating endpoints.  A standalone
+        // diagnostic must not depend on another MIDI application already
+        // having loaded the server and its network driver.
+        MIDIClientRef client = 0;
+        OSStatus clientStatus = MIDIClientCreate(CFSTR("CL MIDI Round Trip Tester"), NULL, NULL, &client);
+        if (clientStatus != noErr) {
+            fprintf(stderr, "COREMIDI_CLIENT_ERROR status=%d\n", (int)clientStatus);
             return 3;
         }
 
-        MIDIClientRef client = 0;
+        MIDIEndpointRef source = findEndpoint(YES, endpointSearchName);
+        destination = findEndpoint(NO, endpointSearchName);
+        if (source == 0 || destination == 0) {
+            fprintf(stderr, "RTP_ENDPOINTS_NOT_FOUND name=%s source=%s destination=%s\n",
+                    endpointSearchName.UTF8String, source ? "yes" : "no", destination ? "yes" : "no");
+            MIDIClientDispose(client);
+            return 4;
+        }
+
         MIDIPortRef inputPort = 0;
-        MIDIClientCreate(CFSTR("CL MIDI Round Trip Tester"), NULL, NULL, &client);
-        MIDIInputPortCreate(client, CFSTR("RTP return"), midiRead, NULL, &inputPort);
-        MIDIOutputPortCreate(client, CFSTR("RTP test send"), &outputPort);
+        OSStatus inputStatus = MIDIInputPortCreate(client, CFSTR("RTP return"), midiRead, NULL, &inputPort);
+        OSStatus outputStatus = MIDIOutputPortCreate(client, CFSTR("RTP test send"), &outputPort);
+        if (inputStatus != noErr || outputStatus != noErr) {
+            fprintf(stderr, "COREMIDI_PORT_ERROR input_status=%d output_status=%d\n",
+                    (int)inputStatus, (int)outputStatus);
+            if (inputPort) MIDIPortDispose(inputPort);
+            if (outputPort) MIDIPortDispose(outputPort);
+            MIDIClientDispose(client);
+            return 5;
+        }
         OSStatus connectStatus = MIDIPortConnectSource(inputPort, source, NULL);
         if (connectStatus != noErr) {
-            fprintf(stderr, "Unable to connect RTP source: %d\n", (int)connectStatus);
-            return 4;
+            fprintf(stderr, "COREMIDI_SOURCE_CONNECT_ERROR status=%d\n", (int)connectStatus);
+            MIDIPortDispose(inputPort);
+            MIDIPortDispose(outputPort);
+            MIDIClientDispose(client);
+            return 6;
         }
 
         Byte storage[1024];
@@ -134,6 +155,14 @@ int main(int argc, const char *argv[]) {
         fprintf(stdout, "SENT channel=%u program=%u scene=%lu status=%d\n",
                 expectedChannel, expectedProgram, (unsigned long)sceneNumber, (int)sendStatus);
         fflush(stdout);
+        if (sendStatus != noErr) {
+            fprintf(stderr, "COREMIDI_SEND_ERROR status=%d\n", (int)sendStatus);
+            MIDIPortDisconnectSource(inputPort, source);
+            MIDIPortDispose(inputPort);
+            MIDIPortDispose(outputPort);
+            MIDIClientDispose(client);
+            return 7;
+        }
 
         NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
         while (!received && deadline.timeIntervalSinceNow > 0) {
@@ -150,8 +179,10 @@ int main(int argc, const char *argv[]) {
         MIDIPortDispose(outputPort);
         MIDIClientDispose(client);
         if (!received) {
-            fprintf(stderr, "TIMEOUT scene=%lu timeout_s=%.1f\n", (unsigned long)sceneNumber, timeout);
-            return 5;
+            fprintf(stderr, "TIMEOUT scene=%lu timeout_s=%.1f sent=yes ignored_local_echoes=%lu received_program_changes=%lu\n",
+                    (unsigned long)sceneNumber, timeout, (unsigned long)ignoredLocalEchoCount,
+                    (unsigned long)totalProgramChangeCount);
+            return 8;
         }
         double firstLatencyMs = (firstMatchAt - sentAt) * 1000.0;
         fprintf(stdout, "SUMMARY matching_returns=%lu total_program_changes=%lu ignored_local_echoes=%lu observation_ms=500 first_latency_ms=%.1f\n",
@@ -160,7 +191,7 @@ int main(int argc, const char *argv[]) {
         if (matchingReturnCount > 4 || totalProgramChangeCount > 16) {
             fprintf(stderr, "LOOP_DETECTED matching_returns=%lu total_program_changes=%lu\n",
                     (unsigned long)matchingReturnCount, (unsigned long)totalProgramChangeCount);
-            return 6;
+            return 9;
         }
     }
     return 0;

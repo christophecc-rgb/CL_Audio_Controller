@@ -11,6 +11,26 @@
 static volatile sig_atomic_t keepRunning = 1;
 static void stopAgent(int value) { (void)value; keepRunning = 0; }
 
+static void installLoginLaunchAgent(void) {
+    NSString *executable = NSProcessInfo.processInfo.arguments.firstObject;
+    if (!executable.length) return;
+    executable = executable.stringByStandardizingPath;
+    NSString *agentsDirectory = [NSHomeDirectory() stringByAppendingPathComponent:@"Library/LaunchAgents"];
+    NSString *plistPath = [agentsDirectory stringByAppendingPathComponent:@"com.claudio.midi-rtp-agent.plist"];
+    NSDictionary *configuration = @{
+        @"Label": @"com.claudio.midi-rtp-agent",
+        @"ProgramArguments": @[executable],
+        @"RunAtLoad": @YES,
+        @"ProcessType": @"Background"
+    };
+    [NSFileManager.defaultManager createDirectoryAtPath:agentsDirectory
+                            withIntermediateDirectories:YES attributes:nil error:nil];
+    NSData *plist = [NSPropertyListSerialization dataWithPropertyList:configuration
+                                                               format:NSPropertyListXMLFormat_v1_0
+                                                              options:0 error:nil];
+    if (plist.length) [plist writeToFile:plistPath options:NSDataWritingAtomic error:nil];
+}
+
 static NSString *argumentValue(NSArray<NSString *> *arguments, NSString *name, NSString *fallback) {
     NSUInteger index = [arguments indexOfObject:name];
     return index != NSNotFound && index + 1 < arguments.count ? arguments[index + 1] : fallback;
@@ -59,6 +79,14 @@ static NSDictionary *handleControlCommand(NSDictionary *command) {
     if (![command[@"service"] isEqualToString:@"cl-midi-rtp-control"]) return nil;
     NSString *action = command[@"action"];
     NSString *bundleID = @"com.claudio.midi-rtp-simulator";
+    if ([action isEqualToString:@"status-simulator"]) {
+        NSArray<NSString *> *candidates = @[[NSHomeDirectory() stringByAppendingPathComponent:@"Applications/CL MIDI RTP Simulator.app"], @"/Applications/CL MIDI RTP Simulator.app"];
+        BOOL installed = NO;
+        for (NSString *candidate in candidates) if ([NSFileManager.defaultManager fileExistsAtPath:candidate]) { installed = YES; break; }
+        BOOL running = [NSRunningApplication runningApplicationsWithBundleIdentifier:bundleID].count > 0;
+        return @{@"ok": @YES, @"agent": @YES, @"installed": @(installed), @"running": @(running),
+                 @"message": installed ? (running ? @"Simulateur distant actif" : @"Simulateur distant prêt") : @"Simulateur absent sur le Mac distant"};
+    }
     if ([action isEqualToString:@"start-simulator"]) {
         NSArray<NSString *> *candidates = @[
             [NSHomeDirectory() stringByAppendingPathComponent:@"Applications/CL MIDI RTP Simulator.app"],
@@ -94,6 +122,7 @@ static void receiveControlCommands(int socketFD) {
 
 int main(int argc, const char *argv[]) {
     @autoreleasepool {
+        installLoginLaunchAgent();
         NSArray<NSString *> *arguments = NSProcessInfo.processInfo.arguments;
         NSString *targetsValue = argumentValue(arguments, @"--targets", @"CL5,QL1");
         uint16_t statusPort = (uint16_t)[argumentValue(arguments, @"--status-port", @"50021") integerValue];
@@ -107,6 +136,12 @@ int main(int argc, const char *argv[]) {
         if (MIDIClientCreate(CFSTR("CL MIDI RTP Agent"), NULL, NULL, &client) != noErr) return 2;
         MIDINetworkSession *session = MIDINetworkSession.defaultSession;
         session.enabled = YES; session.connectionPolicy = MIDINetworkConnectionPolicy_Anyone;
+        NSString *publishedName = session.localName.length ? session.localName : (NSHost.currentHost.localizedName ?: NSProcessInfo.processInfo.hostName);
+        NSNetService *controlService = [[NSNetService alloc] initWithDomain:@"local."
+                                                                       type:@"_cl-midi-rtp-control._udp."
+                                                                       name:publishedName
+                                                                       port:50022];
+        [controlService publish];
         int socketFD = socket(AF_INET, SOCK_DGRAM, 0), enabled = 1;
         if (socketFD >= 0) setsockopt(socketFD, SOL_SOCKET, SO_BROADCAST, &enabled, sizeof(enabled));
         int controlFD = socket(AF_INET, SOCK_DGRAM, 0);
@@ -122,8 +157,12 @@ int main(int argc, const char *argv[]) {
             if (controlFD >= 0) receiveControlCommands(controlFD);
             for (NSString *target in targets) ensurePeer(session, target);
             if (socketFD >= 0) broadcastStatus(socketFD, session, targets, statusPort);
-            for (NSUInteger tick = 0; tick < 20 && keepRunning; tick++) [NSThread sleepForTimeInterval:0.1];
+            for (NSUInteger tick = 0; tick < 20 && keepRunning; tick++) {
+                [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode
+                                         beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
+            }
         }
+        [controlService stop];
         if (socketFD >= 0) close(socketFD);
         if (controlFD >= 0) close(controlFD);
         MIDIClientDispose(client);

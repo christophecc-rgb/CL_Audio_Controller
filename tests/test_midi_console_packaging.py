@@ -80,6 +80,10 @@ class MidiConsolePackagingTests(unittest.TestCase):
             "open_rtp_settings.applescript",
         ):
             self.assertIn(required, source)
+        self.assertIn('CLYamahaSimulatorDashboard" "$KIT_ROOT/CL MIDI RTP Simulator.app/Contents/MacOS/CL MIDI RTP Simulator', source)
+        self.assertIn('CLYamahaConsoleSimulator" "$KIT_ROOT/CL MIDI RTP Simulator.app/Contents/MacOS/CLYamahaConsoleSimulator', source)
+        simulator_plist = source.split('CL MIDI RTP Simulator.app/Contents/Info.plist', 1)[1].split('EOF', 1)[0]
+        self.assertNotIn("LSBackgroundOnly", simulator_plist)
 
         export_source = (ROOT / "scripts" / "export_transport_kit.command").read_text()
         self.assertIn("CL MIDI Console Monitor.amxd", export_source)

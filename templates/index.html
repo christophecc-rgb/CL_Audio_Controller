@@ -70,6 +70,11 @@
     .status.connected { color: #8bc34a; }
     .status.disconnected { color: #ef9a9a; }
 
+    .midi-returns { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
+    .midi-return { border:1px solid var(--border); border-radius:8px; padding:5px 7px; background:#15181d; color:var(--muted); font-size:9px; font-weight:750; }
+    .midi-return strong { display:block; color:#ffcf62; font-size:11px; }
+    .midi-return.ok { border-color:#43a047; color:#8bc34a; }
+
     .topnav {
       display: grid;
       grid-template-columns: 1fr 1fr 1fr;
@@ -602,6 +607,11 @@
       <a href="/arrangement" data-arrangement-link>Arrangement</a>
     </nav>
 
+    <section class="midi-returns" aria-label="Retours MIDI consoles">
+      <div class="midi-return" id="webCl5Return"><strong id="webCl5Program">CL5 · scène —</strong><span id="webCl5State">Aucun retour MIDI</span></div>
+      <div class="midi-return" id="webQl1Return"><strong id="webQl1Program">QL1 · scène —</strong><span id="webQl1State">Aucun retour MIDI</span></div>
+    </section>
+
     <div class="scene-cards">
       <section class="card current-card" id="currentCard" aria-live="polite">
         <div class="label">En cours</div>
@@ -652,6 +662,8 @@
     const gotoButton = document.getElementById('gotoButton');
     const pauseButton = document.getElementById('pauseButton');
     const ltcTimecodeEl = document.getElementById('ltcTimecode');
+    const webCl5Return = document.getElementById('webCl5Return');
+    const webQl1Return = document.getElementById('webQl1Return');
 
     let actionBusy = false;
     let lastKnownState = null;
@@ -1024,6 +1036,17 @@
       const state = rawState && rawState.state ? rawState.state : rawState;
       if (!acceptStateGeneration(state)) return;
       if (window.CLRemoteLTC) window.CLRemoteLTC.render(ltcTimecodeEl, state);
+      const midi = state.midi_console || {};
+      const renderConsoleReturn = (name, value, card, programId, stateId) => {
+        value = value || {};
+        const receivedAt = Number(value.received_at || 0);
+        const fresh = Boolean(value.received && receivedAt && Date.now() / 1000 - receivedAt <= 5);
+        card.classList.toggle('ok', fresh);
+        document.getElementById(programId).textContent = name + ' · scène ' + (value.program ?? '—');
+        document.getElementById(stateId).textContent = fresh ? '✓ Retour confirmé' : (value.received ? 'Dernier retour reçu' : 'Aucun retour MIDI');
+      };
+      renderConsoleReturn('CL5', midi.cl5, webCl5Return, 'webCl5Program', 'webCl5State');
+      renderConsoleReturn('QL1', midi.ql1, webQl1Return, 'webQl1Program', 'webQl1State');
       fillSceneSelect(state);
 
       const connected = Boolean(state && state.connected);

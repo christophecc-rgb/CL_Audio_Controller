@@ -79,6 +79,7 @@ m4l_client = udp_client.SimpleUDPClient(M4L_IP, M4L_PORT)
 # Contexte de scène destiné au moniteur MIDI Max for Live. La destination
 # suit la cible Ableton active afin de fonctionner aussi en mode distant.
 MIDI_MONITOR_SCENE_PORT = 9002
+MIDI_CONSOLE_STATE_PATH = Path("/private/tmp/CL_MIDI_Console_State.json")
 
 # Compatibilité diagnostic ancienne interface — non utilisé.
 MIDI_PORT_EXACT = "M4L_OSC_9001"
@@ -623,6 +624,11 @@ def state_snapshot_locked() -> Dict[str, Any]:
     snapshot["uptime_ms"] = int((time.monotonic() - SERVER_STARTED_MONOTONIC) * 1000)
     snapshot["ableton_target"] = ableton_target.to_dict()
     snapshot["osc_transport"] = ableton_transport.diagnostics()
+    try:
+        midi_console = json.loads(MIDI_CONSOLE_STATE_PATH.read_text(encoding="utf-8"))
+        snapshot["midi_console"] = midi_console if midi_console.get("service") == "cl-midi-console-monitor" else {}
+    except (OSError, ValueError, TypeError, AttributeError):
+        snapshot["midi_console"] = {}
     if not snapshot.get("set_ready", False):
         snapshot.update({
             "scenes": {},

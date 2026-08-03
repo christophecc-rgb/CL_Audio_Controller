@@ -79,6 +79,15 @@ la scène envoyée. Il affiche aussi la latence mesurée.
 
 ## Assistant réseau autonome
 
+`CL MIDI Network Assistant` s'ouvre en **Vue Assistant** : choisir l'autre Mac,
+choisir CL5 ou QL1, puis envoyer une scène témoin et vérifier son retour. Le
+bouton **Diagnostic détaillé** affiche séparément les informations techniques.
+
+**Configurer le simulateur distant** est réservé au diagnostic. L'Assistant
+doit d'abord vérifier que `CL MIDI RTP Agent` répond, que le simulateur est
+installé et s'il est réellement actif. Ne jamais le démarrer avec une vraie
+console en exploitation.
+
 `CL MIDI Network Assistant` conserve une écoute passive des retours CL5/QL1 afin
 de publier leurs derniers numéros de Program Change pour CL Audio Show Control.
 Cette écoute n'émet aucun message MIDI et ne peut donc pas créer de boucle. Le

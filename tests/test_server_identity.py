@@ -450,7 +450,8 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
 
     def test_control_panel_publishes_the_ltc_device_destination(self):
         self.assertIn('id="ltcDestination"', launcher.PANEL_HTML_V2)
-        self.assertIn("Destination à saisir dans LTC Display v2", launcher.PANEL_HTML_V2)
+        self.assertIn("copyLtcDestination()", launcher.PANEL_HTML_V2)
+        self.assertIn("navigator.clipboard.writeText(value)", launcher.PANEL_HTML_V2)
         profiles = self.remote_profiles()
         with (
             mock.patch.object(launcher, "load_profiles", return_value=profiles),

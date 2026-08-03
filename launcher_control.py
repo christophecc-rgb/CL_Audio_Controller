@@ -76,6 +76,7 @@ PARADIS_LOGO = bundled_resource("assets", "paradis latin.jpg")
 
 WEB_PORT = 5050
 MIDI_CONSOLE_STATE_PATH = Path("/private/tmp/CL_MIDI_Console_State.json")
+MIDI_CONSOLE_MONITOR_PROCESS = None
 OSC_PORT = 11000
 RETURN_PORT = 11001
 LTC_PORT = 63123
@@ -160,6 +161,33 @@ def read_midi_console_state(expected_agent_host=None):
     except (OSError, ValueError, TypeError):
         agent = read_rtp_agent_state(expected_agent_host)
         return {"rtp": agent} if agent else {}
+
+
+def find_midi_network_assistant():
+    candidates = [
+        Path.home() / "Applications" / "CL MIDI Network Assistant.app",
+        Path("/Applications/CL MIDI Network Assistant.app"),
+    ]
+    return next((candidate for candidate in candidates if candidate.exists()), None)
+
+
+def ensure_midi_console_monitor():
+    """Démarre l'écoute CoreMIDI sans afficher la fenêtre de diagnostic."""
+    global MIDI_CONSOLE_MONITOR_PROCESS
+    if MIDI_CONSOLE_MONITOR_PROCESS and MIDI_CONSOLE_MONITOR_PROCESS.poll() is None:
+        return True
+    assistant = find_midi_network_assistant()
+    if assistant is None:
+        return False
+    executable = assistant / "Contents" / "MacOS" / "CL MIDI Network Assistant"
+    if not executable.exists():
+        return False
+    MIDI_CONSOLE_MONITOR_PROCESS = subprocess.Popen(
+        [str(executable), "--background-monitor"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    return True
 
 
 def ownership_headers(record):
@@ -1013,7 +1041,7 @@ button{font:inherit}
 .network-grid{display:grid;grid-template-columns:.85fr 1.25fr;gap:7px}.network-grid label{font-size:8px;color:var(--muted)}
 .network-grid input,.network-grid select{width:100%;height:28px;margin-top:2px;border-radius:7px;border:1px solid #353b45;background:#11141a;color:#e4e8ee;padding:0 7px;font-size:10px}
 .ports-readonly{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;min-height:28px;padding:0 8px;border-radius:7px;background:#11141a;border:1px solid #353b45;font-size:9px;color:var(--muted)}.ports-readonly strong{font:11px Menlo,monospace;color:#d6dbe4}
-.ltc-destination{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;min-height:30px;padding:0 8px;border-radius:7px;border:1px solid rgba(84,224,132,.42);background:rgba(46,154,84,.10);font-size:9px;color:#9aa2ae}.ltc-destination strong{font:11px Menlo,monospace;color:#72e49a}.ltc-destination span:first-child{font-weight:760;letter-spacing:.035em}
+.ltc-destination{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;min-height:30px;padding:0 8px;border-radius:7px;border:1px solid rgba(84,224,132,.42);background:rgba(46,154,84,.10);font-size:9px;color:#9aa2ae;cursor:pointer;user-select:none}.ltc-destination:hover{border-color:#72e49a;background:rgba(46,154,84,.18)}.ltc-destination strong{font:11px Menlo,monospace;color:#72e49a}.ltc-destination span:first-child{font-weight:760;letter-spacing:.035em}
 .network-buttons{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:6px}.network-buttons .action{height:31px;font-size:10px}
 .badge{padding:4px 8px;border-radius:999px;background:rgba(67,200,111,.12);color:#7ee39e;border:1px solid rgba(67,200,111,.28);font-size:10px}
 .console-card{padding:10px}.console-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}.console-head strong{font-size:10px;letter-spacing:.075em}.rtp-control{display:flex;align-items:center;gap:6px}.rtp-badge{font-size:9px;color:#d7a64c}.rtp-badge.ok{color:#70d89a}.rtp-badge.error{color:#ed7e7e}.rtp-open{height:24px;padding:0 8px;border:1px solid #3f4b5d;border-radius:7px;background:#242b35;color:#cfd6e1;font-size:9px;cursor:pointer}.console-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.console-return{border:1px solid #343b47;border-radius:9px;background:#12161c;padding:8px}.console-program{font-size:15px;font-weight:800;color:#edc65b}.console-title{font-size:10px;color:#c4cad4;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.console-state{font-size:9px;color:#7d8592;margin-top:4px}.console-return.ok{border-color:rgba(80,196,123,.76);box-shadow:inset 0 0 0 1px rgba(80,196,123,.16)}.console-return.ok .console-state{color:#70d89a}.console-return.stale{border-color:rgba(235,171,61,.55)}.console-return.stale .console-state{color:#d5a64f}
@@ -1098,7 +1126,7 @@ body.show-mode .show-toggle{border-color:rgba(229,166,59,.72);background:rgba(22
         <label>Mode<select id="abletonMode" onchange="updateNetworkFields()"><option value="local">Local</option><option value="remote">Ableton distant</option></select></label>
         <label>Adresse Ableton<input id="abletonHost" value="127.0.0.1"></label>
         <div class="ports-readonly"><span>Ports AbletonOSC fixes</span><strong><span id="abletonSendPort">11000</span> → <span id="abletonReplyPort">11001</span></strong></div>
-        <div class="ltc-destination"><span>Destination à saisir dans LTC Display v2</span><strong id="ltcDestination">127.0.0.1:63123</strong></div>
+        <div class="ltc-destination" role="button" tabindex="0" onclick="copyLtcDestination()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();copyLtcDestination();}"><span id="ltcDestinationLabel">Destination LTC Display v2 · cliquer pour copier</span><strong id="ltcDestination">127.0.0.1:63123</strong></div>
       </div>
       <div class="network-buttons">
         <button class="action" onclick="saveNetworkConfig()">Appliquer</button>
@@ -1228,6 +1256,7 @@ async function testAbletonConnection(){
 }
 function confirmStop(){if(confirm('Arrêter le serveur de télécommande ?\n\nLes appareils connectés perdront immédiatement l’accès.'))runAction('/stop','Arrêt du serveur');}
 async function copyAddress(){if(!latestState)return;try{await navigator.clipboard.writeText(latestState.lan_url);el('actionStatus').textContent='✓ Adresse copiée';}catch(e){el('actionStatus').textContent='Adresse : '+latestState.lan_url;}}
+async function copyLtcDestination(){const value=el('ltcDestination').textContent;if(!value)return;try{await navigator.clipboard.writeText(value);el('ltcDestinationLabel').textContent='✓ Destination copiée';setTimeout(()=>el('ltcDestinationLabel').textContent='Destination LTC Display v2 · cliquer pour copier',1400);}catch(e){el('actionStatus').textContent='Destination LTC : '+value;}}
 async function resizePanelWindow(width,height){
   try{
     if(window.pywebview&&window.pywebview.api&&window.pywebview.api.resize_panel){await window.pywebview.api.resize_panel(width,height);return;}
@@ -1580,11 +1609,7 @@ def remote_window():
 
 @app.route("/midi-network-assistant")
 def open_midi_network_assistant():
-    candidates = [
-        Path.home() / "Applications" / "CL MIDI Network Assistant.app",
-        Path("/Applications/CL MIDI Network Assistant.app"),
-    ]
-    assistant = next((candidate for candidate in candidates if candidate.exists()), None)
+    assistant = find_midi_network_assistant()
     if assistant is None:
         return jsonify(error="CL MIDI Network Assistant n’est pas installé"), 404
     subprocess.Popen(["/usr/bin/open", str(assistant)])
@@ -1618,6 +1643,7 @@ if __name__ == "__main__":
 
     server_thread = threading.Thread(target=run_control_server, daemon=True)
     server_thread.start()
+    ensure_midi_console_monitor()
     time.sleep(1.0)
 
     if webview is None:
