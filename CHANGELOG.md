@@ -4,6 +4,12 @@ Toutes les évolutions notables de CL Audio Controller seront documentées dans 
 
 ## [Non publié]
 
+### Corrigé
+
+- Le pont XFADER attache désormais le crossfader une seule fois au chargement,
+  ce qui élimine les conflits d'affectation lors des mouvements continus de la
+  télécommande A/B.
+
 ## [2.2.0] — 2026-07-25
 
 ### Télécommandes

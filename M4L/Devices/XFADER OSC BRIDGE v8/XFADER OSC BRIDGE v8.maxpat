@@ -50,7 +50,7 @@
             1200.0,
             22.0
           ],
-          "text": "Manual test: lock patcher, click -1 / 0 / 1. If needed click the black button connected to live.path."
+          "text": "Manual test: lock patcher, click -1 / 0 / 1. The crossfader is attached once when the device loads."
         }
       },
       {
@@ -154,19 +154,6 @@
             22.0
           ],
           "text": "print XFADER_ID"
-        }
-      },
-      {
-        "box": {
-          "id": "idreg",
-          "maxclass": "newobj",
-          "patching_rect": [
-            520.0,
-            250.0,
-            60.0,
-            22.0
-          ],
-          "text": "zl reg"
         }
       },
       {
@@ -314,45 +301,6 @@
       },
       {
         "box": {
-          "id": "trig",
-          "maxclass": "newobj",
-          "patching_rect": [
-            520.0,
-            380.0,
-            70.0,
-            22.0
-          ],
-          "text": "t b b f"
-        }
-      },
-      {
-        "box": {
-          "id": "f",
-          "maxclass": "newobj",
-          "patching_rect": [
-            660.0,
-            420.0,
-            45.0,
-            22.0
-          ],
-          "text": "f"
-        }
-      },
-      {
-        "box": {
-          "id": "dval",
-          "maxclass": "newobj",
-          "patching_rect": [
-            660.0,
-            460.0,
-            75.0,
-            22.0
-          ],
-          "text": "delay 80"
-        }
-      },
-      {
-        "box": {
           "id": "sig",
           "maxclass": "newobj",
           "patching_rect": [
@@ -392,32 +340,6 @@
       },
       {
         "box": {
-          "id": "rel",
-          "maxclass": "newobj",
-          "patching_rect": [
-            790.0,
-            420.0,
-            80.0,
-            22.0
-          ],
-          "text": "delay 450"
-        }
-      },
-      {
-        "box": {
-          "id": "id0",
-          "maxclass": "message",
-          "patching_rect": [
-            790.0,
-            460.0,
-            55.0,
-            22.0
-          ],
-          "text": "id 0"
-        }
-      },
-      {
-        "box": {
           "id": "pulse",
           "maxclass": "comment",
           "patching_rect": [
@@ -426,14 +348,14 @@
             620.0,
             22.0
           ],
-          "text": "Pulse: recall stored ID \u2192 attach live.remote~ \u2192 after 80 ms send value \u2192 after 450 ms release id 0."
+          "text": "Stable mapping: live.path attaches live.remote~ once. Slider values never remap the parameter."
         }
       },
       {
         "box": {
           "id": "value_note",
           "maxclass": "comment",
-          "text": "Slider continu: /xfader/value <float -1..1> va directement vers clip puis live.remote~.",
+          "text": "Slider continu: /xfader/value <float -1..1> va vers clip, sig~ puis live.remote~.",
           "patching_rect": [
             580.0,
             300.0,
@@ -535,7 +457,7 @@
             0
           ],
           "destination": [
-            "idreg",
+            "remote",
             1
           ]
         }
@@ -679,78 +601,6 @@
             0
           ],
           "destination": [
-            "trig",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "trig",
-            2
-          ],
-          "destination": [
-            "f",
-            1
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "trig",
-            1
-          ],
-          "destination": [
-            "idreg",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "idreg",
-            0
-          ],
-          "destination": [
-            "remote",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "trig",
-            0
-          ],
-          "destination": [
-            "dval",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "dval",
-            0
-          ],
-          "destination": [
-            "f",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "f",
-            0
-          ],
-          "destination": [
             "sig",
             0
           ]
@@ -759,7 +609,7 @@
       {
         "patchline": {
           "source": [
-            "f",
+            "clip",
             0
           ],
           "destination": [
@@ -772,42 +622,6 @@
         "patchline": {
           "source": [
             "sig",
-            0
-          ],
-          "destination": [
-            "remote",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "trig",
-            0
-          ],
-          "destination": [
-            "rel",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "rel",
-            0
-          ],
-          "destination": [
-            "id0",
-            0
-          ]
-        }
-      },
-      {
-        "patchline": {
-          "source": [
-            "id0",
             0
           ],
           "destination": [
