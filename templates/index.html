@@ -73,6 +73,8 @@
     .midi-returns { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
     .midi-return { border:1px solid var(--border); border-radius:8px; padding:5px 7px; background:#15181d; color:var(--muted); font-size:9px; font-weight:750; }
     .midi-return strong { display:block; color:#ffcf62; font-size:11px; }
+    .midi-return-title { display:block; margin-top:2px; color:#c8cdd5; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .midi-return-state { display:block; margin-top:2px; }
     .midi-return.ok { border-color:#43a047; color:#8bc34a; }
     .midi-return.remembered { border-color:rgba(67,160,71,.48); color:#a7bbaa; }
 
@@ -609,8 +611,8 @@
     </nav>
 
     <section class="midi-returns" aria-label="Retours MIDI consoles">
-      <div class="midi-return" id="webCl5Return"><strong id="webCl5Program">CL5 · scène —</strong><span id="webCl5State">En attente du premier retour</span></div>
-      <div class="midi-return" id="webQl1Return"><strong id="webQl1Program">QL1 · scène —</strong><span id="webQl1State">En attente du premier retour</span></div>
+      <div class="midi-return" id="webCl5Return"><strong id="webCl5Program">CL5 · scène —</strong><span class="midi-return-title" id="webCl5Title">Titre en attente</span><span class="midi-return-state" id="webCl5State">En attente du premier retour</span></div>
+      <div class="midi-return" id="webQl1Return"><strong id="webQl1Program">QL1 · scène —</strong><span class="midi-return-title" id="webQl1Title">Titre en attente</span><span class="midi-return-state" id="webQl1State">En attente du premier retour</span></div>
     </section>
 
     <div class="scene-cards">
@@ -1047,7 +1049,7 @@
         const rest = minutes % 60;
         return 'il y a ' + hours + ' h' + (rest ? ' ' + rest + ' min' : '');
       };
-      const renderConsoleReturn = (name, value, card, programId, stateId) => {
+      const renderConsoleReturn = (name, value, card, programId, titleId, stateId) => {
         value = value || {};
         const receivedAt = Number(value.received_at || 0);
         const age = receivedAt ? Math.max(0, Date.now() / 1000 - receivedAt) : Infinity;
@@ -1055,12 +1057,13 @@
         card.classList.toggle('ok', recent);
         card.classList.toggle('remembered', Boolean(value.received && !recent));
         document.getElementById(programId).textContent = name + ' · scène ' + (value.program ?? '—');
+        document.getElementById(titleId).textContent = value.title || state.playing_scene_name || 'Titre en attente';
         document.getElementById(stateId).textContent = value.received
-          ? (recent ? '✓ Scène reçue · ' : 'Dernière scène reçue · ') + (receivedAt ? formatMidiAge(age) : 'heure inconnue')
+          ? (recent ? '✓ Scène reçue · ' : (age <= 60 ? 'Dernière scène reçue · ' : 'Aucun retour récent · dernier ')) + (receivedAt ? formatMidiAge(age) : 'heure inconnue')
           : 'En attente du premier retour';
       };
-      renderConsoleReturn('CL5', midi.cl5, webCl5Return, 'webCl5Program', 'webCl5State');
-      renderConsoleReturn('QL1', midi.ql1, webQl1Return, 'webQl1Program', 'webQl1State');
+      renderConsoleReturn('CL5', midi.cl5, webCl5Return, 'webCl5Program', 'webCl5Title', 'webCl5State');
+      renderConsoleReturn('QL1', midi.ql1, webQl1Return, 'webQl1Program', 'webQl1Title', 'webQl1State');
       fillSceneSelect(state);
 
       const connected = Boolean(state && state.connected);

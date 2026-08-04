@@ -836,9 +836,12 @@ def open_remote_app_window(url, title="Télécommande Ableton"):
             webview.create_window(
                 title,
                 url,
-                width=430,
-                height=820,
-                min_size=(360, 620),
+                # Keep the desktop remote aligned with the Show Control panel.
+                # The old 430 x 820 format forced the responsive page into a
+                # narrow phone-like column and clipped the lower controls.
+                width=500,
+                height=900,
+                min_size=(460, 700),
                 resizable=True,
                 text_select=True,
             )
@@ -1210,7 +1213,7 @@ function render(s){
   rtpBadge.textContent=rtp.validated?('RTP VALIDÉ · '+(rtp.peer||'cible')):(rtp.loop_detected?'RTP · BOUCLE':(rtp.available?('RTP DISPONIBLE · '+(rtp.peer||'cible')):'RTP HORS LIGNE'));
   rtpBadge.className='rtp-badge '+(rtp.validated?'ok':(rtp.loop_detected?'error':''));
   const formatMidiAge=(seconds)=>{seconds=Math.max(0,Math.floor(seconds));if(seconds<60)return seconds<2?'à l’instant':'il y a '+seconds+' s';const minutes=Math.floor(seconds/60);if(minutes<60)return'il y a '+minutes+' min';const hours=Math.floor(minutes/60),rest=minutes%60;return'il y a '+hours+' h'+(rest?' '+rest+' min':'');};
-  const returnPresentation=(value)=>{const at=Number(value.received_at||0),age=at?Math.max(0,Date.now()/1000-at):Infinity,recent=value.received&&age<=12;if(!value.received)return {className:'',text:'En attente du premier retour'};return {className:recent?'ok':'remembered',text:recent?'✓ Scène reçue · '+formatMidiAge(age):'Dernière scène reçue · '+(at?formatMidiAge(age):'heure inconnue')};};
+  const returnPresentation=(value)=>{const at=Number(value.received_at||0),age=at?Math.max(0,Date.now()/1000-at):Infinity,recent=value.received&&age<=12;if(!value.received)return {className:'',text:'En attente du premier retour'};const prefix=recent?'✓ Scène reçue · ':(age<=60?'Dernière scène reçue · ':'Aucun retour récent · dernier ');return {className:recent?'ok':'remembered',text:prefix+(at?formatMidiAge(age):'heure inconnue')};};
   const cl5Return=returnPresentation(cl5),ql1Return=returnPresentation(ql1);
   el('cl5Return').className='console-return '+cl5Return.className;el('ql1Return').className='console-return '+ql1Return.className;
   el('cl5Program').textContent='CL5 · scène n° '+(cl5.program??'—');el('ql1Program').textContent='QL1 · scène n° '+(ql1.program??'—');
@@ -1394,7 +1397,7 @@ def state():
         ltc_timecode=remote_state.get("ltc_timecode", "--:--:--:--"),
         ltc_destination=ltc_destination,
         ltc_port=LTC_PORT,
-        midi_console=read_midi_console_state((configured_target or {}).get("host")),
+        midi_console=remote_state.get("midi_console") or read_midi_console_state((configured_target or {}).get("host")),
         orphan_actions_available=identity["code"] == "orphan-claimable",
         orphan_instance_id=(remote_state.get("server_instance_id") or "")[:8] or None,
         orphan_process_id=remote_state.get("server_process_id") if identity["code"] == "orphan-claimable" else None,

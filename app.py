@@ -80,6 +80,7 @@ m4l_client = udp_client.SimpleUDPClient(M4L_IP, M4L_PORT)
 # suit la cible Ableton active afin de fonctionner aussi en mode distant.
 MIDI_MONITOR_SCENE_PORT = 9002
 MIDI_CONSOLE_STATE_PATH = Path("/private/tmp/CL_MIDI_Console_State.json")
+MIDI_CONSOLE_TITLE_OVERRIDES: Dict[str, Tuple[float, str]] = {}
 
 # Compatibilité diagnostic ancienne interface — non utilisé.
 MIDI_PORT_EXACT = "M4L_OSC_9001"
@@ -626,6 +627,24 @@ def state_snapshot_locked() -> Dict[str, Any]:
     snapshot["osc_transport"] = ableton_transport.diagnostics()
     try:
         midi_console = json.loads(MIDI_CONSOLE_STATE_PATH.read_text(encoding="utf-8"))
+        playing_title = str(snapshot.get("playing_scene_name") or "").strip()
+        now = time.time()
+        for console_name in ("cl5", "ql1"):
+            console_state = midi_console.get(console_name) or {}
+            received_at = float(console_state.get("received_at") or 0)
+            if (
+                console_state.get("received")
+                and received_at > 0
+                and now - received_at <= 3.0
+                and playing_title
+                and playing_title != "—"
+            ):
+                MIDI_CONSOLE_TITLE_OVERRIDES[console_name] = (received_at, playing_title)
+            override = MIDI_CONSOLE_TITLE_OVERRIDES.get(console_name)
+            if override and override[0] == received_at:
+                console_state = dict(console_state)
+                console_state["title"] = override[1]
+                midi_console[console_name] = console_state
         snapshot["midi_console"] = midi_console if midi_console.get("service") == "cl-midi-console-monitor" else {}
     except (OSError, ValueError, TypeError, AttributeError):
         snapshot["midi_console"] = {}
@@ -1975,6 +1994,7 @@ def scan_playing_scene_from_tracks():
         should_query_name = False
         should_resolve_clip_duration = False
         scene_context = None
+        selection_to_advance = None
         detected_at = time.time()
         with lock:
             if int(state.get("set_generation", 0)) != generation:
@@ -2005,6 +2025,19 @@ def scan_playing_scene_from_tracks():
                     else None
                 )
                 state["sync_source"] = "Ableton direct"
+                selected_scene = int(state.get("selected_scene", -1))
+                scenes = state.get("scenes", {})
+                if selected_scene <= detected_slot and (detected_slot + 1) in scenes:
+                    selection_to_advance = detected_slot + 1
+                    next_name = str(scenes.get(selection_to_advance, "") or "").strip()
+                    state["selected_scene"] = selection_to_advance
+                    state["next_scene"] = selection_to_advance
+                    state["selected_scene_name"] = next_name or f"Scène {selection_to_advance + 1}"
+                    state["selected_scene_duration_seconds"] = parse_scene_duration_seconds(next_name)
+                    state["selected_scene_duration_index"] = selection_to_advance
+                    state["selected_scene_duration_is_clip"] = False
+                else:
+                    state["next_scene"] = selected_scene
                 scene_context = (
                     generation,
                     detected_slot,
@@ -2014,6 +2047,9 @@ def scan_playing_scene_from_tracks():
                 should_resolve_clip_duration = duration_seconds is None
         if scene_context is not None:
             send_midi_monitor_scene_context(*scene_context)
+        if selection_to_advance is not None:
+            send("/live/view/set/selected_scene", selection_to_advance)
+            schedule_selected_scene_duration_refresh(selection_to_advance, generation)
         # Nom réel demandé hors verrou.
         if should_query_name:
             query(

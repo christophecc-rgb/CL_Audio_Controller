@@ -108,7 +108,10 @@ int main(int argc, const char *argv[]) {
                 printStatus(session, peerName, @"connected");
             }
             if (once) break;
-            [NSThread sleepForTimeInterval:MAX(0.5, interval)];
+            // MIDINetworkSession completes Bonjour/RTP invitations
+            // asynchronously, so keep a run loop active between retries.
+            [[NSRunLoop currentRunLoop] runUntilDate:
+                [NSDate dateWithTimeIntervalSinceNow:MAX(0.5, interval)]];
         }
         printStatus(session, peerName, @"stopped");
         MIDIClientDispose(midiClient);

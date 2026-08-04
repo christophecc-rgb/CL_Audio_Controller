@@ -1,4 +1,5 @@
 #import <AppKit/AppKit.h>
+#import <ApplicationServices/ApplicationServices.h>
 #import <CoreMIDI/CoreMIDI.h>
 #import <arpa/inet.h>
 #import <netdb.h>
@@ -41,6 +42,36 @@ static void CLAppendDiagnostic(NSString *event, NSString *detail) {
         [handle writeData:data];
         [handle closeFile];
     }
+}
+
+static BOOL CLPostDoubleClickFromConnectorReason(NSString *reason) {
+    NSRegularExpression *expression = [NSRegularExpression regularExpressionWithPattern:@"CL_CLICK:([0-9]+),([0-9]+)" options:0 error:nil];
+    NSTextCheckingResult *match = [expression firstMatchInString:reason ?: @"" options:0 range:NSMakeRange(0, reason.length)];
+    if (!match || match.numberOfRanges < 3) return NO;
+    CGFloat x = [[reason substringWithRange:[match rangeAtIndex:1]] doubleValue];
+    CGFloat y = [[reason substringWithRange:[match rangeAtIndex:2]] doubleValue];
+    CGPoint point = CGPointMake(x, y);
+    NSRunningApplication *audioMIDISetup = [NSRunningApplication runningApplicationsWithBundleIdentifier:@"com.apple.audio.AudioMIDISetup"].firstObject;
+    [audioMIDISetup activateWithOptions:NSApplicationActivateIgnoringOtherApps];
+    usleep(350000);
+    for (int click = 1; click <= 2; click++) {
+        CGEventRef down = CGEventCreateMouseEvent(NULL, kCGEventLeftMouseDown, point, kCGMouseButtonLeft);
+        CGEventRef up = CGEventCreateMouseEvent(NULL, kCGEventLeftMouseUp, point, kCGMouseButtonLeft);
+        if (!down || !up) {
+            if (down) CFRelease(down);
+            if (up) CFRelease(up);
+            return NO;
+        }
+        CGEventSetIntegerValueField(down, kCGMouseEventClickState, click);
+        CGEventSetIntegerValueField(up, kCGMouseEventClickState, click);
+        CGEventPost(kCGSessionEventTap, down);
+        usleep(30000);
+        CGEventPost(kCGSessionEventTap, up);
+        CFRelease(down);
+        CFRelease(up);
+        usleep(120000);
+    }
+    return YES;
 }
 
 @interface CLNetworkDelegate : NSObject <NSApplicationDelegate, NSNetServiceBrowserDelegate, NSNetServiceDelegate>
@@ -93,11 +124,9 @@ static void CLAppendDiagnostic(NSString *event, NSString *detail) {
 @property NSString *guardianHost;
 @property NSUInteger guardianPort;
 @property NSString *guardianManagedPeer;
-@property NSTask *legacyWakeTask;
-@property BOOL legacyWakeRunning;
-@property BOOL legacyWakeCompleted;
-@property NSUInteger legacyWakeAttempts;
-@property NSDate *legacyWakeNextAttemptAt;
+@property BOOL systemConnectRunning;
+@property NSMutableSet<NSString *> *systemConnectAttemptedPeers;
+@property NSMutableDictionary<NSString *, NSNumber *> *systemConnectRetryCounts;
 @property NSTextField *technicalSession;
 @property NSTextField *technicalEndpoints;
 @property NSTextField *technicalPeers;
@@ -444,6 +473,8 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     self.peerHosts = [NSMutableDictionary dictionary];
     self.rtpPeerHosts = [NSMutableDictionary dictionary];
     self.rtpPeerPorts = [NSMutableDictionary dictionary];
+    self.systemConnectAttemptedPeers = [NSMutableSet set];
+    self.systemConnectRetryCounts = [NSMutableDictionary dictionary];
     self.serviceBrowser = [[NSNetServiceBrowser alloc] init];
     self.serviceBrowser.delegate = self;
     [self.serviceBrowser searchForServicesOfType:@"_apple-midi._udp." inDomain:@"local."];
@@ -702,7 +733,7 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     self.detail.stringValue = detail;
 }
 
-- (void)refreshTimer:(NSTimer *)timer { (void)timer; [self refreshEndpoints]; [self refreshAbletonSceneTitle]; [self ensureGuardianRunning]; [self ensureLegacyWakeIfNeeded]; if (!self.ownsPassiveReturnMonitor) [self loadPublishedConsoleReturnState]; }
+- (void)refreshTimer:(NSTimer *)timer { (void)timer; [self refreshEndpoints]; [self refreshAbletonSceneTitle]; [self ensureGuardianRunning]; if (!self.ownsPassiveReturnMonitor) [self loadPublishedConsoleReturnState]; }
 - (void)refreshNow:(id)sender {
     (void)sender;
     [self refreshEndpoints];
@@ -779,45 +810,6 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     [self restartGuardianForPeer:peer];
 }
 
-- (void)ensureLegacyWakeIfNeeded {
-    if (self.legacyWakeRunning || self.legacyWakeCompleted) return;
-    NSString *peer = [[NSUserDefaults standardUserDefaults] stringForKey:@"preferredRtpPeer"];
-    if (!peer.length) return;
-    if (![self.discoveredPeers containsObject:peer]) return;
-    if (self.legacyWakeNextAttemptAt && [self.legacyWakeNextAttemptAt timeIntervalSinceNow] > 0) return;
-    NSString *openSource = [NSString stringWithContentsOfFile:[self toolPath:@"open_rtp_settings.applescript"] encoding:NSUTF8StringEncoding error:nil] ?: @"";
-    NSString *connectTemplate = [NSString stringWithContentsOfFile:[self toolPath:@"connect_rtp_peer.applescript"] encoding:NSUTF8StringEncoding error:nil] ?: @"";
-    if (!openSource.length || !connectTemplate.length) return;
-
-    self.legacyWakeRunning = YES;
-    self.lastTest.stringValue = [NSString stringWithFormat:@"Réveil de la session RTP historique vers %@…", peer];
-    NSDictionary *openError = nil;
-    [[[NSAppleScript alloc] initWithSource:openSource] executeAndReturnError:&openError];
-    NSString *escapedPeer = [[peer stringByReplacingOccurrencesOfString:@"\\" withString:@"\\\\"]
-                              stringByReplacingOccurrencesOfString:@"\"" withString:@"\\\""];
-    NSString *connectSource = [connectTemplate stringByReplacingOccurrencesOfString:@"__CL_PEER__" withString:escapedPeer];
-    NSDictionary *connectError = nil;
-    NSAppleEventDescriptor *result = openError ? nil : [[[NSAppleScript alloc] initWithSource:connectSource] executeAndReturnError:&connectError];
-    NSString *output = result.stringValue ?: @"";
-    self.legacyWakeRunning = NO;
-    BOOL success = !openError && !connectError &&
-        ([output hasPrefix:@"connected:"] || [output hasPrefix:@"already-connected:"]);
-    if (success) {
-        self.legacyWakeCompleted = YES;
-        self.legacyWakeAttempts = 0;
-        self.legacyWakeNextAttemptAt = nil;
-        self.lastTest.stringValue = [NSString stringWithFormat:@"✓ Session RTP historique réveillée · %@", peer];
-        CLAppendDiagnostic(@"legacy-wake-success", output);
-    } else {
-        self.legacyWakeAttempts += 1;
-        self.legacyWakeNextAttemptAt = [NSDate dateWithTimeIntervalSinceNow:MIN(60.0, 5.0 * self.legacyWakeAttempts)];
-        NSString *reason = openError[NSAppleScriptErrorMessage] ?: connectError[NSAppleScriptErrorMessage] ?: output ?: @"erreur inconnue";
-        self.lastTest.stringValue = [NSString stringWithFormat:@"Réveil RTP historique incomplet · %@", reason];
-        CLAppendDiagnostic(@"legacy-wake-retry", [NSString stringWithFormat:@"peer=%@ attempt=%lu reason=%@", peer, (unsigned long)self.legacyWakeAttempts, reason]);
-    }
-    if (self.showModeEnabled) [self updateCompactSummary];
-}
-
 - (void)refreshTargetMenu {
     NSString *selected = [[NSUserDefaults standardUserDefaults] stringForKey:@"preferredRtpPeer"];
     NSMutableArray<NSString *> *available = [self.discoveredPeers.array mutableCopy];
@@ -847,12 +839,12 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
         ? [NSString stringWithFormat:@"%lu détecté(s)\n%@", (unsigned long)names.count, [names componentsJoinedByString:@" · "]]
         : @"Aucun correspondant _apple-midi._udp détecté";
     if (adoptedPeer) {
-        self.legacyWakeCompleted = NO;
-        self.legacyWakeAttempts = 0;
-        self.legacyWakeNextAttemptAt = nil;
         [self restartGuardianForPeer:selected];
     }
-    [self ensureLegacyWakeIfNeeded];
+    if (selected.length && [names containsObject:selected] &&
+        ![self.systemConnectAttemptedPeers containsObject:selected]) {
+        [self connectPeerThroughSystem:selected automatic:YES];
+    }
     [self writeConsoleReturnState];
 }
 
@@ -923,9 +915,67 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
         if ([service.type isEqualToString:@"_apple-midi._udp."]) {
             [self.rtpPeerHosts removeObjectForKey:service.name];
             [self.rtpPeerPorts removeObjectForKey:service.name];
+            [self.systemConnectAttemptedPeers removeObject:service.name];
+            [self.systemConnectRetryCounts removeObjectForKey:service.name];
         }
     }
     if (!moreComing) [self refreshTargetMenu];
+}
+
+- (void)connectPeerThroughSystem:(NSString *)peer automatic:(BOOL)automatic {
+    if (!peer.length || [peer hasPrefix:@"Aucun"] || [peer hasPrefix:@"Recherche"] || self.systemConnectRunning) return;
+    if (automatic && [self.systemConnectAttemptedPeers containsObject:peer]) return;
+    [self.systemConnectAttemptedPeers addObject:peer];
+    self.systemConnectRunning = YES;
+    self.connectButton.enabled = NO;
+    self.lastTest.stringValue = [NSString stringWithFormat:@"Connexion système vers %@…", peer];
+    CLAppendDiagnostic(@"rtp-connect-start", [NSString stringWithFormat:@"peer=%@ method=SystemMIDI double-click", peer]);
+    [self restartGuardianForPeer:peer];
+
+    NSString *template = [NSString stringWithContentsOfFile:[self toolPath:@"connect_rtp_peer.applescript"]
+                                                    encoding:NSUTF8StringEncoding error:nil] ?: @"";
+    NSString *escapedPeer = [[peer stringByReplacingOccurrencesOfString:@"\\" withString:@"\\\\"]
+                              stringByReplacingOccurrencesOfString:@"\"" withString:@"\\\""];
+    NSString *source = [template stringByReplacingOccurrencesOfString:@"__CL_PEER__" withString:escapedPeer];
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        NSDictionary *scriptError = nil;
+        NSAppleEventDescriptor *result = source.length
+            ? [[[NSAppleScript alloc] initWithSource:source] executeAndReturnError:&scriptError]
+            : nil;
+        NSString *output = result.stringValue ?: @"";
+        dispatch_async(dispatch_get_main_queue(), ^{
+            self.systemConnectRunning = NO;
+            self.connectButton.enabled = self.discoveredPeers.count > 0;
+            BOOL connected = !scriptError && ([output hasPrefix:@"connected:"] || [output hasPrefix:@"already-connected:"]);
+            if (connected) {
+                [self.systemConnectRetryCounts removeObjectForKey:peer];
+                self.lastTest.stringValue = [NSString stringWithFormat:@"✓ %@ connecté par macOS · test MIDI requis", peer];
+                CLAppendDiagnostic(@"rtp-connect-success", output);
+            } else {
+                NSString *reason = scriptError[NSAppleScriptErrorMessage] ?: (output.length ? output : @"connecteur indisponible");
+                BOOL postedPhysicalClick = CLPostDoubleClickFromConnectorReason(reason);
+                NSUInteger retry = [self.systemConnectRetryCounts[peer] unsignedIntegerValue] + 1;
+                self.systemConnectRetryCounts[peer] = @(retry);
+                BOOL willRetry = automatic && retry <= 8 && [self.discoveredPeers containsObject:peer];
+                self.lastTest.stringValue = willRetry
+                    ? [NSString stringWithFormat:@"Connexion en attente · nouvel essai automatique %lu/8", (unsigned long)retry]
+                    : [NSString stringWithFormat:@"Connexion système incomplète · %@", reason];
+                CLAppendDiagnostic(@"rtp-connect-pending", [NSString stringWithFormat:@"peer=%@ reason=%@", peer, reason]);
+                if (postedPhysicalClick) {
+                    CLAppendDiagnostic(@"rtp-connect-physical-click", [NSString stringWithFormat:@"peer=%@", peer]);
+                }
+                if (willRetry) {
+                    NSTimeInterval delay = postedPhysicalClick ? 1.0 : MIN(30.0, 5.0 + retry * 3.0);
+                    CLAppendDiagnostic(@"rtp-connect-retry-scheduled", [NSString stringWithFormat:@"peer=%@ attempt=%lu delay=%.0f", peer, (unsigned long)retry, delay]);
+                    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                        [self.systemConnectAttemptedPeers removeObject:peer];
+                        [self connectPeerThroughSystem:peer automatic:YES];
+                    });
+                }
+            }
+            [self writeConsoleReturnState];
+        });
+    });
 }
 
 - (void)connectSelectedPeer:(id)sender {
@@ -933,29 +983,8 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     NSString *peer = self.targetMenu.selectedItem.title ?: @"";
     if (!peer.length || [peer hasPrefix:@"Aucun"] || [peer hasPrefix:@"Recherche"]) return;
     [[NSUserDefaults standardUserDefaults] setObject:peer forKey:@"preferredRtpPeer"];
-    self.connectButton.enabled = NO;
-    self.lastTest.stringValue = [NSString stringWithFormat:@"Connexion RTP vers %@…", peer];
-    CLAppendDiagnostic(@"rtp-connect-start", peer);
-    NSString *helper = [NSString stringWithContentsOfFile:[self toolPath:@"connect_rtp_peer.applescript"]
-                                                  encoding:NSUTF8StringEncoding error:nil] ?: @"";
-    NSString *escapedPeer = [[peer stringByReplacingOccurrencesOfString:@"\\" withString:@"\\\\"]
-                              stringByReplacingOccurrencesOfString:@"\"" withString:@"\\\""];
-    NSString *source = [helper stringByReplacingOccurrencesOfString:@"__CL_PEER__" withString:escapedPeer];
-    NSDictionary *scriptError = nil;
-    NSAppleEventDescriptor *result = [[[NSAppleScript alloc] initWithSource:source] executeAndReturnError:&scriptError];
-    NSString *output = result.stringValue ?: @"";
-    self.connectButton.enabled = YES;
-    if (scriptError == nil && [output rangeOfString:@"already-connected:"].location != NSNotFound) {
-        self.lastTest.stringValue = [NSString stringWithFormat:@"%@ est déjà connecté · test MIDI requis", peer];
-        CLAppendDiagnostic(@"rtp-connect-already-connected", output);
-    } else if (scriptError == nil && [output rangeOfString:@"connected:"].location != NSNotFound) {
-        self.lastTest.stringValue = [NSString stringWithFormat:@"Connexion RTP établie avec %@ · test MIDI requis", peer];
-        CLAppendDiagnostic(@"rtp-connect-success", output);
-    } else {
-        NSString *reason = scriptError[NSAppleScriptErrorMessage] ?: @"erreur inconnue";
-        self.lastTest.stringValue = [NSString stringWithFormat:@"Connexion impossible : %@", reason];
-        CLAppendDiagnostic(@"rtp-connect-failure", [NSString stringWithFormat:@"peer=%@ error=%@ output=%@", peer, reason, output]);
-    }
+    [self.systemConnectAttemptedPeers removeObject:peer];
+    [self connectPeerThroughSystem:peer automatic:NO];
 }
 
 - (void)refreshEndpoints {
@@ -983,8 +1012,11 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     BOOL hasSource = [sources containsObject:endpoint];
     BOOL hasDestination = [destinations containsObject:endpoint];
     MIDINetworkSession *session = [MIDINetworkSession defaultSession];
-    self.technicalSession.stringValue = [NSString stringWithFormat:@"Réglages : gérés par macOS\nCorrespondants API détectés : %lu\nValidation : test aller-retour",
-        (unsigned long)session.connections.count];
+    NSString *validation = (self.validatedEndpoint && [self.validatedEndpoint isEqualToString:endpoint])
+        ? @"Connexion confirmée par aller-retour MIDI"
+        : @"Connexion à confirmer par test MIDI";
+    self.technicalSession.stringValue = [NSString stringWithFormat:@"Réglages : gérés par macOS\nIndication API macOS : %lu (peut être incomplète)\n%@",
+        (unsigned long)session.connections.count, validation];
     self.technicalEndpoints.stringValue = [NSString stringWithFormat:@"Entrées : %lu   Sorties : %lu\nPorts RTP détectés : %lu\nCoreMIDI : %@",
         (unsigned long)sources.count, (unsigned long)destinations.count, (unsigned long)candidates.count,
         (sources.count || destinations.count) ? @"opérationnel" : @"aucun port"];
@@ -1155,13 +1187,18 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
 }
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender { (void)sender; return !self.backgroundMonitorOnly; }
+- (BOOL)applicationShouldHandleReopen:(NSApplication *)sender hasVisibleWindows:(BOOL)hasVisibleWindows {
+    (void)sender;
+    if (!hasVisibleWindows) [self.window makeKeyAndOrderFront:nil];
+    [NSApp activateIgnoringOtherApps:YES];
+    return YES;
+}
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender {
     (void)sender;
     [self.timer invalidate];
     [self.serviceBrowser stop];
     [self.agentServiceBrowser stop];
     if (self.guardianTask.running) [self.guardianTask terminate];
-    if (self.legacyWakeTask.running) [self.legacyWakeTask terminate];
     if (self.returnMonitorSource && self.returnMonitorInputPort) {
         MIDIPortDisconnectSource(self.returnMonitorInputPort, self.returnMonitorSource);
     }
