@@ -2,7 +2,9 @@ tell application "Audio MIDI Setup" to activate
 delay 0.3
 
 tell application "System Events"
-	tell process "Audio MIDI Setup"
+	set midiProcesses to every process whose bundle identifier is "com.apple.audio.AudioMIDISetup"
+	if (count of midiProcesses) is 0 then error "Processus Configuration audio et MIDI introuvable"
+	tell item 1 of midiProcesses
 		set frontmost to true
 		repeat with candidateWindow in windows
 			set windowName to name of candidateWindow as text
@@ -12,7 +14,9 @@ tell application "System Events"
 				if exists static text "Sessions et répertoires" of candidateWindow then set isNetworkWindow to true
 			end try
 			if isNetworkWindow then
-				perform action "AXRaise" of candidateWindow
+				try
+					perform action "AXRaise" of candidateWindow
+				end try
 				return "raised"
 			end if
 		end repeat
@@ -88,7 +92,9 @@ tell application "System Events"
 					if exists static text "Sessions et répertoires" of candidateWindow then set isNetworkWindow to true
 				end try
 				if isNetworkWindow then
-					perform action "AXRaise" of candidateWindow
+					try
+						perform action "AXRaise" of candidateWindow
+					end try
 					return "opened"
 				end if
 			end repeat

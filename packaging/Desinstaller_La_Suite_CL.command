@@ -153,6 +153,8 @@ if [[ "${CL_SUITE_NONINTERACTIVE:-0}" != "1" ]]; then
 fi
 
 if [[ "$UNINSTALL_MIDI_CONSOLE" == "1" && "$INSTALL_HOME" == "$HOME" && "${CL_SUITE_SKIP_POSTINSTALL:-0}" != "1" ]]; then
+  /bin/launchctl bootout "gui/$(id -u)/com.claudio.midi-network-monitor" >/dev/null 2>&1 || true
+  rm -f "$HOME/Library/LaunchAgents/com.claudio.midi-network-monitor.plist"
   /usr/bin/osascript >/dev/null 2>&1 <<'APPLESCRIPT' || true
 tell application "System Events"
   if exists login item "CL MIDI Network Assistant" then

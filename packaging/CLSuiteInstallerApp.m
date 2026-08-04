@@ -104,7 +104,7 @@
                                 size:27 weight:NSFontWeightBold color:NSColor.whiteColor];
     NSString *introText = self.uninstaller
         ? @"Choisissez uniquement les éléments à retirer. Ils resteront récupérables dans la Corbeille."
-        : @"Choisissez votre version d’Ableton Live et les applications à installer.";
+        : @"Choisissez le rôle de ce Mac. Les rôles Télécommande et Ableton assurent tous deux l’émission et la réception RTP-MIDI.";
     NSTextField *intro = [self label:introText size:14 weight:NSFontWeightRegular color:[NSColor colorWithCalibratedWhite:0.72 alpha:1]];
     NSStackView *titles = [NSStackView stackViewWithViews:@[title, intro]];
     titles.orientation = NSUserInterfaceLayoutOrientationVertical;
@@ -145,11 +145,11 @@
     NSArray<NSArray<NSString *> *> *components = self.uninstaller ? @[
         @[@"autoscene", @"Paradis Latin AutoScene — Live 11/12", @"Périphérique Max for Live AutoScene.", @"ParadisLatin.jpg"],
         @[@"autoscene-live10", @"Paradis Latin AutoScene — Live 10", @"Variante dédiée à Ableton Live 10.", @"ParadisLatin.jpg"],
-        @[@"controller", @"Mac Télécommande", @"Show Control, serveur web et télécommandes distantes.", @"Controller.png"],
-        @[@"ableton-reader", @"Mac Ableton Lecteur", @"AbletonOSC, LTC, X-Fader et agent RTP léger.", @"Controller.png"],
+        @[@"controller", @"Mac Télécommande — RTP émetteur-récepteur", @"Show Control, découverte Bonjour et liaison RTP-MIDI bidirectionnelle avec retours consoles.", @"Controller.png"],
+        @[@"ableton-reader", @"Mac Ableton Lecteur — RTP émetteur-récepteur", @"AbletonOSC, LTC, X-Fader et agent RTP-MIDI bidirectionnel à démarrage automatique.", @"Controller.png"],
         @[@"builder", @"CL Arrangement Builder Live", @"Application Builder et Remote Script Ableton.", @"Builder.png"],
         @[@"midi-console", @"CL MIDI Console Monitor", @"Moniteur Max for Live et outils réseau MIDI.", @"MIDIConsole.png"],
-        @[@"simulator", @"Simulateur de console RTP", @"Répondant Program Change réservé aux essais sans console.", @"MIDIConsole.png"]
+        @[@"simulator", @"Simulateur de console RTP", @"Simule les retours Program Change CL5 (canal 1) et QL1 (canal 2) pour les essais sans console.", @"MIDIConsole.png"]
     ] : @[
         @[@"autoscene", @"Paradis Latin AutoScene", @"Périphérique Max for Live pour Ableton Live 11 et 12.", @"ParadisLatin.jpg"],
         @[@"controller", @"Mac Télécommande", @"Show Control, serveur web et télécommandes distantes.", @"Controller.png"],
@@ -303,13 +303,19 @@
             selfRef.actionButton.enabled = YES;
             if (finished.terminationStatus == 0) {
                 selfRef.statusLabel.stringValue = @"Opération terminée";
+                BOOL installedController = !selfRef.uninstaller && [selected containsObject:@"controller"];
+                BOOL installedAbletonReader = !selfRef.uninstaller && [selected containsObject:@"ableton-reader"];
                 BOOL installedNetworkAssistant = !selfRef.uninstaller && [selected containsObject:@"midi-console"];
-                BOOL installedReceiver = !selfRef.uninstaller && [selected containsObject:@"simulator"];
-                NSString *successMessage = installedNetworkAssistant
-                    ? @"CL MIDI Network Assistant a été installé comme outil de diagnostic à lancer à la demande. Acceptez l’autorisation Accessibilité si macOS la demande. Fermez puis relancez Ableton Live s’il était ouvert."
-                    : (installedReceiver
-                       ? @"Le répondant RTP léger a été installé et configuré pour démarrer automatiquement sur ce Mac receveur. Il fonctionne en arrière-plan, sans fenêtre."
-                       : (selfRef.uninstaller ? @"Les éléments retirés restent récupérables dans la Corbeille." : @"Fermez complètement Ableton Live si celui-ci était ouvert, puis relancez-le."));
+                BOOL installedSimulator = !selfRef.uninstaller && [selected containsObject:@"simulator"];
+                NSString *successMessage = installedController
+                    ? @"Le rôle Mac Télécommande est installé. La liaison RTP-MIDI émetteur-récepteur, la découverte Bonjour et les retours consoles démarrent automatiquement à l’ouverture de session."
+                    : (installedAbletonReader
+                       ? @"Le rôle Mac Ableton Lecteur est installé. Son agent RTP-MIDI émetteur-récepteur démarre automatiquement à l’ouverture de session. Fermez puis relancez Ableton Live s’il était ouvert."
+                       : (installedNetworkAssistant
+                          ? @"CL MIDI Network Assistant a été installé comme outil de diagnostic. Acceptez l’autorisation Accessibilité si macOS la demande."
+                          : (installedSimulator
+                             ? @"Le simulateur de consoles RTP a été installé pour les essais manuels CL5 et QL1."
+                             : (selfRef.uninstaller ? @"Les éléments retirés restent récupérables dans la Corbeille." : @"Fermez complètement Ableton Live si celui-ci était ouvert, puis relancez-le."))));
                 [selfRef showAlert:(selfRef.uninstaller ? @"Désinstallation terminée" : @"Installation terminée")
                               message:successMessage
                                 style:NSAlertStyleInformational];

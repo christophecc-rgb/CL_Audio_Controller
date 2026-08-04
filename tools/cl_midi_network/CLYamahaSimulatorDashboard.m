@@ -41,6 +41,7 @@ static NSArray<NSString *> *CLMidiEndpointNames(void) {
 @property NSArray<NSString *> *endpoints;
 @property NSTextField *summary;
 @property NSArray<NSDictionary *> *savedConfigs;
+@property BOOL migrateLegacyConsoleChannels;
 @end
 
 @implementation CLYamahaSimulatorDelegate
@@ -70,6 +71,7 @@ static NSArray<NSString *> *CLMidiEndpointNames(void) {
     self.rows = [NSMutableArray array];
     self.endpoints = CLMidiEndpointNames();
     self.savedConfigs = [NSUserDefaults.standardUserDefaults arrayForKey:@"CLYamahaSimulatorConsoles"] ?: @[];
+    self.migrateLegacyConsoleChannels = [NSUserDefaults.standardUserDefaults integerForKey:@"CLYamahaSimulatorConfigVersion"] < 2;
     self.window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 760, 500)
                                               styleMask:(NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable)
                                                 backing:NSBackingStoreBuffered defer:NO];
@@ -96,6 +98,8 @@ static NSArray<NSString *> *CLMidiEndpointNames(void) {
     [content addSubview:self.rowsView];
     NSUInteger initialCount = self.savedConfigs.count ? MIN(self.savedConfigs.count, 6) : 2;
     for (NSUInteger index = 0; index < initialCount; index++) [self addRowWithDefaults:index];
+    [NSUserDefaults.standardUserDefaults setInteger:2 forKey:@"CLYamahaSimulatorConfigVersion"];
+    [self saveConfiguration];
 
     [content addSubview:[self button:@"＋ Ajouter une console" frame:NSMakeRect(24, 58, 170, 34) action:@selector(addConsole:)]];
     [content addSubview:[self button:@"Tout démarrer" frame:NSMakeRect(204, 58, 130, 34) action:@selector(startAll:)]];
@@ -145,7 +149,7 @@ static NSArray<NSString *> *CLMidiEndpointNames(void) {
     row.channelMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(427, 7, 75, 27) pullsDown:NO];
     [row.channelMenu addItemWithTitle:@"Tous"];
     for (NSUInteger channel = 1; channel <= 16; channel++) [row.channelMenu addItemWithTitle:[NSString stringWithFormat:@"%lu", (unsigned long)channel]];
-    [row.channelMenu selectItemWithTitle:@"1"];
+    [row.channelMenu selectItemWithTitle:index == 1 ? @"2" : @"1"];
     [line addSubview:row.channelMenu];
 
     row.delayField = [[NSTextField alloc] initWithFrame:NSMakeRect(510, 8, 65, 25)];
@@ -165,6 +169,11 @@ static NSArray<NSString *> *CLMidiEndpointNames(void) {
         if ([self.endpoints containsObject:endpoint]) [row.endpointMenu selectItemWithTitle:endpoint];
         if ([row.channelMenu itemWithTitle:channel]) [row.channelMenu selectItemWithTitle:channel];
         if (delay) row.delayField.stringValue = delay.stringValue;
+        if (self.migrateLegacyConsoleChannels) {
+            NSString *canonicalName = row.nameField.stringValue.uppercaseString;
+            if ([canonicalName containsString:@"QL1"]) [row.channelMenu selectItemWithTitle:@"2"];
+            else if ([canonicalName containsString:@"CL5"]) [row.channelMenu selectItemWithTitle:@"1"];
+        }
     }
     [self.rows addObject:row];
     [self updateSummary];

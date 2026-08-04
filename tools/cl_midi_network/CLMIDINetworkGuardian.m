@@ -1,6 +1,9 @@
 #import <Foundation/Foundation.h>
 #import <CoreMIDI/CoreMIDI.h>
 #import <signal.h>
+#import <sys/file.h>
+#import <fcntl.h>
+#import <unistd.h>
 
 static volatile sig_atomic_t keepRunning = 1;
 
@@ -43,6 +46,8 @@ static void printStatus(MIDINetworkSession *session, NSString *peerName, NSStrin
 
 int main(int argc, const char *argv[]) {
     @autoreleasepool {
+        int singletonLock = open("/private/tmp/CL_MIDI_Network_Guardian.lock", O_CREAT | O_RDWR, 0600);
+        if (singletonLock < 0 || flock(singletonLock, LOCK_EX | LOCK_NB) != 0) return 0;
         NSArray<NSString *> *arguments = [[NSProcessInfo processInfo] arguments];
         if (hasFlag(arguments, @"--help")) {
             puts("Usage: CLMIDINetworkGuardian --peer-name NAME [--peer-host HOST] [--peer-port 5004] [--once]");

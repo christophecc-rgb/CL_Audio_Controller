@@ -50,6 +50,17 @@ ditto "$APP_SOURCE" "$APP_TARGET"
 chmod 700 "$TOOLS_TARGET"
 chmod +x "$TOOLS_TARGET"/CLMIDI* "$APP_TARGET/Contents/MacOS/CL MIDI Network Assistant"
 
+if [[ "$INSTALL_HOME" == "$HOME" && "${CL_SUITE_SKIP_POSTINSTALL:-0}" != "1" ]]; then
+  /usr/bin/open -gj "$APP_TARGET" --args --background-monitor \
+    || fail "impossible de lancer le moniteur réseau MIDI"
+  for _ in 1 2 3 4 5; do
+    [[ -f "$HOME/Library/LaunchAgents/com.claudio.midi-network-monitor.plist" ]] && break
+    sleep 1
+  done
+  [[ -f "$HOME/Library/LaunchAgents/com.claudio.midi-network-monitor.plist" ]] \
+    || fail "le démarrage automatique du moniteur réseau MIDI n’a pas été enregistré"
+fi
+
 echo
 echo "Installation terminée :"
 echo "  Max for Live : $ABLETON_TARGET"

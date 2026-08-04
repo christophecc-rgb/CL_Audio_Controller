@@ -190,6 +190,24 @@ def ensure_midi_console_monitor():
     return True
 
 
+def stop_midi_console_monitor():
+    """Arrête uniquement le moniteur démarré par cette instance du launcher."""
+    global MIDI_CONSOLE_MONITOR_PROCESS
+    process = MIDI_CONSOLE_MONITOR_PROCESS
+    MIDI_CONSOLE_MONITOR_PROCESS = None
+    if process is None or process.poll() is not None:
+        return
+    process.terminate()
+    try:
+        process.wait(timeout=2)
+    except subprocess.TimeoutExpired:
+        launcher_diagnostic_log({
+            "source": "MidiConsoleMonitor",
+            "event": "monitor-stop-timeout",
+            "monitorProcessId": process.pid,
+        })
+
+
 def ownership_headers(record):
     return {
         "X-CL-Launch-ID": record["launch_id"],
@@ -1044,7 +1062,7 @@ button{font:inherit}
 .ltc-destination{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;min-height:30px;padding:0 8px;border-radius:7px;border:1px solid rgba(84,224,132,.42);background:rgba(46,154,84,.10);font-size:9px;color:#9aa2ae;cursor:pointer;user-select:none}.ltc-destination:hover{border-color:#72e49a;background:rgba(46,154,84,.18)}.ltc-destination strong{font:11px Menlo,monospace;color:#72e49a}.ltc-destination span:first-child{font-weight:760;letter-spacing:.035em}
 .network-buttons{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:6px}.network-buttons .action{height:31px;font-size:10px}
 .badge{padding:4px 8px;border-radius:999px;background:rgba(67,200,111,.12);color:#7ee39e;border:1px solid rgba(67,200,111,.28);font-size:10px}
-.console-card{padding:10px}.console-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}.console-head strong{font-size:10px;letter-spacing:.075em}.rtp-control{display:flex;align-items:center;gap:6px}.rtp-badge{font-size:9px;color:#d7a64c}.rtp-badge.ok{color:#70d89a}.rtp-badge.error{color:#ed7e7e}.rtp-open{height:24px;padding:0 8px;border:1px solid #3f4b5d;border-radius:7px;background:#242b35;color:#cfd6e1;font-size:9px;cursor:pointer}.console-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.console-return{border:1px solid #343b47;border-radius:9px;background:#12161c;padding:8px}.console-program{font-size:15px;font-weight:800;color:#edc65b}.console-title{font-size:10px;color:#c4cad4;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.console-state{font-size:9px;color:#7d8592;margin-top:4px}.console-return.ok{border-color:rgba(80,196,123,.76);box-shadow:inset 0 0 0 1px rgba(80,196,123,.16)}.console-return.ok .console-state{color:#70d89a}.console-return.stale{border-color:rgba(235,171,61,.55)}.console-return.stale .console-state{color:#d5a64f}
+.console-card{padding:10px}.console-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}.console-head strong{font-size:10px;letter-spacing:.075em}.rtp-control{display:flex;align-items:center;gap:6px}.rtp-badge{font-size:9px;color:#d7a64c}.rtp-badge.ok{color:#70d89a}.rtp-badge.error{color:#ed7e7e}.rtp-open{height:24px;padding:0 8px;border:1px solid #3f4b5d;border-radius:7px;background:#242b35;color:#cfd6e1;font-size:9px;cursor:pointer}.console-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.console-return{border:1px solid #343b47;border-radius:9px;background:#12161c;padding:8px}.console-program{font-size:15px;font-weight:800;color:#edc65b}.console-title{font-size:10px;color:#c4cad4;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.console-state{font-size:9px;color:#7d8592;margin-top:4px}.console-return.ok{border-color:rgba(80,196,123,.76);box-shadow:inset 0 0 0 1px rgba(80,196,123,.16)}.console-return.ok .console-state{color:#70d89a}.console-return.remembered{border-color:rgba(80,196,123,.38)}.console-return.remembered .console-state{color:#9eb8a8}
 details{background:var(--card2);border:1px solid #292e37;border-radius:12px;overflow:hidden}
 details[open]{overflow:visible}
 summary{height:34px;padding:0 11px;display:flex;align-items:center;cursor:pointer;font-size:12px;color:#c5cad3;list-style:none}
@@ -1138,8 +1156,8 @@ body.show-mode .show-toggle{border-color:rgba(229,166,59,.72);background:rgba(22
   <section class="card console-card">
     <div class="console-head"><strong>MIDI &amp; CONSOLES</strong><div class="rtp-control"><span id="rtpBadge" class="rtp-badge">RTP · attente</span><button class="rtp-open" onclick="runAction('/midi-network-assistant','Ouverture du diagnostic RTP')">Diagnostic</button></div></div>
     <div class="console-grid">
-      <div id="cl5Return" class="console-return"><div id="cl5Program" class="console-program">CL5 · scène n° —</div><div id="cl5Title" class="console-title">Contexte Ableton en attente</div><div id="cl5State" class="console-state">Aucun retour Program Change</div></div>
-      <div id="ql1Return" class="console-return"><div id="ql1Program" class="console-program">QL1 · scène n° —</div><div id="ql1Title" class="console-title">Contexte Ableton en attente</div><div id="ql1State" class="console-state">Aucun retour Program Change</div></div>
+      <div id="cl5Return" class="console-return"><div id="cl5Program" class="console-program">CL5 · scène n° —</div><div id="cl5Title" class="console-title">Contexte Ableton en attente</div><div id="cl5State" class="console-state">En attente du premier retour</div></div>
+      <div id="ql1Return" class="console-return"><div id="ql1Program" class="console-program">QL1 · scène n° —</div><div id="ql1Title" class="console-title">Contexte Ableton en attente</div><div id="ql1State" class="console-state">En attente du premier retour</div></div>
     </div>
   </section>
 
@@ -1191,7 +1209,8 @@ function render(s){
   const rtp=midi.rtp||{},rtpBadge=el('rtpBadge');
   rtpBadge.textContent=rtp.validated?('RTP VALIDÉ · '+(rtp.peer||'cible')):(rtp.loop_detected?'RTP · BOUCLE':(rtp.available?('RTP DISPONIBLE · '+(rtp.peer||'cible')):'RTP HORS LIGNE'));
   rtpBadge.className='rtp-badge '+(rtp.validated?'ok':(rtp.loop_detected?'error':''));
-  const returnPresentation=(value)=>{const at=Number(value.received_at||0),age=at?Math.max(0,Date.now()/1000-at):Infinity,fresh=value.received&&age<=5;return {className:fresh?'ok':(value.received?'stale':''),text:fresh?'✓ Retour confirmé':(value.received?(at?'Dernier retour · il y a '+Math.floor(age)+' s':'Dernier retour · ancien'):'Aucun retour Program Change')};};
+  const formatMidiAge=(seconds)=>{seconds=Math.max(0,Math.floor(seconds));if(seconds<60)return seconds<2?'à l’instant':'il y a '+seconds+' s';const minutes=Math.floor(seconds/60);if(minutes<60)return'il y a '+minutes+' min';const hours=Math.floor(minutes/60),rest=minutes%60;return'il y a '+hours+' h'+(rest?' '+rest+' min':'');};
+  const returnPresentation=(value)=>{const at=Number(value.received_at||0),age=at?Math.max(0,Date.now()/1000-at):Infinity,recent=value.received&&age<=12;if(!value.received)return {className:'',text:'En attente du premier retour'};return {className:recent?'ok':'remembered',text:recent?'✓ Scène reçue · '+formatMidiAge(age):'Dernière scène reçue · '+(at?formatMidiAge(age):'heure inconnue')};};
   const cl5Return=returnPresentation(cl5),ql1Return=returnPresentation(ql1);
   el('cl5Return').className='console-return '+cl5Return.className;el('ql1Return').className='console-return '+ql1Return.className;
   el('cl5Program').textContent='CL5 · scène n° '+(cl5.program??'—');el('ql1Program').textContent='QL1 · scène n° '+(ql1.program??'—');
@@ -1622,6 +1641,7 @@ def quit_launcher():
 
     def close_owned_processes():
         stop_owned_server()
+        stop_midi_console_monitor()
         os._exit(0)
 
     threading.Timer(0.5, close_owned_processes).start()
@@ -1669,3 +1689,4 @@ if __name__ == "__main__":
     panel_api.window = panel_window
     webview.start(gui="cocoa", debug=False)
     stop_owned_server()
+    stop_midi_console_monitor()

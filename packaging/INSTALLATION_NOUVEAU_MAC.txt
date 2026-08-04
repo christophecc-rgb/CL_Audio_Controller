@@ -27,13 +27,28 @@ INSTALLATION AUTOMATIQUE RECOMMANDÉE
 2. Double-cliquer sur « Installer la Suite CL.app ».
 3. Si macOS refuse le premier lancement :
    clic droit sur le fichier > Ouvrir > Ouvrir.
-4. Choisir Ableton Live 12, puis les composants souhaités.
+4. Choisir le rôle de ce Mac, puis Ableton Live 12 si le rôle le demande.
 5. Relancer Ableton Live.
 6. Ouvrir Réglages > Link, Tempo et MIDI.
 7. Choisir AbletonOSC comme surface de contrôle si CL Audio Controller a été
    installé.
 8. Ouvrir les applications depuis le dossier Applications de votre compte.
 9. Conserver le profil Local pour une installation sur un seul Mac.
+
+
+RÔLES RTP-MIDI
+
+- Mac Télécommande — RTP émetteur-récepteur : installe Show Control, la
+  découverte automatique Bonjour et les retours MIDI des consoles. La liaison
+  réseau démarre automatiquement à l'ouverture de session.
+- Mac Ableton Lecteur — RTP émetteur-récepteur : installe AbletonOSC, LTC,
+  X-Fader et l'agent RTP-MIDI bidirectionnel. L'agent démarre automatiquement à
+  l'ouverture de session.
+- Simulateur de console RTP : outil d'essai manuel qui simule les retours
+  Program Change CL5 sur le canal 1 et QL1 sur le canal 2.
+
+Les noms des ordinateurs ne sont pas inscrits en dur dans le kit : les autres
+Macs sont découverts sur le réseau par Bonjour.
 
 
 EMPLACEMENTS UTILISÉS

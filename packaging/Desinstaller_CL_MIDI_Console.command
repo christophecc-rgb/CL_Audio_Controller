@@ -8,7 +8,12 @@ TARGETS=(
   "$INSTALL_HOME/Music/Ableton/User Library/Presets/MIDI Effects/Max MIDI Effect/CL MIDI Console Monitor"
   "$INSTALL_HOME/Library/Application Support/CL MIDI Console/Network Tools"
   "$INSTALL_HOME/Applications/CL MIDI Network Assistant.app"
+  "$INSTALL_HOME/Library/LaunchAgents/com.claudio.midi-network-monitor.plist"
 )
+
+if [[ "$INSTALL_HOME" == "$HOME" && "${CL_SUITE_SKIP_POSTINSTALL:-0}" != "1" ]]; then
+  /bin/launchctl bootout "gui/$(id -u)/com.claudio.midi-network-monitor" >/dev/null 2>&1 || true
+fi
 
 echo "CL MIDI CONSOLE — DÉSINSTALLATION"
 echo "Les éléments installés seront déplacés dans la Corbeille."

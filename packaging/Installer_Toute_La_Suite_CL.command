@@ -241,19 +241,19 @@ say ""; say "User Library retenue : $ABLETON_LIBRARY"
 INSTALL_REMOTE=0; INSTALL_CONTROLLER=0; INSTALL_ABLETON_READER=0; INSTALL_BUILDER=0; INSTALL_AUTOSCENE=0; INSTALL_AUTOSCENE_LIVE10=0; INSTALL_MIDI_CONSOLE=0; INSTALL_MIDI_RECEIVER=0
 CHOICE="${CL_SUITE_COMPONENTS:-}"
 if [[ -z "$CHOICE" ]]; then
-  echo; echo "Composants à installer :"; echo "  1 — Suite complète"; echo "  2 — Télécommande CL Audio uniquement"; echo "  3 — Arrangement Builder uniquement"; echo "  4 — AutoScene uniquement"; echo "  5 — CL MIDI Console uniquement"; echo "  6 — Annuler"
+  echo; echo "Rôle ou composant à installer :"; echo "  1 — Suite complète"; echo "  2 — Télécommande CL Audio uniquement"; echo "  3 — Arrangement Builder uniquement"; echo "  4 — AutoScene uniquement"; echo "  5 — CL MIDI Console uniquement"; echo "  6 — Mac Ableton Lecteur — RTP émetteur-récepteur"; echo "  7 — Simulateur de console RTP"; echo "  8 — Annuler"
   read -r -p "Votre choix : " CHOICE
 fi
 case "$CHOICE" in
   1|all|complete) INSTALL_CONTROLLER=1; INSTALL_ABLETON_READER=1; INSTALL_BUILDER=1; INSTALL_AUTOSCENE=1; INSTALL_MIDI_CONSOLE=1 ;;
   2|remote) INSTALL_REMOTE=1 ;;
   controller|show-control) INSTALL_CONTROLLER=1 ;;
-  ableton-reader|reader) INSTALL_ABLETON_READER=1; INSTALL_BUILDER=1; INSTALL_AUTOSCENE=1 ;;
+  6|ableton-reader|reader) INSTALL_ABLETON_READER=1; INSTALL_BUILDER=1; INSTALL_AUTOSCENE=1 ;;
   3|builder) INSTALL_BUILDER=1 ;;
   4|autoscene) INSTALL_AUTOSCENE=1 ;;
   5|midi-console) INSTALL_MIDI_CONSOLE=1 ;;
-  midi-receiver|receiver|simulator) INSTALL_MIDI_RECEIVER=1 ;;
-  6|cancel) exit 0 ;;
+  7|midi-receiver|receiver|simulator) INSTALL_MIDI_RECEIVER=1 ;;
+  8|cancel) exit 0 ;;
   *)
     normalized=",$CHOICE,"
     [[ "$normalized" == *,remote,* ]] && INSTALL_REMOTE=1
@@ -290,6 +290,15 @@ fi
 if [[ "$INSTALL_ABLETON_READER" == 1 ]]; then
   install_item "$APPLICATIONS_SOURCE/CL MIDI RTP Agent.app" "$USER_APPS/CL MIDI RTP Agent.app" "Ableton Lecteur — Agent RTP léger" "ableton-reader"
   install_item "$APPLICATIONS_SOURCE/CL MIDI RTP Simulator.app" "$USER_APPS/CL MIDI RTP Simulator.app" "Ableton Lecteur — Simulateur RTP" "ableton-reader"
+  say ""; say "Ableton Lecteur — Activation du démarrage automatique RTP"
+  /usr/bin/open -gj "$USER_APPS/CL MIDI RTP Agent.app" || fail "impossible de démarrer CL MIDI RTP Agent"
+  for _ in 1 2 3 4 5; do
+    [[ -f "$INSTALL_HOME/Library/LaunchAgents/com.claudio.midi-rtp-agent.plist" ]] && break
+    sleep 1
+  done
+  [[ -f "$INSTALL_HOME/Library/LaunchAgents/com.claudio.midi-rtp-agent.plist" ]] \
+    || fail "CL MIDI RTP Agent n’a pas enregistré son démarrage automatique"
+  say "  ✓ Agent RTP actif et enregistré pour les prochaines ouvertures de session"
 fi
 if [[ "$INSTALL_BUILDER" == 1 ]]; then
   install_item "$APPLICATIONS_SOURCE/Arrangement Builder Live.app" "$USER_APPS/Arrangement Builder Live.app" "Builder — Application" "builder"
@@ -303,6 +312,19 @@ if [[ "$INSTALL_MIDI_CONSOLE" == 1 ]]; then
   [[ "$INSTALL_CONTROLLER" != 1 ]] && install_item "$APPLICATIONS_SOURCE/CL MIDI Network Assistant.app" "$USER_APPS/CL MIDI Network Assistant.app" "MIDI Console — Assistant réseau" "midi-console"
 fi
 [[ "$INSTALL_MIDI_RECEIVER" == 1 ]] && install_item "$APPLICATIONS_SOURCE/CL MIDI RTP Simulator.app" "$USER_APPS/CL MIDI RTP Simulator.app" "RTP — Simulateur de console" "midi-receiver"
+
+if [[ ( "$INSTALL_CONTROLLER" == 1 || "$INSTALL_MIDI_CONSOLE" == 1 ) && "$INSTALL_HOME" == "$HOME" && "${CL_SUITE_SKIP_POSTINSTALL:-0}" != "1" ]]; then
+  say ""; say "Télécommande — Activation de la reconnexion RTP au démarrage"
+  /usr/bin/open -gj "$USER_APPS/CL MIDI Network Assistant.app" --args --background-monitor \
+    || fail "impossible de lancer le moniteur réseau MIDI"
+  for _ in 1 2 3 4 5; do
+    [[ -f "$HOME/Library/LaunchAgents/com.claudio.midi-network-monitor.plist" ]] && break
+    sleep 1
+  done
+  [[ -f "$HOME/Library/LaunchAgents/com.claudio.midi-network-monitor.plist" ]] \
+    || fail "le démarrage automatique du moniteur réseau MIDI n’a pas été enregistré"
+  say "  ✓ Découverte Bonjour et reconnexion RTP activées à l’ouverture de session"
+fi
 
 write_install_manifest
 say ""; say "============================================================"; say " INSTALLATION TERMINÉE ET VÉRIFIÉE"; say "============================================================"

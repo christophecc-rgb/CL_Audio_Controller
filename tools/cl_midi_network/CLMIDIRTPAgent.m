@@ -21,6 +21,8 @@ static void installLoginLaunchAgent(void) {
         @"Label": @"com.claudio.midi-rtp-agent",
         @"ProgramArguments": @[executable],
         @"RunAtLoad": @YES,
+        @"KeepAlive": @YES,
+        @"ThrottleInterval": @5,
         @"ProcessType": @"Background"
     };
     [NSFileManager.defaultManager createDirectoryAtPath:agentsDirectory
