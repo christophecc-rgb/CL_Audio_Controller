@@ -9,8 +9,13 @@
 @property (nonatomic, strong) NSTextField *statusLabel;
 @property (nonatomic, strong) NSButton *startButton;
 @property (nonatomic, strong) NSButton *stopButton;
+@property (nonatomic, strong) NSPopUpButton *retentionButton;
 @property (nonatomic, strong) CLMIDICore *core;
 @property (nonatomic, strong) CLMIDIAnalyzerSession *session;
+@property (nonatomic, strong) NSMutableArray<CLMIDIEvent *> *pendingEvents;
+@property (nonatomic, strong) NSMutableArray<CLCommand *> *pendingCommands;
+@property (nonatomic, strong) NSMutableArray<CLMIDIEvent *> *pendingCommandEvents;
+@property (nonatomic) BOOL flushScheduled;
 @end
 
 
@@ -20,6 +25,9 @@
 {
     (void)notification;
     self.session = [CLMIDIAnalyzerSession new];
+    self.pendingEvents = [NSMutableArray array];
+    self.pendingCommands = [NSMutableArray array];
+    self.pendingCommandEvents = [NSMutableArray array];
     [self buildMenu];
     [self buildWindow];
     [self.window makeKeyAndOrderFront:nil];
@@ -98,6 +106,11 @@
                                         target:self
                                         action:@selector(saveLog:)];
 
+    self.retentionButton = [[NSPopUpButton alloc] initWithFrame:NSZeroRect pullsDown:NO];
+    [self.retentionButton addItemsWithTitles:@[@"10 000 events", @"50 000 events", @"Unlimited"]];
+    self.retentionButton.target = self;
+    self.retentionButton.action = @selector(changeRetention:);
+
     self.statusLabel = [NSTextField labelWithString:@"Stopped"];
     self.statusLabel.textColor = NSColor.secondaryLabelColor;
     [self.statusLabel setContentHuggingPriority:NSLayoutPriorityDefaultLow
@@ -107,6 +120,7 @@
     [toolbar addArrangedSubview:self.stopButton];
     [toolbar addArrangedSubview:clear];
     [toolbar addArrangedSubview:save];
+    [toolbar addArrangedSubview:self.retentionButton];
     [toolbar addArrangedSubview:self.statusLabel];
     return toolbar;
 }
@@ -197,9 +211,23 @@
 - (void)clearLog:(id)sender
 {
     (void)sender;
+    @synchronized (self)
+    {
+        [self.pendingEvents removeAllObjects];
+        [self.pendingCommands removeAllObjects];
+        [self.pendingCommandEvents removeAllObjects];
+    }
     [self.session clear];
     [self.tableView reloadData];
     self.detailView.string = @"";
+}
+
+- (void)changeRetention:(id)sender
+{
+    (void)sender;
+    NSArray<NSNumber *> *limits = @[@10000, @50000, @0];
+    self.session.maximumRecordCount = limits[(NSUInteger)self.retentionButton.indexOfSelectedItem].unsignedIntegerValue;
+    [self.tableView reloadData];
 }
 
 - (void)saveLog:(id)sender
@@ -228,32 +256,102 @@
 
 - (void)receiveCommand:(CLCommand *)command originatingEvent:(CLMIDIEvent *)event
 {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        CLMIDIAnalyzerRecord *record = [self.session recordForEvent:event];
-        if (record == nil) return;
-        [record applyCommand:command];
-        [self.tableView reloadData];
-    });
+    @synchronized (self)
+    {
+        [self.pendingCommands addObject:command];
+        [self.pendingCommandEvents addObject:event];
+        [self scheduleFlushLocked];
+    }
 }
 
 - (void)receiveEvent:(CLMIDIEvent *)event
 {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        CLMIDIAnalyzerRecord *record = [[CLMIDIAnalyzerRecord alloc]
-            initWithCommand:nil event:event direction:@"RX" timestamp:[NSDate date]];
-        [self.session addRecord:record];
-        [self.tableView reloadData];
-        NSInteger row = (NSInteger)self.session.visibleRecords.count - 1;
-        if (row >= 0) [self.tableView scrollRowToVisible:row];
-        self.statusLabel.stringValue = [NSString stringWithFormat:@"Monitoring · %lu events",
-            (unsigned long)self.session.records.count];
-    });
+    @synchronized (self)
+    {
+        [self.pendingEvents addObject:event];
+        [self scheduleFlushLocked];
+    }
+}
+
+- (void)scheduleFlushLocked
+{
+    if (self.flushScheduled) return;
+    self.flushScheduled = YES;
+    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 16 * NSEC_PER_MSEC),
+        dispatch_get_main_queue(), ^{ [self flushPendingUpdates]; });
+}
+
+- (void)flushPendingUpdates
+{
+    NSArray<CLMIDIEvent *> *events;
+    NSArray<CLCommand *> *commands;
+    NSArray<CLMIDIEvent *> *commandEvents;
+    @synchronized (self)
+    {
+        events = self.pendingEvents.copy;
+        commands = self.pendingCommands.copy;
+        commandEvents = self.pendingCommandEvents.copy;
+        [self.pendingEvents removeAllObjects];
+        [self.pendingCommands removeAllObjects];
+        [self.pendingCommandEvents removeAllObjects];
+        self.flushScheduled = NO;
+    }
+
+    NSUInteger oldCount = self.session.visibleRecords.count;
+    NSMutableArray<CLMIDIAnalyzerRecord *> *records = [NSMutableArray arrayWithCapacity:events.count];
+    NSDate *timestamp = [NSDate date];
+    for (CLMIDIEvent *event in events)
+    {
+        [records addObject:[[CLMIDIAnalyzerRecord alloc]
+            initWithCommand:nil event:event direction:@"RX" timestamp:timestamp]];
+    }
+    [self.session addRecords:records];
+    NSUInteger newCount = self.session.visibleRecords.count;
+
+    if (records.count > 0)
+    {
+        NSUInteger discardedCount = oldCount + records.count - newCount;
+        NSUInteger removedCount = MIN(oldCount, discardedCount);
+        NSUInteger retainedOldCount = oldCount - removedCount;
+        NSUInteger insertedCount = newCount - retainedOldCount;
+        [self.tableView beginUpdates];
+        if (removedCount > 0)
+            [self.tableView removeRowsAtIndexes:[NSIndexSet indexSetWithIndexesInRange:NSMakeRange(0, removedCount)]
+                                 withAnimation:NSTableViewAnimationEffectNone];
+        if (insertedCount > 0)
+            [self.tableView insertRowsAtIndexes:[NSIndexSet indexSetWithIndexesInRange:
+                NSMakeRange(newCount - insertedCount, insertedCount)]
+                                 withAnimation:NSTableViewAnimationEffectNone];
+        [self.tableView endUpdates];
+    }
+
+    NSMutableIndexSet *changedRows = [NSMutableIndexSet indexSet];
+    for (NSUInteger index = 0; index < commands.count; index++)
+    {
+        CLMIDIEvent *event = commandEvents[index];
+        CLMIDIAnalyzerRecord *record = [self.session recordForEvent:event];
+        if (record == nil) continue;
+        [record applyCommand:commands[index]];
+        NSUInteger row = [self.session.visibleRecords indexOfObjectIdenticalTo:record];
+        if (row != NSNotFound) [changedRows addIndex:row];
+    }
+    if (changedRows.count > 0)
+    {
+        NSIndexSet *columns = [NSIndexSet indexSetWithIndexesInRange:NSMakeRange(0, self.tableView.tableColumns.count)];
+        [self.tableView reloadDataForRowIndexes:changedRows columnIndexes:columns];
+    }
+
+    NSInteger lastRow = (NSInteger)newCount - 1;
+    if (lastRow >= 0 && records.count > 0) [self.tableView scrollRowToVisible:lastRow];
+    self.statusLabel.stringValue = [NSString stringWithFormat:@"Monitoring · %lu events",
+        (unsigned long)newCount];
 }
 
 - (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView
 {
     (void)tableView;
-    return (NSInteger)self.session.visibleRecords.count;
+    NSArray<CLMIDIAnalyzerRecord *> *visibleRecords = self.session.visibleRecords;
+    return (NSInteger)visibleRecords.count;
 }
 
 - (NSView *)tableView:(NSTableView *)tableView
@@ -267,7 +365,8 @@
         cell.identifier = tableColumn.identifier;
         cell.lineBreakMode = NSLineBreakByTruncatingTail;
     }
-    CLMIDIAnalyzerRecord *record = self.session.visibleRecords[(NSUInteger)row];
+    NSArray<CLMIDIAnalyzerRecord *> *visibleRecords = self.session.visibleRecords;
+    CLMIDIAnalyzerRecord *record = visibleRecords[(NSUInteger)row];
     NSDictionary<NSString *, NSString *> *values = @{
         @"time": record.timeText, @"direction": record.direction,
         @"source": record.sourceText, @"command": record.commandTypeText,
@@ -282,8 +381,9 @@
 {
     (void)notification;
     NSInteger row = self.tableView.selectedRow;
-    if (row < 0 || row >= (NSInteger)self.session.visibleRecords.count) return;
-    self.detailView.string = self.session.visibleRecords[(NSUInteger)row].detailText;
+    NSArray<CLMIDIAnalyzerRecord *> *visibleRecords = self.session.visibleRecords;
+    if (row < 0 || row >= (NSInteger)visibleRecords.count) return;
+    self.detailView.string = visibleRecords[(NSUInteger)row].detailText;
 }
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender

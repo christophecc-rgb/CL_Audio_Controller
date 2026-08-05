@@ -13,6 +13,9 @@ static NSDateFormatter *CLMIDIAnalyzerClock(void)
 }
 
 @implementation CLMIDIAnalyzerRecord
+{
+    NSString *_cachedDetailText;
+}
 
 - (instancetype)initWithCommand:(CLCommand *)command
                            event:(CLMIDIEvent *)event
@@ -38,7 +41,6 @@ static NSDateFormatter *CLMIDIAnalyzerClock(void)
         {
             _commandTypeText = @"(none)";
             _descriptionText = event.typeName;
-            _detailText = [self.class detailTextForCommand:nil event:event];
         }
     }
     return self;
@@ -100,7 +102,14 @@ static NSDateFormatter *CLMIDIAnalyzerClock(void)
     _command = command;
     _commandTypeText = [self.class typeTextForCommand:command];
     _descriptionText = [self.class descriptionTextForCommand:command];
-    _detailText = [self.class detailTextForCommand:command event:self.event];
+    _cachedDetailText = nil;
+}
+
+- (NSString *)detailText
+{
+    if (_cachedDetailText == nil)
+        _cachedDetailText = [self.class detailTextForCommand:self.command event:self.event];
+    return _cachedDetailText;
 }
 
 @end
@@ -108,6 +117,7 @@ static NSDateFormatter *CLMIDIAnalyzerClock(void)
 
 @interface CLMIDIAnalyzerSession ()
 @property (nonatomic, strong) NSMutableArray<CLMIDIAnalyzerRecord *> *mutableRecords;
+@property (nonatomic, copy) NSArray<CLMIDIAnalyzerRecord *> *cachedVisibleRecords;
 @end
 
 @implementation CLMIDIAnalyzerSession
@@ -115,7 +125,12 @@ static NSDateFormatter *CLMIDIAnalyzerClock(void)
 - (instancetype)init
 {
     self = [super init];
-    if (self) _mutableRecords = [NSMutableArray array];
+    if (self)
+    {
+        _mutableRecords = [NSMutableArray array];
+        _cachedVisibleRecords = @[];
+        _maximumRecordCount = 10000;
+    }
     return self;
 }
 
@@ -126,30 +141,81 @@ static NSDateFormatter *CLMIDIAnalyzerClock(void)
 
 - (NSArray<CLMIDIAnalyzerRecord *> *)visibleRecords
 {
+    return self.cachedVisibleRecords;
+}
+
+- (BOOL)isRecordVisible:(CLMIDIAnalyzerRecord *)record
+{
+    if (self.typeFilter.length > 0 &&
+        [record.commandTypeText rangeOfString:self.typeFilter options:NSCaseInsensitiveSearch].location == NSNotFound)
+        return NO;
+    if (self.sourceFilter.length > 0 &&
+        [record.sourceText rangeOfString:self.sourceFilter options:NSCaseInsensitiveSearch].location == NSNotFound)
+        return NO;
+    if (self.searchText.length > 0)
+    {
+        NSString *haystack = [NSString stringWithFormat:@"%@ %@ %@ %@",
+            record.sourceText, record.commandTypeText, record.descriptionText, record.hexText];
+        if ([haystack rangeOfString:self.searchText options:NSCaseInsensitiveSearch].location == NSNotFound)
+            return NO;
+    }
+    return YES;
+}
+
+- (void)rebuildVisibleRecords
+{
     NSPredicate *predicate = [NSPredicate predicateWithBlock:
         ^BOOL(CLMIDIAnalyzerRecord *record, NSDictionary *bindings) {
             (void)bindings;
-            if (self.typeFilter.length > 0 &&
-                [record.commandTypeText rangeOfString:self.typeFilter options:NSCaseInsensitiveSearch].location == NSNotFound)
-                return NO;
-            if (self.sourceFilter.length > 0 &&
-                [record.sourceText rangeOfString:self.sourceFilter options:NSCaseInsensitiveSearch].location == NSNotFound)
-                return NO;
-            if (self.searchText.length > 0)
-            {
-                NSString *haystack = [NSString stringWithFormat:@"%@ %@ %@ %@",
-                    record.sourceText, record.commandTypeText, record.descriptionText, record.hexText];
-                if ([haystack rangeOfString:self.searchText options:NSCaseInsensitiveSearch].location == NSNotFound)
-                    return NO;
-            }
-            return YES;
+            return [self isRecordVisible:record];
         }];
-    return [self.mutableRecords filteredArrayUsingPredicate:predicate];
+    self.cachedVisibleRecords = [self.mutableRecords filteredArrayUsingPredicate:predicate];
 }
 
 - (void)addRecord:(CLMIDIAnalyzerRecord *)record
 {
-    [self.mutableRecords addObject:record];
+    [self addRecords:@[record]];
+}
+
+- (void)addRecords:(NSArray<CLMIDIAnalyzerRecord *> *)records
+{
+    if (records.count == 0) return;
+    [self.mutableRecords addObjectsFromArray:records];
+    if (self.maximumRecordCount > 0 && self.mutableRecords.count > self.maximumRecordCount)
+    {
+        NSUInteger excess = self.mutableRecords.count - self.maximumRecordCount;
+        [self.mutableRecords removeObjectsInRange:NSMakeRange(0, excess)];
+    }
+    [self rebuildVisibleRecords];
+}
+
+- (void)setMaximumRecordCount:(NSUInteger)maximumRecordCount
+{
+    _maximumRecordCount = maximumRecordCount;
+    if (maximumRecordCount > 0 && self.mutableRecords.count > maximumRecordCount)
+    {
+        NSUInteger excess = self.mutableRecords.count - maximumRecordCount;
+        [self.mutableRecords removeObjectsInRange:NSMakeRange(0, excess)];
+    }
+    [self rebuildVisibleRecords];
+}
+
+- (void)setTypeFilter:(NSString *)typeFilter
+{
+    _typeFilter = [typeFilter copy];
+    [self rebuildVisibleRecords];
+}
+
+- (void)setSourceFilter:(NSString *)sourceFilter
+{
+    _sourceFilter = [sourceFilter copy];
+    [self rebuildVisibleRecords];
+}
+
+- (void)setSearchText:(NSString *)searchText
+{
+    _searchText = [searchText copy];
+    [self rebuildVisibleRecords];
 }
 
 - (CLMIDIAnalyzerRecord *)recordForEvent:(CLMIDIEvent *)event
@@ -164,6 +230,7 @@ static NSDateFormatter *CLMIDIAnalyzerClock(void)
 - (void)clear
 {
     [self.mutableRecords removeAllObjects];
+    self.cachedVisibleRecords = @[];
 }
 
 - (NSString *)textLog
