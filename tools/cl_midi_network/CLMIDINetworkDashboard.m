@@ -10,6 +10,21 @@
 
 static int CLBackgroundMonitorLock = -1;
 
+static void CLInstallApplicationMenu(void) {
+    NSMenu *mainMenu = [[NSMenu alloc] initWithTitle:@""];
+    NSMenuItem *applicationItem = [[NSMenuItem alloc] initWithTitle:@"" action:nil keyEquivalent:@""];
+    NSMenu *applicationMenu = [[NSMenu alloc] initWithTitle:@""];
+    NSString *appName = NSProcessInfo.processInfo.processName;
+    NSMenuItem *quitItem = [[NSMenuItem alloc] initWithTitle:[@"Quitter " stringByAppendingString:appName]
+                                                     action:@selector(terminate:)
+                                              keyEquivalent:@"q"];
+    quitItem.keyEquivalentModifierMask = NSEventModifierFlagCommand;
+    [applicationMenu addItem:quitItem];
+    applicationItem.submenu = applicationMenu;
+    [mainMenu addItem:applicationItem];
+    NSApp.mainMenu = mainMenu;
+}
+
 static NSString *EndpointName(MIDIEndpointRef endpoint) {
     CFStringRef value = NULL;
     if (MIDIObjectGetStringProperty(endpoint, kMIDIPropertyDisplayName, &value) != noErr || value == NULL) {
@@ -257,6 +272,7 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
 
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
     (void)notification;
+    CLInstallApplicationMenu();
     self.backgroundMonitorOnly = [NSProcessInfo.processInfo.arguments containsObject:@"--background-monitor"];
     CLBackgroundMonitorLock = open("/private/tmp/CL_MIDI_Console_Monitor.lock", O_CREAT | O_RDWR, 0600);
     self.ownsPassiveReturnMonitor = CLBackgroundMonitorLock >= 0 && flock(CLBackgroundMonitorLock, LOCK_EX | LOCK_NB) == 0;

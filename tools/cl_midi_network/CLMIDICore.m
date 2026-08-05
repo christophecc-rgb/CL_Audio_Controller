@@ -5,6 +5,7 @@
 @interface CLMIDICore ()
 {
     MIDIClientRef _client;
+    MIDIPortRef _inputPort;
 }
 @end
 
@@ -17,6 +18,7 @@
     if (self)
     {
         _client = 0;
+        _inputPort = 0;
     }
 
     return self;
@@ -24,7 +26,10 @@
 
 - (void)dealloc
 {
-    if (_client)
+    if (_inputPort)
+    {
+        MIDIPortDispose(_inputPort);
+    } if (_client)
     {
         MIDIClientDispose(_client);
     }
@@ -60,9 +65,10 @@
     NSLog(@"");
     NSLog(@"Creating MIDI Client...");
 
+
     OSStatus err =
     MIDIClientCreate(
-        CFSTR("CL Audio Analyzer"),
+     CFSTR("CL Audio Analyzer"),
         NULL,
         NULL,
         &_client);
@@ -74,7 +80,24 @@
     }
 
     NSLog(@"Client created.");
-    NSLog(@"Next step : create input port.");
+
+    OSStatus status =
+MIDIInputPortCreate(
+    _client,
+    CFSTR("CL Audio Input"),
+    NULL,
+    NULL,
+    &_inputPort);
+
+    if (status != noErr)
+    {
+    NSLog(@"Unable to create input port (%d)", (int)status);
+    return;
+}
+
+    NSLog(@"Input port created.");
+    
+    NSLog(@"Ready for source connection.");
 }
 
 - (void)printEndpoint:(MIDIEndpointRef)endpoint

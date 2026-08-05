@@ -1,6 +1,21 @@
 #import <AppKit/AppKit.h>
 #import <CoreMIDI/CoreMIDI.h>
 
+static void CLInstallApplicationMenu(void) {
+    NSMenu *mainMenu = [[NSMenu alloc] initWithTitle:@""];
+    NSMenuItem *applicationItem = [[NSMenuItem alloc] initWithTitle:@"" action:nil keyEquivalent:@""];
+    NSMenu *applicationMenu = [[NSMenu alloc] initWithTitle:@""];
+    NSString *appName = NSProcessInfo.processInfo.processName;
+    NSMenuItem *quitItem = [[NSMenuItem alloc] initWithTitle:[@"Quitter " stringByAppendingString:appName]
+                                                     action:@selector(terminate:)
+                                              keyEquivalent:@"q"];
+    quitItem.keyEquivalentModifierMask = NSEventModifierFlagCommand;
+    [applicationMenu addItem:quitItem];
+    applicationItem.submenu = applicationMenu;
+    [mainMenu addItem:applicationItem];
+    NSApp.mainMenu = mainMenu;
+}
+
 static NSString *CLMidiEndpointName(MIDIEndpointRef endpoint) {
     CFStringRef value = NULL;
     if (MIDIObjectGetStringProperty(endpoint, kMIDIPropertyDisplayName, &value) != noErr || value == NULL) {
@@ -68,6 +83,7 @@ static NSArray<NSString *> *CLMidiEndpointNames(void) {
 
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
     (void)notification;
+    CLInstallApplicationMenu();
     self.rows = [NSMutableArray array];
     self.endpoints = CLMidiEndpointNames();
     self.savedConfigs = [NSUserDefaults.standardUserDefaults arrayForKey:@"CLYamahaSimulatorConsoles"] ?: @[];
