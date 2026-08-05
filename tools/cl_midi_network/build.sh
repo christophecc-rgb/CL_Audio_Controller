@@ -48,7 +48,9 @@ clang -arch arm64 -arch x86_64 -mmacosx-version-min=10.15 -fobjc-arc -fblocks \
 clang -arch arm64 -arch x86_64 -mmacosx-version-min=10.15 \
   -fobjc-arc -fblocks \
   -framework Foundation -framework CoreMIDI \
+  "$SCRIPT_DIR/CLCommand.m" \
   "$SCRIPT_DIR/CLMIDICore.m" \
+  "$SCRIPT_DIR/CLMIDICommandInterpreter.m" \
   "$SCRIPT_DIR/CLMIDIEvent.m" \
   "$SCRIPT_DIR/CLMIDILogger.m" \
   "$SCRIPT_DIR/CLMIDIPacket.m" \
