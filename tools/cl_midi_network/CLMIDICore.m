@@ -1,4 +1,5 @@
 #import "CLMIDICore.h"
+#import "CLMIDIEvent.h"
 #import "CLMIDILogger.h"
 #import "CLMIDIPacket.h"
 #import "CLMIDIPort.h"
@@ -118,7 +119,8 @@ static void CLMIDINotifyProc(const MIDINotification *message, void *refCon)
 - (void)midiPort:(CLMIDIPort *)port didReceivePacket:(CLMIDIPacket *)packet
 {
     (void)port;
-    [_logger logPacket:packet];
+    CLMIDIEvent *event = [[CLMIDIEvent alloc] initWithPacket:packet];
+    [_logger logEvent:event];
 }
 
 - (NSString *)nameForEndpoint:(MIDIEndpointRef)endpoint
