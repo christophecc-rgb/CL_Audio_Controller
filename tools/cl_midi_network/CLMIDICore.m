@@ -1,34 +1,23 @@
 #import "CLMIDICore.h"
 #import "CLMIDILogger.h"
+#import "CLMIDIPacket.h"
+#import "CLMIDIPort.h"
 
-@interface CLMIDICore ()
+@interface CLMIDICore () <CLMIDIPortDelegate>
 {
     MIDIClientRef _client;
-    MIDIPortRef _inputPort;
+    CLMIDIPort *_inputPort;
     CLMIDILogger *_logger;
-    NSMutableSet<NSNumber *> *_connectedSourceIDs;
 }
 
-- (void)connectAvailableSources;
-- (void)receivedPacketList:(const MIDIPacketList *)packetList
-                 fromSource:(MIDIEndpointRef)source;
+- (void)refreshSources;
 @end
 
-static void CLMIDIReadProc(const MIDIPacketList *packetList,
-                           void *readProcRefCon,
-                           void *srcConnRefCon)
-{
-    @autoreleasepool
-    {
-        CLMIDICore *core = (__bridge CLMIDICore *)readProcRefCon;
-        MIDIEndpointRef source = (MIDIEndpointRef)(uintptr_t)srcConnRefCon;
-        [core receivedPacketList:packetList fromSource:source];
-    }
-}
 
 static void CLMIDINotifyProc(const MIDINotification *message, void *refCon)
 {
     if (message->messageID != kMIDIMsgObjectAdded &&
+        message->messageID != kMIDIMsgObjectRemoved &&
         message->messageID != kMIDIMsgSetupChanged)
     {
         return;
@@ -37,7 +26,7 @@ static void CLMIDINotifyProc(const MIDINotification *message, void *refCon)
     @autoreleasepool
     {
         CLMIDICore *core = (__bridge CLMIDICore *)refCon;
-        [core connectAvailableSources];
+        [core refreshSources];
     }
 }
 
@@ -49,7 +38,6 @@ static void CLMIDINotifyProc(const MIDINotification *message, void *refCon)
     if (self)
     {
         _logger = [CLMIDILogger new];
-        _connectedSourceIDs = [NSMutableSet set];
     }
     return self;
 }
@@ -85,8 +73,6 @@ static void CLMIDINotifyProc(const MIDINotification *message, void *refCon)
         return YES;
     }
 
-    NSLog(@"");
-    NSLog(@"Creating MIDI Client...");
     OSStatus status = MIDIClientCreate(CFSTR("CL Audio Analyzer"),
                                        CLMIDINotifyProc,
                                        (__bridge void *)self,
@@ -97,92 +83,42 @@ static void CLMIDINotifyProc(const MIDINotification *message, void *refCon)
         return NO;
     }
 
-    NSLog(@"Client created.");
-    status = MIDIInputPortCreate(_client,
-                                 CFSTR("CL Audio Input"),
-                                 CLMIDIReadProc,
-                                 (__bridge void *)self,
-                                 &_inputPort);
-    if (status != noErr)
+    _inputPort = [[CLMIDIPort alloc] initWithClient:_client delegate:self];
+    NSError *error = nil;
+    if (![_inputPort open:&error])
     {
-        NSLog(@"Unable to create input port: %d", (int)status);
+        NSLog(@"%@", error.localizedDescription);
+        _inputPort = nil;
         MIDIClientDispose(_client);
         _client = 0;
         return NO;
     }
 
-    NSLog(@"Input port created.");
-    [self connectAvailableSources];
-    NSLog(@"Monitoring MIDI. Press Control-C to stop.");
+    NSLog(@"");
+    NSLog(@"Listening...");
     return YES;
 }
 
 - (void)stopMonitoring
 {
-    if (_inputPort != 0)
-    {
-        MIDIPortDispose(_inputPort);
-        _inputPort = 0;
-    }
+    [_inputPort close];
+    _inputPort = nil;
     if (_client != 0)
     {
         MIDIClientDispose(_client);
         _client = 0;
     }
-    [_connectedSourceIDs removeAllObjects];
 }
 
-- (void)connectAvailableSources
+- (void)refreshSources
 {
-    if (_inputPort == 0)
-    {
-        return;
-    }
-
-    ItemCount sourceCount = MIDIGetNumberOfSources();
-    for (ItemCount index = 0; index < sourceCount; index++)
-    {
-        MIDIEndpointRef source = MIDIGetSource(index);
-        if (source == 0)
-        {
-            continue;
-        }
-
-        MIDIUniqueID uniqueID = 0;
-        OSStatus propertyStatus = MIDIObjectGetIntegerProperty(source,
-                                                               kMIDIPropertyUniqueID,
-                                                               &uniqueID);
-        NSNumber *sourceKey = propertyStatus == noErr
-            ? @(uniqueID)
-            : @((uintptr_t)source);
-        if ([_connectedSourceIDs containsObject:sourceKey])
-        {
-            continue;
-        }
-
-        OSStatus status = MIDIPortConnectSource(_inputPort,
-                                                source,
-                                                (void *)(uintptr_t)source);
-        if (status == noErr)
-        {
-            [_connectedSourceIDs addObject:sourceKey];
-            NSLog(@"Connected source [%lu]: %@",
-                  (unsigned long)index,
-                  [self nameForEndpoint:source]);
-        }
-        else
-        {
-            NSLog(@"Unable to connect source [%lu] (%d)",
-                  (unsigned long)index,
-                  (int)status);
-        }
-    }
+    [_inputPort refreshSources];
 }
 
-- (void)receivedPacketList:(const MIDIPacketList *)packetList
-                 fromSource:(MIDIEndpointRef)source
+- (void)midiPort:(CLMIDIPort *)port didReceivePacket:(CLMIDIPacket *)packet
 {
-    [_logger logPacketList:packetList fromSource:source];
+    (void)port;
+    [_logger logPacket:packet];
 }
 
 - (NSString *)nameForEndpoint:(MIDIEndpointRef)endpoint

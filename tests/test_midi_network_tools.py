@@ -76,12 +76,30 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('${1:-$SCRIPT_DIR/build}', source)
         self.assertIn("-framework CoreMIDI", source)
         self.assertIn("-arch arm64 -arch x86_64", source)
-        self.assertEqual(source.count("-mmacosx-version-min=10.15"), 7)
+        self.assertEqual(source.count("-mmacosx-version-min=10.15"), 9)
         self.assertIn("CLMIDINetworkGuardian", source)
         self.assertIn("CLYamahaConsoleSimulator", source)
         self.assertIn("CLMIDIRoundTripTester", source)
         self.assertIn("CLMIDINetworkDashboard", source)
         self.assertIn("CLYamahaSimulatorDashboard", source)
+        self.assertIn("CLMIDICoreMIDIAnalyzer", source)
+
+    def test_core_midi_analyzer_routes_packets_through_a_port_delegate(self):
+        port_header = (TOOLS / "CLMIDIPort.h").read_text(encoding="utf-8")
+        port_source = (TOOLS / "CLMIDIPort.m").read_text(encoding="utf-8")
+        core_source = (TOOLS / "CLMIDICore.m").read_text(encoding="utf-8")
+        logger_source = (TOOLS / "CLMIDILogger.m").read_text(encoding="utf-8")
+
+        self.assertIn("CLMIDIPortDelegate", port_header)
+        self.assertIn("MIDIGetNumberOfSources", port_source)
+        self.assertIn("MIDIPortConnectSource", port_source)
+        self.assertIn("MIDIPortDisconnectSource", port_source)
+        self.assertIn("initWithBytes:packet->data", port_source)
+        self.assertIn("didReceivePacket:receivedPacket", port_source)
+        self.assertIn("kMIDIMsgObjectAdded", core_source)
+        self.assertIn("kMIDIMsgObjectRemoved", core_source)
+        self.assertIn("[_logger logPacket:packet]", core_source)
+        self.assertIn('Program %u', logger_source)
 
     def test_dashboard_exposes_visible_rtp_status_and_real_round_trip(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text()
