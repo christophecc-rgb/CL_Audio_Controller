@@ -24,16 +24,22 @@ static NSDateFormatter *CLMIDIAnalyzerClock(void)
     {
         _receivedAt = timestamp;
         _direction = [direction copy];
-        _command = command;
         _event = event;
         _packet = event.packet;
         _timeText = [CLMIDIAnalyzerClock() stringFromDate:timestamp];
         _sourceText = event.packet.sourceName;
-        _commandTypeText = [self.class typeTextForCommand:command];
         _channelText = event.channel != nil ? event.channel.stringValue : @"—";
-        _descriptionText = [self.class descriptionTextForCommand:command];
         _hexText = event.packet.hexString;
-        _detailText = [self.class detailTextForCommand:command event:event];
+        if (command != nil)
+        {
+            [self applyCommand:command];
+        }
+        else
+        {
+            _commandTypeText = @"(none)";
+            _descriptionText = event.typeName;
+            _detailText = [self.class detailTextForCommand:nil event:event];
+        }
     }
     return self;
 }
@@ -79,7 +85,7 @@ static NSDateFormatter *CLMIDIAnalyzerClock(void)
         @"CLCommand\n%@\n\nCLMIDIEvent\nType: %@\nChannel: %@\nProtocol: %lu\n\n"
          "CLMIDIPacket\nSource: %@\nTimestamp: %llu\nLength: %lu bytes\n\n"
          "Hexadecimal Dump\n%@",
-        [self descriptionTextForCommand:command],
+        command != nil ? [self descriptionTextForCommand:command] : @"(none)",
         event.typeName,
         event.channel ?: @"—",
         (unsigned long)event.protocol,
@@ -87,6 +93,14 @@ static NSDateFormatter *CLMIDIAnalyzerClock(void)
         (unsigned long long)packet.timestamp,
         (unsigned long)packet.data.length,
         packet.hexString];
+}
+
+- (void)applyCommand:(CLCommand *)command
+{
+    _command = command;
+    _commandTypeText = [self.class typeTextForCommand:command];
+    _descriptionText = [self.class descriptionTextForCommand:command];
+    _detailText = [self.class detailTextForCommand:command event:self.event];
 }
 
 @end
@@ -136,6 +150,15 @@ static NSDateFormatter *CLMIDIAnalyzerClock(void)
 - (void)addRecord:(CLMIDIAnalyzerRecord *)record
 {
     [self.mutableRecords addObject:record];
+}
+
+- (CLMIDIAnalyzerRecord *)recordForEvent:(CLMIDIEvent *)event
+{
+    for (CLMIDIAnalyzerRecord *record in self.mutableRecords.reverseObjectEnumerator)
+    {
+        if (record.event == event) return record;
+    }
+    return nil;
 }
 
 - (void)clear

@@ -21,6 +21,7 @@ class MidiAnalyzerAppTests(unittest.TestCase):
                 str(TOOLS / "CLCommand.m"),
                 str(TOOLS / "CLMIDIPacket.m"),
                 str(TOOLS / "CLMIDIEvent.m"),
+                str(TOOLS / "CLMIDICommandInterpreter.m"),
                 str(TOOLS / "CLMIDIAnalyzerModel.m"),
                 str(NATIVE_TEST), "-o", str(executable),
             ]
@@ -39,6 +40,15 @@ class MidiAnalyzerAppTests(unittest.TestCase):
         for forbidden in ("MIDIGet", "MIDIPacketList", "MIDIPort", "MIDIClient", "packet->", ".bytes"):
             self.assertNotIn(forbidden, source)
             self.assertNotIn(forbidden, model)
+
+    def test_event_observation_precedes_command_interpretation(self):
+        core = (TOOLS / "CLMIDICore.m").read_text(encoding="utf-8")
+        header = (TOOLS / "CLMIDICore.h").read_text(encoding="utf-8")
+        app = (TOOLS / "CLMIDIAnalyzerApp.m").read_text(encoding="utf-8")
+        self.assertIn("eventHandler", header)
+        self.assertLess(core.index("eventHandler(event)"), core.index("commandsForEvent:event"))
+        self.assertIn("initWithCommand:nil", app)
+        self.assertIn("recordForEvent:event", app)
 
 
 if __name__ == "__main__":
