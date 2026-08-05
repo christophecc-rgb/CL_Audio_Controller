@@ -1410,6 +1410,56 @@ class LiveSetGenerationTests(unittest.TestCase):
             space_branch = source.rsplit("if (event.code === 'Space' || event.key === ' ')", 1)[1]
             self.assertIn("event.preventDefault();", space_branch.split("}", 1)[0])
 
+    def test_rapid_transport_clicks_preserve_every_explicit_intention(self):
+        sent = []
+        client = self.app.app.test_client()
+        with self.app.lock:
+            self.app.state["is_playing"] = False
+            self.app.state["confirmed_is_playing"] = False
+            self.app.state["is_paused"] = True
+            self.app.state["play_mode"] = "session"
+
+        with mock.patch.object(self.app, "send", side_effect=lambda address, *args: sent.append((address, args))):
+            actions = ("transport_play", "transport_pause", "transport_play", "transport_pause")
+            responses = [
+                client.post("/action", json={"action": action, "request_id": f"rapid-{index}"})
+                for index, action in enumerate(actions)
+            ]
+
+        self.assertTrue(all(response.status_code == 200 for response in responses))
+        self.assertEqual(
+            [address for address, _ in sent],
+            [
+                "/live/song/continue_playing",
+                "/live/song/stop_playing",
+                "/live/song/continue_playing",
+                "/live/song/stop_playing",
+            ],
+        )
+        with self.app.lock:
+            self.assertFalse(self.app.state["is_playing"])
+            self.assertEqual(self.app.state["transport_intent_request_id"], "rapid-3")
+
+    def test_all_views_share_the_explicit_transport_queue_for_mouse_and_keyboard(self):
+        shared = (PROJECT_ROOT / "static/remote-v2.js").read_text(encoding="utf-8")
+        self.assertIn("transport_play", shared)
+        self.assertIn("transport_pause", shared)
+        self.assertIn("chain = chain.then(run, run)", shared)
+        self.assertIn("lock-released", shared)
+        for relative_path in ("templates/index.html", "templates/ab.html", "templates/arrangement.html"):
+            source = (PROJECT_ROOT / relative_path).read_text(encoding="utf-8")
+            self.assertIn("explicitTransport.click()", source)
+
+    def test_shared_transport_script_loads_before_inline_view_code(self):
+        with self.app.app.test_client() as client:
+            page = client.get("/").get_data(as_text=True)
+
+        shared_script = '<script src="/static/remote-v2.js?v=2.0.4"></script>'
+        self.assertIn(shared_script, page)
+        self.assertNotIn('remote-v2.js?v=2.0.4" defer', page)
+        self.assertGreater(page.index(shared_script), page.index('id="pauseButton"'))
+        self.assertLess(page.index(shared_script), page.index("const explicitTransport ="))
+
     def test_session_buttons_are_reenabled_without_artificial_delay(self):
         source = (PROJECT_ROOT / "templates/index.html").read_text(encoding="utf-8")
         action_finally = source.split(

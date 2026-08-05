@@ -602,6 +602,19 @@ body.is-arrangement-paused .card.current {
       } finally { clearTimeout(timeout); }
     }
 
+    const explicitTransport = window.CLExplicitTransport({
+      source: 'Arrangement',
+      readLocalPlaying: () => document.body.classList.contains('is-arrangement-playing'),
+      optimistic: playing => {
+        arrangementReturnActive = true;
+        document.body.classList.toggle('is-arrangement-playing', playing);
+        document.body.classList.toggle('is-arrangement-paused', !playing);
+        pauseToggleBtn.textContent = playing ? '⏸ PAUSE' : '▶ LECTURE';
+      },
+      fetchJSON, applyState: applyStatus,
+      onError: () => setStatus('○ Lecture / pause impossible', false)
+    });
+
     function cleanTitle(value) {
       const raw = value && value !== '—' ? String(value).trim() : '';
       if (!raw) return '—';
@@ -788,6 +801,7 @@ body.is-arrangement-paused .card.current {
     }
 
     function applyStatus(state) {
+      explicitTransport.observe(state);
       if (!acceptStateGeneration(state)) return;
       if (window.CLRemoteLTC) window.CLRemoteLTC.render(ltcTimecodeEl, state);
       const connected = Boolean(state && state.connected);
@@ -841,7 +855,7 @@ body.is-arrangement-paused .card.current {
     function setDisabled(value) {
       busy = value;
       [...transportButtons, goBtn, previewBtn, nextBtn, gotoBtn]
-      .forEach(b => { if (b) b.disabled = value; });
+      .forEach(b => { if (b && b !== pauseToggleBtn) b.disabled = value; });
       if (!value) renderConduite();
     }
 
@@ -1002,7 +1016,7 @@ markerSelectEl.addEventListener('change', () => {
     });
 
     function runArrangementPlayPause() {
-      return sendAction({action: pauseToggleBtn.dataset.action});
+      return explicitTransport.click();
     }
 
     transportButtons.forEach(button => {

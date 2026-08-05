@@ -1149,6 +1149,7 @@
       }
 
       lastKnownState = state;
+      if (typeof explicitTransport !== 'undefined') explicitTransport.observe(state);
       failedStatusPolls = 0;
     }
 
@@ -1173,10 +1174,26 @@
       return `go-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     }
 
+    const explicitTransport = window.CLExplicitTransport({
+      source: 'Session',
+      readLocalPlaying: () => lastKnownState ? isAbletonPlaying(lastKnownState) : pauseButton.textContent.trim().toUpperCase() !== 'PLAY',
+      optimistic: playing => setSessionUiState(playing ? 'playing' : 'paused', currentEl.textContent || selectedEl.textContent),
+      fetchJSON: async (url, options, timeoutMs) => {
+        const response = await fetchWithTimeout(url, options, timeoutMs);
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || 'Commande refusée');
+        return data;
+      },
+      applyState: applyStatus,
+      onError: () => setActionMessage('○ Lecture / pause impossible', true)
+    });
+
     async function act(action) {
       if (action === 'play_pause') {
         action = 'pause';
       }
+
+      if (action === 'pause') return explicitTransport.click();
 
       if (action === 'stop') {
         sessionStoppedByUser = true;
@@ -1185,12 +1202,6 @@
         lastSessionCurrentRaw = '';
         setSessionUiState('stopped', '—');
         setCountdownForScene('', 'stopped');
-      }
-
-      if (action === 'pause' && sessionStoppedByUser) {
-        setActionMessage('● Après STOP, relance avec GO', false);
-        setSessionUiState('stopped', '—');
-        return;
       }
 
       if (actionBusy) return;
@@ -1233,14 +1244,6 @@
           setCountdownForScene(lastSessionCurrentRaw, 'playing');
           setSessionUiState('playing', selectedName);
         }
-      }
-
-      if (action === 'pause') {
-        const currentlyShowingPlay = pauseButton && pauseButton.textContent.trim().toUpperCase() === 'PLAY';
-        const fallbackTitle = normalizeSceneName(currentEl.textContent) !== '—'
-          ? currentEl.textContent
-          : selectedEl.textContent;
-        setSessionUiState(currentlyShowingPlay ? 'playing' : 'paused', fallbackTitle);
       }
 
       actionBusy = true;

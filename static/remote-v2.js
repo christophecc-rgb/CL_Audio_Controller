@@ -1,6 +1,53 @@
 (() => {
   const controllers = new Set();
 
+  window.CLExplicitTransport = function createExplicitTransport(options) {
+    let intendedPlaying = null;
+    let confirmedPlaying = false;
+    let chain = Promise.resolve();
+    let pendingCount = 0;
+    const log = (event, details = {}) => {
+      const record = { source: options.source, event, ...details };
+      console.info(`[TRANSPORT][${options.source}] ${event}`, record);
+      fetch('/keyboard-log', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(record), keepalive:true}).catch(() => {});
+    };
+    const requestId = () => window.crypto && typeof window.crypto.randomUUID === 'function'
+      ? window.crypto.randomUUID() : `transport-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const observe = state => {
+      if (!state) return;
+      const next = Boolean(state.confirmed_is_playing === undefined ? state.is_playing : state.confirmed_is_playing);
+      if (next !== confirmedPlaying) log('ableton-state-changed', {before:confirmedPlaying, after:next});
+      confirmedPlaying = next;
+      if (!pendingCount && state.transport_intent_is_playing === null) intendedPlaying = null;
+    };
+    const click = () => {
+      const localBefore = intendedPlaying === null ? Boolean(options.readLocalPlaying()) : intendedPlaying;
+      const desiredPlaying = !localBefore;
+      const id = requestId();
+      intendedPlaying = desiredPlaying;
+      pendingCount += 1;
+      log('click-received', {requestId:id, localBefore, confirmedBefore:confirmedPlaying, command:desiredPlaying?'Play':'Pause', pendingCount, lock:'activated'});
+      options.optimistic(desiredPlaying);
+      const run = async () => {
+        try {
+          log('command-sent', {requestId:id, command:desiredPlaying?'Play':'Pause'});
+          const response = await options.fetchJSON('/action', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action:desiredPlaying?'transport_play':'transport_pause', request_id:id})}, 2500);
+          log('response-received', {requestId:id, ok:Boolean(response && response.ok !== false)});
+          if (response && response.state) { observe(response.state); options.applyState(response.state); }
+        } catch (error) {
+          log('response-error', {requestId:id, error:String(error && error.message || error)});
+          options.onError();
+        } finally {
+          pendingCount = Math.max(0, pendingCount - 1);
+          log('lock-released', {requestId:id, pendingCount});
+        }
+      };
+      chain = chain.then(run, run);
+      return chain;
+    };
+    return {click, observe, get intendedPlaying(){ return intendedPlaying; }};
+  };
+
   window.CLRemoteEnergy = {
     startPolling(task, isActive, options = {}) {
       const minActiveMs = Math.max(40, Number(options.minActiveMs) || 250);

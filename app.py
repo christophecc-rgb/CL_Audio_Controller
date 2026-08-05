@@ -335,13 +335,19 @@ def decorate_remote_page_html(response):
 """
 
     if "</head>" in html:
-        assets = (
-            '<link rel="stylesheet" href="/static/remote-v2.css?v=2.0.4">\n'
-            '<script src="/static/remote-v2.js?v=2.0.4" defer></script>\n'
-        )
-        html = html.replace("</head>", assets + "</head>", 1)
+        stylesheet = '<link rel="stylesheet" href="/static/remote-v2.css?v=2.0.4">\n'
+        html = html.replace("</head>", stylesheet + "</head>", 1)
     else:
         html = '<link rel="stylesheet" href="/static/remote-v2.css?v=2.0.4">' + html
+
+    # Le script commun dépend du DOM de la vue, tandis que le script inline de
+    # la vue dépend de CLExplicitTransport. Il doit donc être placé exactement
+    # entre le contenu HTML et le premier script inline, sans `defer`.
+    shared_script = '<script src="/static/remote-v2.js?v=2.0.4"></script>\n'
+    if "<script>" in html:
+        html = html.replace("<script>", shared_script + "<script>", 1)
+    else:
+        html = html.replace("</body>", shared_script + "</body>", 1)
 
     if "<body" in html:
         body_end = html.find(">", html.find("<body"))
@@ -396,6 +402,10 @@ state: Dict[str, Any] = {
     "last_fired_scene": -1,
     "last_fired_scene_name": "—",
     "is_playing": False,
+    "confirmed_is_playing": False,
+    "transport_intent_is_playing": None,
+    "transport_intent_request_id": None,
+    "transport_intent_deadline": None,
     "scene_duration_seconds": None,
     "remaining_seconds": None,
     "playback_deadline": None,
@@ -703,6 +713,10 @@ def reset_live_set_state_locked(set_id: Optional[str], reason: str) -> int:
         "last_fired_scene": -1,
         "last_fired_scene_name": "—",
         "is_playing": False,
+        "confirmed_is_playing": False,
+        "transport_intent_is_playing": None,
+        "transport_intent_request_id": None,
+        "transport_intent_deadline": None,
         "is_paused": False,
         "scene_duration_seconds": None,
         "remaining_seconds": None,
@@ -787,11 +801,35 @@ def apply_osc_response_locked(address: str, args: Tuple[Any, ...], expected_gene
             if isinstance(raw, str)
             else bool(raw)
         )
-        state["is_playing"] = playing
-        if playing:
-            state["is_paused"] = False
-        elif state.get("play_mode") == "arrangement":
-            state["is_paused"] = True
+        previous_confirmed = bool(state.get("confirmed_is_playing", state.get("is_playing", False)))
+        state["confirmed_is_playing"] = playing
+        intent = state.get("transport_intent_is_playing")
+        intent_request_id = state.get("transport_intent_request_id")
+        intent_deadline = state.get("transport_intent_deadline")
+        if previous_confirmed != playing:
+            print(
+                f"[TRANSPORT] ableton-state changed={previous_confirmed}->{playing} "
+                f"intent={intent} request_id={intent_request_id}",
+                flush=True,
+            )
+        if intent is not None and playing == bool(intent):
+            print(f"[TRANSPORT] intent-confirmed request_id={intent_request_id} playing={playing}", flush=True)
+            state["transport_intent_is_playing"] = None
+            state["transport_intent_request_id"] = None
+            state["transport_intent_deadline"] = None
+            intent = None
+        elif intent is not None and intent_deadline is not None and time.time() >= float(intent_deadline):
+            print(f"[TRANSPORT] intent-expired request_id={intent_request_id} confirmed={playing}", flush=True)
+            state["transport_intent_is_playing"] = None
+            state["transport_intent_request_id"] = None
+            state["transport_intent_deadline"] = None
+            intent = None
+
+        # Une réponse Ableton antérieure à la dernière intention ne doit pas
+        # annuler l'affichage optimiste ni décider de la commande suivante.
+        effective_playing = bool(intent) if intent is not None else playing
+        state["is_playing"] = effective_playing
+        state["is_paused"] = not effective_playing and state.get("play_mode") in ("session", "arrangement")
         normalize_transport_state_locked()
 
 
@@ -2879,6 +2917,51 @@ def confirm_live_playing_state(expected_generation: int) -> Tuple[Optional[bool]
     return confirmed_playing, True
 
 
+def apply_explicit_transport_intent(action_name: str, request_id: str, action_generation: int) -> Tuple[bool, str]:
+    """Applique Play/Pause sans recalculer une bascule depuis un retour OSC retardé."""
+    desired_playing = action_name == "transport_play"
+    with lock:
+        if int(state.get("set_generation", 0)) != int(action_generation) or not state.get("set_ready", False):
+            return False, "Live Set modifié pendant la commande"
+        before_local = bool(state.get("is_playing", False))
+        before_confirmed = bool(state.get("confirmed_is_playing", before_local))
+        state["transport_intent_is_playing"] = desired_playing
+        state["transport_intent_request_id"] = request_id
+        state["transport_intent_deadline"] = time.time() + 1.5
+        current_mode = str(state.get("play_mode", "stopped"))
+        print(
+            f"[TRANSPORT] request received request_id={request_id} action={action_name} "
+            f"local_before={before_local} confirmed_before={before_confirmed} lock=activated",
+            flush=True,
+        )
+
+    try:
+        if desired_playing:
+            send("/live/song/continue_playing")
+        else:
+            send("/live/song/stop_playing")
+        with lock:
+            if desired_playing:
+                remaining_seconds = state.get("remaining_seconds")
+                if remaining_seconds is not None:
+                    state["playback_deadline"] = time.time() + max(0.0, float(remaining_seconds))
+            else:
+                deadline = state.get("playback_deadline")
+                if deadline is not None:
+                    state["remaining_seconds"] = max(0.0, float(deadline) - time.time())
+            state["is_playing"] = desired_playing
+            state["is_paused"] = not desired_playing
+            state["play_mode"] = current_mode if current_mode in ("arrangement", "session") else "arrangement"
+            state["message"] = "Lecture" if desired_playing else "Pause"
+            state["sync_source"] = "Télécommande"
+        print(f"[TRANSPORT] command sent request_id={request_id} command={'Play' if desired_playing else 'Pause'}", flush=True)
+        return True, "Lecture" if desired_playing else "Pause"
+    finally:
+        # Le verrou serveur ne couvre que l'envoi. L'intention reste publiée
+        # séparément jusqu'à confirmation Ableton ou expiration.
+        print(f"[TRANSPORT] request finished request_id={request_id} lock=released", flush=True)
+
+
 @app.route("/action", methods=["POST"])
 def action():
     data = request.get_json(force=True, silent=True) or {}
@@ -2952,6 +3035,15 @@ def action():
             "request_id": request_id,
             "state": response_state,
         }), (200 if ok else 409)
+    elif action_name in ("transport_play", "transport_pause"):
+        request_id = str(data.get("request_id", "")).strip()
+        if not request_id:
+            return jsonify({"ok": False, "message": "Identifiant de requête manquant"}), 400
+        ok, message = apply_explicit_transport_intent(action_name, request_id, action_generation)
+        with lock:
+            response_state = state_snapshot_locked()
+        print(f"[TRANSPORT] response request_id={request_id} ok={ok} is_playing={response_state.get('is_playing')}", flush=True)
+        return jsonify({"ok": ok, "message": message, "request_id": request_id, "state": response_state}), (200 if ok else 409)
     elif action_name == "arrangement_toggle":
         # Bouton dédié Arrangement :
         # - si l'Arrangement joue, on met en pause

@@ -2009,6 +2009,7 @@
     function applyStatus(state) {
       if (!acceptStateGeneration(state)) return;
       lastKnownAbState = state;
+      if (typeof explicitTransport !== 'undefined') explicitTransport.observe(state);
       const connected = Boolean(state && state.connected);
       setStatus((connected ? '● ' : '○ ') + ((state && state.message) || (connected ? 'Connecté' : 'Interface non connectée')), connected);
 
@@ -2214,6 +2215,17 @@
       } finally { clearTimeout(timeout); }
     }
 
+    const explicitTransport = window.CLExplicitTransport({
+      source: 'AB',
+      readLocalPlaying: () => Boolean(lastKnownAbState && lastKnownAbState.is_playing),
+      optimistic: playing => {
+        abPauseResumeEl.classList.toggle('is-paused', !playing);
+        abPauseResumeEl.setAttribute('aria-label', playing ? 'Mettre la lecture en pause' : 'Reprendre la lecture');
+      },
+      fetchJSON, applyState: applyStatus,
+      onError: () => setStatus('○ Lecture / pause impossible', false)
+    });
+
     async function update() {
       if (busy) return;
       try { applyStatus(await fetchJSON('/status', {}, 1800)); }
@@ -2352,18 +2364,7 @@
     }
 
     async function togglePlayPauseFromKeyboard() {
-      try {
-        setStatus('● Lecture / pause…', true);
-        const data = await fetchJSON('/action', {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({action: 'pause'})
-        }, 1800);
-        if (data && data.state) applyStatus(data.state);
-        else await update();
-      } catch (_) {
-        setStatus('○ Lecture / pause impossible', false);
-      }
+      return explicitTransport.click();
     }
 
     function keyboardShortcutBlockReason(event) {
