@@ -100,10 +100,17 @@
 
 - (instancetype)initWithBank:(NSUInteger)bank channel:(NSNumber *)channel
 {
+    return [self initWithMSB:bank LSB:0 channel:channel];
+}
+
+- (instancetype)initWithMSB:(NSUInteger)msb LSB:(NSUInteger)lsb channel:(NSNumber *)channel
+{
     self = [super initWithKind:CLCommandKindBank name:@"Bank"];
     if (self)
     {
-        _bank = bank;
+        _msb = msb & 0x7F;
+        _lsb = lsb & 0x7F;
+        _bank = _msb;
         _channel = channel;
     }
     return self;

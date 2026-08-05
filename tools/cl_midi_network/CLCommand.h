@@ -83,10 +83,16 @@ typedef NS_ENUM(NSUInteger, CLTransportAction)
 @interface CLBankCommand : CLCommand
 
 @property (nonatomic, readonly) NSUInteger bank;
+@property (nonatomic, readonly) NSUInteger msb;
+@property (nonatomic, readonly) NSUInteger lsb;
 @property (nonatomic, readonly, nullable) NSNumber *channel;
 
 - (instancetype)initWithBank:(NSUInteger)bank
                       channel:(nullable NSNumber *)channel;
+
+- (instancetype)initWithMSB:(NSUInteger)msb
+                         LSB:(NSUInteger)lsb
+                     channel:(nullable NSNumber *)channel;
 
 @end
 

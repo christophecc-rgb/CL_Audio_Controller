@@ -2,6 +2,13 @@
 #import "CLCommand.h"
 #import "CLMIDIEvent.h"
 
+@interface CLMIDICommandInterpreter ()
+{
+    NSUInteger _bankMSB[16];
+    NSUInteger _bankLSB[16];
+}
+@end
+
 @implementation CLMIDICommandInterpreter
 
 - (NSArray<CLCommand *> *)commandsForEvent:(CLMIDIEvent *)event
@@ -28,8 +35,18 @@
                  event.controller.unsignedIntegerValue == 32) &&
                 event.value != nil)
             {
+                NSUInteger channelIndex = event.channel.unsignedIntegerValue - 1;
+                if (event.controller.unsignedIntegerValue == 0)
+                {
+                    _bankMSB[channelIndex] = event.value.unsignedIntegerValue;
+                }
+                else
+                {
+                    _bankLSB[channelIndex] = event.value.unsignedIntegerValue;
+                }
                 return @[[[CLBankCommand alloc]
-                    initWithBank:event.value.unsignedIntegerValue
+                    initWithMSB:_bankMSB[channelIndex]
+                             LSB:_bankLSB[channelIndex]
                          channel:event.channel]];
             }
             break;

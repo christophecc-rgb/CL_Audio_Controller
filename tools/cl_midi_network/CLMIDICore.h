@@ -1,5 +1,4 @@
 #import <Foundation/Foundation.h>
-#import <CoreMIDI/CoreMIDI.h>
 #import "CLCommand.h"
 
 @interface CLMIDICore : NSObject
