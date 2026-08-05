@@ -65,6 +65,15 @@ MACOSX_DEPLOYMENT_TARGET=10.15 clang -arch arm64 -arch x86_64 -fobjc-arc -fblock
   -framework Foundation -framework CoreMIDI \
   "$SCRIPT_DIR/CLMIDIMonitor.m" "$OUTPUT_DIR/libCLMIDIFramework.a" \
   -o "$OUTPUT_DIR/CLMIDIMonitor"
+
+MACOSX_DEPLOYMENT_TARGET=10.15 clang -arch arm64 -arch x86_64 -fobjc-arc -fblocks \
+  -framework Foundation -framework CoreMIDI \
+  "$SCRIPT_DIR/CLLogicTransportState.m" \
+  "$SCRIPT_DIR/CLLogicTransportAdapter.m" \
+  "$SCRIPT_DIR/CLLogicBridge.m" \
+  "$SCRIPT_DIR/CLLogicBridgeMain.m" \
+  "$OUTPUT_DIR/libCLMIDIFramework.a" \
+  -o "$OUTPUT_DIR/CLLogicBridge"
 echo "$OUTPUT_DIR/CLMIDINetworkGuardian"
 echo "$OUTPUT_DIR/CLMIDIRTPAgent"
 echo "$OUTPUT_DIR/CLYamahaConsoleSimulator"
@@ -75,3 +84,4 @@ echo "$OUTPUT_DIR/CLYamahaSimulatorDashboard"
 echo "$OUTPUT_DIR/CLMIDIPerformanceMonitor"
 echo "$OUTPUT_DIR/CLMIDICoreMIDIAnalyzer"
 echo "$OUTPUT_DIR/CLMIDIMonitor"
+echo "$OUTPUT_DIR/CLLogicBridge"
