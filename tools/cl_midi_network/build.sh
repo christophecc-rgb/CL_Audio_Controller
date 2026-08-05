@@ -50,6 +50,7 @@ clang -arch arm64 -arch x86_64 -mmacosx-version-min=10.15 \
   -framework Foundation -framework CoreMIDI \
   "$SCRIPT_DIR/CLMIDICore.m" \
   "$SCRIPT_DIR/CLMIDILogger.m" \
+  "$SCRIPT_DIR/CLMIDIPacket.m" \
   "$SCRIPT_DIR/CLMIDICoreMIDIAnalyzer.m" \
   -o "$OUTPUT_DIR/CLMIDICoreMIDIAnalyzer"
 echo "$OUTPUT_DIR/CLMIDINetworkGuardian"

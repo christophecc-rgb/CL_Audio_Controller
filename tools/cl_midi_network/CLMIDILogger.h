@@ -1,6 +1,8 @@
 #import <Foundation/Foundation.h>
 #import <CoreMIDI/CoreMIDI.h>
 
+@class CLMIDIPacket;
+
 NS_ASSUME_NONNULL_BEGIN
 
 @interface CLMIDILogger : NSObject
@@ -12,6 +14,8 @@ NS_ASSUME_NONNULL_BEGIN
           length:(NSUInteger)length
        timestamp:(MIDITimeStamp)timestamp
       sourceName:(nullable NSString *)sourceName;
+
+- (void)logPacket:(CLMIDIPacket *)packet;
 
 @end
 

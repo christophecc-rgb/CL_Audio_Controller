@@ -1,4 +1,5 @@
 #import "CLMIDILogger.h"
+#import "CLMIDIPacket.h"
 
 @implementation CLMIDILogger
 
@@ -15,10 +16,12 @@
 
     for (UInt32 index = 0; index < packetList->numPackets; index++)
     {
-        [self logBytes:packet->data
-                length:packet->length
-             timestamp:packet->timeStamp
-            sourceName:sourceName];
+        CLMIDIPacket *receivedPacket = [[CLMIDIPacket alloc]
+            initWithBytes:packet->data
+                   length:packet->length
+                timestamp:packet->timeStamp
+               sourceName:sourceName];
+        [self logPacket:receivedPacket];
         packet = MIDIPacketNext(packet);
     }
 }
@@ -33,18 +36,25 @@
         return;
     }
 
-    NSMutableString *hex = [NSMutableString stringWithCapacity:length * 3];
-    for (NSUInteger index = 0; index < length; index++)
-    {
-        [hex appendFormat:index == 0 ? @"%02X" : @" %02X", bytes[index]];
-    }
+    CLMIDIPacket *packet = [[CLMIDIPacket alloc] initWithBytes:bytes
+                                                       length:length
+                                                    timestamp:timestamp
+                                                   sourceName:sourceName];
+    [self logPacket:packet];
+}
 
-    NSString *label = sourceName.length > 0 ? sourceName : @"<unknown>";
-    NSLog(@"RX [%@] timestamp=%llu length=%lu | %@",
-          label,
-          (unsigned long long)timestamp,
-          (unsigned long)length,
-          hex);
+- (void)logPacket:(CLMIDIPacket *)packet
+{
+    NSString *channelText = packet.channel != nil
+        ? [NSString stringWithFormat:@" ch.%@", packet.channel]
+        : @"";
+    NSLog(@"RX [%@] %@%@ timestamp=%llu length=%lu | %@",
+          packet.sourceName,
+          packet.messageType,
+          channelText,
+          (unsigned long long)packet.timestamp,
+          (unsigned long)packet.data.length,
+          packet.hexString);
 }
 
 - (NSString *)nameForEndpoint:(MIDIEndpointRef)endpoint
