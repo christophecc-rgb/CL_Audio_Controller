@@ -37,10 +37,13 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, nullable) NSString *typeFilter;
 @property (nonatomic, copy, nullable) NSString *sourceFilter;
 @property (nonatomic, copy, nullable) NSString *searchText;
+/// Zero retains the complete capture.
+@property (nonatomic) NSUInteger maximumRecordCount;
 @property (nonatomic, copy, readonly) NSArray<CLMIDIAnalyzerRecord *> *records;
 @property (nonatomic, copy, readonly) NSArray<CLMIDIAnalyzerRecord *> *visibleRecords;
 
 - (void)addRecord:(CLMIDIAnalyzerRecord *)record;
+- (void)addRecords:(NSArray<CLMIDIAnalyzerRecord *> *)records;
 - (nullable CLMIDIAnalyzerRecord *)recordForEvent:(CLMIDIEvent *)event;
 - (void)clear;
 - (NSString *)textLog;

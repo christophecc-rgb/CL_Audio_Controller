@@ -55,6 +55,15 @@ int main(void)
         [session clear];
         NSCAssert(session.records.count == 0, @"Clear failed");
 
+        session.maximumRecordCount = 2;
+        [session addRecords:@[programRecord, stopRecord, programRecord]];
+        NSCAssert(session.records.count == 2, @"Retention limit failed");
+        NSCAssert(session.records.firstObject == stopRecord, @"Retention must discard oldest rows");
+        NSArray<CLMIDIAnalyzerRecord *> *cachedRows = session.visibleRecords;
+        NSCAssert(cachedRows == session.visibleRecords, @"Visible row cache was rebuilt unnecessarily");
+        session.maximumRecordCount = 0;
+        [session clear];
+
         const UInt8 noteOnBytes[] = {0x90, 60, 100};
         const UInt8 noteOffBytes[] = {0x80, 60, 0};
         const UInt8 pitchBendBytes[] = {0xE0, 0, 64};
