@@ -1,5 +1,6 @@
 #import <Foundation/Foundation.h>
 #import "CLMIDIAnalyzerModel.h"
+#import "CLMIDICommandInterpreter.h"
 
 static CLMIDIEvent *Event(const UInt8 *bytes, NSUInteger length, NSString *source)
 {
@@ -53,6 +54,51 @@ int main(void)
 
         [session clear];
         NSCAssert(session.records.count == 0, @"Clear failed");
+
+        const UInt8 noteOnBytes[] = {0x90, 60, 100};
+        const UInt8 noteOffBytes[] = {0x80, 60, 0};
+        const UInt8 pitchBendBytes[] = {0xE0, 0, 64};
+        const UInt8 sysExBytes[] = {0xF0, 0x43, 0x10, 0xF7};
+        const UInt8 activeSenseBytes[] = {0xFE};
+        const UInt8 allProgramBytes[] = {0xCF, 42};
+        CLMIDIEvent *allEvents[] = {
+            Event(noteOnBytes, sizeof(noteOnBytes), @"Test"),
+            Event(noteOffBytes, sizeof(noteOffBytes), @"Test"),
+            Event(pitchBendBytes, sizeof(pitchBendBytes), @"Test"),
+            Event(sysExBytes, sizeof(sysExBytes), @"Test"),
+            Event(activeSenseBytes, sizeof(activeSenseBytes), @"Test"),
+            Event(allProgramBytes, sizeof(allProgramBytes), @"Test")
+        };
+        CLMIDICommandInterpreter *interpreter = [CLMIDICommandInterpreter new];
+        NSUInteger producedCommandCount = 0;
+        for (NSUInteger index = 0; index < 6; index++)
+        {
+            CLMIDIAnalyzerRecord *record = [[CLMIDIAnalyzerRecord alloc]
+                initWithCommand:nil
+                           event:allEvents[index]
+                       direction:@"RX"
+                       timestamp:[NSDate date]];
+            [session addRecord:record];
+            NSArray<CLCommand *> *commands = [interpreter commandsForEvent:allEvents[index]];
+            if (commands.firstObject != nil)
+            {
+                [record applyCommand:commands.firstObject];
+                producedCommandCount += commands.count;
+            }
+        }
+        NSCAssert(session.records.count == 6, @"Every MIDI event must produce one row");
+        NSCAssert(producedCommandCount == 1, @"Only Program Change should produce a command");
+        for (NSUInteger index = 0; index < 5; index++)
+        {
+            CLMIDIAnalyzerRecord *record = session.records[index];
+            NSCAssert(record.command == nil, @"Non-command event unexpectedly has a command");
+            NSCAssert([record.detailText containsString:@"CLCommand\n(none)"],
+                      @"Missing explicit command absence");
+        }
+        CLMIDIAnalyzerRecord *correlatedProgram = session.records[5];
+        NSCAssert(correlatedProgram.command != nil, @"Program command was not correlated");
+        NSCAssert([correlatedProgram.commandTypeText isEqualToString:@"PROGRAM"],
+                  @"Program row was not enriched");
     }
     return 0;
 }

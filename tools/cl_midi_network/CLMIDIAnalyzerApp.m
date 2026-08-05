@@ -166,6 +166,10 @@
     (void)sender;
     if (self.core != nil) return;
     self.core = [CLMIDICore new];
+    __weak typeof(self) weakSelf = self;
+    self.core.eventHandler = ^(CLMIDIEvent *event) {
+        [weakSelf receiveEvent:event];
+    };
     self.core.commandReceiver = self;
     if (![self.core startMonitoring])
     {
@@ -182,6 +186,7 @@
 - (void)stopMonitoring:(id)sender
 {
     (void)sender;
+    self.core.eventHandler = nil;
     [self.core stopMonitoring];
     self.core = nil;
     self.statusLabel.stringValue = @"Stopped";
@@ -224,13 +229,23 @@
 - (void)receiveCommand:(CLCommand *)command originatingEvent:(CLMIDIEvent *)event
 {
     dispatch_async(dispatch_get_main_queue(), ^{
+        CLMIDIAnalyzerRecord *record = [self.session recordForEvent:event];
+        if (record == nil) return;
+        [record applyCommand:command];
+        [self.tableView reloadData];
+    });
+}
+
+- (void)receiveEvent:(CLMIDIEvent *)event
+{
+    dispatch_async(dispatch_get_main_queue(), ^{
         CLMIDIAnalyzerRecord *record = [[CLMIDIAnalyzerRecord alloc]
-            initWithCommand:command event:event direction:@"RX" timestamp:[NSDate date]];
+            initWithCommand:nil event:event direction:@"RX" timestamp:[NSDate date]];
         [self.session addRecord:record];
         [self.tableView reloadData];
         NSInteger row = (NSInteger)self.session.visibleRecords.count - 1;
         if (row >= 0) [self.tableView scrollRowToVisible:row];
-        self.statusLabel.stringValue = [NSString stringWithFormat:@"Monitoring · %lu commands",
+        self.statusLabel.stringValue = [NSString stringWithFormat:@"Monitoring · %lu events",
             (unsigned long)self.session.records.count];
     });
 }

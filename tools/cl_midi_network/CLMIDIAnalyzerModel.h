@@ -7,7 +7,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @property (nonatomic, strong, readonly) NSDate *receivedAt;
 @property (nonatomic, copy, readonly) NSString *direction;
-@property (nonatomic, strong, readonly) CLCommand *command;
+@property (nonatomic, strong, readonly, nullable) CLCommand *command;
 @property (nonatomic, strong, readonly) CLMIDIEvent *event;
 @property (nonatomic, strong, readonly) CLMIDIPacket *packet;
 
@@ -22,10 +22,12 @@ NS_ASSUME_NONNULL_BEGIN
 - (instancetype)init NS_UNAVAILABLE;
 + (instancetype)new NS_UNAVAILABLE;
 
-- (instancetype)initWithCommand:(CLCommand *)command
+- (instancetype)initWithCommand:(nullable CLCommand *)command
                            event:(CLMIDIEvent *)event
                        direction:(NSString *)direction
                        timestamp:(NSDate *)timestamp NS_DESIGNATED_INITIALIZER;
+
+- (void)applyCommand:(CLCommand *)command;
 
 @end
 
@@ -39,6 +41,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy, readonly) NSArray<CLMIDIAnalyzerRecord *> *visibleRecords;
 
 - (void)addRecord:(CLMIDIAnalyzerRecord *)record;
+- (nullable CLMIDIAnalyzerRecord *)recordForEvent:(CLMIDIEvent *)event;
 - (void)clear;
 - (NSString *)textLog;
 

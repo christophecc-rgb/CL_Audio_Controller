@@ -124,6 +124,11 @@ static void CLMIDINotifyProc(const MIDINotification *message, void *refCon)
 {
     (void)port;
     CLMIDIEvent *event = [[CLMIDIEvent alloc] initWithPacket:packet];
+    void (^eventHandler)(CLMIDIEvent *) = self.eventHandler;
+    if (eventHandler != nil)
+    {
+        eventHandler(event);
+    }
     [_logger logEvent:event];
     for (CLCommand *command in [_commandInterpreter commandsForEvent:event])
     {
