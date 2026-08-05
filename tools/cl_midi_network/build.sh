@@ -45,18 +45,26 @@ clang -arch arm64 -arch x86_64 -mmacosx-version-min=10.15 -fobjc-arc -fblocks \
   "$SCRIPT_DIR/CLMIDIPerformanceMonitor.m" \
   -o "$OUTPUT_DIR/CLMIDIPerformanceMonitor"
 
-clang -arch arm64 -arch x86_64 -mmacosx-version-min=10.15 \
-  -fobjc-arc -fblocks \
+FRAMEWORK_SOURCES=(CLCommand CLMIDICore CLMIDICommandInterpreter CLMIDIEvent CLMIDILogger CLMIDIPacket CLMIDIPort)
+FRAMEWORK_OBJECTS=()
+mkdir -p "$OUTPUT_DIR/framework-objects"
+for source_name in $FRAMEWORK_SOURCES; do
+  object_path="$OUTPUT_DIR/framework-objects/$source_name.o"
+  clang -arch arm64 -arch x86_64 -mmacosx-version-min=10.15 -fobjc-arc -fblocks \
+    -c "$SCRIPT_DIR/$source_name.m" -o "$object_path"
+  FRAMEWORK_OBJECTS+=("$object_path")
+done
+libtool -static -o "$OUTPUT_DIR/libCLMIDIFramework.a" $FRAMEWORK_OBJECTS
+
+MACOSX_DEPLOYMENT_TARGET=10.15 clang -arch arm64 -arch x86_64 -fobjc-arc -fblocks \
   -framework Foundation -framework CoreMIDI \
-  "$SCRIPT_DIR/CLCommand.m" \
-  "$SCRIPT_DIR/CLMIDICore.m" \
-  "$SCRIPT_DIR/CLMIDICommandInterpreter.m" \
-  "$SCRIPT_DIR/CLMIDIEvent.m" \
-  "$SCRIPT_DIR/CLMIDILogger.m" \
-  "$SCRIPT_DIR/CLMIDIPacket.m" \
-  "$SCRIPT_DIR/CLMIDIPort.m" \
-  "$SCRIPT_DIR/CLMIDICoreMIDIAnalyzer.m" \
+  "$SCRIPT_DIR/CLMIDICoreMIDIAnalyzer.m" "$OUTPUT_DIR/libCLMIDIFramework.a" \
   -o "$OUTPUT_DIR/CLMIDICoreMIDIAnalyzer"
+
+MACOSX_DEPLOYMENT_TARGET=10.15 clang -arch arm64 -arch x86_64 -fobjc-arc -fblocks \
+  -framework Foundation -framework CoreMIDI \
+  "$SCRIPT_DIR/CLMIDIMonitor.m" "$OUTPUT_DIR/libCLMIDIFramework.a" \
+  -o "$OUTPUT_DIR/CLMIDIMonitor"
 echo "$OUTPUT_DIR/CLMIDINetworkGuardian"
 echo "$OUTPUT_DIR/CLMIDIRTPAgent"
 echo "$OUTPUT_DIR/CLYamahaConsoleSimulator"
@@ -66,3 +74,4 @@ echo "$OUTPUT_DIR/CLMIDINetworkDashboard"
 echo "$OUTPUT_DIR/CLYamahaSimulatorDashboard"
 echo "$OUTPUT_DIR/CLMIDIPerformanceMonitor"
 echo "$OUTPUT_DIR/CLMIDICoreMIDIAnalyzer"
+echo "$OUTPUT_DIR/CLMIDIMonitor"
