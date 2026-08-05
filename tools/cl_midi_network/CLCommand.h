@@ -1,5 +1,7 @@
 #import <Foundation/Foundation.h>
 
+@class CLMIDIEvent;
+
 NS_ASSUME_NONNULL_BEGIN
 
 typedef NS_ENUM(NSUInteger, CLCommandKind)
@@ -109,6 +111,14 @@ typedef NS_ENUM(NSUInteger, CLTransportAction)
 @protocol CLCommandReceiver <NSObject>
 
 - (void)receiveCommand:(CLCommand *)command;
+
+@end
+
+
+@protocol CLCommandTraceReceiver <CLCommandReceiver>
+
+- (void)receiveCommand:(CLCommand *)command
+       originatingEvent:(CLMIDIEvent *)event;
 
 @end
 

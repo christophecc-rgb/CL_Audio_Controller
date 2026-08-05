@@ -127,7 +127,15 @@ static void CLMIDINotifyProc(const MIDINotification *message, void *refCon)
     [_logger logEvent:event];
     for (CLCommand *command in [_commandInterpreter commandsForEvent:event])
     {
-        [self.commandReceiver receiveCommand:command];
+        id<CLCommandReceiver> receiver = self.commandReceiver;
+        if ([receiver conformsToProtocol:@protocol(CLCommandTraceReceiver)])
+        {
+            [(id<CLCommandTraceReceiver>)receiver receiveCommand:command originatingEvent:event];
+        }
+        else
+        {
+            [self.commandReceiver receiveCommand:command];
+        }
     }
 }
 
