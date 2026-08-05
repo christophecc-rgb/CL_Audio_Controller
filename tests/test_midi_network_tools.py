@@ -101,6 +101,8 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn("initWithPacket:packet", core_source)
         self.assertIn("[_logger logEvent:event]", core_source)
         self.assertIn('event.program', logger_source)
+        self.assertIn("commandsForEvent:event", core_source)
+        self.assertIn("[self.commandReceiver receiveCommand:command]", core_source)
 
     def test_dashboard_exposes_visible_rtp_status_and_real_round_trip(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text()

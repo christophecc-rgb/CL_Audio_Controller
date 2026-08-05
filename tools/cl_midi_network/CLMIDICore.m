@@ -1,5 +1,7 @@
 #import "CLMIDICore.h"
+#import "CLCommand.h"
 #import "CLMIDIEvent.h"
+#import "CLMIDICommandInterpreter.h"
 #import "CLMIDILogger.h"
 #import "CLMIDIPacket.h"
 #import "CLMIDIPort.h"
@@ -9,6 +11,7 @@
     MIDIClientRef _client;
     CLMIDIPort *_inputPort;
     CLMIDILogger *_logger;
+    id<CLMIDIEventCommandInterpreting> _commandInterpreter;
 }
 
 - (void)refreshSources;
@@ -39,6 +42,7 @@ static void CLMIDINotifyProc(const MIDINotification *message, void *refCon)
     if (self)
     {
         _logger = [CLMIDILogger new];
+        _commandInterpreter = [CLMIDICommandInterpreter new];
     }
     return self;
 }
@@ -121,6 +125,10 @@ static void CLMIDINotifyProc(const MIDINotification *message, void *refCon)
     (void)port;
     CLMIDIEvent *event = [[CLMIDIEvent alloc] initWithPacket:packet];
     [_logger logEvent:event];
+    for (CLCommand *command in [_commandInterpreter commandsForEvent:event])
+    {
+        [self.commandReceiver receiveCommand:command];
+    }
 }
 
 - (NSString *)nameForEndpoint:(MIDIEndpointRef)endpoint
