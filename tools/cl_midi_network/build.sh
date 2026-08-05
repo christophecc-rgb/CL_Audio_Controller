@@ -40,6 +40,19 @@ clang -arch arm64 -arch x86_64 -mmacosx-version-min=10.15 -fobjc-arc -fblocks \
   "$SCRIPT_DIR/CLYamahaSimulatorDashboard.m" \
   -o "$OUTPUT_DIR/CLYamahaSimulatorDashboard"
 
+clang -arch arm64 -arch x86_64 -mmacosx-version-min=10.15 -fobjc-arc -fblocks \
+  -framework AppKit -framework Foundation -framework CoreMIDI \
+  "$SCRIPT_DIR/CLMIDIPerformanceMonitor.m" \
+  -o "$OUTPUT_DIR/CLMIDIPerformanceMonitor"
+
+clang -arch arm64 -arch x86_64 -mmacosx-version-min=10.15 \
+  -fobjc-arc -fblocks \
+  -framework Foundation \
+-framework Foundation \
+-framework CoreMIDI \
+"$SCRIPT_DIR/CLMIDICore.m" \
+"$SCRIPT_DIR/CLMIDICoreMIDIAnalyzer.m" \
+-o "$OUTPUT_DIR/CLMIDICoreMIDIAnalyzer"
 echo "$OUTPUT_DIR/CLMIDINetworkGuardian"
 echo "$OUTPUT_DIR/CLMIDIRTPAgent"
 echo "$OUTPUT_DIR/CLYamahaConsoleSimulator"
@@ -47,3 +60,5 @@ echo "$OUTPUT_DIR/CLMIDIRTPResponder"
 echo "$OUTPUT_DIR/CLMIDIRoundTripTester"
 echo "$OUTPUT_DIR/CLMIDINetworkDashboard"
 echo "$OUTPUT_DIR/CLYamahaSimulatorDashboard"
+echo "$OUTPUT_DIR/CLMIDIPerformanceMonitor"
+echo "$OUTPUT_DIR/CLMIDICoreMIDIAnalyzer"
