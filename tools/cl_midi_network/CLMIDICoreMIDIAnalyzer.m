@@ -9,7 +9,12 @@ int main(int argc,const char * argv[])
 
         [midi scanPorts];
 
-        [midi startMonitoring];
+        if (![midi startMonitoring])
+        {
+            return 1;
+        }
+
+        [[NSRunLoop currentRunLoop] run];
     }
 
     return 0;

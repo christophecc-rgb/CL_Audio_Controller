@@ -4,6 +4,7 @@
 @interface CLMIDICore : NSObject
 
 - (void)scanPorts;
-- (void)startMonitoring;
+- (BOOL)startMonitoring;
+- (void)stopMonitoring;
 
 @end
