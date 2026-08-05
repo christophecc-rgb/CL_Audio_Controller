@@ -1,11 +1,11 @@
 #import <Foundation/Foundation.h>
-@class CLMIDIPacket;
+@class CLMIDIEvent;
 
 NS_ASSUME_NONNULL_BEGIN
 
 @interface CLMIDILogger : NSObject
 
-- (void)logPacket:(CLMIDIPacket *)packet;
+- (void)logEvent:(CLMIDIEvent *)event;
 
 @end
 

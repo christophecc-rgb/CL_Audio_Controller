@@ -98,8 +98,9 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn("didReceivePacket:receivedPacket", port_source)
         self.assertIn("kMIDIMsgObjectAdded", core_source)
         self.assertIn("kMIDIMsgObjectRemoved", core_source)
-        self.assertIn("[_logger logPacket:packet]", core_source)
-        self.assertIn('Program %u', logger_source)
+        self.assertIn("initWithPacket:packet", core_source)
+        self.assertIn("[_logger logEvent:event]", core_source)
+        self.assertIn('event.program', logger_source)
 
     def test_dashboard_exposes_visible_rtp_status_and_real_round_trip(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text()
