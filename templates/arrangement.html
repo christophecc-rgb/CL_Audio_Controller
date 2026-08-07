@@ -56,6 +56,14 @@
 .status.connected { color: #8bc34a; }
 .status.disconnected { color: #ef9a9a; }
 
+.midi-returns { display:grid; grid-template-columns:1fr 1fr; gap:7px; min-height:116px; }
+.midi-return { border:1.5px solid var(--border); border-radius:16px; padding:14px 12px; background:linear-gradient(180deg,#1a1f27 0%,#12161c 100%); color:var(--muted); font-size:11px; font-weight:750; min-width:0; display:flex; flex-direction:column; justify-content:center; box-shadow:0 8px 18px rgba(0,0,0,.20); }
+.midi-return strong { display:block; color:#ffcf62; font-size:16px; line-height:1.1; }
+.midi-return-title { display:block; margin-top:7px; color:#e1e5eb; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.midi-return-state { display:block; margin-top:6px; font-size:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.midi-return.ok { border-color:#43a047; color:#8bc34a; }
+.midi-return.remembered { border-color:rgba(67,160,71,.48); color:#a7bbaa; }
+
 .topnav {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
@@ -274,28 +282,31 @@ button:disabled {
   box-shadow: 0 0 18px rgba(255,152,0,.55);
 }
 
-.arrangement-btn {
+.arrangement-indicator {
   min-height: clamp(58px, 7.5vh, 72px);
-  border: 0;
   border-radius: 15px;
-  color: white;
-  font-size: clamp(14px, 3.4vw, 18px);
-  font-weight: 1000;
-  letter-spacing: .02em;
-  background: linear-gradient(180deg, #6d28d9 0%, #5b21b6 52%, #3b0764 100%);
-  box-shadow:
-    0 0 10px rgba(91,33,182,.18),
-    0 8px 18px rgba(0,0,0,.18),
-    inset 0 1px 0 rgba(255,255,255,.08);
-  opacity: .95;
-  transition: background .18s ease, box-shadow .18s ease, opacity .18s ease;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#1b1204;
+  font-size:clamp(14px,3.4vw,18px);
+  font-weight:1000;
+  letter-spacing:.02em;
+  background:linear-gradient(180deg,#ffb74d 0%,#ef6c00 100%);
+  box-shadow:0 0 10px rgba(255,183,77,.25);
+  flex-direction:column;
+  line-height:1.1;
+  text-align:center;
+  padding:8px;
 }
 
-.arrangement-btn.arrangement-active {
-  background: linear-gradient(180deg, #ffb74d 0%, #ef6c00 100%);
-  color: #1b1204;
-  box-shadow: 0 0 10px rgba(255,183,77,.25);
-  opacity: .92;
+.arrangement-indicator small {
+  display:block;
+  margin-top:5px;
+  color:rgba(27,18,4,.76);
+  font-size:9px;
+  font-weight:800;
+  letter-spacing:.01em;
 }
 
 .select-row {
@@ -330,28 +341,6 @@ select {
   font-size: 12px;
   line-height: 1.35;
   text-align: center;
-}
-
-.position {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 5px;
-}
-
-.position .card {
-  padding: 6px 8px;
-}
-
-.position .label {
-  font-size: 8px;
-  margin-bottom: 2px;
-  letter-spacing: .05em;
-}
-
-.position .value {
-  color: var(--amber);
-  font-size: 13px;
-  font-weight: 1000;
 }
 
 body.is-arrangement-playing .card.current {
@@ -411,9 +400,6 @@ body.is-arrangement-paused .card.current {
     font-size: 10px;
     line-height: 1.2;
   }
-  .position {
-    margin-top: -4px;
-  }
 }
 
 @media (orientation:landscape) {
@@ -427,9 +413,6 @@ body.is-arrangement-paused .card.current {
   .big-go { min-height:96px; font-size:42px; }
   .scene-name { font-size:clamp(30px,6vw,54px); }
   .next .scene-name { font-size:clamp(26px,5vw,46px); }
-  .position .card { padding:6px 8px; }
-  .position .label { font-size:8px; margin-bottom:2px; }
-  .position .value { font-size:13px; }
   .small { display:none; }
 }
     
@@ -440,8 +423,9 @@ body.is-arrangement-paused .card.current {
     <div class="status disconnected" id="status">Connexion…</div>
     <nav class="topnav"><a href="/">Session</a><a href="/ab">A/B</a><a href="/arrangement" class="active">Arrangement</a></nav>
 
-    <section class="arrangement-warning" role="alert">
-      Attention : vous êtes en mode Arrangement. Vérifiez la position de lecture avant toute commande.
+    <section class="midi-returns" aria-label="Retours MIDI consoles">
+      <div class="midi-return" id="arrCl5Return"><strong id="arrCl5Program">CL5 · scène —</strong><span class="midi-return-title" id="arrCl5Title">Titre en attente</span><span class="midi-return-state" id="arrCl5State">En attente du premier retour</span></div>
+      <div class="midi-return" id="arrQl1Return"><strong id="arrQl1Program">QL1 · scène —</strong><span class="midi-return-title" id="arrQl1Title">Titre en attente</span><span class="midi-return-state" id="arrQl1State">En attente du premier retour</span></div>
     </section>
 
     <section class="ltc-display ltc-display--disconnected" aria-live="polite" aria-label="Retour LTC timecode">
@@ -473,9 +457,7 @@ body.is-arrangement-paused .card.current {
     <div class="transport-row" aria-label="Transport Arrangement">
       <button class="grey transport-toggle" id="pauseToggleBtn" data-action="arrangement_toggle">
       </button>
-      <button class="arrangement-btn" data-action="back_to_arrangement">
-        MODE SESSION
-      </button>
+      <div class="arrangement-indicator" id="arrangementIndicator" role="status"><strong id="arrangementIndicatorTitle">ARRANGEMENT ACTIF</strong><small>Vérifier la position avant toute commande</small></div>
     </div>
   </section>
 
@@ -489,17 +471,6 @@ body.is-arrangement-paused .card.current {
       </div>
     </section>
 
-
-        <div class="position">
-      <section class="card">
-        <div class="label">Scène</div>
-        <div class="value" id="countLabel">— / —</div>
-      </section>
-      <section class="card">
-        <div class="label">Position</div>
-        <div class="value" id="timeLabel">00:00</div>
-      </section>
-    </div>
   </section>
 </div>
 
@@ -515,8 +486,8 @@ body.is-arrangement-paused .card.current {
     const ltcTimecodeEl = document.getElementById('ltcTimecode');
     const nextMetaEl = document.getElementById('nextMeta');
     const nextCardEl = document.querySelector('.card.next');
-    const countLabelEl = document.getElementById('countLabel');
-    const timeLabelEl = document.getElementById('timeLabel');
+    const arrCl5Return = document.getElementById('arrCl5Return');
+    const arrQl1Return = document.getElementById('arrQl1Return');
     const markerSelectEl = document.getElementById('markerSelect');
     const gotoBtn = document.getElementById('gotoBtn');
     const goBtn = document.getElementById('goBtn');
@@ -554,8 +525,6 @@ body.is-arrangement-paused .card.current {
       nextNameEl.textContent = '—';
       currentMetaEl.textContent = '';
       nextMetaEl.textContent = '';
-      countLabelEl.textContent = '';
-      timeLabelEl.textContent = '';
       if (markerSelectEl) markerSelectEl.innerHTML = '';
       document.body.classList.remove('is-arrangement-playing', 'is-arrangement-paused');
       if (currentCardEl) currentCardEl.classList.remove('is-playing', 'is-paused');
@@ -642,10 +611,6 @@ body.is-arrangement-paused .card.current {
   // Plus aucune info secondaire sous les titres
   currentMetaEl.textContent = '';
   nextMetaEl.textContent = '';
-
-  // Plus de timecode / compteur de repères affiché
-  countLabelEl.textContent = '';
-  timeLabelEl.textContent = '';
 
   if (!markerSelectIsOpen && markerSelectEl && markers[displayNextIndex] && pendingGotoIndex === null) {
     markerSelectEl.value = String(displayNextIndex);
@@ -775,7 +740,6 @@ body.is-arrangement-paused .card.current {
 
       nextNameEl.textContent = cleanTitle(marker.name || 'Repère');
       nextMetaEl.textContent = '';
-      countLabelEl.textContent = '';
 
       if (animate && nextCardEl) {
         nextCardEl.classList.add('is-prepared');
@@ -790,6 +754,30 @@ body.is-arrangement-paused .card.current {
     function applyStatus(state) {
       if (!acceptStateGeneration(state)) return;
       if (window.CLRemoteLTC) window.CLRemoteLTC.render(ltcTimecodeEl, state);
+      const midi = state.midi_console || {};
+      const formatMidiAge = (seconds) => {
+        seconds = Math.max(0, Math.floor(seconds));
+        if (seconds < 60) return seconds < 2 ? 'à l’instant' : 'il y a ' + seconds + ' s';
+        const minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return 'il y a ' + minutes + ' min';
+        const hours = Math.floor(minutes / 60), rest = minutes % 60;
+        return 'il y a ' + hours + ' h' + (rest ? ' ' + rest + ' min' : '');
+      };
+      const renderConsoleReturn = (name, value, card, programId, titleId, stateId) => {
+        value = value || {};
+        const receivedAt = Number(value.received_at || 0);
+        const age = receivedAt ? Math.max(0, Date.now() / 1000 - receivedAt) : Infinity;
+        const recent = Boolean(value.received && age <= 12);
+        card.classList.toggle('ok', recent);
+        card.classList.toggle('remembered', Boolean(value.received && !recent));
+        document.getElementById(programId).textContent = name + ' · scène ' + (value.program ?? '—');
+        document.getElementById(titleId).textContent = value.title || state.arrangement_marker || 'Titre en attente';
+        document.getElementById(stateId).textContent = value.received
+          ? (recent ? '✓ Scène reçue · ' : (age <= 60 ? 'Dernière scène reçue · ' : 'Aucun retour récent · dernier ')) + (receivedAt ? formatMidiAge(age) : 'heure inconnue')
+          : 'En attente du premier retour';
+      };
+      renderConsoleReturn('CL5', midi.cl5, arrCl5Return, 'arrCl5Program', 'arrCl5Title', 'arrCl5State');
+      renderConsoleReturn('QL1', midi.ql1, arrQl1Return, 'arrQl1Program', 'arrQl1Title', 'arrQl1State');
       const connected = Boolean(state && state.connected);
       const arrangementMode = Boolean(state && state.play_mode === 'arrangement');
       if (arrangementMode) arrangementReturnActive = true;
@@ -810,22 +798,18 @@ body.is-arrangement-paused .card.current {
           ? 'LECTURE ARRANGEMENT'
           : (arrangementReturnActive && paused ? 'ARRANGEMENT EN PAUSE' : 'ARRANGEMENT ARRÊTÉ');
       }
-      const arrangementBtn = document.querySelector('button[data-action="back_to_arrangement"]');
-      if (arrangementBtn) {
-        arrangementBtn.classList.toggle('arrangement-active', arrangementReturnActive);
-        arrangementBtn.textContent = arrangementReturnActive ? 'ARRANGEMENT ACTIF' : 'MODE SESSION';
-        arrangementBtn.title = arrangementReturnActive
-          ? 'Arrangement actif : le bouton GO lance les scènes/repères Arrangement.'
-          : 'Mode Session : appuyer ici pour revenir à la lecture Arrangement.';
-      }
+      const arrangementIndicatorTitle = document.getElementById('arrangementIndicatorTitle');
+      if (arrangementIndicatorTitle) arrangementIndicatorTitle.textContent = arrangementMode ? 'ARRANGEMENT ACTIF' : 'ARRANGEMENT PRÊT';
 
-      if (pauseToggleBtn) {
-        pauseToggleBtn.textContent = playing ? '⏸ PAUSE' : '▶ LECTURE';
-        pauseToggleBtn.classList.toggle('transport-paused', paused);
+      if (
+        pauseToggleBtn &&
+        !busy &&
+        pendingArrangementDesired === null
+      ) {
+        renderArrangementTransport(playing);
       }
 
       setStatus((connected ? '● ' : '○ ') + ((state && state.message) || (connected ? 'Connecté' : 'Interface non connectée')), connected);
-      timeLabelEl.textContent = (state && state.arrangement_time_label) || '00:00';
       setMarkers(state && state.arrangement_markers, state);
       advanceNextWhenPlayheadPassed(state);
       // Debug block removed
@@ -841,14 +825,43 @@ body.is-arrangement-paused .card.current {
     function setDisabled(value) {
       busy = value;
       [...transportButtons, goBtn, previewBtn, nextBtn, gotoBtn]
-      .forEach(b => { if (b) b.disabled = value; });
+      .forEach(b => {
+        if (b && b !== pauseToggleBtn) b.disabled = value;
+      });
       if (!value) renderConduite();
+    }
+
+    let arrangementDesiredPlaying = null;
+    let pendingArrangementDesired = null;
+
+    function renderArrangementTransport(playing) {
+      arrangementDesiredPlaying = Boolean(playing);
+
+      if (!pauseToggleBtn) return;
+
+      pauseToggleBtn.textContent = arrangementDesiredPlaying
+        ? '⏸ PAUSE'
+        : '▶ LECTURE';
+
+      pauseToggleBtn.classList.toggle(
+        'transport-paused',
+        !arrangementDesiredPlaying
+      );
     }
 
     async function sendAction(payload) {
   if (busy) return;
 
   const action = payload && payload.action;
+
+  if (
+    action === 'arrangement_toggle' &&
+    typeof payload.desired_playing === 'boolean'
+  ) {
+    arrangementDesiredPlaying = payload.desired_playing;
+    renderArrangementTransport(arrangementDesiredPlaying);
+  }
+
   if (action === 'back_to_arrangement') arrangementReturnActive = true;
   if (action === 'arrangement_play_marker') arrangementReturnActive = true;
   if (action === 'arrangement_toggle') arrangementReturnActive = true;
@@ -856,14 +869,6 @@ body.is-arrangement-paused .card.current {
   setDisabled(true);
   try {
     let data = null;
-
-    if (action === 'arrangement_toggle') {
-      await fetchJSON('/action', {
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({action:'back_to_arrangement'})
-      }, 2200);
-    }
 
     data = await fetchJSON('/action', {
       method:'POST',
@@ -875,7 +880,26 @@ body.is-arrangement-paused .card.current {
   } catch (_) {
     setStatus('○ Commande Arrangement impossible', false);
   } finally {
-    setTimeout(() => { setDisabled(false); update(); }, 180);
+    setTimeout(() => {
+      setDisabled(false);
+
+      if (
+        (action === 'arrangement_toggle' || action === 'pause') &&
+        pendingArrangementDesired !== null
+      ) {
+        const queuedDesired = pendingArrangementDesired;
+        pendingArrangementDesired = null;
+
+        renderArrangementTransport(queuedDesired);
+
+        sendAction({
+          action: 'pause',
+          desired_playing: queuedDesired
+        });
+      } else {
+        update();
+      }
+    }, 80);
   }
 }
 
@@ -923,13 +947,32 @@ async function runArrangementGo() {
     selectedMarkerIndex = null;
     manualNextIndex = null;
     nextWasManuallySelected = false;
-    await update();
+
+    arrangementReturnActive = true;
+    renderArrangementTransport(true);
+
     renderConduite();
   } catch (_) {
     if (nextCardEl) nextCardEl.classList.add('is-prepared');
     setStatus('○ GO Arrangement impossible', false);
   } finally {
-    setTimeout(() => { setDisabled(false); update(); }, 180);
+    setTimeout(() => {
+      setDisabled(false);
+
+      if (pendingArrangementDesired !== null) {
+        const queuedDesired = pendingArrangementDesired;
+        pendingArrangementDesired = null;
+
+        renderArrangementTransport(queuedDesired);
+
+        sendAction({
+          action: 'pause',
+          desired_playing: queuedDesired
+        });
+      } else {
+        update();
+      }
+    }, 80);
   }
 }
 
@@ -972,7 +1015,6 @@ markerSelectEl.addEventListener('change', () => {
   nextWasManuallySelected = false;
   nextNameEl.textContent = cleanTitle(markers[idx].name || 'Repère');
   nextMetaEl.textContent = '';
-  countLabelEl.textContent = '';
   if (nextCardEl) nextCardEl.classList.add('is-prepared');
   setStatus('● Choix prêt — appuie sur Aller : ' + cleanTitle(markers[idx].name || 'Repère'), true);
 });
@@ -985,7 +1027,6 @@ markerSelectEl.addEventListener('change', () => {
       nextWasManuallySelected = false;
       nextNameEl.textContent = cleanTitle(markers[idx].name || 'Repère');
       nextMetaEl.textContent = '';
-      countLabelEl.textContent = '';
       if (nextCardEl) nextCardEl.classList.add('is-prepared');
       setStatus('● Choix prêt — appuie sur Aller : ' + cleanTitle(markers[idx].name || 'Repère'), true);
     });
@@ -1002,8 +1043,69 @@ markerSelectEl.addEventListener('change', () => {
     });
 
     function runArrangementPlayPause() {
-      return sendAction({action: pauseToggleBtn.dataset.action});
+      const confirmedPlaying = Boolean(
+        lastAcceptedGeneration !== null &&
+        arrangementDesiredPlaying
+      );
+
+      const currentPlaying = pendingArrangementDesired !== null
+        ? pendingArrangementDesired
+        : confirmedPlaying;
+
+      const desiredPlaying = !currentPlaying;
+
+      renderArrangementTransport(desiredPlaying);
+
+      if (busy) {
+        pendingArrangementDesired = desiredPlaying;
+
+        setStatus(
+          desiredPlaying
+            ? '● Lecture Arrangement demandée…'
+            : '● Pause Arrangement demandée…',
+          true
+        );
+
+        return Promise.resolve();
+      }
+
+      return sendAction({
+        action: 'pause',
+        desired_playing: desiredPlaying,
+        source: 'arrangement-play-pause'
+      });
     }
+
+    document.addEventListener('click', event => {
+      const target = event.target instanceof Element
+        ? event.target.closest('#pauseToggleBtn')
+        : null;
+
+      if (!target) return;
+
+      console.info('[ARRANGEMENT CLICK CAPTURE]', {
+        busy,
+        disabled: target.disabled,
+        connected: target.isConnected,
+        text: target.textContent,
+        timestamp: Date.now()
+      });
+
+      fetch('/keyboard-log', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          source: 'Arrangement',
+          event: 'pause-click-capture',
+          busy,
+          disabled: target.disabled,
+          connected: target.isConnected,
+          text: target.textContent,
+          timestamp: Date.now()
+        }),
+        keepalive: true
+      }).catch(() => {});
+    }, true);
 
     transportButtons.forEach(button => {
       if (button === pauseToggleBtn) {
@@ -1045,7 +1147,8 @@ markerSelectEl.addEventListener('change', () => {
     });
 
     document.addEventListener('keydown', event => {
-      const reason = keyboardShortcutBlockReason(event) || (busy ? 'busy' : '');
+      const isTransportShortcut = event.code === 'Space' || event.key === ' ';
+      const reason = keyboardShortcutBlockReason(event) || (busy && !isTransportShortcut ? 'busy' : '');
       keyboardDiagnosticLog('keydown', {
         diagnosticCase: reason ? 'CASE_2_REJECTED' : 'KEYDOWN_ACCEPTED',
         timestamp: Date.now(),
@@ -1075,6 +1178,22 @@ markerSelectEl.addEventListener('change', () => {
         event.stopPropagation();
         keyboardDiagnosticLog('invoke-play-pause', { diagnosticCase: 'CASE_3_HANDLER_CALLED', timestamp: Date.now() });
         runArrangementPlayPause();
+        return;
+      }
+
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        event.stopPropagation();
+        keyboardDiagnosticLog('invoke-preview', { diagnosticCase: 'CASE_3_HANDLER_CALLED', timestamp: Date.now() });
+        previewBtn.click();
+        return;
+      }
+
+      if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        event.stopPropagation();
+        keyboardDiagnosticLog('invoke-next', { diagnosticCase: 'CASE_3_HANDLER_CALLED', timestamp: Date.now() });
+        nextBtn.click();
       }
     });
 

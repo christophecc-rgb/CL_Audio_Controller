@@ -132,6 +132,10 @@ static BOOL CLPostDoubleClickFromConnectorReason(NSString *reason) {
 @property BOOL peerInspectionRunning;
 @property NSString *validatedEndpoint;
 @property NSDate *validatedAt;
+@property NSString *lastRTPTestStatus;
+@property NSNumber *lastRTPTestLatencyMs;
+@property NSString *lastRTPTestMessage;
+@property NSDate *lastRTPTestAt;
 @property NSString *loopDetectedEndpoint;
 @property NSTask *simulatorDashboardTask;
 @property NSTask *guardianTask;
@@ -290,6 +294,10 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     self.lastQL1Test = @"non testé";
     self.pendingCL5Program = -1;
     self.pendingQL1Program = -1;
+    self.lastRTPTestStatus = @"idle";
+    self.lastRTPTestLatencyMs = nil;
+    self.lastRTPTestMessage = @"Aucun aller-retour validé";
+    self.lastRTPTestAt = nil;
     self.lastCL5Program = -1;
     self.lastQL1Program = -1;
     NSUserDefaults *returnDefaults = NSUserDefaults.standardUserDefaults;
@@ -319,8 +327,57 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     header.layer.borderColor = [NSColor colorWithWhite:0.24 alpha:1.0].CGColor;
     [content addSubview:header];
 
-    NSString *logoPath = [NSBundle.mainBundle.resourcePath stringByAppendingPathComponent:@"paradis_latin_logo.jpg"];
-    NSImage *logo = [[NSImage alloc] initWithContentsOfFile:logoPath];
+    NSMutableArray<NSString *> *logoCandidates = [NSMutableArray array];
+
+    NSString *resourcePath = NSBundle.mainBundle.resourcePath;
+    if (resourcePath.length) {
+        [logoCandidates addObject:
+            [resourcePath stringByAppendingPathComponent:@"paradis_latin_logo.jpg"]];
+        [logoCandidates addObject:
+            [resourcePath stringByAppendingPathComponent:@"cl_audio_logo.png"]];
+        [logoCandidates addObject:
+            [resourcePath stringByAppendingPathComponent:@"assets/cl_audio_logo.png"]];
+    }
+
+    NSString *executablePath =
+        NSProcessInfo.processInfo.arguments.firstObject.stringByStandardizingPath;
+    NSString *executableDirectory =
+        executablePath.stringByDeletingLastPathComponent;
+
+    if (executableDirectory.length) {
+        [logoCandidates addObject:
+            [executableDirectory stringByAppendingPathComponent:@"paradis_latin_logo.jpg"]];
+        [logoCandidates addObject:
+            [executableDirectory stringByAppendingPathComponent:@"cl_audio_logo.png"]];
+
+        NSString *repositoryRoot =
+            [[[executableDirectory stringByDeletingLastPathComponent]
+                stringByDeletingLastPathComponent]
+                    stringByDeletingLastPathComponent];
+
+        [logoCandidates addObject:
+            [repositoryRoot stringByAppendingPathComponent:
+                @"M4L/Install/paradis_latin_logo.jpg"]];
+        [logoCandidates addObject:
+            [repositoryRoot stringByAppendingPathComponent:
+                @"assets/cl_audio_logo.png"]];
+        [logoCandidates addObject:
+            [repositoryRoot stringByAppendingPathComponent:
+                @"cl_audio_logo.png"]];
+    }
+
+    NSString *logoPath = nil;
+    for (NSString *candidate in logoCandidates) {
+        if ([NSFileManager.defaultManager fileExistsAtPath:candidate]) {
+            logoPath = candidate;
+            break;
+        }
+    }
+
+    NSImage *logo = logoPath.length
+        ? [[NSImage alloc] initWithContentsOfFile:logoPath]
+        : nil;
+
     NSImageView *logoView = [[NSImageView alloc] initWithFrame:NSMakeRect(12, 8, 444, 72)];
     logoView.image = logo;
     logoView.imageScaling = NSImageScaleProportionallyUpOrDown;
@@ -546,32 +603,108 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
 - (void)writeConsoleReturnState {
     NSString *endpoint = self.endpointMenu.selectedItem.title ?: @"";
     NSString *peer = self.targetMenu.selectedItem.title ?: @"";
+    NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
+
+    BOOL endpointAvailable =
+        endpoint.length > 0 &&
+        ![endpoint hasPrefix:@"Aucun"];
+
+    BOOL endpointValidated =
+        [self.lastRTPTestStatus isEqualToString:@"validated"] &&
+        self.validatedEndpoint &&
+        [self.validatedEndpoint isEqualToString:endpoint];
+
+    BOOL loopDetected =
+        self.loopDetectedEndpoint &&
+        [self.loopDetectedEndpoint isEqualToString:endpoint];
+
+    NSString *testText =
+        self.lastRTPTestMessage.length
+            ? self.lastRTPTestMessage
+            : (self.lastTest.stringValue ?: @"");
+
+    NSString *testStatus =
+        self.lastRTPTestStatus.length
+            ? self.lastRTPTestStatus
+            : (endpointAvailable ? @"available" : @"offline");
+
+    if (endpointValidated) testStatus = @"validated";
+    if (loopDetected) testStatus = @"loop_detected";
+
+    NSInteger requestedProgram = self.programField.integerValue;
+    NSInteger requestedChannel = self.testTargetMenu.indexOfSelectedItem + 1;
+    NSString *requestedConsole = requestedChannel == 2 ? @"QL1" : @"CL5";
+
+    id latencyValue =
+        self.lastRTPTestLatencyMs ?: NSNull.null;
+
     NSDictionary *payload = @{
+        @"schema_version": @2,
         @"service": @"cl-midi-console-monitor",
-        @"updated_at": @([[NSDate date] timeIntervalSince1970]),
+        @"source": @"CL MIDI Network Assistant",
+        @"updated_at": @(now),
+        @"online": @YES,
+
         @"rtp": @{
             @"peer": peer,
             @"endpoint": endpoint,
-            @"available": @(![endpoint hasPrefix:@"Aucun"] && endpoint.length > 0),
-            @"validated": @(self.validatedEndpoint && [self.validatedEndpoint isEqualToString:endpoint]),
-            @"loop_detected": @(self.loopDetectedEndpoint && [self.loopDetectedEndpoint isEqualToString:endpoint]),
-            @"last_test": self.lastTest.stringValue ?: @"",
+            @"available": @(endpointAvailable),
+            @"validated": @(endpointValidated),
+            @"loop_detected": @(loopDetected),
+            @"status": testStatus,
+            @"latency_ms": latencyValue,
+            @"last_test":
+                self.lastRTPTestMessage.length
+                    ? self.lastRTPTestMessage
+                    : testText,
+            @"validated_at": self.validatedAt
+                ? @([self.validatedAt timeIntervalSince1970])
+                : NSNull.null,
         },
+
+        @"test": @{
+            @"status": testStatus,
+            @"console": requestedConsole,
+            @"channel": @(requestedChannel),
+            @"program": @(requestedProgram),
+            @"latency_ms": latencyValue,
+            @"updated_at": self.lastRTPTestAt
+                ? @([self.lastRTPTestAt timeIntervalSince1970])
+                : @(now),
+        },
+
         @"cl5": @{
-            @"program": self.lastCL5Program >= 0 ? @(self.lastCL5Program + 1) : NSNull.null,
+            @"program": self.lastCL5Program >= 0
+                ? @(self.lastCL5Program + 1)
+                : NSNull.null,
             @"title": self.lastCL5Title ?: @"",
             @"received": @(self.lastCL5Program >= 0),
-            @"received_at": self.lastCL5ProgramAt ? @([self.lastCL5ProgramAt timeIntervalSince1970]) : NSNull.null,
+            @"received_at": self.lastCL5ProgramAt
+                ? @([self.lastCL5ProgramAt timeIntervalSince1970])
+                : NSNull.null,
         },
+
         @"ql1": @{
-            @"program": self.lastQL1Program >= 0 ? @(self.lastQL1Program + 1) : NSNull.null,
+            @"program": self.lastQL1Program >= 0
+                ? @(self.lastQL1Program + 1)
+                : NSNull.null,
             @"title": self.lastQL1Title ?: @"",
             @"received": @(self.lastQL1Program >= 0),
-            @"received_at": self.lastQL1ProgramAt ? @([self.lastQL1ProgramAt timeIntervalSince1970]) : NSNull.null,
+            @"received_at": self.lastQL1ProgramAt
+                ? @([self.lastQL1ProgramAt timeIntervalSince1970])
+                : NSNull.null,
         },
     };
-    NSData *data = [NSJSONSerialization dataWithJSONObject:payload options:0 error:nil];
-    [data writeToFile:@"/private/tmp/CL_MIDI_Console_State.json" options:NSDataWritingAtomic error:nil];
+
+    NSData *data =
+        [NSJSONSerialization dataWithJSONObject:payload
+                                        options:0
+                                          error:nil];
+
+    [data writeToFile:@"/private/tmp/CL_MIDI_Console_State.json"
+              options:NSDataWritingAtomic
+                error:nil];
+
     [self updateConsoleReturnCards];
 }
 
@@ -757,7 +890,27 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     self.lastTest.stringValue = @"Diagnostic actualisé · aucune reconnexion demandée";
     CLAppendDiagnostic(@"diagnostic-refresh", @"manual refresh only");
 }
-- (void)endpointChanged:(id)sender { (void)sender; self.validatedEndpoint = nil; self.loopDetectedEndpoint = nil; [self refreshEndpoints]; }
+- (void)endpointChanged:(id)sender {
+    (void)sender;
+
+    NSString *endpoint = self.endpointMenu.selectedItem.title ?: @"";
+
+    if (
+        self.validatedEndpoint.length &&
+        ![self.validatedEndpoint isEqualToString:endpoint]
+    ) {
+        self.validatedEndpoint = nil;
+        self.validatedAt = nil;
+        self.lastRTPTestStatus = @"available";
+        self.lastRTPTestLatencyMs = nil;
+        self.lastRTPTestMessage =
+            @"Nouvel endpoint sélectionné · lancez un test aller-retour";
+        self.lastRTPTestAt = [NSDate date];
+    }
+
+    self.loopDetectedEndpoint = nil;
+    [self refreshEndpoints];
+}
 - (void)targetChanged:(id)sender {
     (void)sender;
     NSString *target = self.targetMenu.selectedItem.title;
@@ -1042,13 +1195,64 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
 
     if (self.loopDetectedEndpoint && [self.loopDetectedEndpoint isEqualToString:endpoint]) {
         [self setLamp:[NSColor systemRedColor] title:@"BOUCLE MIDI DÉTECTÉE" detail:@"Dans Ableton : désactivez Entrée RTP > Piste, puis relancez le test."];
-    } else if (self.validatedEndpoint && [self.validatedEndpoint isEqualToString:endpoint]) {
-        NSTimeInterval age = -[self.validatedAt timeIntervalSinceNow];
-        [self setLamp:[NSColor systemGreenColor] title:@"RTP VALIDÉ" detail:[NSString stringWithFormat:@"Aller-retour confirmé il y a %.0f s sur %@", age, endpoint]];
+    } else if (
+        [self.lastRTPTestStatus isEqualToString:@"validated"] &&
+        self.validatedEndpoint &&
+        [self.validatedEndpoint isEqualToString:endpoint]
+    ) {
+        NSTimeInterval age =
+            self.validatedAt
+                ? MAX(0.0, -[self.validatedAt timeIntervalSinceNow])
+                : 0.0;
+
+        NSString *latency =
+            self.lastRTPTestLatencyMs
+                ? [NSString stringWithFormat:@" · %.1f ms",
+                    self.lastRTPTestLatencyMs.doubleValue]
+                : @"";
+
+        [self setLamp:
+            [NSColor systemGreenColor]
+            title:@"RTP VALIDÉ"
+            detail:[NSString stringWithFormat:
+                @"Aller-retour confirmé il y a %.0f s sur %@%@",
+                age,
+                endpoint,
+                latency]];
+
+    } else if ([self.lastRTPTestStatus isEqualToString:@"running"]) {
+        [self setLamp:
+            [NSColor systemOrangeColor]
+            title:@"TEST RTP EN COURS"
+            detail:self.lastRTPTestMessage ?: @"Vérification aller-retour…"];
+
+    } else if ([self.lastRTPTestStatus isEqualToString:@"loop_detected"]) {
+        [self setLamp:
+            [NSColor systemRedColor]
+            title:@"BOUCLE MIDI"
+            detail:self.lastRTPTestMessage ?: @"Boucle MIDI détectée"];
+
+    } else if (
+        [self.lastRTPTestStatus isEqualToString:@"timeout"] ||
+        [self.lastRTPTestStatus isEqualToString:@"send_error"] ||
+        [self.lastRTPTestStatus isEqualToString:@"failed"]
+    ) {
+        [self setLamp:
+            [NSColor systemRedColor]
+            title:@"RTP NON VALIDÉ"
+            detail:self.lastRTPTestMessage ?: @"Le dernier test a échoué"];
+
     } else if (hasSource && hasDestination) {
-        [self setLamp:[NSColor systemOrangeColor] title:@"RTP DISPONIBLE" detail:@"Le port est visible ; lancez un test pour valider le retour réel."];
+        [self setLamp:
+            [NSColor systemOrangeColor]
+            title:@"RTP DISPONIBLE"
+            detail:@"Ports visibles · lancez un test aller-retour"];
+
     } else {
-        [self setLamp:[NSColor systemRedColor] title:@"RTP HORS LIGNE" detail:@"Aucune paire entrée/sortie RTP exploitable n’est visible."];
+        [self setLamp:
+            [NSColor systemRedColor]
+            title:@"RTP HORS LIGNE"
+            detail:@"Aucune paire entrée/sortie RTP exploitable n’est visible."];
     }
     [self writeConsoleReturnState];
 }
@@ -1068,7 +1272,14 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
         return;
     }
     self.testButton.enabled = NO;
-    self.lastTest.stringValue = [NSString stringWithFormat:@"Test %@ · canal %ld · PGM %ld…", console, (long)channel, (long)program];
+    self.lastRTPTestStatus = @"running";
+    self.lastRTPTestLatencyMs = nil;
+    self.lastRTPTestAt = [NSDate date];
+    self.lastRTPTestMessage =
+        [NSString stringWithFormat:@"Test %@ · canal %ld · PGM %ld…",
+            console, (long)channel, (long)program];
+    self.lastTest.stringValue = self.lastRTPTestMessage;
+    [self writeConsoleReturnState];
     NSTask *task = [[NSTask alloc] init];
     task.executableURL = [NSURL fileURLWithPath:[self toolPath:@"CLMIDIRoundTripTester"]];
     task.arguments = @[@"--endpoint", endpoint,
@@ -1092,7 +1303,14 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
                 self.validatedEndpoint = endpoint;
                 self.loopDetectedEndpoint = nil;
                 self.validatedAt = [NSDate date];
-                self.lastTest.stringValue = [NSString stringWithFormat:@"✓ %@ · canal %ld · PGM %ld confirmé · %@ ms", console, (long)channel, (long)program, latency];
+                self.lastRTPTestStatus = @"validated";
+                self.lastRTPTestLatencyMs = @([latency doubleValue]);
+                self.lastRTPTestAt = self.validatedAt;
+                self.lastRTPTestMessage =
+                    [NSString stringWithFormat:
+                        @"✓ %@ · canal %ld · PGM %ld confirmé · %@ ms",
+                        console, (long)channel, (long)program, latency];
+                self.lastTest.stringValue = self.lastRTPTestMessage;
                 NSString *compactResult = [NSString stringWithFormat:@"PGM %ld confirmé · %@ ms", (long)program, latency];
                 if (channel == 1) self.lastCL5Test = compactResult; else self.lastQL1Test = compactResult;
             } else {
@@ -1104,10 +1322,23 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
                     : ([output rangeOfString:@"COREMIDI_CLIENT_ERROR"].location != NSNotFound ? @"CoreMIDI indisponible"
                     : ([output rangeOfString:@"RTP_ENDPOINTS_NOT_FOUND"].location != NSNotFound ? @"port RTP introuvable"
                     : ([output rangeOfString:@"COREMIDI_SEND_ERROR"].location != NSNotFound ? @"envoi CoreMIDI refusé" : @"test impossible"))));
-                self.lastTest.stringValue = [NSString stringWithFormat:@"Échec : %@", reason];
+                self.lastRTPTestStatus =
+                    loopDetected
+                        ? @"loop_detected"
+                        : ([output rangeOfString:@"TIMEOUT"].location != NSNotFound
+                            ? @"timeout"
+                            : ([output rangeOfString:@"COREMIDI_SEND_ERROR"].location != NSNotFound
+                                ? @"send_error"
+                                : @"failed"));
+                self.lastRTPTestLatencyMs = nil;
+                self.lastRTPTestAt = [NSDate date];
+                self.lastRTPTestMessage =
+                    [NSString stringWithFormat:@"Échec : %@", reason];
+                self.lastTest.stringValue = self.lastRTPTestMessage;
                 if (channel == 1) self.lastCL5Test = reason; else self.lastQL1Test = reason;
             }
             if (self.showModeEnabled) [self updateCompactSummary];
+            [self writeConsoleReturnState];
             [self refreshEndpoints];
         });
     };

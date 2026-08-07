@@ -2178,6 +2178,9 @@
       }
       if (abPauseResumeEl) {
         const isPlaying = Boolean(state && state.is_playing);
+        if (!abTransportBusy && abPendingDesiredPlaying === null) {
+          abDesiredPlaying = isPlaying;
+        }
         abPauseResumeEl.textContent = isPlaying ? 'PAUSE' : 'REPRENDRE';
         abPauseResumeEl.classList.toggle('is-paused', !isPlaying);
         abPauseResumeEl.setAttribute('aria-label', isPlaying ? 'Mettre la lecture en pause' : 'Reprendre la lecture');
@@ -2351,18 +2354,82 @@
       previewSceneSelect(true);
     }
 
-    async function togglePlayPauseFromKeyboard() {
+    let abDesiredPlaying = null;
+    let abTransportBusy = false;
+    let abPendingDesiredPlaying = null;
+
+    async function togglePlayPauseFromKeyboard(desiredPlayingOverride = null) {
+      const currentPlaying = abPendingDesiredPlaying !== null
+        ? abPendingDesiredPlaying
+        : (
+            abDesiredPlaying === null
+              ? Boolean(
+                  abPauseResumeEl &&
+                  abPauseResumeEl.textContent.trim().toUpperCase() === 'PAUSE'
+                )
+              : abDesiredPlaying
+          );
+
+      const desiredPlaying =
+        typeof desiredPlayingOverride === 'boolean'
+          ? desiredPlayingOverride
+          : !currentPlaying;
+
+      abDesiredPlaying = desiredPlaying;
+
+      if (abPauseResumeEl) {
+        abPauseResumeEl.textContent = desiredPlaying ? 'PAUSE' : 'REPRENDRE';
+        abPauseResumeEl.classList.toggle('is-paused', !desiredPlaying);
+        abPauseResumeEl.setAttribute(
+          'aria-label',
+          desiredPlaying
+            ? 'Mettre la lecture en pause'
+            : 'Reprendre la lecture'
+        );
+      }
+
+      if (abTransportBusy) {
+        abPendingDesiredPlaying = desiredPlaying;
+
+        setStatus(
+          desiredPlaying
+            ? '● Lecture demandée…'
+            : '● Pause demandée…',
+          true
+        );
+
+        return;
+      }
+
+      abTransportBusy = true;
+
       try {
         setStatus('● Lecture / pause…', true);
+
         const data = await fetchJSON('/action', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({action: 'pause'})
+          body: JSON.stringify({
+            action: 'pause',
+            desired_playing: desiredPlaying
+          })
         }, 1800);
+
         if (data && data.state) applyStatus(data.state);
         else await update();
       } catch (_) {
         setStatus('○ Lecture / pause impossible', false);
+      } finally {
+        abTransportBusy = false;
+
+        if (abPendingDesiredPlaying !== null) {
+          const queuedDesired = abPendingDesiredPlaying;
+          abPendingDesiredPlaying = null;
+
+          window.setTimeout(() => {
+            togglePlayPauseFromKeyboard(queuedDesired);
+          }, 0);
+        }
       }
     }
 

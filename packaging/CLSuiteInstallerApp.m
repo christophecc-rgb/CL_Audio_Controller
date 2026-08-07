@@ -1,5 +1,20 @@
 #import <Cocoa/Cocoa.h>
 
+static void CLInstallApplicationMenu(void) {
+    NSMenu *mainMenu = [[NSMenu alloc] initWithTitle:@""];
+    NSMenuItem *applicationItem = [[NSMenuItem alloc] initWithTitle:@"" action:nil keyEquivalent:@""];
+    NSMenu *applicationMenu = [[NSMenu alloc] initWithTitle:@""];
+    NSString *appName = NSProcessInfo.processInfo.processName;
+    NSMenuItem *quitItem = [[NSMenuItem alloc] initWithTitle:[@"Quitter " stringByAppendingString:appName]
+                                                     action:@selector(terminate:)
+                                              keyEquivalent:@"q"];
+    quitItem.keyEquivalentModifierMask = NSEventModifierFlagCommand;
+    [applicationMenu addItem:quitItem];
+    applicationItem.submenu = applicationMenu;
+    [mainMenu addItem:applicationItem];
+    NSApp.mainMenu = mainMenu;
+}
+
 @interface CLSuiteAppDelegate : NSObject <NSApplicationDelegate>
 @property NSWindow *window;
 @property NSMutableDictionary<NSString *, NSButton *> *checks;
@@ -80,6 +95,7 @@
 
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+    CLInstallApplicationMenu();
     CGFloat height = self.uninstaller ? 930 : 900;
     NSRect frame = NSMakeRect(0, 0, 760, height);
     self.window = [[NSWindow alloc] initWithContentRect:frame

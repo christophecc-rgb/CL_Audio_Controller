@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import socket
 import threading
 import time
 from contextlib import contextmanager
@@ -16,6 +17,21 @@ LOCAL_ABLETON_REPLY_PORT = 11001
 
 
 ResponseMatcher = Callable[[str, Tuple[Any, ...], Tuple[Any, ...]], bool]
+
+
+def resolve_ipv4_host(host: str) -> str:
+    """Résout explicitement une cible OSC en IPv4.
+
+    Évite que Bonjour sélectionne une adresse IPv6 link-local sans route.
+    """
+    value = str(host or "").strip()
+    if not value:
+        raise OSError("cible OSC vide")
+
+    try:
+        return socket.gethostbyname(value)
+    except socket.gaierror as exc:
+        raise OSError(f"cible OSC introuvable : {value}") from exc
 UnsolicitedHandler = Callable[..., None]
 
 
@@ -30,10 +46,14 @@ class OSCTransport:
         response_matcher: Optional[ResponseMatcher] = None,
         unsolicited_handler: Optional[UnsolicitedHandler] = None,
     ) -> None:
-        self.host = host
+        self.host = str(host)
+        self.resolved_host = resolve_ipv4_host(self.host)
         self.send_port = int(send_port)
         self.reply_port = int(reply_port)
-        self._client = udp_client.SimpleUDPClient(self.host, self.send_port)
+        self._client = udp_client.SimpleUDPClient(
+            self.resolved_host,
+            self.send_port,
+        )
         self._response_matcher = response_matcher or self._default_response_matcher
         self._unsolicited_handler = unsolicited_handler
         self._state_lock = threading.RLock()
@@ -70,7 +90,8 @@ class OSCTransport:
 
     def send_to(self, host: str, port: int, address: str, *args: Any) -> None:
         """Émet un message OSC auxiliaire sans exposer le client à la logique métier."""
-        client = udp_client.SimpleUDPClient(str(host), int(port))
+        resolved_host = resolve_ipv4_host(str(host))
+        client = udp_client.SimpleUDPClient(resolved_host, int(port))
         client.send_message(address, list(args))
 
     def _receive(self, address: str, *args: Any) -> None:
@@ -165,6 +186,8 @@ class OSCTransport:
         with self._state_lock:
             return {
                 "connected": bool(self.connected),
+                "host": self.host,
+                "resolved_host": self.resolved_host,
                 "last_response_at": self.last_response_at,
                 "last_latency_ms": self.last_latency_ms,
                 "timeout_count": int(self.timeout_count),

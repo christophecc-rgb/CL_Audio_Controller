@@ -153,6 +153,8 @@ class PackagingTests(unittest.TestCase):
         self.assertLess(installer_section.index("Paradis Latin AutoScene"), installer_section.index("Mac Télécommande"))
         self.assertLess(installer_section.index("Mac Télécommande"), installer_section.index("CL Arrangement Builder Live"))
         self.assertLess(installer_section.index("CL Arrangement Builder Live"), installer_section.index("CL MIDI Console Monitor"))
+        self.assertIn('@selector(terminate:)', source)
+        self.assertIn('keyEquivalent:@"q"', source)
 
     def test_desktop_kit_builder_is_a_macos_app_with_the_cl_icon(self):
         wrapper = (

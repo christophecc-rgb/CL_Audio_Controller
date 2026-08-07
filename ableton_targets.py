@@ -5,6 +5,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import os
+import socket
 import stat
 import tempfile
 from dataclasses import asdict, dataclass, replace
@@ -112,17 +113,32 @@ def validate_target(value: Any) -> AbletonTarget:
         raise AbletonTargetError("mode attendu : local ou remote")
     host = LOCAL_HOST if mode == "local" else str(value.get("host", "")).strip()
     if mode == "remote":
+        if not host:
+            raise AbletonTargetError("adresse ou nom du Mac Ableton manquant")
+
         try:
-            parsed = ipaddress.ip_address(host)
+            resolved_host = socket.gethostbyname(host)
+        except socket.gaierror as exc:
+            raise AbletonTargetError(
+                f"Mac Ableton introuvable : {host}"
+            ) from exc
+
+        try:
+            parsed = ipaddress.ip_address(resolved_host)
         except ValueError as exc:
-            raise AbletonTargetError("adresse IPv4 Ableton invalide") from exc
+            raise AbletonTargetError(
+                f"adresse résolue invalide pour {host}"
+            ) from exc
+
         if (
             parsed.version != 4
             or parsed.is_unspecified
             or parsed.is_multicast
             or parsed.is_loopback
         ):
-            raise AbletonTargetError("adresse IPv4 Ableton non utilisable")
+            raise AbletonTargetError(
+                f"adresse Ableton non utilisable : {host} → {resolved_host}"
+            )
     try:
         send_port = int(value.get("send_port", DEFAULT_SEND_PORT))
         reply_port = int(value.get("reply_port", DEFAULT_REPLY_PORT))

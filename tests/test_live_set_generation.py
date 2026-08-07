@@ -1,7 +1,10 @@
 import importlib.util
+import json
 import re
 import subprocess
 import sys
+import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -99,6 +102,25 @@ class LiveSetGenerationTests(unittest.TestCase):
         with mock.patch.object(self.app, "send_midi_monitor_scene_context") as publish:
             self.assertFalse(self.app.publish_current_midi_monitor_scene_context())
         publish.assert_not_called()
+
+    def test_arrangement_console_return_uses_current_marker_title(self):
+        payload = {
+            "service": "cl-midi-console-monitor",
+            "cl5": {"received": True, "received_at": time.time(), "program": 42, "title": "Ancien titre"},
+            "ql1": {"received": False},
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            state_path = Path(temporary) / "midi-state.json"
+            state_path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.app.lock:
+                self.app.state["play_mode"] = "arrangement"
+                self.app.state["arrangement_marker"] = "43. Dancing queen"
+                self.app.state["playing_scene_name"] = "Ancienne scène Session"
+                self.app.MIDI_CONSOLE_TITLE_OVERRIDES.clear()
+                with mock.patch.object(self.app, "MIDI_CONSOLE_STATE_PATH", state_path):
+                    snapshot = self.app.state_snapshot_locked()
+
+        self.assertEqual(snapshot["midi_console"]["cl5"]["title"], "43. Dancing queen")
 
     def post_action_with_playing_reply(self, action_name, playing, sent):
         with (
@@ -224,6 +246,38 @@ class LiveSetGenerationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(("/live/song/stop_playing", ()), sent)
         self.assertNotIn(("/live/song/continue_playing", ()), sent)
+
+    def test_pause_obeys_explicit_mouse_intent_without_querying_stale_state(self):
+        sent = []
+        with (
+            mock.patch.object(self.app, "query") as query,
+            mock.patch.object(self.app, "send", side_effect=lambda address, *args: sent.append((address, args))),
+        ):
+            response = self.app.app.test_client().post(
+                "/action",
+                json={"action": "pause", "desired_playing": False},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        query.assert_not_called()
+        self.assertIn(("/live/song/stop_playing", ()), sent)
+        self.assertNotIn(("/live/song/continue_playing", ()), sent)
+
+    def test_arrangement_toggle_obeys_explicit_mouse_resume_intent(self):
+        sent = []
+        with (
+            mock.patch.object(self.app, "query") as query,
+            mock.patch.object(self.app, "send", side_effect=lambda address, *args: sent.append((address, args))),
+        ):
+            response = self.app.app.test_client().post(
+                "/action",
+                json={"action": "arrangement_toggle", "desired_playing": True},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        query.assert_not_called()
+        self.assertIn(("/live/song/continue_playing", ()), sent)
+        self.assertNotIn(("/live/song/stop_playing", ()), sent)
 
     def test_toggle_refuses_if_generation_changes_during_confirmation(self):
         def change_generation(*args, **kwargs):
@@ -1016,7 +1070,7 @@ class LiveSetGenerationTests(unittest.TestCase):
         self.assertIn("Attention : vous passez en mode Arrangement", script)
         self.assertIn("window.confirm(arrangementWarning)", script)
         self.assertIn("action: 'back_to_arrangement'", script)
-        self.assertIn("Attention : vous êtes en mode Arrangement", arrangement_source)
+        self.assertIn("Vérifier la position avant toute commande", arrangement_source)
 
     def test_opening_arrangement_page_does_not_switch_ableton_view(self):
         with (
@@ -1234,6 +1288,22 @@ class LiveSetGenerationTests(unittest.TestCase):
         self.assertIn("if (event.key === 'ArrowRight')", source)
         self.assertIn("movePreparedScene(1);", source)
         self.assertIn("previewSceneSelect(true);", source)
+
+    def test_arrangement_has_console_returns_and_local_keyboard_controls(self):
+        source = (PROJECT_ROOT / "templates/arrangement.html").read_text(encoding="utf-8")
+
+        self.assertIn('id="arrCl5Return"', source)
+        self.assertIn('id="arrQl1Return"', source)
+        self.assertIn("state.midi_console || {}", source)
+        self.assertIn("if (event.key === 'ArrowLeft')", source)
+        self.assertIn("previewBtn.click();", source)
+        self.assertIn("if (event.key === 'ArrowRight')", source)
+        self.assertIn("nextBtn.click();", source)
+        self.assertNotIn('id="countLabel"', source)
+        self.assertNotIn('id="timeLabel"', source)
+        self.assertNotIn('class="arrangement-warning"', source)
+        self.assertIn("Vérifier la position avant toute commande", source)
+        self.assertIn("min-height:116px", source)
 
     def test_scene_selection_publishes_cached_title_immediately(self):
         with self.app.lock:

@@ -1173,7 +1173,9 @@
       return `go-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     }
 
-    async function act(action) {
+    let pendingTransportDesired = null;
+
+    async function act(action, desiredPlayingOverride = null) {
       if (action === 'play_pause') {
         action = 'pause';
       }
@@ -1193,9 +1195,58 @@
         return;
       }
 
-      if (actionBusy) return;
+      if (actionBusy) {
+        if (action === 'pause') {
+          const basePlaying = pendingTransportDesired !== null
+            ? pendingTransportDesired
+            : Boolean(lastKnownState && lastKnownState.is_playing);
+
+          pendingTransportDesired = !basePlaying;
+
+          if (lastKnownState) {
+            lastKnownState = {
+              ...lastKnownState,
+              is_playing: pendingTransportDesired,
+              is_paused: !pendingTransportDesired
+            };
+          }
+
+          const queuedTitle = normalizeSceneName(currentEl.textContent) !== '—'
+            ? currentEl.textContent
+            : selectedEl.textContent;
+
+          setSessionUiState(
+            pendingTransportDesired ? 'playing' : 'paused',
+            queuedTitle
+          );
+
+          setActionMessage(
+            pendingTransportDesired
+              ? '● Lecture demandée…'
+              : '● Pause demandée…',
+            false
+          );
+        }
+        return;
+      }
 
       let actionPayload = { action };
+      if (action === 'pause') {
+        const currentlyPlaying = Boolean(lastKnownState && lastKnownState.is_playing);
+
+        actionPayload.desired_playing =
+          typeof desiredPlayingOverride === 'boolean'
+            ? desiredPlayingOverride
+            : !currentlyPlaying;
+
+        if (lastKnownState) {
+          lastKnownState = {
+            ...lastKnownState,
+            is_playing: actionPayload.desired_playing,
+            is_paused: !actionPayload.desired_playing
+          };
+        }
+      }
       if (action === 'go') {
         const generation = Number(lastKnownState && lastKnownState.set_generation);
         const selectedIndex = Number(lastKnownState && lastKnownState.selected_scene);
@@ -1236,7 +1287,7 @@
       }
 
       if (action === 'pause') {
-        const currentlyShowingPlay = pauseButton && pauseButton.textContent.trim().toUpperCase() === 'PLAY';
+        const currentlyShowingPlay = Boolean(actionPayload.desired_playing);
         const fallbackTitle = normalizeSceneName(currentEl.textContent) !== '—'
           ? currentEl.textContent
           : selectedEl.textContent;
@@ -1246,7 +1297,9 @@
       actionBusy = true;
 
       try {
-        buttons.forEach(button => { button.disabled = true; });
+        buttons.forEach(button => {
+          if (button !== pauseButton) button.disabled = true;
+        });
         gotoButton.disabled = true;
         setActionMessage('● Envoi commande…', false);
 
@@ -1289,6 +1342,15 @@
         }
         gotoButton.disabled = false;
         actionBusy = false;
+
+        if (action === 'pause' && pendingTransportDesired !== null) {
+          const queuedDesired = pendingTransportDesired;
+          pendingTransportDesired = null;
+
+          queueMicrotask(() => {
+            void act('pause', queuedDesired);
+          });
+        }
       }
     }
 

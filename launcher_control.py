@@ -129,8 +129,13 @@ def read_rtp_agent_state(expected_host=None):
         payload = dict(rtp_agent_state)
     if not payload or time.time() - float(payload.get("received_at", 0)) > 6:
         return {}
-    if expected_host not in (None, "", "127.0.0.1", "localhost") and payload.get("address") != expected_host:
-        return {}
+    if expected_host not in (None, "", "127.0.0.1", "localhost"):
+        try:
+            expected_address = socket.gethostbyname(str(expected_host))
+        except OSError:
+            expected_address = str(expected_host)
+        if payload.get("address") != expected_address:
+            return {}
     connections = payload.get("connections") or []
     targets = payload.get("targets") or []
     return {
@@ -144,23 +149,77 @@ def read_rtp_agent_state(expected_host=None):
 
 
 def read_midi_console_state(expected_agent_host=None):
+    """Lit l'état officiel publié par CL MIDI Network Assistant.
+
+    L'agent RTP reste un diagnostic complémentaire et ne remplace jamais
+    le résultat du véritable test aller-retour du Network Assistant.
+    """
+    payload = {}
+
     try:
-        if MIDI_CONSOLE_STATE_PATH.stat().st_size > 65536:
-            return {}
-        payload = json.loads(MIDI_CONSOLE_STATE_PATH.read_text(encoding="utf-8"))
-        if not (isinstance(payload, dict) and payload.get("service") == "cl-midi-console-monitor"):
-            payload = {}
-        agent = read_rtp_agent_state(expected_agent_host)
-        if agent:
-            payload = dict(payload)
-            payload["rtp"] = agent
-        elif expected_agent_host not in (None, "", "127.0.0.1", "localhost"):
-            payload = dict(payload)
-            payload.pop("rtp", None)
-        return payload
+        if MIDI_CONSOLE_STATE_PATH.stat().st_size <= 65536:
+            candidate = json.loads(
+                MIDI_CONSOLE_STATE_PATH.read_text(encoding="utf-8")
+            )
+            if (
+                isinstance(candidate, dict)
+                and candidate.get("service") == "cl-midi-console-monitor"
+            ):
+                payload = dict(candidate)
     except (OSError, ValueError, TypeError):
-        agent = read_rtp_agent_state(expected_agent_host)
-        return {"rtp": agent} if agent else {}
+        payload = {}
+
+    now = time.time()
+    updated_at = float(payload.get("updated_at") or 0)
+    age = max(0.0, now - updated_at) if updated_at else None
+    stale = age is None or age > 8.0
+
+    if payload:
+        payload["age_seconds"] = age
+        payload["stale"] = stale
+        payload["online"] = not stale
+
+        rtp = dict(payload.get("rtp") or {})
+        if stale:
+            rtp["validated"] = False
+            rtp["status"] = "assistant_offline"
+            rtp["last_test"] = "CL MIDI Network Assistant hors ligne"
+        payload["rtp"] = rtp
+    else:
+        payload = {
+            "schema_version": 2,
+            "service": "cl-midi-console-monitor",
+            "source": "CL MIDI Network Assistant",
+            "updated_at": None,
+            "age_seconds": None,
+            "stale": True,
+            "online": False,
+            "rtp": {
+                "available": False,
+                "validated": False,
+                "loop_detected": False,
+                "status": "assistant_offline",
+                "last_test": "CL MIDI Network Assistant hors ligne",
+            },
+            "cl5": {
+                "program": None,
+                "title": "",
+                "received": False,
+                "received_at": None,
+            },
+            "ql1": {
+                "program": None,
+                "title": "",
+                "received": False,
+                "received_at": None,
+            },
+        }
+
+    agent = read_rtp_agent_state(expected_agent_host)
+    if agent:
+        payload["rtp_agent"] = agent
+
+    return payload
 
 
 def find_midi_network_assistant():
@@ -1437,6 +1496,27 @@ def telemetry():
     )
 
 
+def validate_remote_target_host(candidate) -> None:
+    """Empêche le mode distant de piloter silencieusement Ableton local."""
+    if candidate.mode != "remote":
+        return
+
+    host = str(candidate.host or "").strip()
+    normalized = host.lower()
+
+    if normalized in {"", "localhost", "127.0.0.1", "::1"}:
+        raise AbletonTargetError(
+            "Mode distant refusé : indiquez l’adresse du Mac Ableton distant."
+        )
+
+    local_ip = str(get_lan_ip() or "").strip()
+    if local_ip and host == local_ip:
+        raise AbletonTargetError(
+            f"Mode distant refusé : {host} est l’adresse de ce Mac. "
+            "Choisissez le Mac Ableton distant ou repassez en mode Local."
+        )
+
+
 @app.route("/network-config", methods=["GET", "POST"])
 def network_config():
     if request.method == "GET":
@@ -1459,6 +1539,7 @@ def network_config():
         if set(payload) - allowed:
             raise AbletonTargetError("champs de configuration inconnus")
         candidate = validate_target({key: value for key, value in payload.items() if key != "name"})
+        validate_remote_target_host(candidate)
         candidate_profiles = update_profile(
             previous_profiles,
             candidate,

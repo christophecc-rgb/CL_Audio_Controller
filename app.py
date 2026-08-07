@@ -627,7 +627,11 @@ def state_snapshot_locked() -> Dict[str, Any]:
     snapshot["osc_transport"] = ableton_transport.diagnostics()
     try:
         midi_console = json.loads(MIDI_CONSOLE_STATE_PATH.read_text(encoding="utf-8"))
-        playing_title = str(snapshot.get("playing_scene_name") or "").strip()
+        playing_title = str((
+            snapshot.get("arrangement_marker")
+            if snapshot.get("play_mode") == "arrangement"
+            else snapshot.get("playing_scene_name")
+        ) or "").strip()
         now = time.time()
         for console_name in ("cl5", "ql1"):
             console_state = midi_console.get(console_name) or {}
@@ -645,7 +649,26 @@ def state_snapshot_locked() -> Dict[str, Any]:
                 console_state = dict(console_state)
                 console_state["title"] = override[1]
                 midi_console[console_name] = console_state
-        snapshot["midi_console"] = midi_console if midi_console.get("service") == "cl-midi-console-monitor" else {}
+        if midi_console.get("service") == "cl-midi-console-monitor":
+            updated_at = float(midi_console.get("updated_at") or 0)
+            assistant_age = max(0.0, now - updated_at) if updated_at else None
+            assistant_stale = assistant_age is None or assistant_age > 8.0
+
+            midi_console = dict(midi_console)
+            midi_console["age_seconds"] = assistant_age
+            midi_console["stale"] = assistant_stale
+            midi_console["online"] = not assistant_stale
+
+            rtp_state = dict(midi_console.get("rtp") or {})
+            if assistant_stale:
+                rtp_state["validated"] = False
+                rtp_state["status"] = "assistant_offline"
+                rtp_state["last_test"] = "CL MIDI Network Assistant hors ligne"
+            midi_console["rtp"] = rtp_state
+
+            snapshot["midi_console"] = midi_console
+        else:
+            snapshot["midi_console"] = {}
     except (OSError, ValueError, TypeError, AttributeError):
         snapshot["midi_console"] = {}
     if not snapshot.get("set_ready", False):
@@ -805,6 +828,9 @@ def start_osc_server():
     )
     print(f"OSC reply server listening on 0.0.0.0:{ableton_transport.reply_port}")
     ableton_transport.serve_forever()
+
+
+transport_command_lock = threading.RLock()
 
 
 def send(address: str, *args):
@@ -1248,6 +1274,7 @@ def current_arrangement_marker(seconds: float) -> str:
 
 def refresh_arrangement_time():
     """Suit la position de lecture Arrangement quand AbletonOSC répond."""
+    scene_context = None
     with lock:
         generation = int(state.get("set_generation", 0))
     res = query(
@@ -1276,7 +1303,25 @@ def refresh_arrangement_time():
         # Ne pas recalculer les cue points ici : cela peut déclencher des appels OSC
         # dans le thread de fond et finir par bloquer /status après quelques minutes.
         # Les repères Arrangement sont rafraîchis uniquement sur demande depuis les actions.
-        state["arrangement_marker"] = state.get("arrangement_marker", "—")
+        previous_marker = str(state.get("arrangement_marker") or "—")
+        current_marker = "—"
+        current_marker_cue_index = -1
+        for marker_index, marker in enumerate(state.get("arrangement_markers", [])):
+            if float(value) + 0.01 >= float(marker.get("time", 0)):
+                current_marker = str(marker.get("name") or "—")
+                try:
+                    current_marker_cue_index = int(marker.get("cue_index", marker_index))
+                except (TypeError, ValueError):
+                    current_marker_cue_index = marker_index
+            else:
+                break
+        state["arrangement_marker"] = current_marker
+        if (
+            state.get("play_mode") == "arrangement"
+            and current_marker != "—"
+            and current_marker != previous_marker
+        ):
+            scene_context = (generation, current_marker_cue_index, current_marker)
 
         # Si la tête Arrangement avance réellement, on considère
         # l'Arrangement comme en lecture même si is_playing
@@ -1290,6 +1335,9 @@ def refresh_arrangement_time():
                 state["is_paused"] = False
 
         normalize_transport_state_locked()
+
+    if scene_context is not None:
+        send_midi_monitor_scene_context(*scene_context)
 
 
 def set_arrangement_time(seconds: float, label: str = ""):
@@ -2883,7 +2931,17 @@ def confirm_live_playing_state(expected_generation: int) -> Tuple[Optional[bool]
 def action():
     data = request.get_json(force=True, silent=True) or {}
     action_name = data.get("action")
-    print("ACTION REÇUE :", action_name, flush=True)
+    print(
+        "ACTION REÇUE :",
+        action_name,
+        "| desired_playing =",
+        data.get("desired_playing"),
+        "| source =",
+        data.get("source", "non précisée"),
+        "| heure =",
+        time.strftime("%H:%M:%S"),
+        flush=True,
+    )
 
     with lock:
         action_ready = bool(state.get("set_ready", False))
@@ -2956,21 +3014,26 @@ def action():
         # Bouton dédié Arrangement :
         # - si l'Arrangement joue, on met en pause
         # - sinon on reprend la lecture Arrangement à la position courante
-        confirmed_playing, _ = confirm_live_playing_state(action_generation)
-        if confirmed_playing is None:
-            return jsonify({
-                "ok": False,
-                "message": "Live Set modifié pendant la commande",
-            }), 409
+        desired_playing = data.get("desired_playing")
+        confirmed_playing = None
+        if not isinstance(desired_playing, bool):
+            confirmed_playing, _ = confirm_live_playing_state(action_generation)
+            if confirmed_playing is None:
+                return jsonify({
+                    "ok": False,
+                    "message": "Live Set modifié pendant la commande",
+                }), 409
         with lock:
             arrangement_is_playing = (
+                not desired_playing if isinstance(desired_playing, bool) else
                 confirmed_playing
                 and str(state.get("play_mode", "")) == "arrangement"
                 and not bool(state.get("is_paused", False))
             )
 
         if arrangement_is_playing:
-            send("/live/song/stop_playing")
+            with transport_command_lock:
+                send("/live/song/stop_playing")
             with lock:
                 state["is_playing"] = False
                 state["is_paused"] = True
@@ -2983,8 +3046,9 @@ def action():
                 state["sync_source"] = "Télécommande"
         else:
             show_arrangement_view()
-            send("/live/song/set/back_to_arranger", 0)
-            send("/live/song/continue_playing")
+            with transport_command_lock:
+                send("/live/song/set/back_to_arranger", 0)
+                send("/live/song/continue_playing")
             with lock:
                 state["is_playing"] = True
                 state["is_paused"] = False
@@ -2997,19 +3061,42 @@ def action():
                 state["sync_source"] = "Télécommande"
 
     elif action_name == "pause":
-        confirmed_playing, _ = confirm_live_playing_state(action_generation)
-        if confirmed_playing is None:
-            return jsonify({
-                "ok": False,
-                "message": "Live Set modifié pendant la commande",
-            }), 409
+        desired_playing = data.get("desired_playing")
+        confirmed_playing = None
+        if not isinstance(desired_playing, bool):
+            confirmed_playing, _ = confirm_live_playing_state(action_generation)
+            if confirmed_playing is None:
+                return jsonify({
+                    "ok": False,
+                    "message": "Live Set modifié pendant la commande",
+                }), 409
         with lock:
-            is_playing = confirmed_playing
+            is_playing = not desired_playing if isinstance(desired_playing, bool) else confirmed_playing
             is_paused = bool(state.get("is_paused", False))
             current_mode = str(state.get("play_mode", "stopped"))
 
         if is_playing:
-            send("/live/song/stop_playing")
+            print(
+                "PAUSE TRACE : attente verrou transport",
+                "| heure =", time.strftime("%H:%M:%S"),
+                flush=True,
+            )
+
+            with transport_command_lock:
+                print(
+                    "PAUSE TRACE : verrou acquis",
+                    "| heure =", time.strftime("%H:%M:%S"),
+                    flush=True,
+                )
+
+                send("/live/song/stop_playing")
+
+                print(
+                    "PAUSE TRACE : stop_playing envoyé",
+                    "| heure =", time.strftime("%H:%M:%S"),
+                    flush=True,
+                )
+
             with lock:
                 deadline = state.get("playback_deadline")
                 if deadline is not None:
@@ -3020,7 +3107,8 @@ def action():
                 state["message"] = "Pause"
                 state["sync_source"] = "Télécommande"
         else:
-            send("/live/song/continue_playing")
+            with transport_command_lock:
+                send("/live/song/continue_playing")
             with lock:
                 remaining_seconds = state.get("remaining_seconds")
                 if remaining_seconds is not None:
@@ -3059,12 +3147,20 @@ def action():
         if not play_after_jump:
             send("/live/song/stop_playing")
 
-        send("/live/song/set/back_to_arranger", 0)
-        set_arrangement_time(seconds, marker_name)
+        with transport_command_lock:
+            send("/live/song/set/back_to_arranger", 0)
+            set_arrangement_time(seconds, marker_name)
 
-        if play_after_jump:
-            time.sleep(0.04)
-            send("/live/song/continue_playing")
+            if play_after_jump:
+                time.sleep(0.04)
+                send("/live/song/continue_playing")
+
+        try:
+            marker_context_index = int(data.get("cue_index", data.get("marker_index", -1)))
+        except (TypeError, ValueError):
+            marker_context_index = -1
+        if marker_name:
+            send_midi_monitor_scene_context(action_generation, marker_context_index, marker_name)
 
         with lock:
             state["arrangement_time"] = seconds
