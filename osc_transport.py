@@ -54,6 +54,22 @@ class OSCTransport:
         self._last_resolve_attempt = 0.0
         self._resolve_retry_seconds = 2.0
         self.last_error = None
+
+        # Conserve le comportement historique pour les cibles immédiatement
+        # résolubles (localhost ou IPv4), tout en tolérant une cible distante
+        # Bonjour momentanément absente. Dans ce dernier cas, _ensure_client()
+        # retentera la résolution au premier envoi puis périodiquement.
+        try:
+            self.resolved_host = resolve_ipv4_host(self.host)
+            self._client = udp_client.SimpleUDPClient(
+                self.resolved_host,
+                self.send_port,
+            )
+        except OSError as exc:
+            self.resolved_host = None
+            self._client = None
+            self.last_error = str(exc)
+
         self._response_matcher = response_matcher or self._default_response_matcher
         self._unsolicited_handler = unsolicited_handler
         self._state_lock = threading.RLock()
@@ -193,7 +209,7 @@ class OSCTransport:
         with self._state_lock:
             self._active_request = request
 
-        if not self.send(address, *args):
+        if self.send(address, *args) is False:
             with self._state_lock:
                 if self._active_request is request:
                     self._active_request = None
