@@ -47,13 +47,13 @@ class OSCTransport:
         unsolicited_handler: Optional[UnsolicitedHandler] = None,
     ) -> None:
         self.host = str(host)
-        self.resolved_host = resolve_ipv4_host(self.host)
+        self.resolved_host = None
         self.send_port = int(send_port)
         self.reply_port = int(reply_port)
-        self._client = udp_client.SimpleUDPClient(
-            self.resolved_host,
-            self.send_port,
-        )
+        self._client = None
+        self._last_resolve_attempt = 0.0
+        self._resolve_retry_seconds = 2.0
+        self.last_error = None
         self._response_matcher = response_matcher or self._default_response_matcher
         self._unsolicited_handler = unsolicited_handler
         self._state_lock = threading.RLock()
@@ -85,8 +85,48 @@ class OSCTransport:
     def set_unsolicited_handler(self, handler: Optional[UnsolicitedHandler]) -> None:
         self._unsolicited_handler = handler
 
-    def send(self, address: str, *args: Any) -> None:
-        self._client.send_message(address, list(args))
+    def _ensure_client(self) -> bool:
+        """Résout la cible seulement lorsqu'un envoi est réellement nécessaire."""
+        now = time.monotonic()
+
+        with self._state_lock:
+            if self._client is not None:
+                return True
+            if now - self._last_resolve_attempt < self._resolve_retry_seconds:
+                return False
+            self._last_resolve_attempt = now
+
+        try:
+            resolved_host = resolve_ipv4_host(self.host)
+            client = udp_client.SimpleUDPClient(resolved_host, self.send_port)
+        except OSError as exc:
+            with self._state_lock:
+                self.connected = False
+                self.resolved_host = None
+                self._client = None
+                self.last_error = str(exc)
+            return False
+
+        with self._state_lock:
+            self.resolved_host = resolved_host
+            self._client = client
+            self.last_error = None
+        return True
+
+    def send(self, address: str, *args: Any) -> bool:
+        if not self._ensure_client():
+            return False
+
+        try:
+            self._client.send_message(address, list(args))
+            return True
+        except OSError as exc:
+            with self._state_lock:
+                self.connected = False
+                self.resolved_host = None
+                self._client = None
+                self.last_error = str(exc)
+            return False
 
     def send_to(self, host: str, port: int, address: str, *args: Any) -> None:
         """Émet un message OSC auxiliaire sans exposer le client à la logique métier."""
@@ -152,7 +192,13 @@ class OSCTransport:
         }
         with self._state_lock:
             self._active_request = request
-        self.send(address, *args)
+
+        if not self.send(address, *args):
+            with self._state_lock:
+                if self._active_request is request:
+                    self._active_request = None
+                self.connected = False
+            return None
 
         started = time.time()
         while time.time() - started < timeout:
@@ -188,6 +234,7 @@ class OSCTransport:
                 "connected": bool(self.connected),
                 "host": self.host,
                 "resolved_host": self.resolved_host,
+                "last_error": self.last_error,
                 "last_response_at": self.last_response_at,
                 "last_latency_ms": self.last_latency_ms,
                 "timeout_count": int(self.timeout_count),

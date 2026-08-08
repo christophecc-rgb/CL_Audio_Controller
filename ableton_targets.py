@@ -116,29 +116,24 @@ def validate_target(value: Any) -> AbletonTarget:
         if not host:
             raise AbletonTargetError("adresse ou nom du Mac Ableton manquant")
 
+        # Un profil distant enregistré doit rester valide même si le Mac est
+        # éteint ou momentanément absent du réseau. La résolution DNS/Bonjour
+        # est effectuée au moment de la connexion, pas au chargement du profil.
         try:
-            resolved_host = socket.gethostbyname(host)
-        except socket.gaierror as exc:
-            raise AbletonTargetError(
-                f"Mac Ableton introuvable : {host}"
-            ) from exc
+            parsed = ipaddress.ip_address(host)
+        except ValueError:
+            parsed = None
 
-        try:
-            parsed = ipaddress.ip_address(resolved_host)
-        except ValueError as exc:
-            raise AbletonTargetError(
-                f"adresse résolue invalide pour {host}"
-            ) from exc
-
-        if (
+        if parsed is not None and (
             parsed.version != 4
             or parsed.is_unspecified
             or parsed.is_multicast
             or parsed.is_loopback
         ):
             raise AbletonTargetError(
-                f"adresse Ableton non utilisable : {host} → {resolved_host}"
+                f"adresse Ableton non utilisable : {host}"
             )
+
     try:
         send_port = int(value.get("send_port", DEFAULT_SEND_PORT))
         reply_port = int(value.get("reply_port", DEFAULT_REPLY_PORT))
