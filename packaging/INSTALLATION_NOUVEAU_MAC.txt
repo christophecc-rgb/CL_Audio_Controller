@@ -44,8 +44,9 @@ RÔLES RTP-MIDI
 - Mac Ableton Lecteur — RTP émetteur-récepteur : installe AbletonOSC, LTC,
   X-Fader et l'agent RTP-MIDI bidirectionnel. L'agent démarre automatiquement à
   l'ouverture de session.
-- Simulateur de console RTP : outil d'essai manuel qui simule les retours
-  Program Change CL5 sur le canal 1 et QL1 sur le canal 2.
+- Simulateur de consoles : intégré à CL MIDI Network Assistant. Le mode IAC
+  teste uniquement le Mac local ; le mode RTP teste le trajet réseau. Les deux
+  modes sont exclusifs et la simulation s'arrête avec l'Assistant.
 
 Les noms des ordinateurs ne sont pas inscrits en dur dans le kit : les autres
 Macs sont découverts sur le réseau par Bonjour.

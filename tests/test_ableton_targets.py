@@ -64,8 +64,10 @@ class AbletonTargetTests(unittest.TestCase):
                 validate_target({"mode": "remote", "host": host})
 
     def test_invalid_address_ports_and_unexpected_keys_are_rejected(self):
+        target = validate_target({"mode": "remote", "host": "mac-ableton.local"})
+        self.assertEqual(target.host, "mac-ableton.local")
         with self.assertRaises(AbletonTargetError):
-            validate_target({"mode": "remote", "host": "not-an-ip"})
+            validate_target({"mode": "remote", "host": "not a valid host"})
         with self.assertRaises(AbletonTargetError):
             validate_target({"mode": "remote", "host": "192.168.1.20", "send_port": 0})
         with self.assertRaises(AbletonTargetError):

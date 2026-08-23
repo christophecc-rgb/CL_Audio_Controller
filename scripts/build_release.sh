@@ -86,9 +86,8 @@ mkdir -p \
   "$KIT_ROOT/CL MIDI Network Tools" \
   "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/MacOS" \
   "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Resources/Network Tools" \
-  "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/MacOS" \
-  "$KIT_ROOT/CL MIDI RTP Simulator.app/Contents/MacOS"
-for tool in CLMIDINetworkGuardian CLMIDIRTPAgent CLMIDIRoundTripTester CLMIDIRTPResponder CLYamahaConsoleSimulator CLMIDINetworkDashboard CLYamahaSimulatorDashboard; do
+  "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/MacOS"
+for tool in CLMIDINetworkGuardian CLMIDIRTPAgent CLMIDIRoundTripTester CLMIDIRTPResponder CLYamahaConsoleSimulator CLMIDINetworkDashboard; do
   ditto "$BUILD_ROOT/midi-tools/$tool" "$KIT_ROOT/CL MIDI Network Tools/$tool"
   ditto "$BUILD_ROOT/midi-tools/$tool" "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Resources/Network Tools/$tool"
 done
@@ -109,23 +108,6 @@ cat > "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/Info.plist" <<EOF
 </dict></plist>
 EOF
 codesign --force --deep --sign - "$KIT_ROOT/CL MIDI RTP Agent.app"
-ditto "$BUILD_ROOT/midi-tools/CLYamahaSimulatorDashboard" "$KIT_ROOT/CL MIDI RTP Simulator.app/Contents/MacOS/CL MIDI RTP Simulator"
-ditto "$BUILD_ROOT/midi-tools/CLYamahaConsoleSimulator" "$KIT_ROOT/CL MIDI RTP Simulator.app/Contents/MacOS/CLYamahaConsoleSimulator"
-chmod +x "$KIT_ROOT/CL MIDI RTP Simulator.app/Contents/MacOS/CL MIDI RTP Simulator" "$KIT_ROOT/CL MIDI RTP Simulator.app/Contents/MacOS/CLYamahaConsoleSimulator"
-cat > "$KIT_ROOT/CL MIDI RTP Simulator.app/Contents/Info.plist" <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-<key>CFBundleDisplayName</key><string>CL MIDI RTP Simulator</string>
-<key>CFBundleExecutable</key><string>CL MIDI RTP Simulator</string>
-<key>CFBundleIdentifier</key><string>com.claudio.midi-rtp-simulator</string>
-<key>CFBundleName</key><string>CL MIDI RTP Simulator</string>
-<key>CFBundlePackageType</key><string>APPL</string>
-<key>CFBundleShortVersionString</key><string>$VERSION</string>
-<key>LSMinimumSystemVersion</key><string>10.15</string>
-</dict></plist>
-EOF
-codesign --force --deep --sign - "$KIT_ROOT/CL MIDI RTP Simulator.app"
 ditto "$MIDI_TOOLS_SOURCE/reconnect_legacy_rtp.applescript" "$KIT_ROOT/CL MIDI Network Tools/reconnect_legacy_rtp.applescript"
 ditto "$MIDI_TOOLS_SOURCE/reconnect_legacy_rtp.applescript" "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Resources/Network Tools/reconnect_legacy_rtp.applescript"
 ditto "$MIDI_TOOLS_SOURCE/connect_rtp_peer.applescript" "$KIT_ROOT/CL MIDI Network Tools/connect_rtp_peer.applescript"

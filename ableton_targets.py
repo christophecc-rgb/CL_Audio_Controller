@@ -5,6 +5,7 @@ from __future__ import annotations
 import ipaddress
 import json
 import os
+import re
 import socket
 import stat
 import tempfile
@@ -124,15 +125,29 @@ def validate_target(value: Any) -> AbletonTarget:
         except ValueError:
             parsed = None
 
-        if parsed is not None and (
-            parsed.version != 4
-            or parsed.is_unspecified
-            or parsed.is_multicast
-            or parsed.is_loopback
-        ):
-            raise AbletonTargetError(
-                f"adresse Ableton non utilisable : {host}"
-            )
+        if parsed is not None:
+            if (
+                parsed.version != 4
+                or parsed.is_unspecified
+                or parsed.is_multicast
+                or parsed.is_loopback
+            ):
+                raise AbletonTargetError(
+                    f"adresse Ableton non utilisable : {host}"
+                )
+        else:
+            hostname = host[:-1] if host.endswith(".") else host
+            labels = hostname.split(".")
+            if (
+                len(hostname) > 253
+                or any(
+                    not label
+                    or len(label) > 63
+                    or re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?", label) is None
+                    for label in labels
+                )
+            ):
+                raise AbletonTargetError(f"nom d’hôte Ableton invalide : {host}")
 
     try:
         send_port = int(value.get("send_port", DEFAULT_SEND_PORT))

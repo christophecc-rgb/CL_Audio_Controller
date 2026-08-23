@@ -255,13 +255,29 @@ static NSArray<NSString *> *CLMidiEndpointNames(void) {
     [self updateSummary];
 }
 
+- (void)terminateAllSimulatorProcesses {
+    // Une ancienne fenêtre peut avoir disparu sans que ses NSTask soient encore
+    // référencés par cette instance. Le filtre vise exactement notre exécutable.
+    NSTask *task = [[NSTask alloc] init];
+    task.executableURL = [NSURL fileURLWithPath:@"/usr/bin/pkill"];
+    task.arguments = @[@"-TERM", @"-x", @"CLYamahaConsoleSimulator"];
+    task.standardOutput = NSFileHandle.fileHandleWithNullDevice;
+    task.standardError = NSFileHandle.fileHandleWithNullDevice;
+    NSError *error = nil;
+    if ([task launchAndReturnError:&error]) [task waitUntilExit];
+}
+
 - (void)toggleConsole:(NSButton *)sender {
     CLYamahaRow *row = self.rows[(NSUInteger)sender.tag];
     sender.state == NSControlStateValueOn ? [self startRow:row] : [self stopRow:row];
 }
 - (void)addConsole:(id)sender { (void)sender; [self addRowWithDefaults:self.rows.count]; }
 - (void)startAll:(id)sender { (void)sender; for (CLYamahaRow *row in self.rows) { row.power.state = NSControlStateValueOn; [self startRow:row]; } }
-- (void)stopAll:(id)sender { (void)sender; for (CLYamahaRow *row in self.rows) [self stopRow:row]; }
+- (void)stopAll:(id)sender {
+    (void)sender;
+    for (CLYamahaRow *row in self.rows) [self stopRow:row];
+    [self terminateAllSimulatorProcesses];
+}
 - (void)refreshPorts:(id)sender {
     (void)sender;
     self.endpoints = CLMidiEndpointNames();
@@ -295,6 +311,7 @@ static NSArray<NSString *> *CLMidiEndpointNames(void) {
     (void)sender;
     [self saveConfiguration];
     for (CLYamahaRow *row in self.rows) if (row.task.running) [row.task terminate];
+    [self terminateAllSimulatorProcesses];
     return NSTerminateNow;
 }
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender { (void)sender; return YES; }

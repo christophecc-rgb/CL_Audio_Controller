@@ -209,11 +209,13 @@ int main(int argc, const char *argv[]) {
                              [processName containsString:@"RTP Receiver"] ||
                              [processName containsString:@"RTP Simulator"];
         if ([arguments containsObject:@"--help"]) {
-            puts("Usage: CLYamahaConsoleSimulator [--label QL1] [--endpoint name] [--channel 1-16] [--delay-ms 80] [--no-echo]");
+            puts("Usage: CLYamahaConsoleSimulator [--label QL1] [--transport rtp|iac] [--endpoint name] [--channel 1-16] [--delay-ms 80] [--no-echo]");
             return 0;
         }
         consoleLabel = argumentValue(arguments, @"--label", responderMode ? @"RTP RESPONDER" : @"QL1");
         NSString *endpointSearchName = argumentValue(arguments, @"--endpoint", @"mb pro");
+        NSString *transport = [argumentValue(arguments, @"--transport", @"rtp") lowercaseString];
+        BOOL localCoreMIDI = [transport isEqualToString:@"iac"];
         echoDelayMs = (NSUInteger)[argumentValue(arguments, @"--delay-ms", @"80") integerValue];
         acceptedChannel = (NSUInteger)[argumentValue(arguments, @"--channel", @"0") integerValue];
         if (acceptedChannel > 16) acceptedChannel = 0;
@@ -222,18 +224,25 @@ int main(int argc, const char *argv[]) {
         signal(SIGTERM, stopHandler);
 
         MIDINetworkSession *session = [MIDINetworkSession defaultSession];
-        session.enabled = YES;
-        session.connectionPolicy = MIDINetworkConnectionPolicy_Anyone;
         MIDIEndpointRef networkSource = 0;
-        NSUInteger endpointAttempts = responderMode ? 600 : 50;
-        for (NSUInteger attempt = 0; attempt < endpointAttempts; attempt++) {
-            networkSource = session.sourceEndpoint;
-            networkDestination = session.destinationEndpoint;
-            if (networkSource != 0 && networkDestination != 0) break;
-            [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
+        if (localCoreMIDI) {
+            // En mode IAC, respecter strictement le port choisi. L'ancienne
+            // logique basculait silencieusement sur RTP dès qu'il était actif.
+            networkSource = findEndpoint(YES, endpointSearchName);
+            networkDestination = findEndpoint(NO, endpointSearchName);
+        } else {
+            session.enabled = YES;
+            session.connectionPolicy = MIDINetworkConnectionPolicy_Anyone;
+            NSUInteger endpointAttempts = responderMode ? 600 : 50;
+            for (NSUInteger attempt = 0; attempt < endpointAttempts; attempt++) {
+                networkSource = session.sourceEndpoint;
+                networkDestination = session.destinationEndpoint;
+                if (networkSource != 0 && networkDestination != 0) break;
+                [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
+            }
+            if (networkSource == 0) networkSource = findEndpoint(YES, endpointSearchName);
+            if (networkDestination == 0) networkDestination = findEndpoint(NO, endpointSearchName);
         }
-        if (networkSource == 0) networkSource = findEndpoint(YES, endpointSearchName);
-        if (networkDestination == 0) networkDestination = findEndpoint(NO, endpointSearchName);
         if (networkSource == 0 || networkDestination == 0) {
             fprintf(stderr, "RTP session endpoints unavailable source=%u destination=%u\n",
                     (unsigned int)networkSource, (unsigned int)networkDestination);
@@ -252,8 +261,9 @@ int main(int argc, const char *argv[]) {
             return 1;
         }
 
-        fprintf(stdout, "READY console=%s delay_ms=%lu echo=%s session=%s port=%lu\n",
-                consoleLabel.UTF8String, (unsigned long)echoDelayMs,
+        fprintf(stdout, "READY console=%s transport=%s endpoint=%s delay_ms=%lu echo=%s session=%s port=%lu\n",
+                consoleLabel.UTF8String, transport.UTF8String, endpointSearchName.UTF8String,
+                (unsigned long)echoDelayMs,
                 echoEnabled ? "on" : "off", session.localName.UTF8String,
                 (unsigned long)session.networkPort);
         fflush(stdout);

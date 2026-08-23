@@ -21,6 +21,7 @@ static void CLInstallApplicationMenu(void) {
 @property NSMutableDictionary<NSString *, NSView *> *cards;
 @property NSSegmentedControl *liveSelector;
 @property NSSegmentedControl *roleSelector;
+@property NSView *liveSection;
 @property NSButton *actionButton;
 @property NSProgressIndicator *progress;
 @property NSTextField *statusLabel;
@@ -57,8 +58,8 @@ static void CLInstallApplicationMenu(void) {
     box.boxType = NSBoxCustom;
     box.cornerRadius = 12;
     box.borderWidth = 1;
-    box.borderColor = [NSColor colorWithCalibratedWhite:0.28 alpha:1];
-    box.fillColor = [NSColor colorWithCalibratedWhite:0.105 alpha:1];
+    box.borderColor = [NSColor colorWithCalibratedRed:0.20 green:0.24 blue:0.30 alpha:1];
+    box.fillColor = [NSColor colorWithCalibratedRed:0.075 green:0.09 blue:0.12 alpha:1];
 
     NSImageView *icon = [[NSImageView alloc] initWithFrame:NSZeroRect];
     icon.imageScaling = NSImageScaleProportionallyUpOrDown;
@@ -71,7 +72,7 @@ static void CLInstallApplicationMenu(void) {
     check.contentTintColor = NSColor.whiteColor;
     self.checks[identifier] = check;
 
-    NSTextField *detail = [self label:subtitle size:13 weight:NSFontWeightRegular color:[NSColor colorWithCalibratedWhite:0.70 alpha:1]];
+    NSTextField *detail = [self label:subtitle size:13 weight:NSFontWeightRegular color:[NSColor colorWithCalibratedWhite:0.76 alpha:1]];
     NSStackView *labels = [NSStackView stackViewWithViews:@[check, detail]];
     labels.orientation = NSUserInterfaceLayoutOrientationVertical;
     labels.alignment = NSLayoutAttributeLeading;
@@ -87,7 +88,7 @@ static void CLInstallApplicationMenu(void) {
     [NSLayoutConstraint activateConstraints:@[
         [icon.widthAnchor constraintEqualToConstant:54],
         [icon.heightAnchor constraintEqualToConstant:54],
-        [box.heightAnchor constraintEqualToConstant:82]
+        [box.heightAnchor constraintEqualToConstant:78]
     ]];
     self.cards[identifier] = box;
     return box;
@@ -96,8 +97,8 @@ static void CLInstallApplicationMenu(void) {
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
     CLInstallApplicationMenu();
-    CGFloat height = self.uninstaller ? 930 : 900;
-    NSRect frame = NSMakeRect(0, 0, 760, height);
+    CGFloat height = 850;
+    NSRect frame = NSMakeRect(0, 0, 820, height);
     self.window = [[NSWindow alloc] initWithContentRect:frame
                                               styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable
                                                 backing:NSBackingStoreBuffered
@@ -106,9 +107,9 @@ static void CLInstallApplicationMenu(void) {
     self.window.minSize = frame.size;
     [self.window center];
 
-    NSVisualEffectView *background = [[NSVisualEffectView alloc] initWithFrame:frame];
-    background.material = NSVisualEffectMaterialHUDWindow;
-    background.state = NSVisualEffectStateActive;
+    NSView *background = [[NSView alloc] initWithFrame:frame];
+    background.wantsLayer = YES;
+    background.layer.backgroundColor = [NSColor colorWithCalibratedRed:0.055 green:0.065 blue:0.085 alpha:1].CGColor;
     self.window.contentView = background;
 
     NSImageView *logo = [[NSImageView alloc] initWithFrame:NSZeroRect];
@@ -116,27 +117,38 @@ static void CLInstallApplicationMenu(void) {
     logo.imageScaling = NSImageScaleProportionallyUpOrDown;
     logo.translatesAutoresizingMaskIntoConstraints = NO;
 
+    NSImageView *paradisLogo = [[NSImageView alloc] initWithFrame:NSZeroRect];
+    paradisLogo.image = [[NSImage alloc] initWithContentsOfURL:[self.resources URLByAppendingPathComponent:@"ParadisLatin.jpg"]];
+    paradisLogo.imageScaling = NSImageScaleProportionallyUpOrDown;
+    paradisLogo.translatesAutoresizingMaskIntoConstraints = NO;
+
     NSTextField *title = [self label:(self.uninstaller ? @"Désinstaller la Suite CL" : @"Installer la Suite CL")
                                 size:27 weight:NSFontWeightBold color:NSColor.whiteColor];
     NSString *introText = self.uninstaller
         ? @"Choisissez uniquement les éléments à retirer. Ils resteront récupérables dans la Corbeille."
-        : @"Choisissez le rôle de ce Mac. Les rôles Télécommande et Ableton assurent tous deux l’émission et la réception RTP-MIDI.";
+        : @"Choisissez le rôle de ce Mac. Les anciennes versions remplacées seront déplacées dans la Corbeille et resteront récupérables.";
     NSTextField *intro = [self label:introText size:14 weight:NSFontWeightRegular color:[NSColor colorWithCalibratedWhite:0.72 alpha:1]];
     NSStackView *titles = [NSStackView stackViewWithViews:@[title, intro]];
     titles.orientation = NSUserInterfaceLayoutOrientationVertical;
     titles.alignment = NSLayoutAttributeLeading;
     titles.spacing = 4;
-    NSStackView *header = [NSStackView stackViewWithViews:@[logo, titles]];
+    NSView *headerSpacer = [[NSView alloc] initWithFrame:NSZeroRect];
+    [headerSpacer setContentHuggingPriority:NSLayoutPriorityDefaultLow forOrientation:NSLayoutConstraintOrientationHorizontal];
+    NSStackView *header = [NSStackView stackViewWithViews:@[logo, titles, headerSpacer, paradisLogo]];
     header.orientation = NSUserInterfaceLayoutOrientationHorizontal;
     header.alignment = NSLayoutAttributeCenterY;
     header.spacing = 18;
     [NSLayoutConstraint activateConstraints:@[
         [logo.widthAnchor constraintEqualToConstant:72],
-        [logo.heightAnchor constraintEqualToConstant:72]
+        [logo.heightAnchor constraintEqualToConstant:72],
+        [paradisLogo.widthAnchor constraintEqualToConstant:132],
+        [paradisLogo.heightAnchor constraintEqualToConstant:58]
     ]];
 
     NSMutableArray<NSView *> *mainViews = [NSMutableArray arrayWithObject:header];
     if (!self.uninstaller) {
+        NSTextField *roleTitle = [self label:@"1. Choisissez l’usage de ce Mac" size:14 weight:NSFontWeightSemibold color:NSColor.whiteColor];
+        [mainViews addObject:roleTitle];
         self.roleSelector = [NSSegmentedControl segmentedControlWithLabels:@[@"Mac Télécommande", @"Mac Ableton Lecteur", @"Simulateur console", @"Personnalisé"]
                                                                trackingMode:NSSegmentSwitchTrackingSelectOne
                                                                      target:self
@@ -145,6 +157,7 @@ static void CLInstallApplicationMenu(void) {
         self.roleSelector.segmentStyle = NSSegmentStyleRounded;
         [self.roleSelector.heightAnchor constraintEqualToConstant:36].active = YES;
         [mainViews addObject:self.roleSelector];
+        NSTextField *liveTitle = [self label:@"2. Choisissez la version d’Ableton Live" size:14 weight:NSFontWeightSemibold color:NSColor.whiteColor];
         self.liveSelector = [NSSegmentedControl segmentedControlWithLabels:@[@"Ableton Live 12", @"Ableton Live 10"]
                                                                trackingMode:NSSegmentSwitchTrackingSelectOne
                                                                      target:self
@@ -152,8 +165,16 @@ static void CLInstallApplicationMenu(void) {
         self.liveSelector.selectedSegment = 0;
         self.liveSelector.segmentStyle = NSSegmentStyleRounded;
         [self.liveSelector.heightAnchor constraintEqualToConstant:34].active = YES;
-        [mainViews addObject:self.liveSelector];
+        NSStackView *liveSection = [NSStackView stackViewWithViews:@[liveTitle, self.liveSelector]];
+        liveSection.orientation = NSUserInterfaceLayoutOrientationVertical;
+        liveSection.alignment = NSLayoutAttributeLeading;
+        liveSection.spacing = 7;
+        self.liveSection = liveSection;
+        [mainViews addObject:liveSection];
     }
+
+    NSTextField *componentsTitle = [self label:(self.uninstaller ? @"Éléments à retirer" : @"Composants inclus") size:14 weight:NSFontWeightSemibold color:NSColor.whiteColor];
+    [mainViews addObject:componentsTitle];
 
     NSStackView *componentStack = [[NSStackView alloc] initWithFrame:NSZeroRect];
     componentStack.orientation = NSUserInterfaceLayoutOrientationVertical;
@@ -164,15 +185,13 @@ static void CLInstallApplicationMenu(void) {
         @[@"controller", @"Mac Télécommande — RTP émetteur-récepteur", @"Show Control, découverte Bonjour et liaison RTP-MIDI bidirectionnelle avec retours consoles.", @"Controller.png"],
         @[@"ableton-reader", @"Mac Ableton Lecteur — RTP émetteur-récepteur", @"AbletonOSC, LTC, X-Fader et agent RTP-MIDI bidirectionnel à démarrage automatique.", @"Controller.png"],
         @[@"builder", @"CL Arrangement Builder Live", @"Application Builder et Remote Script Ableton.", @"Builder.png"],
-        @[@"midi-console", @"CL MIDI Console Monitor", @"Moniteur Max for Live et outils réseau MIDI.", @"MIDIConsole.png"],
-        @[@"simulator", @"Simulateur de console RTP", @"Simule les retours Program Change CL5 (canal 1) et QL1 (canal 2) pour les essais sans console.", @"MIDIConsole.png"]
+        @[@"midi-console", @"CL MIDI Network Assistant + simulateur", @"Diagnostic MIDI, retours consoles et simulateur intégré IAC/RTP.", @"MIDIConsole.png"]
     ] : @[
         @[@"autoscene", @"Paradis Latin AutoScene", @"Périphérique Max for Live pour Ableton Live 11 et 12.", @"ParadisLatin.jpg"],
         @[@"controller", @"Mac Télécommande", @"Show Control, serveur web et télécommandes distantes.", @"Controller.png"],
         @[@"ableton-reader", @"Mac Ableton Lecteur", @"AbletonOSC, LTC, X-Fader et agent RTP léger.", @"Controller.png"],
         @[@"builder", @"CL Arrangement Builder Live", @"Application Builder et Remote Script Ableton.", @"Builder.png"],
-        @[@"midi-console", @"CL MIDI Console Monitor", @"Assistant technique du Mac serveur et retours consoles.", @"MIDIConsole.png"],
-        @[@"simulator", @"Simulateur de console RTP", @"Répondant Program Change réservé aux essais sans console.", @"MIDIConsole.png"]
+        @[@"midi-console", @"CL MIDI Network Assistant + simulateur", @"Diagnostic, retours consoles et tests IAC/RTP dans une seule application.", @"MIDIConsole.png"]
     ];
     for (NSArray<NSString *> *item in components) {
         [componentStack addArrangedSubview:[self componentCard:item[0] title:item[1] subtitle:item[2] iconName:item[3]]];
@@ -191,15 +210,16 @@ static void CLInstallApplicationMenu(void) {
     status.orientation = NSUserInterfaceLayoutOrientationHorizontal;
     status.spacing = 8;
 
-    NSButton *cancel = [NSButton buttonWithTitle:@"Annuler" target:self action:@selector(cancelPressed:)];
-    cancel.bezelStyle = NSBezelStyleRounded;
+    NSButton *quit = [NSButton buttonWithTitle:@"Quitter" target:self action:@selector(cancelPressed:)];
+    quit.bezelStyle = NSBezelStyleRounded;
+    quit.keyEquivalent = @"\033";
     self.actionButton = [NSButton buttonWithTitle:(self.uninstaller ? @"Désinstaller" : @"Installer") target:self action:@selector(actionPressed:)];
     self.actionButton.bezelStyle = NSBezelStyleRounded;
     self.actionButton.keyEquivalent = @"\r";
     self.actionButton.contentTintColor = self.uninstaller ? NSColor.systemRedColor : NSColor.systemBlueColor;
     NSView *spacer = [[NSView alloc] initWithFrame:NSZeroRect];
     [spacer setContentHuggingPriority:NSLayoutPriorityDefaultLow forOrientation:NSLayoutConstraintOrientationHorizontal];
-    NSStackView *buttons = [NSStackView stackViewWithViews:@[status, spacer, cancel, self.actionButton]];
+    NSStackView *buttons = [NSStackView stackViewWithViews:@[status, spacer, quit, self.actionButton]];
     buttons.orientation = NSUserInterfaceLayoutOrientationHorizontal;
     buttons.alignment = NSLayoutAttributeCenterY;
     buttons.spacing = 10;
@@ -208,8 +228,8 @@ static void CLInstallApplicationMenu(void) {
     NSStackView *root = [NSStackView stackViewWithViews:mainViews];
     root.orientation = NSUserInterfaceLayoutOrientationVertical;
     root.alignment = NSLayoutAttributeLeading;
-    root.spacing = 14;
-    root.edgeInsets = NSEdgeInsetsMake(24, 28, 24, 28);
+    root.spacing = 12;
+    root.edgeInsets = NSEdgeInsetsMake(24, 30, 24, 30);
     root.translatesAutoresizingMaskIntoConstraints = NO;
     [background addSubview:root];
     [NSLayoutConstraint activateConstraints:@[
@@ -217,6 +237,7 @@ static void CLInstallApplicationMenu(void) {
         [root.trailingAnchor constraintEqualToAnchor:background.trailingAnchor],
         [root.topAnchor constraintEqualToAnchor:background.topAnchor],
         [root.bottomAnchor constraintLessThanOrEqualToAnchor:background.bottomAnchor],
+        [header.widthAnchor constraintEqualToAnchor:componentStack.widthAnchor],
         [componentStack.widthAnchor constraintEqualToAnchor:root.widthAnchor constant:-56],
         [buttons.widthAnchor constraintEqualToAnchor:componentStack.widthAnchor]
     ]];
@@ -237,18 +258,21 @@ static void CLInstallApplicationMenu(void) {
     NSInteger role = self.roleSelector.selectedSegment;
     if (role == 3) {
         [self.checks enumerateKeysAndObjectsUsingBlock:^(NSString *key, NSButton *check, BOOL *stop) { check.enabled = YES; }];
+        [self.cards enumerateKeysAndObjectsUsingBlock:^(NSString *key, NSView *card, BOOL *stop) { card.alphaValue = 1.0; }];
         self.liveSelector.enabled = YES;
+        self.liveSection.hidden = NO;
         return;
     }
     [self.checks enumerateKeysAndObjectsUsingBlock:^(NSString *key, NSButton *check, BOOL *stop) {
         BOOL selected = (role == 0 && [key isEqualToString:@"controller"]) ||
                         (role == 1 && ([key isEqualToString:@"ableton-reader"] || [key isEqualToString:@"builder"] || [key isEqualToString:@"autoscene"])) ||
-                        (role == 2 && [key isEqualToString:@"simulator"]);
+                        (role == 2 && [key isEqualToString:@"midi-console"]);
         check.state = selected ? NSControlStateValueOn : NSControlStateValueOff;
         check.enabled = NO;
-        self.cards[key].alphaValue = selected ? 1.0 : 0.38;
+        self.cards[key].alphaValue = selected ? 1.0 : 0.28;
     }];
     self.liveSelector.enabled = role == 1;
+    self.liveSection.hidden = role != 1;
 }
 
 - (void)cancelPressed:(id)sender { [NSApp terminate:nil]; }
@@ -260,6 +284,23 @@ static void CLInstallApplicationMenu(void) {
     alert.alertStyle = style;
     [alert addButtonWithTitle:@"OK"];
     [alert runModal];
+}
+
+- (NSString *)failureMessageForLog:(NSString *)log {
+    NSString *contents = [NSString stringWithContentsOfFile:log encoding:NSUTF8StringEncoding error:nil];
+    __block NSString *reason = nil;
+    [[contents componentsSeparatedByCharactersInSet:NSCharacterSet.newlineCharacterSet]
+        enumerateObjectsWithOptions:NSEnumerationReverse
+                         usingBlock:^(NSString *line, NSUInteger index, BOOL *stop) {
+        if ([line hasPrefix:@"ERREUR : "]) {
+            reason = [line substringFromIndex:@"ERREUR : ".length];
+            *stop = YES;
+        }
+    }];
+    if (reason.length) {
+        return [NSString stringWithFormat:@"%@\n\nRapport complet : %@", reason, log];
+    }
+    return [@"Consultez le rapport complet : " stringByAppendingString:log];
 }
 
 - (void)actionPressed:(id)sender {
@@ -322,22 +363,21 @@ static void CLInstallApplicationMenu(void) {
                 BOOL installedController = !selfRef.uninstaller && [selected containsObject:@"controller"];
                 BOOL installedAbletonReader = !selfRef.uninstaller && [selected containsObject:@"ableton-reader"];
                 BOOL installedNetworkAssistant = !selfRef.uninstaller && [selected containsObject:@"midi-console"];
-                BOOL installedSimulator = !selfRef.uninstaller && [selected containsObject:@"simulator"];
                 NSString *successMessage = installedController
-                    ? @"Le rôle Mac Télécommande est installé. La liaison RTP-MIDI émetteur-récepteur, la découverte Bonjour et les retours consoles démarrent automatiquement à l’ouverture de session."
+                    ? @"Le rôle Mac Télécommande est installé. Les versions remplacées sont dans la Corbeille. La liaison RTP-MIDI, la découverte Bonjour et les retours consoles démarrent automatiquement à l’ouverture de session."
                     : (installedAbletonReader
                        ? @"Le rôle Mac Ableton Lecteur est installé. Son agent RTP-MIDI émetteur-récepteur démarre automatiquement à l’ouverture de session. Fermez puis relancez Ableton Live s’il était ouvert."
                        : (installedNetworkAssistant
-                          ? @"CL MIDI Network Assistant a été installé comme outil de diagnostic. Acceptez l’autorisation Accessibilité si macOS la demande."
-                          : (installedSimulator
-                             ? @"Le simulateur de consoles RTP a été installé pour les essais manuels CL5 et QL1."
-                             : (selfRef.uninstaller ? @"Les éléments retirés restent récupérables dans la Corbeille." : @"Fermez complètement Ableton Live si celui-ci était ouvert, puis relancez-le."))));
+                          ? @"CL MIDI Network Assistant et son simulateur IAC/RTP intégré ont été installés. Acceptez l’autorisation Accessibilité si macOS la demande."
+                          : (selfRef.uninstaller ? @"Les éléments retirés restent récupérables dans la Corbeille." : @"Fermez complètement Ableton Live si celui-ci était ouvert, puis relancez-le.")));
                 [selfRef showAlert:(selfRef.uninstaller ? @"Désinstallation terminée" : @"Installation terminée")
                               message:successMessage
                                 style:NSAlertStyleInformational];
             } else {
                 selfRef.statusLabel.stringValue = @"Échec — consultez le rapport";
-                [selfRef showAlert:@"L’opération a échoué" message:[@"Rapport : " stringByAppendingString:log] style:NSAlertStyleCritical];
+                [selfRef showAlert:@"L’opération a échoué"
+                              message:[selfRef failureMessageForLog:log]
+                                style:NSAlertStyleCritical];
             }
         });
     };

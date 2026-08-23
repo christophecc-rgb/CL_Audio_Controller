@@ -52,8 +52,36 @@
 
   const LTC_PLACEHOLDER = '--:--:--:--';
   const LTC_PATTERN = /^\d{2}:\d{2}:\d{2}:\d{2}$/;
+  const ltcClocks = new WeakMap();
+
+  const parseLtcFrames = (value, fps) => {
+    const parts = value.split(':').map(Number);
+    return (((parts[0] * 60 + parts[1]) * 60 + parts[2]) * fps) + parts[3];
+  };
+
+  const formatLtcFrames = (frames, fps) => {
+    const dayFrames = 24 * 60 * 60 * fps;
+    let value = ((frames % dayFrames) + dayFrames) % dayFrames;
+    const ff = value % fps;
+    value = Math.floor(value / fps);
+    const ss = value % 60;
+    value = Math.floor(value / 60);
+    const mm = value % 60;
+    const hh = Math.floor(value / 60) % 24;
+    return [hh, mm, ss, ff].map(part => String(part).padStart(2, '0')).join(':');
+  };
 
   window.CLRemoteLTC = {
+    enableSmoothing(element, fps = 25) {
+      if (!element || ltcClocks.has(element)) return;
+      const clock = { baseFrames: null, fps, syncedAt: 0 };
+      ltcClocks.set(element, clock);
+      window.setInterval(() => {
+        if (clock.baseFrames === null || document.hidden) return;
+        const elapsedFrames = Math.floor((performance.now() - clock.syncedAt) * clock.fps / 1000);
+        element.textContent = formatLtcFrames(clock.baseFrames + elapsedFrames, clock.fps);
+      }, Math.round(1000 / fps));
+    },
     render(element, state) {
       if (!element) return;
       const connected = Boolean(state && state.ltc_connected === true);
@@ -62,6 +90,11 @@
         : '';
       const active = connected && LTC_PATTERN.test(value);
       element.textContent = active ? value : LTC_PLACEHOLDER;
+      const clock = ltcClocks.get(element);
+      if (clock) {
+        clock.baseFrames = active ? parseLtcFrames(value, clock.fps) : null;
+        clock.syncedAt = performance.now();
+      }
       const display = element.closest('.ltc-display');
       if (display) {
         display.classList.toggle('ltc-display--connected', active);
@@ -69,6 +102,9 @@
       }
     }
   };
+
+  const sharedLtcTimecode = document.getElementById('ltcTimecode');
+  if (sharedLtcTimecode) window.CLRemoteLTC.enableSmoothing(sharedLtcTimecode, 25);
 
   const arrangementWarning = 'Attention : vous passez en mode Arrangement. Cette action peut modifier la lecture en cours. Continuer ?';
   document.querySelectorAll('[data-arrangement-link]').forEach(link => {

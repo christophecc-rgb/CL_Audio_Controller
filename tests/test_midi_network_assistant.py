@@ -7,6 +7,14 @@ LAUNCHER = ROOT / "packaging" / "CL_MIDI_Network_Assistant.sh"
 
 
 class MidiNetworkAssistantLauncherTests(unittest.TestCase):
+    def test_simulator_stop_all_also_terminates_orphaned_processes(self):
+        source = (ROOT / "tools/cl_midi_network/CLYamahaSimulatorDashboard.m").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn('@"/usr/bin/pkill"', source)
+        self.assertIn('@[@"-TERM", @"-x", @"CLYamahaConsoleSimulator"]', source)
+        self.assertGreaterEqual(source.count("[self terminateAllSimulatorProcesses]"), 2)
+
     def test_selection_uses_an_explicit_applescript_variable(self):
         source = LAUNCHER.read_text(encoding="utf-8")
         self.assertIn("set picked to choose from list", source)

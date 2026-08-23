@@ -1,4 +1,4 @@
-import socket, subprocess, webbrowser, threading, os, time, sys, importlib.util, json, uuid, secrets
+import socket, subprocess, webbrowser, threading, os, time, sys, importlib.util, json, uuid, secrets, functools
 import urllib.request
 import urllib.error
 
@@ -31,6 +31,7 @@ ROOT = Path(__file__).resolve().parent
 APP = ROOT / "app.py"
 PYTHON = ROOT / ".venv" / "bin" / "python"
 KEYBOARD_LOG_PATH = Path("/private/tmp/CL_Audio_Controller_keyboard.log")
+SERVER_CHILD_LOG_PATH = Path("/private/tmp/CL_Audio_Controller_child.log")
 launcher_log_lock = threading.Lock()
 
 
@@ -88,6 +89,7 @@ REMOTE_ARRANGEMENT_URL = f"http://127.0.0.1:{WEB_PORT}/arrangement"
 REMOTE_ROOT_LAN_URL = lambda: f"http://{get_lan_ip()}:{WEB_PORT}/"
 REMOTE_APP_NAME = "Télécommande Ableton.app"
 server_ownership_lock = threading.RLock()
+server_lifecycle_lock = threading.RLock()
 owned_server = None
 claimable_server = None
 ignored_orphan_instance_id = None
@@ -203,12 +205,16 @@ def read_midi_console_state(expected_agent_host=None):
             },
             "cl5": {
                 "program": None,
+                "midi_program": None,
+                "scene": None,
                 "title": "",
                 "received": False,
                 "received_at": None,
             },
             "ql1": {
                 "program": None,
+                "midi_program": None,
+                "scene": None,
                 "title": "",
                 "received": False,
                 "received_at": None,
@@ -388,6 +394,16 @@ def run_embedded_server():
     module.app.run(host="0.0.0.0", port=WEB_PORT, debug=False, use_reloader=False, threaded=True)
 
 
+def serialized_server_lifecycle(function):
+    """Empêche les boutons et l'auto-démarrage de piloter 5050 en parallèle."""
+    @functools.wraps(function)
+    def serialized(*args, **kwargs):
+        with server_lifecycle_lock:
+            return function(*args, **kwargs)
+    return serialized
+
+
+@serialized_server_lifecycle
 def start_web_server(timeout=6.0):
     """Lance et valide exactement le processus enfant créé par ce launcher."""
     global owned_server
@@ -435,7 +451,24 @@ def start_web_server(timeout=6.0):
         else:
             py = str(PYTHON if PYTHON.exists() else sys.executable)
             command = [py, str(APP)]
-        process = subprocess.Popen(command, cwd=str(ROOT), env=child_environment)
+        # Une application macOS lancée depuis Finder n'a pas de Terminal où
+        # conserver stderr. Sans redirection, un enfant qui quitte tôt ne laisse
+        # donc aucune explication exploitable dans le rapport de diagnostic.
+        try:
+            child_log = SERVER_CHILD_LOG_PATH.open("ab", buffering=0)
+        except OSError:
+            child_log = subprocess.DEVNULL
+        try:
+            process = subprocess.Popen(
+                command,
+                cwd=str(ROOT),
+                env=child_environment,
+                stdout=child_log,
+                stderr=subprocess.STDOUT,
+            )
+        finally:
+            if child_log is not subprocess.DEVNULL:
+                child_log.close()
         owned_server = {
             "process": process,
             "launch_id": launch_id,
@@ -486,6 +519,33 @@ def start_web_server(timeout=6.0):
                 return False, validation["message"]
         time.sleep(0.05)
     return False, "Délai dépassé avant validation de l'identité du serveur"
+
+
+def auto_start_web_server(attempts=5, retry_delay=1.0):
+    """Démarre 5050 en arrière-plan et absorbe les courses de fin d'installation."""
+    last_message = "Démarrage automatique non exécuté"
+    for attempt in range(1, max(1, int(attempts)) + 1):
+        ok, last_message = ensure_valid_server()
+        launcher_diagnostic_log({
+            "source": "ServerLifecycle",
+            "event": "automatic-start",
+            "attempt": attempt,
+            "success": ok,
+            "message": last_message,
+        })
+        if ok:
+            event(last_message)
+            return True, last_message
+        if tcp_ok(WEB_PORT) or attempt >= attempts:
+            break
+        # L'ancien binaire ou ses sockets peuvent finir de se fermer juste après
+        # une réinstallation. Une attente progressive évite de déclarer l'échec
+        # définitif alors qu'un lancement manuel quelques secondes après réussit.
+        time.sleep(retry_delay * attempt)
+    event(f"Démarrage automatique impossible : {last_message}")
+    return False, last_message
+
+
 def find_remote_app():
     candidates = []
 
@@ -754,7 +814,8 @@ def tcp_ok(port):
 def port_used(port):
     return bool(subprocess.run(["lsof", "-i", f":{port}"], capture_output=True, text=True).stdout.strip())
 
-def stop_owned_server(graceful_timeout=3.0, terminate_timeout=2.0):
+@serialized_server_lifecycle
+def stop_owned_server(graceful_timeout=6.0, terminate_timeout=2.0):
     """Arrête une instance prouvée, sans action globale ni terminaison forcée."""
     global owned_server
     with server_ownership_lock:
@@ -766,6 +827,15 @@ def stop_owned_server(graceful_timeout=3.0, terminate_timeout=2.0):
     process = ownership.get("process")
     pid = ownership.get("server_process_id") or getattr(process, "pid", None)
     if not instance_id:
+        if process is not None and process.poll() is not None:
+            with server_ownership_lock:
+                if owned_server is ownership:
+                    owned_server = None
+            try:
+                remove_record()
+            except OwnershipRecordError:
+                pass
+            return True, "Serveur déjà arrêté"
         return False, "Arrêt refusé : identité serveur incomplète"
 
     payload = read_remote_state_diagnostic()
@@ -794,6 +864,7 @@ def stop_owned_server(graceful_timeout=3.0, terminate_timeout=2.0):
         method="POST",
         headers=ownership_headers(ownership),
     )
+    shutdown_request_error = None
     try:
         with urllib.request.urlopen(request_shutdown, timeout=1.0):
             launcher_diagnostic_log({
@@ -804,8 +875,19 @@ def stop_owned_server(graceful_timeout=3.0, terminate_timeout=2.0):
                 "buildId": ownership["build_id"],
                 "serverProcessId": payload.get("server_process_id"),
             })
-    except (urllib.error.URLError, TimeoutError) as exc:
-        return False, f"Arrêt propre non confirmé : {exc}"
+    except (urllib.error.URLError, TimeoutError, OSError) as exc:
+        # Le processus peut fermer sa socket avant qu'urllib reçoive le 200.
+        # L'ownership étant déjà prouvé, on attend puis on ne termine au besoin
+        # que le processus enfant exact.
+        shutdown_request_error = str(exc)
+        launcher_diagnostic_log({
+            "source": "ServerIdentity",
+            "event": "graceful-shutdown-response-lost",
+            "launchId": ownership["launch_id"],
+            "serverInstanceId": instance_id,
+            "serverProcessId": payload.get("server_process_id"),
+            "reason": shutdown_request_error,
+        })
 
     deadline = time.monotonic() + graceful_timeout
     while time.monotonic() < deadline:
@@ -820,7 +902,8 @@ def stop_owned_server(graceful_timeout=3.0, terminate_timeout=2.0):
             try:
                 process.wait(timeout=terminate_timeout)
             except subprocess.TimeoutExpired:
-                return False, "Le processus exact résiste à l’arrêt normal ; terminaison forcée non exécutée"
+                suffix = f" ({shutdown_request_error})" if shutdown_request_error else ""
+                return False, f"Le processus exact résiste à l’arrêt normal ; terminaison forcée non exécutée{suffix}"
         else:
             return False, "Arrêt demandé mais libération des ports non confirmée"
 
@@ -837,10 +920,22 @@ def stop_owned_server(graceful_timeout=3.0, terminate_timeout=2.0):
     return True, "Serveur arrêté proprement"
 
 
+@serialized_server_lifecycle
 def ensure_valid_server():
     payload, validation = current_identity_status() if tcp_ok(WEB_PORT) else ({}, {"valid": False})
     if validation.get("valid"):
         return True, validation["message"]
+    if validation.get("code") == "orphan-claimable":
+        ok, message = adopt_claimable_server()
+        launcher_diagnostic_log({
+            "source": "ServerLifecycle",
+            "event": "automatic-orphan-adoption",
+            "success": ok,
+            "message": message,
+            "serverInstanceId": payload.get("server_instance_id"),
+            "serverProcessId": payload.get("server_process_id"),
+        })
+        return ok, message
     if tcp_ok(WEB_PORT):
         return False, validation.get("message", "Serveur non identifiable sur le port 5050")
     return start_web_server()
@@ -1748,6 +1843,12 @@ if __name__ == "__main__":
     server_thread = threading.Thread(target=run_control_server, daemon=True)
     server_thread.start()
     ensure_midi_console_monitor()
+    server_start_thread = threading.Thread(
+        target=auto_start_web_server,
+        name="cl-audio-server-autostart",
+        daemon=True,
+    )
+    server_start_thread.start()
     time.sleep(1.0)
 
     if webview is None:
@@ -1771,6 +1872,21 @@ if __name__ == "__main__":
         js_api=panel_api,
     )
     panel_api.window = panel_window
+    panel_close_cleanup_started = threading.Event()
+
+    def quit_when_main_panel_closes():
+        """Le bouton rouge ferme toute l'application, pas seulement sa fenêtre."""
+        if panel_close_cleanup_started.is_set():
+            return
+        panel_close_cleanup_started.set()
+        event("Fenêtre principale fermée — arrêt complet")
+        try:
+            stop_owned_server()
+        finally:
+            stop_midi_console_monitor()
+            os._exit(0)
+
+    panel_window.events.closed += quit_when_main_panel_closes
     webview.start(gui="cocoa", debug=False)
-    stop_owned_server()
-    stop_midi_console_monitor()
+    # Filet de sécurité pour les backends où start() retourne sans événement.
+    quit_when_main_panel_closes()

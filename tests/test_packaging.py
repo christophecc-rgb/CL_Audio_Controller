@@ -63,7 +63,20 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("CL_Arrangement_Builder_Live", script)
         self.assertIn("AbletonOSC", script)
         self.assertIn("Max Audio Effect/CL Audio Controller", script)
-        self.assertIn("backup_existing", script)
+        self.assertIn("trash_existing", script)
+        self.assertIn('TRASH_ROOT="${CL_SUITE_TRASH_DIR:-$INSTALL_HOME/.Trash}"', script)
+        self.assertIn('for legacy_backup in "${target}.sauvegarde_"*', script)
+        self.assertIn('mv "$target" "$destination"', script)
+        self.assertIn("prepare_controller_replacement", script)
+        self.assertIn('tell application id "com.claudio.controller" to quit', script)
+        self.assertIn("http://127.0.0.1:5055/quit", script)
+
+        self.assertIn('local quit_requested=0', script)
+        self.assertIn('if [[ "$quit_requested" != 1 ]]', script)
+        self.assertIn("Serveur orphelin détecté", script)
+        self.assertIn('open -gj "$USER_APPS/CL Audio Controller.app"', script)
+        self.assertIn("port_listening 5050", script)
+        self.assertIn("port_listening 5055", script)
         self.assertIn("Live 10", script)
         self.assertIn("Live 11", script)
         self.assertIn("CL Audio Controller - Live 10", script)
@@ -76,8 +89,11 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("Ableton Live 10", script)
         self.assertIn("Paradis Latin AutoScene - Live 10", script)
         self.assertIn("CL MIDI RTP Agent.app", script)
-        self.assertIn("CL MIDI RTP Simulator.app", script)
+        self.assertNotIn("CL MIDI RTP Simulator.app", script)
         self.assertIn('open -gj "$USER_APPS/CL MIDI RTP Agent.app"', script)
+        self.assertIn("prepare_rtp_agent_replacement", script)
+        self.assertIn("l’état réel (processus + LaunchAgent) fait foi", script)
+        self.assertIn("pgrep -f -x", script)
         self.assertIn("com.claudio.midi-rtp-agent.plist", script)
         self.assertIn("com.claudio.midi-network-monitor.plist", script)
         self.assertIn("--background-monitor", script)
@@ -88,6 +104,11 @@ class PackagingTests(unittest.TestCase):
         self.assertIn('COMPONENTS_ROOT="$SCRIPT_DIR/Composants"', script)
         self.assertNotIn("sudo", script)
         self.assertNotIn("pkill", script)
+
+    def test_red_window_button_triggers_a_full_launcher_shutdown(self):
+        launcher = (PROJECT_ROOT / "launcher_control.py").read_text(encoding="utf-8")
+        self.assertIn("panel_window.events.closed += quit_when_main_panel_closes", launcher)
+        self.assertIn("Fenêtre principale fermée — arrêt complet", launcher)
 
     def test_desktop_export_includes_full_suite_installer(self):
         script = (
@@ -100,13 +121,18 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("Paradis Latin AutoScene - Live 10.maxpat", script)
         self.assertIn("Arrangement Builder Live.app/", script)
         self.assertIn('"CL MIDI RTP Agent.app/"', script)
-        self.assertIn('"CL MIDI RTP Simulator.app/"', script)
+        self.assertNotIn('"CL MIDI RTP Simulator.app/"', script)
         self.assertIn("CFBundleIconFile", script)
         self.assertIn("CL_RELEASE_OUTPUT_ROOT", script)
         self.assertIn("CLSuiteInstallerApp.m", script)
         self.assertIn("installer-universal", script)
         self.assertIn("x86_64-apple-macosx10.15", script)
         self.assertIn("arm64-apple-macosx10.15", script)
+        self.assertIn('python3 -m PyInstaller', script)
+        self.assertIn('"Arrangement Builder Live.spec"', script)
+        self.assertIn('ditto "$BUILDER_APP"', script)
+        self.assertIn('ditto "$BUILDER_DIR/RemoteScript"', script)
+        self.assertNotIn('BUILDER_DIR/release/Arrangement Builder Live 1.2.2', script)
 
     def test_graphical_installer_wraps_the_noninteractive_engine(self):
         source = (
@@ -138,7 +164,7 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("Mac Télécommande", source)
         self.assertIn("CL Arrangement Builder Live", source)
         self.assertIn("Paradis Latin AutoScene", source)
-        self.assertIn("CL MIDI Console Monitor", source)
+        self.assertIn("CL MIDI Network Assistant + simulateur", source)
         self.assertIn("Mac Ableton Lecteur", source)
         self.assertIn("Simulateur console", source)
         self.assertIn("agent RTP léger", source)
@@ -149,10 +175,15 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("CL_SUITE_UNINSTALL_COMPONENTS", source)
         self.assertIn("NSProgressIndicatorStyleBar", source)
         self.assertIn("Installation terminée", source)
+        self.assertIn('@"ParadisLatin.jpg"', source)
+        self.assertIn('buttonWithTitle:@"Quitter"', source)
+        self.assertIn('quit.keyEquivalent = @"\\033"', source)
+        self.assertIn("failureMessageForLog", source)
+        self.assertIn('@"ERREUR : "', source)
         installer_section = source.split("] : @[", 1)[1]
         self.assertLess(installer_section.index("Paradis Latin AutoScene"), installer_section.index("Mac Télécommande"))
         self.assertLess(installer_section.index("Mac Télécommande"), installer_section.index("CL Arrangement Builder Live"))
-        self.assertLess(installer_section.index("CL Arrangement Builder Live"), installer_section.index("CL MIDI Console Monitor"))
+        self.assertLess(installer_section.index("CL Arrangement Builder Live"), installer_section.index("CL MIDI Network Assistant + simulateur"))
         self.assertIn('@selector(terminate:)', source)
         self.assertIn('keyEquivalent:@"q"', source)
 
@@ -243,6 +274,15 @@ class PackagingTests(unittest.TestCase):
             self.assertTrue((home / "Applications/CL Audio Controller.app").is_dir())
             self.assertTrue((home / "Applications/Arrangement Builder Live.app").is_dir())
             self.assertTrue((home / "Applications/CL MIDI Network Assistant.app").is_dir())
+
+            legacy = home / "Applications/CL Audio Controller.app.sauvegarde_ancienne"
+            legacy.mkdir()
+            subprocess.run([str(engine)], check=True, env=environment, capture_output=True)
+            trash_sessions = list((home / ".Trash").glob("CL Suite remplacée *"))
+            self.assertTrue(trash_sessions)
+            trashed_names = {item.name for session in trash_sessions for item in session.iterdir()}
+            self.assertTrue(any(name.endswith("CL Audio Controller.app") for name in trashed_names))
+            self.assertTrue(any("sauvegarde_ancienne" in name for name in trashed_names))
             self.assertTrue(
                 (home / "Music/Ableton/User Library/Remote Scripts/AbletonOSC").is_dir()
             )

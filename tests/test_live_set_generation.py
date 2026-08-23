@@ -29,6 +29,9 @@ class LiveSetGenerationTests(unittest.TestCase):
         cls.app = load_app_module()
 
     def setUp(self):
+        schedule_patcher = mock.patch.object(self.app, "schedule_console_scene_map_refresh")
+        schedule_patcher.start()
+        self.addCleanup(schedule_patcher.stop)
         with self.app.lock:
             self.app._bootstrap_generation = None
             self.app._bootstrap_transaction = None
@@ -46,7 +49,12 @@ class LiveSetGenerationTests(unittest.TestCase):
             self.app.state["current_scene"] = 7
             self.app.state["next_scene"] = 8
             self.app.state["has_show_started"] = True
+            self.app.state["play_mode"] = "session"
+            self.app.state["arrangement_marker"] = ""
             self.app.state["scenes"] = {7: "Ancienne en cours", 8: "Ancienne prochaine"}
+            self.app.state["console_scene_map"] = {"cl5": {}, "ql1": {}}
+            self.app.state["console_title_mode"] = "ableton_context"
+            self.app.state["console_scene_libraries"] = {"cl5": {}, "ql1": {}}
 
     def run_confirmed_go(self, request_id, generation, scene_number, sent):
         def confirm_selected(address, *args, **kwargs):
@@ -103,7 +111,7 @@ class LiveSetGenerationTests(unittest.TestCase):
             self.assertFalse(self.app.publish_current_midi_monitor_scene_context())
         publish.assert_not_called()
 
-    def test_arrangement_console_return_uses_current_marker_title(self):
+    def test_recent_console_return_uses_active_scene_title_not_program_lookup(self):
         payload = {
             "service": "cl-midi-console-monitor",
             "cl5": {"received": True, "received_at": time.time(), "program": 42, "title": "Ancien titre"},
@@ -113,14 +121,274 @@ class LiveSetGenerationTests(unittest.TestCase):
             state_path = Path(temporary) / "midi-state.json"
             state_path.write_text(json.dumps(payload), encoding="utf-8")
             with self.app.lock:
-                self.app.state["play_mode"] = "arrangement"
-                self.app.state["arrangement_marker"] = "43. Dancing queen"
-                self.app.state["playing_scene_name"] = "Ancienne scène Session"
-                self.app.MIDI_CONSOLE_TITLE_OVERRIDES.clear()
+                self.app.state["playing_scene"] = 43
+                self.app.state["playing_scene_name"] = "43. Dancing queen"
+                self.app.state["console_scene_map"] = {
+                    "cl5": {41: [{"scene_index": 43, "program": 42, "midi_program": 41, "title": "43. Dancing queen"}]},
+                    "ql1": {},
+                }
                 with mock.patch.object(self.app, "MIDI_CONSOLE_STATE_PATH", state_path):
                     snapshot = self.app.state_snapshot_locked()
 
         self.assertEqual(snapshot["midi_console"]["cl5"]["title"], "43. Dancing queen")
+
+    def test_session_console_return_prioritizes_resolved_program_mapping(self):
+        payload = {
+            "service": "cl-midi-console-monitor",
+            "cl5": {
+                "received": True,
+                "received_at": time.time(),
+                "program": 42,
+                "midi_program": 41,
+                "scene": 42,
+                "title": "Titre résolu pour scène 42",
+            },
+            "ql1": {"received": False},
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            state_path = Path(temporary) / "midi-state.json"
+            state_path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.app.lock:
+                self.app.state["play_mode"] = "session"
+                self.app.state["playing_scene"] = 42
+                self.app.state["playing_scene_name"] = "Titre actif pour scène 42"
+                self.app.state["console_scene_map"] = {
+                    "cl5": {41: [{"scene_index": 42, "program": 42, "midi_program": 41, "title": "Titre résolu pour scène 42"}]},
+                    "ql1": {},
+                }
+                with mock.patch.object(self.app, "MIDI_CONSOLE_STATE_PATH", state_path):
+                    snapshot = self.app.state_snapshot_locked()
+
+        self.assertEqual(
+            snapshot["midi_console"]["cl5"]["title"],
+            "Titre résolu pour scène 42",
+        )
+        self.assertEqual(snapshot["midi_console"]["cl5"]["title_source"], "console_scene_map")
+
+    def test_unresolved_console_return_does_not_publish_stale_monitor_title(self):
+        payload = {
+            "service": "cl-midi-console-monitor",
+            "cl5": {"received": True, "program": 42, "title": "Ancien titre"},
+            "ql1": {"received": False},
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            state_path = Path(temporary) / "midi-state.json"
+            state_path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.app.lock:
+                self.app.state["console_scene_map"] = {"cl5": {}, "ql1": {}}
+                with mock.patch.object(self.app, "MIDI_CONSOLE_STATE_PATH", state_path):
+                    snapshot = self.app.state_snapshot_locked()
+
+        self.assertEqual(snapshot["midi_console"]["cl5"]["title"], "")
+        self.assertEqual(snapshot["midi_console"]["cl5"]["monitor_title"], "Ancien titre")
+        self.assertIsNone(snapshot["midi_console"]["cl5"]["resolved_scene"])
+
+    def test_stale_console_return_uses_current_scene_expected_program_for_display(self):
+        payload = {
+            "service": "cl-midi-console-monitor",
+            "cl5": {"received": True, "received_at": time.time() - 3600, "program": 42},
+            "ql1": {"received": False},
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            state_path = Path(temporary) / "midi-state.json"
+            state_path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.app.lock:
+                self.app.state["playing_scene"] = 6
+                self.app.state["console_scene_map"] = {
+                    "cl5": {92: [{"scene_index": 6, "program": 93, "midi_program": 92, "title": "9- QUICK CHANGE"}]},
+                    "ql1": {},
+                }
+                with mock.patch.object(self.app, "MIDI_CONSOLE_STATE_PATH", state_path):
+                    snapshot = self.app.state_snapshot_locked()
+
+        returned = snapshot["midi_console"]["cl5"]
+        self.assertEqual(returned["program"], 93)
+        self.assertEqual(returned["return_program"], 42)
+        self.assertEqual(returned["title"], "9- QUICK CHANGE")
+        self.assertEqual(returned["display_source"], "ableton_scene")
+
+    def test_recent_program_change_validates_active_scene_title_regardless_of_program(self):
+        payload = {
+            "service": "cl-midi-console-monitor",
+            "cl5": {"received": True, "received_at": time.time(), "program": 127, "title": ""},
+            "ql1": {"received": False},
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            state_path = Path(temporary) / "midi-state.json"
+            state_path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.app.lock:
+                self.app.state["playing_scene"] = 6
+                self.app.state["playing_scene_name"] = "9- QUICK CHANGE"
+                self.app.state["console_scene_map"] = {"cl5": {}, "ql1": {}}
+                with mock.patch.object(self.app, "MIDI_CONSOLE_STATE_PATH", state_path):
+                    snapshot = self.app.state_snapshot_locked()
+
+        returned = snapshot["midi_console"]["cl5"]
+        self.assertEqual(returned["program"], 127)
+        self.assertEqual(returned["title"], "9- QUICK CHANGE")
+        self.assertEqual(returned["resolved_scene"]["scene_index"], 6)
+        self.assertEqual(returned["display_source"], "console_return")
+
+    def test_recent_program_change_in_arrangement_validates_active_marker_title(self):
+        payload = {
+            "service": "cl-midi-console-monitor",
+            "cl5": {"received": True, "received_at": time.time(), "program": 81, "title": "Ancien"},
+            "ql1": {"received": False},
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            state_path = Path(temporary) / "midi-state.json"
+            state_path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.app.lock:
+                self.app.state["play_mode"] = "arrangement"
+                self.app.state["arrangement_marker"] = "4-CABARET NEW GAGA"
+                self.app.state["playing_scene_name"] = "Titre Session à ignorer"
+                self.app.state["console_scene_map"] = {"cl5": {}, "ql1": {}}
+                with mock.patch.object(self.app, "MIDI_CONSOLE_STATE_PATH", state_path):
+                    snapshot = self.app.state_snapshot_locked()
+
+        returned = snapshot["midi_console"]["cl5"]
+        self.assertEqual(returned["program"], 81)
+        self.assertEqual(returned["title"], "4-CABARET NEW GAGA")
+
+    def test_clf_scene_library_parser_reads_numbered_memapi_titles(self):
+        payload = bytearray(64)
+        payload[0x10:0x10 + len(b"QL [OSX, 5.8.1]")] = b"QL [OSX, 5.8.1]"
+        for title in (b"Initial Data", b"WELCOME", b"STAR IS BORN"):
+            payload.extend(b"MEMAPI" + b"\x00" * 6 + title + b"\x00" + b"\x00" * 32)
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "ql1.CLF"
+            path.write_bytes(payload)
+            library = self.app.load_console_scene_library(path, "QL")
+
+        self.assertEqual(library[0], "Initial Data")
+        self.assertEqual(library[1], "WELCOME")
+        self.assertEqual(library[2], "STAR IS BORN")
+
+    def test_console_file_mode_does_not_use_program_as_clf_scene_number(self):
+        payload = {
+            "service": "cl-midi-console-monitor",
+            "cl5": {"received": True, "received_at": time.time(), "program": 57, "title": ""},
+            "ql1": {"received": True, "received_at": time.time(), "program": 54, "title": ""},
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            state_path = Path(temporary) / "midi-state.json"
+            state_path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.app.lock:
+                self.app.state["console_title_mode"] = "console_file"
+                self.app.state["console_scene_libraries"] = {
+                    "cl5": {57: "PROUD MARY"},
+                    "ql1": {54: "PEGAZ MENEUSE"},
+                }
+                self.app.state["playing_scene"] = 10
+                self.app.state["selected_scene"] = 10
+                self.app.state["playing_scene_name"] = "L'OBJET DU DÉSIR"
+                self.app.state["console_scene_map"] = {
+                    "cl5": {56: [{"scene_index": 10, "program": 57, "midi_program": 56, "title": "L'OBJET DU DÉSIR"}]},
+                    "ql1": {53: [{"scene_index": 10, "program": 54, "midi_program": 53, "title": "L'OBJET DU DÉSIR"}]},
+                }
+                with mock.patch.object(self.app, "MIDI_CONSOLE_STATE_PATH", state_path):
+                    snapshot = self.app.state_snapshot_locked()
+
+        self.assertEqual(snapshot["midi_console"]["cl5"]["title"], "L'OBJET DU DÉSIR")
+        self.assertEqual(snapshot["midi_console"]["cl5"]["title_source"], "console_scene_map")
+        self.assertEqual(snapshot["midi_console"]["ql1"]["title"], "L'OBJET DU DÉSIR")
+        self.assertEqual(snapshot["midi_console"]["ql1"]["title_source"], "console_scene_map")
+        self.assertNotIn("console_scene_libraries", snapshot)
+
+    def test_recent_console_returns_resolve_defile_des_nations_for_both_consoles(self):
+        payload = {
+            "service": "cl-midi-console-monitor",
+            "cl5": {"received": True, "received_at": time.time(), "program": 58, "title": "CANT STOP THE FE"},
+            "ql1": {"received": True, "received_at": time.time(), "program": 55, "title": "P MENEUSE+MARCEL"},
+        }
+        mapping = self.app.build_console_scene_map(
+            ["Main", "PGM CHANGE CL5", "PGM CHANGE QL1"],
+            {
+                0: ["L'OBJET DU DÉSIR", "DÉFILÉ DES NATIONS"],
+                1: ["PGM CHANGE 57", "PGM CHANGE 58"],
+                2: ["PGM CHANGE 54", "PGM CHANGE 55"],
+            },
+            2,
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            state_path = Path(temporary) / "midi-state.json"
+            state_path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.app.lock:
+                self.app.state["playing_scene"] = 1
+                self.app.state["selected_scene"] = 1
+                self.app.state["playing_scene_name"] = "DÉFILÉ DES NATIONS"
+                self.app.state["console_scene_map"] = mapping
+                self.app.state["console_scene_libraries"] = {
+                    "cl5": {58: "CANT STOP THE FE"},
+                    "ql1": {55: "P MENEUSE+MARCEL"},
+                }
+                with mock.patch.object(self.app, "MIDI_CONSOLE_STATE_PATH", state_path):
+                    snapshot = self.app.state_snapshot_locked()
+
+        for console in ("cl5", "ql1"):
+            self.assertEqual(snapshot["midi_console"][console]["title"], "DÉFILÉ DES NATIONS")
+            self.assertEqual(snapshot["midi_console"][console]["title_source"], "console_scene_map")
+
+    def test_console_scene_map_uses_aligned_main_cl5_and_ql1_clips(self):
+        titles = ["", "10 - L'OBJET DU DÉSIR", "11 - DÉFILÉ DES NATIONS", "13 - H2O", "16 - I WILL ALWAYS...", "17 - BÊTE DE SEXE"]
+        cl5 = ["", "PGM CHANGE 57", "PGM CHANGE 58", "PGM CHANGE 60", "PGM CHANGE 63", "PGM CHANGE 64"]
+        ql1 = ["", "PGM CHANGE 54", "PGM CHANGE 55", "PGM CHANGE 56", "PGM CHANGE 57", "PGM CHANGE 58"]
+        mapping = self.app.build_console_scene_map(
+            ["Audio", "Main", "PGM CHANGE CL5", "PGM CHANGE QL1"],
+            {1: titles, 2: cl5, 3: ql1},
+            len(titles),
+        )
+
+        expected = [(57, 54), (58, 55), (60, 56), (63, 57), (64, 58)]
+        for scene_index, (cl5_program, ql1_program) in enumerate(expected, start=1):
+            self.assertEqual(mapping["cl5"][cl5_program - 1][0]["scene_index"], scene_index)
+            self.assertEqual(mapping["ql1"][ql1_program - 1][0]["scene_index"], scene_index)
+            self.assertEqual(mapping["cl5"][cl5_program - 1][0]["program"], cl5_program)
+            self.assertEqual(mapping["ql1"][ql1_program - 1][0]["midi_program"], ql1_program - 1)
+            self.assertEqual(mapping["cl5"][cl5_program - 1][0]["title"], titles[scene_index])
+
+    def test_reused_programs_are_preserved_and_resolved_deterministically(self):
+        mapping = self.app.build_console_scene_map(
+            ["Main", "PGM CHANGE CL5", "PGM CHANGE QL1"],
+            {
+                0: ["A", "B", "C", "D", "E", "F"],
+                1: ["PGM CHANGE 57", "", "PGM CHANGE 57", "", "", "PGM CHANGE 57"],
+                2: ["PGM CHANGE 54", "", "", "", "", ""],
+            },
+            6,
+        )
+        self.assertEqual([item["scene_index"] for item in mapping["cl5"][56]], [0, 2, 5])
+        self.assertEqual(self.app.resolve_console_scene_candidate(mapping, "cl5", 56, 5, 2)["title"], "F")
+        self.assertEqual(self.app.resolve_console_scene_candidate(mapping, "cl5", 56, -1, 2)["title"], "C")
+        self.assertEqual(self.app.resolve_console_scene_candidate(mapping, "cl5", 56, 4, 3)["title"], "F")
+        self.assertIsNone(self.app.resolve_console_scene_candidate(mapping, "ql1", 56, 5, 2))
+
+    def test_console_scene_map_can_use_published_scene_titles_without_main_track(self):
+        mapping = self.app.build_console_scene_map(
+            ["PGM CHANGE CL5", "PGM CHANGE QL1"],
+            {0: ["PGM CHANGE 42"], 1: ["PGM CHANGE 9"]},
+            1,
+            scene_titles=["1-MISE ENTREE"],
+        )
+
+        self.assertEqual(mapping["cl5"][41][0]["title"], "1-MISE ENTREE")
+        self.assertEqual(mapping["ql1"][8][0]["title"], "1-MISE ENTREE")
+
+    def test_console_scene_map_accepts_cc_change_clip_names(self):
+        mapping = self.app.build_console_scene_map(
+            ["PGM CHANGE CL5"],
+            {0: ["CC CHANGE 42"]},
+            1,
+            scene_titles=["1-MISE ENTREE"],
+        )
+
+        self.assertEqual(mapping["cl5"][41][0]["program"], 42)
+
+    def test_console_scene_map_accepts_live_set_cl5_cc_clip_names(self):
+        for clip_name in ("CC _ 81", "CC-94", "CC _100"):
+            with self.subTest(clip_name=clip_name):
+                self.assertIsNotNone(self.app.parse_program_change_clip_name(clip_name))
+        self.assertIsNone(self.app.parse_program_change_clip_name("CC - WELCOME"))
 
     def post_action_with_playing_reply(self, action_name, playing, sent):
         with (
@@ -985,21 +1253,22 @@ class LiveSetGenerationTests(unittest.TestCase):
             session_source,
         )
         self.assertIn(
-            "{ activeMs: 40, idleMs: 2500, hiddenMs: 15000, minActiveMs: 40 }",
+            "{ activeMs: 250, idleMs: 2500, hiddenMs: 15000, minActiveMs: 250 }",
             arrangement_source,
         )
 
     def test_polling_remains_serialized_and_recovers_after_failures(self):
         scheduler_source = (PROJECT_ROOT / "static/remote-v2.js").read_text(encoding="utf-8")
+        polling_source = scheduler_source.split("const LTC_PLACEHOLDER", 1)[0]
 
-        self.assertNotIn("setInterval", scheduler_source)
-        self.assertIn("let running = false;", scheduler_source)
-        self.assertIn("if (running) {", scheduler_source)
-        self.assertIn("try { await task(); }", scheduler_source)
-        self.assertIn("catch (_) {}", scheduler_source)
-        self.assertIn("finally {", scheduler_source)
-        self.assertIn("running = false;", scheduler_source)
-        self.assertIn("schedule();", scheduler_source)
+        self.assertNotIn("setInterval", polling_source)
+        self.assertIn("let running = false;", polling_source)
+        self.assertIn("if (running) {", polling_source)
+        self.assertIn("try { await task(); }", polling_source)
+        self.assertIn("catch (_) {}", polling_source)
+        self.assertIn("finally {", polling_source)
+        self.assertIn("running = false;", polling_source)
+        self.assertIn("schedule();", polling_source)
 
     def test_ab_generation_filter_and_controls_are_unchanged(self):
         ab_source = (PROJECT_ROOT / "templates/ab.html").read_text(encoding="utf-8")
@@ -1089,7 +1358,7 @@ class LiveSetGenerationTests(unittest.TestCase):
         self.assertIn('open_remote_app_window(REMOTE_ROOT_URL, "Télécommande Ableton")', launcher_source)
         self.assertIn('event("Télécommande ouverte sur Session")', launcher_source)
 
-    def test_shared_ltc_renderer_uses_only_published_ltc_state(self):
+    def test_shared_ltc_renderer_smooths_only_from_published_ltc_state(self):
         source = (PROJECT_ROOT / "static/remote-v2.js").read_text(encoding="utf-8")
 
         self.assertIn("const LTC_PLACEHOLDER = '--:--:--:--';", source)
@@ -1102,8 +1371,11 @@ class LiveSetGenerationTests(unittest.TestCase):
         for legacy_source in ("state.timecode", "state.smpte", "state.arrangement_timecode"):
             self.assertNotIn(legacy_source, source)
         self.assertIsNone(re.search(r"state\.ltc(?!_)", source))
-        for interpolation_marker in ("requestAnimationFrame", "interpolate", "setInterval"):
+        for interpolation_marker in ("requestAnimationFrame", "interpolate"):
             self.assertNotIn(interpolation_marker, source)
+        self.assertIn("window.setInterval", source)
+        self.assertIn("clock.baseFrames = active ? parseLtcFrames(value, clock.fps) : null;", source)
+        self.assertIn("performance.now() - clock.syncedAt", source)
 
     def test_shared_ltc_style_is_stable_and_uses_system_fonts(self):
         source = (PROJECT_ROOT / "static/remote-v2.css").read_text(encoding="utf-8")
@@ -1118,7 +1390,7 @@ class LiveSetGenerationTests(unittest.TestCase):
         expected_polling = {
             "templates/index.html": "{ activeMs: 40, idleMs: 2500, hiddenMs: 15000, minActiveMs: 40 }",
             "templates/ab.html": "{ activeMs: 40, idleMs: 2000, hiddenMs: 15000, minActiveMs: 40 }",
-            "templates/arrangement.html": "{ activeMs: 40, idleMs: 2500, hiddenMs: 15000, minActiveMs: 40 }",
+            "templates/arrangement.html": "{ activeMs: 250, idleMs: 2500, hiddenMs: 15000, minActiveMs: 250 }",
         }
         for relative_path, polling in expected_polling.items():
             source = (PROJECT_ROOT / relative_path).read_text(encoding="utf-8")

@@ -61,7 +61,8 @@ require_dir() {
 
 require_dir "$BUILDER_DIR/.git"
 require_dir "$ABLETONOSC_DIR/.git"
-require_dir "$BUILDER_DIR/release/Arrangement Builder Live 1.2.2"
+require_file "$BUILDER_DIR/Arrangement Builder Live.spec"
+require_dir "$BUILDER_DIR/RemoteScript"
 require_dir "$PROJECT_DIR/M4L/Install"
 require_file "$PROJECT_DIR/scripts/build_release.sh"
 require_file "$PROJECT_DIR/packaging/CLSuiteInstallerApp.m"
@@ -103,6 +104,21 @@ ditto -x -k "$CONTROLLER_RELEASE/CL_Audio_Controller_${VERSION}_Kit_Complet_macO
 CONTROLLER_ROOT="$(find "$CONTROLLER_EXTRACT" -maxdepth 1 -type d -name 'CL Audio Controller *' -print -quit)"
 [[ -n "$CONTROLLER_ROOT" ]] || fail "contenu du kit CL Audio Controller introuvable"
 
+echo
+echo "Construction d’Arrangement Builder Live depuis les sources actuelles…"
+BUILDER_BUILD="$BUILD_ROOT/arrangement-builder"
+mkdir -p "$BUILDER_BUILD"
+(
+  cd "$BUILDER_DIR"
+  python3 -m PyInstaller \
+    --noconfirm \
+    --workpath "$BUILDER_BUILD/work" \
+    --distpath "$BUILDER_BUILD/dist" \
+    "Arrangement Builder Live.spec"
+)
+BUILDER_APP="$BUILDER_BUILD/dist/Arrangement Builder Live.app"
+[[ -d "$BUILDER_APP" ]] || fail "la nouvelle application Arrangement Builder Live est introuvable"
+
 INSTALLER_APP="$SUITE_ROOT/Installer la Suite CL.app"
 UNINSTALLER_APP="$SUITE_ROOT/Désinstaller la Suite CL.app"
 INSTALLER_RESOURCES="$INSTALLER_APP/Contents/Resources"
@@ -126,11 +142,10 @@ echo "Assemblage des applications et composants…"
 ditto "$CONTROLLER_ROOT/CL Audio Controller.app" "$COMPONENTS_ROOT/Applications/CL Audio Controller.app"
 ditto "$CONTROLLER_ROOT/CL MIDI Network Assistant.app" "$COMPONENTS_ROOT/Applications/CL MIDI Network Assistant.app"
 ditto "$CONTROLLER_ROOT/CL MIDI RTP Agent.app" "$COMPONENTS_ROOT/Applications/CL MIDI RTP Agent.app"
-ditto "$CONTROLLER_ROOT/CL MIDI RTP Simulator.app" "$COMPONENTS_ROOT/Applications/CL MIDI RTP Simulator.app"
-ditto "$BUILDER_DIR/release/Arrangement Builder Live 1.2.2/Applications/Arrangement Builder Live.app" "$COMPONENTS_ROOT/Applications/Arrangement Builder Live.app"
+ditto "$BUILDER_APP" "$COMPONENTS_ROOT/Applications/Arrangement Builder Live.app"
 
 ditto "$CONTROLLER_ROOT/AbletonOSC CL/AbletonOSC" "$COMPONENTS_ROOT/Ableton Live 11-12/Remote Scripts/AbletonOSC"
-ditto "$BUILDER_DIR/release/Arrangement Builder Live 1.2.2/Installation Ableton/Remote Scripts/CL_Arrangement_Builder_Live" "$COMPONENTS_ROOT/Ableton Live 11-12/Remote Scripts/CL_Arrangement_Builder_Live"
+ditto "$BUILDER_DIR/RemoteScript" "$COMPONENTS_ROOT/Ableton Live 11-12/Remote Scripts/CL_Arrangement_Builder_Live"
 
 for file in "XFADER OSC BRIDGE v8.amxd" "LTC Display v2.0 Remote Config.amxd" cache.js; do
   ditto "$PROJECT_DIR/M4L/Install/$file" "$COMPONENTS_ROOT/Ableton Live 11-12/Max for Live/CL Audio Controller - Remote/$file"
@@ -239,7 +254,8 @@ Double-cliquer sur « Installer la Suite CL.app » puis choisir :
   AutoScene et CL MIDI Console Monitor ;
 - Ableton Live 10 pour installer uniquement la variante AutoScene compatible.
 
-Les installations existantes sont sauvegardées avec une date avant remplacement.
+Les installations existantes et leurs anciennes sauvegardes sont déplacées dans
+une session datée de la Corbeille avant remplacement. Elles restent récupérables.
 
 DÉSINSTALLATION
 
@@ -292,7 +308,6 @@ for expected in \
   "CL MIDI Console Monitor.amxd" \
   "CL MIDI Network Assistant.app/" \
   "CL MIDI RTP Agent.app/" \
-  "CL MIDI RTP Simulator.app/" \
   "CLMIDIRoundTripTester"; do
   LC_ALL=C grep -aFq "$expected" "$ZIP_LIST" || fail "contrôle final impossible, élément absent du ZIP : $expected"
 done

@@ -3,6 +3,7 @@ import json
 import subprocess
 import sys
 import unittest
+import urllib.error
 import uuid
 from pathlib import Path
 from unittest import mock
@@ -172,6 +173,111 @@ class ServerIdentityTests(unittest.TestCase):
         request.assert_called_once()
         self.assertTrue(process.terminated)
         self.assertFalse(process.killed)
+
+    def test_shutdown_response_loss_is_accepted_after_exact_process_stops(self):
+        process = FakeProcess()
+        process.returncode = 0
+        launcher.owned_server = {
+            "process": process,
+            "launch_id": LAUNCH_ID,
+            "server_instance_id": INSTANCE_ID,
+            "shutdown_token": "secret",
+            "build_id": build_identity.BUILD_ID,
+        }
+        with (
+            mock.patch.object(launcher, "read_remote_state_diagnostic", return_value=valid_status()),
+            mock.patch.object(launcher, "verify_server_ownership", return_value=(True, "ownership-verified")),
+            mock.patch.object(launcher, "process_alive", return_value=False),
+            mock.patch.object(launcher, "tcp_ok", return_value=False),
+            mock.patch.object(launcher, "port_used", return_value=False),
+            mock.patch.object(launcher, "remove_record") as remove,
+            mock.patch.object(
+                launcher.urllib.request,
+                "urlopen",
+                side_effect=urllib.error.URLError("response lost"),
+            ),
+        ):
+            ok, _ = launcher.stop_owned_server()
+        self.assertTrue(ok)
+        remove.assert_called_once_with()
+        self.assertIsNone(launcher.owned_server)
+
+    def test_automatic_start_retries_an_early_child_failure(self):
+        with (
+            mock.patch.object(
+                launcher,
+                "ensure_valid_server",
+                side_effect=[(False, "child exited"), (True, "started")],
+            ) as ensure,
+            mock.patch.object(launcher, "tcp_ok", return_value=False),
+            mock.patch.object(launcher.time, "sleep"),
+        ):
+            ok, message = launcher.auto_start_web_server(attempts=2)
+        self.assertTrue(ok)
+        self.assertEqual(message, "started")
+        self.assertEqual(ensure.call_count, 2)
+
+    def test_automatic_start_survives_several_transient_child_failures(self):
+        with (
+            mock.patch.object(
+                launcher,
+                "ensure_valid_server",
+                side_effect=[
+                    (False, "child exited 1"),
+                    (False, "socket still closing"),
+                    (True, "started"),
+                ],
+            ) as ensure,
+            mock.patch.object(launcher, "tcp_ok", return_value=False),
+            mock.patch.object(launcher.time, "sleep") as sleep,
+        ):
+            ok, message = launcher.auto_start_web_server(attempts=5, retry_delay=1.0)
+        self.assertTrue(ok)
+        self.assertEqual(message, "started")
+        self.assertEqual(ensure.call_count, 3)
+        self.assertEqual([call.args[0] for call in sleep.call_args_list], [1.0, 2.0])
+
+    def test_stop_clears_an_early_child_that_already_exited(self):
+        process = mock.Mock()
+        process.poll.return_value = 1
+        launcher.owned_server = {
+            "process": process,
+            "launch_id": "early-child",
+            "server_instance_id": None,
+        }
+        with mock.patch.object(launcher, "remove_record") as remove:
+            ok, message = launcher.stop_owned_server()
+        self.assertTrue(ok)
+        self.assertEqual(message, "Serveur déjà arrêté")
+        self.assertIsNone(launcher.owned_server)
+        remove.assert_called_once_with()
+
+    def test_ensure_valid_server_automatically_adopts_a_proven_orphan(self):
+        orphan = valid_status()
+        with (
+            mock.patch.object(launcher, "tcp_ok", return_value=True),
+            mock.patch.object(
+                launcher,
+                "current_identity_status",
+                return_value=(orphan, {"valid": False, "code": "orphan-claimable", "message": "orphan"}),
+            ),
+            mock.patch.object(launcher, "adopt_claimable_server", return_value=(True, "adopted")) as adopt,
+        ):
+            ok, message = launcher.ensure_valid_server()
+        self.assertTrue(ok)
+        self.assertEqual(message, "adopted")
+        adopt.assert_called_once_with()
+
+    def test_restart_stops_then_starts_the_owned_server(self):
+        with (
+            mock.patch.object(launcher, "tcp_ok", return_value=True),
+            mock.patch.object(launcher, "stop_owned_server", return_value=(True, "stopped")) as stop,
+            mock.patch.object(launcher, "start_web_server", return_value=(True, "started")) as start,
+        ):
+            response = launcher.app.test_client().get("/restart")
+        self.assertEqual(response.status_code, 200)
+        stop.assert_called_once_with()
+        start.assert_called_once_with()
 
     def test_server_valid_and_system_ready_are_distinct(self):
         launcher.owned_server = {
@@ -467,7 +573,10 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
         with mock.patch.object(launcher, "MIDI_CONSOLE_STATE_PATH") as path:
             path.stat.return_value.st_size = 100
             path.read_text.return_value = '{"service":"unknown","cl5":{"program":41}}'
-            self.assertEqual(launcher.read_midi_console_state(), {})
+            payload = launcher.read_midi_console_state()
+            self.assertEqual(payload["service"], "cl-midi-console-monitor")
+            self.assertFalse(payload["online"])
+            self.assertIsNone(payload["cl5"]["program"])
 
 
 if __name__ == "__main__":

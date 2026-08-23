@@ -57,6 +57,8 @@
 .status.disconnected { color: #ef9a9a; }
 
 .midi-returns { display:grid; grid-template-columns:1fr 1fr; gap:7px; min-height:116px; }
+.midi-title-mode { grid-column:1 / -1; display:flex; justify-content:flex-end; align-items:center; gap:7px; color:var(--muted); font-size:10px; }
+.midi-title-mode select { min-height:28px; border:1px solid var(--border); border-radius:8px; background:#15181d; color:var(--text); font-size:10px; padding:3px 8px; }
 .midi-return { border:1.5px solid var(--border); border-radius:16px; padding:14px 12px; background:linear-gradient(180deg,#1a1f27 0%,#12161c 100%); color:var(--muted); font-size:11px; font-weight:750; min-width:0; display:flex; flex-direction:column; justify-content:center; box-shadow:0 8px 18px rgba(0,0,0,.20); }
 .midi-return strong { display:block; color:#ffcf62; font-size:16px; line-height:1.1; }
 .midi-return-title { display:block; margin-top:7px; color:#e1e5eb; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -194,11 +196,15 @@
   min-height: clamp(58px, 7.5vh, 72px);
   font-size: clamp(17px, 4vw, 22px);
   letter-spacing: .02em;
+  color: #fff4df !important;
+  border-color: rgba(255,184,77,.68) !important;
+  background: linear-gradient(180deg, #7a5420, #432d17) !important;
 }
 
 .transport-toggle.transport-paused {
-  background: linear-gradient(180deg, #d9a441 0%, #9a6a18 100%);
-  border: 1px solid rgba(255,213,128,.42);
+  color: #07160c !important;
+  background: linear-gradient(180deg, #72e892 0%, #34b85a 100%) !important;
+  border-color: rgba(114,232,146,.72) !important;
   animation: arrangementTransportPausePulse 1.1s infinite;
 }
 
@@ -207,15 +213,15 @@
     transform: scale(1);
     filter: brightness(1);
     box-shadow:
-      0 0 10px rgba(255,209,102,.28),
-      0 0 18px rgba(255,209,102,.14);
+      0 0 10px rgba(89,222,123,.30),
+      0 0 18px rgba(52,184,90,.16);
   }
   50% {
     transform: scale(1.015);
     filter: brightness(1.08);
     box-shadow:
-      0 0 22px rgba(255,209,102,.65),
-      0 0 34px rgba(255,209,102,.28);
+      0 0 22px rgba(114,232,146,.55),
+      0 0 34px rgba(52,184,90,.26);
   }
 }
 
@@ -424,6 +430,9 @@ body.is-arrangement-paused .card.current {
     <nav class="topnav"><a href="/">Session</a><a href="/ab">A/B</a><a href="/arrangement" class="active">Arrangement</a></nav>
 
     <section class="midi-returns" aria-label="Retours MIDI consoles">
+      <label class="midi-title-mode">Titres consoles
+        <select id="consoleTitleMode"><option value="ableton_context">Contexte Ableton (secours)</option><option value="console_file">Fichiers CL5 / QL1</option></select>
+      </label>
       <div class="midi-return" id="arrCl5Return"><strong id="arrCl5Program">CL5 · scène —</strong><span class="midi-return-title" id="arrCl5Title">Titre en attente</span><span class="midi-return-state" id="arrCl5State">En attente du premier retour</span></div>
       <div class="midi-return" id="arrQl1Return"><strong id="arrQl1Program">QL1 · scène —</strong><span class="midi-return-title" id="arrQl1Title">Titre en attente</span><span class="midi-return-state" id="arrQl1State">En attente du premier retour</span></div>
     </section>
@@ -455,7 +464,7 @@ body.is-arrangement-paused .card.current {
     </div>
 
     <div class="transport-row" aria-label="Transport Arrangement">
-      <button class="grey transport-toggle" id="pauseToggleBtn" data-action="arrangement_toggle">
+      <button class="grey transport-toggle" id="pauseToggleBtn" data-action="arrangement_toggle" type="button">
       </button>
       <div class="arrangement-indicator" id="arrangementIndicator" role="status"><strong id="arrangementIndicatorTitle">ARRANGEMENT ACTIF</strong><small>Vérifier la position avant toute commande</small></div>
     </div>
@@ -488,6 +497,7 @@ body.is-arrangement-paused .card.current {
     const nextCardEl = document.querySelector('.card.next');
     const arrCl5Return = document.getElementById('arrCl5Return');
     const arrQl1Return = document.getElementById('arrQl1Return');
+    const consoleTitleMode = document.getElementById('consoleTitleMode');
     const markerSelectEl = document.getElementById('markerSelect');
     const gotoBtn = document.getElementById('gotoBtn');
     const goBtn = document.getElementById('goBtn');
@@ -504,6 +514,16 @@ body.is-arrangement-paused .card.current {
     let nextWasManuallySelected = false;
     let selectedMarkerIndex = null;
     let markerSelectIsOpen = false;
+
+    consoleTitleMode.addEventListener('change', async () => {
+      try {
+        const response = await fetch('/action', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({action: 'console_title_mode', mode: consoleTitleMode.value})
+        });
+        if (!response.ok) throw new Error('Mode refusé');
+      } catch (_) {}
+    });
     let arrangementReturnActive = false;
     let pendingGotoIndex = null;
     let manualNextIndex = null;
@@ -755,6 +775,9 @@ body.is-arrangement-paused .card.current {
       if (!acceptStateGeneration(state)) return;
       if (window.CLRemoteLTC) window.CLRemoteLTC.render(ltcTimecodeEl, state);
       const midi = state.midi_console || {};
+      if (document.activeElement !== consoleTitleMode) {
+        consoleTitleMode.value = state.console_title_mode || 'ableton_context';
+      }
       const formatMidiAge = (seconds) => {
         seconds = Math.max(0, Math.floor(seconds));
         if (seconds < 60) return seconds < 2 ? 'à l’instant' : 'il y a ' + seconds + ' s';
@@ -768,11 +791,17 @@ body.is-arrangement-paused .card.current {
         const receivedAt = Number(value.received_at || 0);
         const age = receivedAt ? Math.max(0, Date.now() / 1000 - receivedAt) : Infinity;
         const recent = Boolean(value.received && age <= 12);
+        const expected = value.display_source === 'ableton_scene';
+        const localFallback = state.console_return_mode === 'local_fallback';
         card.classList.toggle('ok', recent);
-        card.classList.toggle('remembered', Boolean(value.received && !recent));
-        document.getElementById(programId).textContent = name + ' · scène ' + (value.program ?? '—');
-        document.getElementById(titleId).textContent = value.title || state.arrangement_marker || 'Titre en attente';
-        document.getElementById(stateId).textContent = value.received
+        card.classList.toggle('remembered', Boolean(value.received && !recent && !expected));
+        document.getElementById(programId).textContent = name + ' · PGM ' + (value.program ?? '—');
+        document.getElementById(titleId).textContent = value.resolved_scene && value.title
+          ? value.title
+          : 'Titre non résolu';
+        document.getElementById(stateId).textContent = expected
+          ? (localFallback ? 'Lecture locale de secours · non confirmée par la console' : 'Commande Ableton prévue · retour console en attente')
+          : value.received
           ? (recent ? '✓ Scène reçue · ' : (age <= 60 ? 'Dernière scène reçue · ' : 'Aucun retour récent · dernier ')) + (receivedAt ? formatMidiAge(age) : 'heure inconnue')
           : 'En attente du premier retour';
       };
@@ -855,7 +884,7 @@ body.is-arrangement-paused .card.current {
   const action = payload && payload.action;
 
   if (
-    action === 'arrangement_toggle' &&
+    action === 'pause' &&
     typeof payload.desired_playing === 'boolean'
   ) {
     arrangementDesiredPlaying = payload.desired_playing;
@@ -876,7 +905,20 @@ body.is-arrangement-paused .card.current {
       body:JSON.stringify(payload)
     }, 2200);
 
-    if (data && data.state) applyStatus(data.state); else await update();
+    if (data && data.state) {
+      applyStatus(data.state);
+      if (
+        action === 'pause' &&
+        pendingArrangementDesired === null
+      ) {
+        renderArrangementTransport(Boolean(
+          data.state.is_playing &&
+          data.state.play_mode === 'arrangement'
+        ));
+      }
+    } else {
+      await update();
+    }
   } catch (_) {
     setStatus('○ Commande Arrangement impossible', false);
   } finally {
@@ -884,7 +926,7 @@ body.is-arrangement-paused .card.current {
       setDisabled(false);
 
       if (
-        (action === 'arrangement_toggle' || action === 'pause') &&
+        action === 'pause' &&
         pendingArrangementDesired !== null
       ) {
         const queuedDesired = pendingArrangementDesired;
@@ -894,7 +936,8 @@ body.is-arrangement-paused .card.current {
 
         sendAction({
           action: 'pause',
-          desired_playing: queuedDesired
+          desired_playing: queuedDesired,
+          source: 'arrangement-play-pause'
         });
       } else {
         update();
@@ -1043,6 +1086,16 @@ markerSelectEl.addEventListener('change', () => {
     });
 
     function runArrangementPlayPause() {
+      if (
+        arrangementDesiredPlaying === null &&
+        pendingArrangementDesired === null
+      ) {
+        return sendAction({
+          action: 'pause',
+          source: 'arrangement-play-pause'
+        });
+      }
+
       const confirmedPlaying = Boolean(
         lastAcceptedGeneration !== null &&
         arrangementDesiredPlaying
@@ -1083,34 +1136,12 @@ markerSelectEl.addEventListener('change', () => {
 
       if (!target) return;
 
-      console.info('[ARRANGEMENT CLICK CAPTURE]', {
-        busy,
-        disabled: target.disabled,
-        connected: target.isConnected,
-        text: target.textContent,
-        timestamp: Date.now()
-      });
-
-      fetch('/keyboard-log', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({
-          source: 'Arrangement',
-          event: 'pause-click-capture',
-          busy,
-          disabled: target.disabled,
-          connected: target.isConnected,
-          text: target.textContent,
-          timestamp: Date.now()
-        }),
-        keepalive: true
-      }).catch(() => {});
+      event.preventDefault();
+      runArrangementPlayPause();
     }, true);
 
     transportButtons.forEach(button => {
-      if (button === pauseToggleBtn) {
-        button.addEventListener('click', runArrangementPlayPause);
-      } else {
+      if (button !== pauseToggleBtn) {
         button.addEventListener('click', () => sendAction({action:button.dataset.action}));
       }
     });
@@ -1177,7 +1208,7 @@ markerSelectEl.addEventListener('change', () => {
         event.preventDefault();
         event.stopPropagation();
         keyboardDiagnosticLog('invoke-play-pause', { diagnosticCase: 'CASE_3_HANDLER_CALLED', timestamp: Date.now() });
-        runArrangementPlayPause();
+        pauseToggleBtn.click();
         return;
       }
 
@@ -1202,7 +1233,7 @@ markerSelectEl.addEventListener('change', () => {
       window.CLRemoteEnergy.startPolling(
         update,
         () => document.body.classList.contains('is-arrangement-playing'),
-        { activeMs: 40, idleMs: 2500, hiddenMs: 15000, minActiveMs: 40 }
+        { activeMs: 250, idleMs: 2500, hiddenMs: 15000, minActiveMs: 250 }
       );
     }, { once: true });
   </script>

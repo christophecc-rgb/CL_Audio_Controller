@@ -51,8 +51,8 @@ class MidiConsolePackagingTests(unittest.TestCase):
         self.assertIn("verify_selected_components", source)
         self.assertIn("composants sélectionnés", source)
         self.assertIn("CL MIDI RTP Agent.app", source)
-        self.assertIn("CL MIDI RTP Simulator.app", source)
-        self.assertIn('"midi-receiver"', source)
+        self.assertNotIn("CL MIDI RTP Simulator.app", source)
+        self.assertIn('7|midi-receiver|receiver|simulator) INSTALL_MIDI_CONSOLE=1', source)
 
     def test_complete_suite_uninstaller_limits_midi_console_removal_to_known_targets(self):
         source = (ROOT / "packaging" / "Desinstaller_La_Suite_CL.command").read_text()
@@ -73,17 +73,20 @@ class MidiConsolePackagingTests(unittest.TestCase):
             "CLMIDINetworkGuardian",
             "CLMIDIRoundTripTester",
             "CLYamahaConsoleSimulator",
-            "CLYamahaSimulatorDashboard",
             "CLMIDINetworkDashboard",
             "connect_rtp_peer.applescript",
             "list_rtp_peers.applescript",
             "open_rtp_settings.applescript",
         ):
             self.assertIn(required, source)
-        self.assertIn('CLYamahaSimulatorDashboard" "$KIT_ROOT/CL MIDI RTP Simulator.app/Contents/MacOS/CL MIDI RTP Simulator', source)
-        self.assertIn('CLYamahaConsoleSimulator" "$KIT_ROOT/CL MIDI RTP Simulator.app/Contents/MacOS/CLYamahaConsoleSimulator', source)
-        simulator_plist = source.split('CL MIDI RTP Simulator.app/Contents/Info.plist', 1)[1].split('EOF', 1)[0]
-        self.assertNotIn("LSBackgroundOnly", simulator_plist)
+        self.assertNotIn("CL MIDI RTP Simulator.app", source)
+        dashboard = (ROOT / "tools" / "cl_midi_network" / "CLMIDINetworkDashboard.m").read_text()
+        engine = (ROOT / "tools" / "cl_midi_network" / "CLYamahaConsoleSimulator.m").read_text()
+        self.assertIn("Simulateur de consoles intégré", dashboard)
+        self.assertIn('@"Désactivé", @"Test local · IAC", @"Test réseau · RTP"', dashboard)
+        self.assertIn('@"--transport", transport', dashboard)
+        self.assertIn("Test IAC refusé · aucun bus IAC sélectionné", dashboard)
+        self.assertIn('localCoreMIDI', engine)
 
         export_source = (ROOT / "scripts" / "export_transport_kit.command").read_text()
         self.assertIn("CL MIDI Console Monitor.amxd", export_source)

@@ -81,6 +81,10 @@ m4l_client = udp_client.SimpleUDPClient(M4L_IP, M4L_PORT)
 MIDI_MONITOR_SCENE_PORT = 9002
 MIDI_CONSOLE_STATE_PATH = Path("/private/tmp/CL_MIDI_Console_State.json")
 MIDI_CONSOLE_TITLE_OVERRIDES: Dict[str, Tuple[float, str]] = {}
+CONSOLE_SCENE_FILE_PATHS = {
+    "cl5": Path(os.environ.get("CL5_SCENE_FILE", str(Path.home() / "Desktop" / "CL5.CLF"))),
+    "ql1": Path(os.environ.get("QL1_SCENE_FILE", str(Path.home() / "Desktop" / "ql1.CLF"))),
+}
 
 # Compatibilité diagnostic ancienne interface — non utilisé.
 MIDI_PORT_EXACT = "M4L_OSC_9001"
@@ -336,12 +340,12 @@ def decorate_remote_page_html(response):
 
     if "</head>" in html:
         assets = (
-            '<link rel="stylesheet" href="/static/remote-v2.css?v=2.0.4">\n'
-            '<script src="/static/remote-v2.js?v=2.0.4" defer></script>\n'
+            '<link rel="stylesheet" href="/static/remote-v2.css?v=2.0.6">\n'
+            '<script src="/static/remote-v2.js?v=2.0.6" defer></script>\n'
         )
         html = html.replace("</head>", assets + "</head>", 1)
     else:
-        html = '<link rel="stylesheet" href="/static/remote-v2.css?v=2.0.4">' + html
+        html = '<link rel="stylesheet" href="/static/remote-v2.css?v=2.0.6">' + html
 
     if "<body" in html:
         body_end = html.find(">", html.find("<body"))
@@ -375,6 +379,131 @@ def parse_scene_duration_seconds(name: Any) -> Optional[float]:
     return float(int(match.group(1)) * 60 + int(match.group(2)))
 
 
+PGM_CHANGE_CLIP_RE = re.compile(
+    r"^\s*(?:PGM\s+CHANGE|CC(?:\s+CHANGE|\s*[_-]))\s*(\d{1,3})\s*$",
+    re.IGNORECASE,
+)
+CONSOLE_TRACK_NAMES = {"cl5": "PGM CHANGE CL5", "ql1": "PGM CHANGE QL1"}
+
+
+def parse_program_change_clip_name(name: Any) -> Optional[int]:
+    """Retourne le numéro écrit dans un clip PGM CHANGE ou CC CHANGE (1..128)."""
+    match = PGM_CHANGE_CLIP_RE.match(str(name or ""))
+    if not match:
+        return None
+    program = int(match.group(1))
+    return program if 1 <= program <= 128 else None
+
+
+def load_console_scene_library(path: Path, expected_family: str) -> Dict[int, str]:
+    """Extrait les numéros et titres des blocs MEMAPI d'un fichier Yamaha CLF."""
+    try:
+        payload = Path(path).read_bytes()
+    except OSError:
+        return {}
+    header = payload[0x10:0x30].decode("ascii", errors="ignore").strip("\x00 ")
+    if not header.startswith(expected_family.upper() + " "):
+        return {}
+    result: Dict[int, str] = {}
+    cursor = 0
+    scene_number = 0
+    while True:
+        block = payload.find(b"MEMAPI", cursor)
+        if block < 0:
+            break
+        raw_title = payload[block + 12:block + 44].split(b"\x00", 1)[0]
+        title = raw_title.decode("latin-1", errors="replace").strip()
+        if title:
+            result[scene_number] = title
+        scene_number += 1
+        cursor = block + 6
+    return result
+
+
+def load_console_scene_libraries() -> Dict[str, Dict[int, str]]:
+    return {
+        "cl5": load_console_scene_library(CONSOLE_SCENE_FILE_PATHS["cl5"], "CL"),
+        "ql1": load_console_scene_library(CONSOLE_SCENE_FILE_PATHS["ql1"], "QL"),
+    }
+
+
+def build_console_scene_map(
+    track_names: Any,
+    clip_names_by_track: Dict[int, Any],
+    scene_count: int,
+    scene_titles: Any = None,
+) -> Dict[str, Dict[int, list]]:
+    """Associe chaque retour console aux clips alignés de Main, CL5 et QL1."""
+    names = [str(name or "").strip() for name in (track_names or ())]
+    indexes = {name.casefold(): index for index, name in enumerate(names)}
+    main_index = indexes.get("main")
+    result: Dict[str, Dict[int, list]] = {"cl5": {}, "ql1": {}}
+    supplied_titles = list(scene_titles or ())
+    if main_index is None and not supplied_titles:
+        return result
+    main_clips = supplied_titles or list(clip_names_by_track.get(main_index) or ())
+    for console, track_name in CONSOLE_TRACK_NAMES.items():
+        track_index = indexes.get(track_name.casefold())
+        if track_index is None:
+            continue
+        program_clips = list(clip_names_by_track.get(track_index) or ())
+        for scene_index in range(max(0, int(scene_count))):
+            title = str(main_clips[scene_index] if scene_index < len(main_clips) else "").strip()
+            clip_name = program_clips[scene_index] if scene_index < len(program_clips) else ""
+            program = parse_program_change_clip_name(clip_name)
+            if program is None or not title:
+                continue
+            midi_program = program - 1
+            result[console].setdefault(midi_program, []).append({
+                "scene_index": scene_index,
+                "program": program,
+                "midi_program": midi_program,
+                "title": title,
+            })
+    return result
+
+
+def resolve_console_scene_candidate(
+    console_scene_map: Dict[str, Any],
+    console: str,
+    midi_program: Any,
+    playing_scene: Any,
+    selected_scene: Any,
+) -> Optional[Dict[str, Any]]:
+    """Résout un doublon: scène jouée, sélection, puis proximité et index."""
+    try:
+        raw_program = int(midi_program)
+    except (TypeError, ValueError):
+        return None
+    console_map = (console_scene_map or {}).get(str(console).lower()) or {}
+    candidates = list(console_map.get(raw_program) or console_map.get(str(raw_program)) or ())
+    if not candidates:
+        return None
+
+    def valid_index(value: Any) -> Optional[int]:
+        try:
+            index = int(value)
+            return index if index >= 0 else None
+        except (TypeError, ValueError):
+            return None
+
+    current = valid_index(playing_scene)
+    selected = valid_index(selected_scene)
+    for preferred in (current, selected):
+        if preferred is not None:
+            exact = [item for item in candidates if int(item["scene_index"]) == preferred]
+            if exact:
+                return exact[0]
+    anchor = current if current is not None else selected
+    return min(
+        candidates,
+        key=lambda item: (
+            abs(int(item["scene_index"]) - anchor) if anchor is not None else 0,
+            int(item["scene_index"]),
+        ),
+    )
+
+
 state: Dict[str, Any] = {
     "current_set_id": None,
     "current_set_name": "",
@@ -389,6 +518,9 @@ state: Dict[str, Any] = {
     "selected_scene_duration_index": None,
     "selected_scene_duration_is_clip": False,
     "scenes": {},
+    "console_scene_map": {"cl5": {}, "ql1": {}},
+    "console_title_mode": "ableton_context",
+    "console_scene_libraries": load_console_scene_libraries(),
     "is_paused": False,
     "play_mode": "stopped",
     "playing_scene": -1,
@@ -611,6 +743,9 @@ _bootstrap_transaction: Optional[BootstrapTransaction] = None
 def state_snapshot_locked() -> Dict[str, Any]:
     """Publie atomiquement l'identité et la génération avec chaque état HTTP."""
     snapshot = dict(state)
+    # Les bibliothèques CLF restent côté serveur : les republier à chaque poll
+    # alourdirait inutilement /status et pourrait faire laguer la télécommande.
+    snapshot.pop("console_scene_libraries", None)
     snapshot["set_generation"] = int(state.get("set_generation", 0))
     snapshot["current_set_id"] = state.get("current_set_id")
     snapshot["generation_debug"] = GENERATION_DEBUG
@@ -625,30 +760,93 @@ def state_snapshot_locked() -> Dict[str, Any]:
     snapshot["uptime_ms"] = int((time.monotonic() - SERVER_STARTED_MONOTONIC) * 1000)
     snapshot["ableton_target"] = ableton_target.to_dict()
     snapshot["osc_transport"] = ableton_transport.diagnostics()
+    snapshot["console_scene_map"] = state.get("console_scene_map") or {"cl5": {}, "ql1": {}}
+    snapshot["console_title_mode"] = str(state.get("console_title_mode") or "ableton_context")
+    snapshot["console_scene_library_status"] = {
+        name: {
+            "path": str(CONSOLE_SCENE_FILE_PATHS[name]),
+            "scene_count": len((state.get("console_scene_libraries") or {}).get(name) or {}),
+        }
+        for name in ("cl5", "ql1")
+    }
     try:
         midi_console = json.loads(MIDI_CONSOLE_STATE_PATH.read_text(encoding="utf-8"))
-        playing_title = str((
-            snapshot.get("arrangement_marker")
-            if snapshot.get("play_mode") == "arrangement"
-            else snapshot.get("playing_scene_name")
-        ) or "").strip()
         now = time.time()
+        console_return_mode = str(midi_console.get("return_mode") or "console_return")
+        snapshot["console_return_mode"] = console_return_mode
+        snapshot["console_return_source"] = str(midi_console.get("return_source") or "")
         for console_name in ("cl5", "ql1"):
-            console_state = midi_console.get(console_name) or {}
+            console_state = dict(midi_console.get(console_name) or {})
             received_at = float(console_state.get("received_at") or 0)
-            if (
-                console_state.get("received")
-                and received_at > 0
-                and now - received_at <= 3.0
-                and playing_title
-                and playing_title != "—"
-            ):
-                MIDI_CONSOLE_TITLE_OVERRIDES[console_name] = (received_at, playing_title)
-            override = MIDI_CONSOLE_TITLE_OVERRIDES.get(console_name)
-            if override and override[0] == received_at:
-                console_state = dict(console_state)
-                console_state["title"] = override[1]
-                midi_console[console_name] = console_state
+            console_midi_program = console_state.get("midi_program")
+            if console_midi_program is None and console_state.get("program") is not None:
+                console_midi_program = int(console_state["program"]) - 1
+            resolved = resolve_console_scene_candidate(
+                snapshot["console_scene_map"], console_name, console_midi_program,
+                snapshot.get("playing_scene"), snapshot.get("selected_scene"),
+            )
+            monitor_title = str(console_state.get("title") or "").strip()
+            return_program = (
+                int(console_midi_program) + 1 if console_midi_program is not None else None
+            )
+            return_recent = bool(
+                console_return_mode == "console_return"
+                and received_at
+                and now - received_at <= 12.0
+            )
+            active_scene = snapshot.get("playing_scene")
+            try:
+                active_scene = int(active_scene)
+            except (TypeError, ValueError):
+                active_scene = -1
+            expected = None
+            if active_scene >= 0:
+                for candidates in (snapshot["console_scene_map"].get(console_name) or {}).values():
+                    expected = next(
+                        (item for item in candidates if int(item.get("scene_index", -1)) == active_scene),
+                        None,
+                    )
+                    if expected:
+                        break
+            console_state["midi_program"] = console_midi_program
+            console_state["program"] = return_program
+            console_state["resolved_scene"] = resolved
+            console_state["monitor_title"] = monitor_title
+            console_state["title"] = str((resolved or {}).get("title") or "")
+            console_state["return_program"] = return_program
+            console_state["return_recent"] = return_recent
+            console_state["display_source"] = "console_return"
+            if return_recent:
+                if str(snapshot.get("play_mode") or "") == "arrangement":
+                    active_title = str(snapshot.get("arrangement_marker") or "").strip()
+                else:
+                    active_title = str(snapshot.get("playing_scene_name") or "").strip()
+                if active_title == "—":
+                    active_title = ""
+                resolved_title = str((resolved or {}).get("title") or "").strip()
+                displayed_title = resolved_title or active_title or monitor_title
+                if displayed_title and displayed_title != "—":
+                    console_state["title"] = displayed_title
+                    if resolved is None:
+                        console_state["resolved_scene"] = {
+                            "scene_index": active_scene,
+                            "program": return_program,
+                            "midi_program": console_midi_program,
+                            "title": displayed_title,
+                        }
+                    console_state["title_source"] = (
+                        "console_scene_map" if resolved_title
+                        else "ableton_context" if active_title
+                        else "monitor"
+                    )
+                    console_state["ableton_title"] = active_title
+            if expected and (console_return_mode == "local_fallback" or not return_recent):
+                console_state["midi_program"] = expected.get("midi_program")
+                console_state["program"] = expected.get("program")
+                console_state["resolved_scene"] = expected
+                console_state["title"] = str(expected.get("title") or "")
+                console_state["display_source"] = "ableton_scene"
+            midi_console[console_name] = console_state
         if midi_console.get("service") == "cl-midi-console-monitor":
             updated_at = float(midi_console.get("updated_at") or 0)
             assistant_age = max(0.0, now - updated_at) if updated_at else None
@@ -671,9 +869,12 @@ def state_snapshot_locked() -> Dict[str, Any]:
             snapshot["midi_console"] = {}
     except (OSError, ValueError, TypeError, AttributeError):
         snapshot["midi_console"] = {}
+        snapshot["console_return_mode"] = "local_fallback"
+        snapshot["console_return_source"] = ""
     if not snapshot.get("set_ready", False):
         snapshot.update({
             "scenes": {},
+            "console_scene_map": {"cl5": {}, "ql1": {}},
             "current_scene": None,
             "next_scene": None,
             "selected_scene_name": "—",
@@ -720,6 +921,7 @@ def reset_live_set_state_locked(set_id: Optional[str], reason: str) -> int:
         "selected_scene_duration_index": None,
         "selected_scene_duration_is_clip": False,
         "scenes": {},
+        "console_scene_map": {"cl5": {}, "ql1": {}},
         "play_mode": "stopped",
         "playing_scene": -1,
         "playing_scene_name": "—",
@@ -1654,6 +1856,130 @@ def apply_live_set_bootstrap_locked(
     return True
 
 
+def refresh_console_scene_map(generation: int, attempt: int = 1) -> None:
+    """Lit les trois pistes de référence et publie leur alignement par scène."""
+    try:
+        track_names_response = query(
+            "/live/song/get/track_names",
+            timeout=0.30,
+            expected_generation=generation,
+            apply_response=False,
+        )
+    except Exception as exc:
+        with lock:
+            if int(state.get("set_generation", 0)) == int(generation):
+                state["console_scene_map_diagnostic"] = {
+                    "status": "track_names_error",
+                    "attempt": int(attempt),
+                    "error": str(exc),
+                }
+        schedule_console_scene_map_refresh(generation, attempt + 1)
+        return
+    if not track_names_response or not generation_is_current(generation):
+        if generation_is_current(generation):
+            schedule_console_scene_map_refresh(generation, attempt + 1)
+        return
+    track_names = [str(name or "") for name in track_names_response]
+    mapping_track_names = list(track_names)
+    for console, expected_name in CONSOLE_TRACK_NAMES.items():
+        if any(name.strip().casefold() == expected_name.casefold() for name in mapping_track_names):
+            continue
+        candidates = [
+            index for index, name in enumerate(mapping_track_names)
+            if console.upper() in name.upper() and "CHANGE" in name.upper()
+        ]
+        if len(candidates) == 1:
+            mapping_track_names[candidates[0]] = expected_name
+    normalized = {name.strip().casefold(): index for index, name in enumerate(mapping_track_names)}
+    missing_tracks = [
+        name for name in ("Main", *CONSOLE_TRACK_NAMES.values())
+        if name.casefold() not in normalized
+    ]
+    with lock:
+        if int(state.get("set_generation", 0)) == int(generation):
+            state["console_scene_map_diagnostic"] = {
+                "status": "reading",
+                "attempt": int(attempt),
+                "track_names": track_names,
+                "missing_tracks": missing_tracks,
+            }
+    required_indexes = {
+        normalized[name.casefold()]
+        for name in CONSOLE_TRACK_NAMES.values()
+        if name.casefold() in normalized
+    }
+    with lock:
+        scene_count = len(state.get("scenes") or {})
+        scene_titles = [
+            str((state.get("scenes") or {}).get(index, "") or "")
+            for index in range(scene_count)
+        ]
+    clip_names_by_track: Dict[int, Any] = {}
+    for track_index in sorted(required_indexes):
+        if not generation_is_current(generation):
+            return
+        try:
+            response = query(
+                "/live/song/get/track_data",
+                track_index,
+                track_index + 1,
+                "clip.name",
+                timeout=0.45,
+                expected_generation=generation,
+                apply_response=False,
+            )
+        except Exception as exc:
+            with lock:
+                if int(state.get("set_generation", 0)) == int(generation):
+                    state["console_scene_map_diagnostic"].update({
+                        "status": "track_data_error",
+                        "track_index": int(track_index),
+                        "error": str(exc),
+                    })
+            schedule_console_scene_map_refresh(generation, attempt + 1)
+            return
+        clip_names_by_track[track_index] = tuple(response or ())
+    with lock:
+        if int(state.get("set_generation", 0)) == int(generation):
+            state["console_scene_map_diagnostic"]["clip_name_samples"] = {
+                mapping_track_names[index]: [
+                    str(value) for value in clip_names_by_track.get(index, ()) if str(value or "").strip()
+                ][:12]
+                for index in sorted(required_indexes)
+            }
+    console_scene_map = build_console_scene_map(
+        mapping_track_names,
+        clip_names_by_track,
+        scene_count,
+        scene_titles=scene_titles,
+    )
+    if not any(console_scene_map.get(name) for name in ("cl5", "ql1")):
+        schedule_console_scene_map_refresh(generation, attempt + 1)
+    with lock:
+        if int(state.get("set_generation", 0)) != int(generation):
+            return
+        state["console_scene_map"] = console_scene_map
+        state["console_scene_map_diagnostic"].update({
+            "status": "ready" if any(console_scene_map.get(name) for name in ("cl5", "ql1")) else "empty",
+            "cl5_program_count": len(console_scene_map.get("cl5") or {}),
+            "ql1_program_count": len(console_scene_map.get("ql1") or {}),
+        })
+
+
+def schedule_console_scene_map_refresh(generation: int, attempt: int = 1) -> None:
+    """Réessaie après le démarrage, quand AbletonOSC répond encore irrégulièrement."""
+    if attempt > 6 or not generation_is_current(generation):
+        return
+    delays = (0.10, 0.40, 0.80, 1.50, 3.00, 5.00)
+    timer = threading.Timer(
+        delays[attempt - 1],
+        refresh_console_scene_map,
+        args=(int(generation), int(attempt)),
+    )
+    timer.daemon = True
+    timer.start()
+
+
 def bootstrap_live_set(generation: int) -> None:
     """Accumule un instantané privé jusqu'à complétion ou échéance globale."""
     global _bootstrap_generation, _bootstrap_transaction
@@ -1739,6 +2065,7 @@ def bootstrap_live_set(generation: int) -> None:
                     _bootstrap_cancel(transaction, "instantané cohérent refusé avant publication")
                     return
                 transaction.completed = True
+                schedule_console_scene_map_refresh(generation)
                 elapsed_ms = int((time.monotonic() - transaction.started_at) * 1000)
                 write_bootstrap_diagnostic(
                     "bootstrap-transaction-completed",
@@ -2433,7 +2760,8 @@ def shutdown():
     shutdown_callback = request.environ.get("werkzeug.server.shutdown")
 
     def stop_process():
-        time.sleep(0.1)
+        # Laisse au serveur HTTP le temps d'envoyer le 200 au launcher.
+        time.sleep(0.35)
         if callable(shutdown_callback):
             shutdown_callback()
         else:
@@ -2834,6 +3162,13 @@ def execute_go_transaction(request_id: str, expected_generation: int, scene_numb
             if not generation_is_current(expected_generation):
                 return False, "Live Set modifié pendant le GO"
 
+            # Le contexte doit arriver avant le premier événement MIDI du clip.
+            send_midi_monitor_scene_context(
+                expected_generation,
+                scene_index,
+                requested_name,
+            )
+
             # Le lancement utilise l'index de la transaction, jamais selected_scene.
             send("/live/scene/fire_as_selected", scene_index)
 
@@ -2958,7 +3293,7 @@ def action():
             "clientGeneration": data.get("set_generation"),
             "requestId": data.get("request_id"),
         })
-        if not action_ready and action_name not in ("xfade", "xfade_value"):
+        if not action_ready and action_name not in ("xfade", "xfade_value", "console_title_mode"):
             write_keyboard_diagnostic({
                 "source": "ServerAction",
                 "event": "action-rejected",
@@ -2977,6 +3312,22 @@ def action():
             }), 409
         selected = int(state.get("selected_scene", 0))
 
+    if action_name == "console_title_mode":
+        requested_mode = str(data.get("mode") or "").strip()
+        if requested_mode not in ("console_file", "ableton_context"):
+            return jsonify({"ok": False, "message": "Mode de titre console invalide"}), 400
+        libraries = load_console_scene_libraries() if requested_mode == "console_file" else None
+        with lock:
+            state["console_title_mode"] = requested_mode
+            if libraries is not None:
+                state["console_scene_libraries"] = libraries
+            state["message"] = (
+                "Titres issus des fichiers consoles"
+                if requested_mode == "console_file"
+                else "Titres issus du contexte Ableton"
+            )
+            response_state = state_snapshot_locked()
+        return jsonify({"ok": True, "message": state["message"], "state": response_state})
     if action_name == "go":
         request_id = str(data.get("request_id", "")).strip()
         try:
@@ -3046,8 +3397,24 @@ def action():
                 state["sync_source"] = "Télécommande"
         else:
             show_arrangement_view()
+            with lock:
+                arrangement_context_name = str(state.get("arrangement_marker") or "").strip()
+                arrangement_context_index = -1
+                for marker_index, marker in enumerate(state.get("arrangement_markers") or []):
+                    if str(marker.get("name") or "").strip() == arrangement_context_name:
+                        try:
+                            arrangement_context_index = int(marker.get("cue_index", marker_index))
+                        except (TypeError, ValueError):
+                            arrangement_context_index = marker_index
+                        break
             with transport_command_lock:
                 send("/live/song/set/back_to_arranger", 0)
+                if arrangement_context_name and arrangement_context_name != "—":
+                    send_midi_monitor_scene_context(
+                        action_generation,
+                        arrangement_context_index,
+                        arrangement_context_name,
+                    )
                 send("/live/song/continue_playing")
             with lock:
                 state["is_playing"] = True
@@ -3147,19 +3514,26 @@ def action():
         if not play_after_jump:
             send("/live/song/stop_playing")
 
+        try:
+            marker_context_index = int(data.get("cue_index", data.get("marker_index", -1)))
+        except (TypeError, ValueError):
+            marker_context_index = -1
+
         with transport_command_lock:
             send("/live/song/set/back_to_arranger", 0)
             set_arrangement_time(seconds, marker_name)
 
             if play_after_jump:
+                if marker_name:
+                    send_midi_monitor_scene_context(
+                        action_generation,
+                        marker_context_index,
+                        marker_name,
+                    )
                 time.sleep(0.04)
                 send("/live/song/continue_playing")
 
-        try:
-            marker_context_index = int(data.get("cue_index", data.get("marker_index", -1)))
-        except (TypeError, ValueError):
-            marker_context_index = -1
-        if marker_name:
+        if marker_name and not play_after_jump:
             send_midi_monitor_scene_context(action_generation, marker_context_index, marker_name)
 
         with lock:

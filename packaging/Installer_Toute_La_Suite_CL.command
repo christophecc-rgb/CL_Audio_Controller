@@ -19,6 +19,9 @@ REPORT="$WORK_DIR/rapport.txt"
 INSTALLED_LIST="$WORK_DIR/installed.tsv"
 LIVE_LIST="$WORK_DIR/live.tsv"
 WARNINGS="$WORK_DIR/warnings.txt"
+TRASH_ROOT="${CL_SUITE_TRASH_DIR:-$INSTALL_HOME/.Trash}"
+TRASH_SESSION="$TRASH_ROOT/CL Suite remplacée $STAMP"
+TRASH_INDEX=0
 
 : > "$MANIFEST_UPDATES"; : > "$INSTALLED_LIST"; : > "$LIVE_LIST"; : > "$WARNINGS"
 cleanup() { rm -rf "$WORK_DIR"; }
@@ -129,14 +132,82 @@ resolve_user_library() {
   printf '%s' "$candidate"
 }
 
-backup_existing() {
-  local target="$1" backup
-  if [[ -e "$target" || -L "$target" ]]; then
-    backup="${target}.sauvegarde_${STAMP}"
-    [[ ! -e "$backup" ]] || fail "sauvegarde déjà existante : $backup"
-    say "  Sauvegarde : $backup"
-    mv "$target" "$backup"
+move_to_trash() {
+  local target="$1" destination
+  [[ -e "$target" || -L "$target" ]] || return 0
+  mkdir -p "$TRASH_SESSION"
+  while :; do
+    TRASH_INDEX=$((TRASH_INDEX + 1))
+    destination="$TRASH_SESSION/$(printf '%03d' "$TRASH_INDEX")_$(basename "$target")"
+    [[ -e "$destination" || -L "$destination" ]] || break
+  done
+  say "  Ancienne version → Corbeille : $destination"
+  mv "$target" "$destination"
+}
+
+trash_existing() {
+  local target="$1" legacy_backup
+  move_to_trash "$target"
+  # Nettoie aussi les sauvegardes créées par les anciennes versions du kit.
+  for legacy_backup in "${target}.sauvegarde_"*; do
+    [[ -e "$legacy_backup" || -L "$legacy_backup" ]] || continue
+    move_to_trash "$legacy_backup"
+  done
+}
+
+port_listening() {
+  [[ -n "$(/usr/sbin/lsof -tiTCP:"$1" -sTCP:LISTEN 2>/dev/null || true)" ]]
+}
+
+prepare_controller_replacement() {
+  local quit_requested=0
+  [[ "$INSTALL_HOME" == "$HOME" ]] || return 0
+  [[ -e "$USER_APPS/CL Audio Controller.app" ]] || return 0
+  say ""; say "Préparation de CL Audio Controller"
+  if port_listening 5050 && ! port_listening 5055; then
+    say "  Serveur orphelin détecté : réouverture temporaire du panneau pour reprise sécurisée"
+    /usr/bin/open -gj "$USER_APPS/CL Audio Controller.app" >/dev/null 2>&1 || true
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+      port_listening 5055 && break
+      sleep 0.5
+    done
   fi
+  if port_listening 5055; then
+    if /usr/bin/curl -fsS --max-time 2 http://127.0.0.1:5055/quit >/dev/null 2>&1; then
+      quit_requested=1
+      say "  Arrêt propre demandé au panneau de contrôle"
+    fi
+  fi
+  if [[ "$quit_requested" != 1 ]]; then
+    say "  Panneau non joignable : demande de fermeture via macOS"
+    /usr/bin/osascript -e 'tell application id "com.claudio.controller" to quit' >/dev/null 2>&1 || true
+  fi
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    if ! port_listening 5050 && ! port_listening 5055; then
+      say "  ✓ Ancienne application fermée, ports 5050/5055 libérés"
+      return 0
+    fi
+    sleep 0.5
+  done
+  fail "CL Audio Controller fonctionne encore sur 5050 ou 5055 après la demande d’arrêt propre. Quittez-le complètement (ou redémarrez le Mac), puis relancez l’installation. Rien n’a été remplacé."
+}
+
+prepare_rtp_agent_replacement() {
+  local executable="$USER_APPS/CL MIDI RTP Agent.app/Contents/MacOS/CL MIDI RTP Agent" pid
+  [[ "$INSTALL_HOME" == "$HOME" ]] || return 0
+  /bin/launchctl bootout "gui/$(id -u)/com.claudio.midi-rtp-agent" >/dev/null 2>&1 || true
+  while IFS= read -r pid; do
+    [[ "$pid" =~ ^[0-9]+$ ]] || continue
+    kill -TERM "$pid" 2>/dev/null || true
+  done < <(/usr/bin/pgrep -f -x "$executable" 2>/dev/null || true)
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    /usr/bin/pgrep -f -x "$executable" >/dev/null 2>&1 || break
+    sleep 0.2
+  done
+  if /usr/bin/pgrep -f -x "$executable" >/dev/null 2>&1; then
+    fail "CL MIDI RTP Agent fonctionne encore après la demande d’arrêt propre"
+  fi
+  rm -f "$INSTALL_HOME/Library/LaunchAgents/com.claudio.midi-rtp-agent.plist"
 }
 
 tree_digest() {
@@ -156,7 +227,7 @@ install_item() {
   local source="$1" target="$2" label="$3" component="$4"
   require_source "$source"
   say ""; say "$label"
-  backup_existing "$target"
+  trash_existing "$target"
   mkdir -p "$(dirname "$target")"
   ditto "$source" "$target"
   if verify_copy "$source" "$target"; then
@@ -186,7 +257,7 @@ verify_selected_components() {
     case "$rel" in
       "Composants/Applications/CL Audio Controller.app/"*) [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Ableton Live 11-12/Remote Scripts/AbletonOSC/"*|"Composants/Ableton Live 11-12/Max for Live/CL Audio Controller - Remote/"*) [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_ABLETON_READER" == 1 ]] && echo "$line" >> "$selected" ;;
-      "Composants/Applications/CL MIDI RTP Agent.app/"*|"Composants/Applications/CL MIDI RTP Simulator.app/"*) [[ "$INSTALL_ABLETON_READER" == 1 || "$INSTALL_MIDI_RECEIVER" == 1 ]] && echo "$line" >> "$selected" ;;
+      "Composants/Applications/CL MIDI RTP Agent.app/"*) [[ "$INSTALL_ABLETON_READER" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Applications/Arrangement Builder Live.app/"*|"Composants/Ableton Live 11-12/Remote Scripts/CL_Arrangement_Builder_Live/"*) [[ "$INSTALL_BUILDER" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Ableton Live 11-12/Max for Live/Paradis Latin AutoScene/"*) [[ "$INSTALL_AUTOSCENE" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Ableton Live 10/Max for Live/Paradis Latin AutoScene - Live 10/"*) [[ "$INSTALL_AUTOSCENE_LIVE10" == 1 ]] && echo "$line" >> "$selected" ;;
@@ -252,7 +323,7 @@ case "$CHOICE" in
   3|builder) INSTALL_BUILDER=1 ;;
   4|autoscene) INSTALL_AUTOSCENE=1 ;;
   5|midi-console) INSTALL_MIDI_CONSOLE=1 ;;
-  7|midi-receiver|receiver|simulator) INSTALL_MIDI_RECEIVER=1 ;;
+  7|midi-receiver|receiver|simulator) INSTALL_MIDI_CONSOLE=1 ;;
   8|cancel) exit 0 ;;
   *)
     normalized=",$CHOICE,"
@@ -262,7 +333,7 @@ case "$CHOICE" in
     [[ "$normalized" == *,builder,* ]] && INSTALL_BUILDER=1
     [[ "$normalized" == *,autoscene,* ]] && INSTALL_AUTOSCENE=1
     [[ "$normalized" == *,midi-console,* ]] && INSTALL_MIDI_CONSOLE=1
-    [[ "$normalized" == *,midi-receiver,* ]] && INSTALL_MIDI_RECEIVER=1
+    [[ "$normalized" == *,midi-receiver,* || "$normalized" == *,simulator,* ]] && INSTALL_MIDI_CONSOLE=1
     ;;
 esac
 
@@ -278,6 +349,7 @@ say ""; say "Vérification de l'intégrité du kit…"
 verify_selected_components
 mkdir -p "$USER_APPS" "$REMOTE_SCRIPTS" "$ABLETON_LIBRARY/Presets"
 
+[[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 ]] && prepare_controller_replacement
 [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 ]] && install_item "$APPLICATIONS_SOURCE/CL Audio Controller.app" "$USER_APPS/CL Audio Controller.app" "Télécommande — CL Audio Controller" "controller"
 if [[ "$INSTALL_CONTROLLER" == 1 ]]; then
   install_item "$MIDI_TOOLS_SOURCE" "$MIDI_TOOLS_TARGET" "Télécommande — Outils diagnostic réseau MIDI" "controller"
@@ -288,16 +360,23 @@ if [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_ABLETON_READER" == 1 ]]; then
   install_item "$LIVE_CURRENT_SOURCE/Max for Live/CL Audio Controller - Remote" "$M4L_REMOTE_TARGET" "Ableton Lecteur — LTC et X-Fader" "ableton-reader"
 fi
 if [[ "$INSTALL_ABLETON_READER" == 1 ]]; then
+  prepare_rtp_agent_replacement
   install_item "$APPLICATIONS_SOURCE/CL MIDI RTP Agent.app" "$USER_APPS/CL MIDI RTP Agent.app" "Ableton Lecteur — Agent RTP léger" "ableton-reader"
-  install_item "$APPLICATIONS_SOURCE/CL MIDI RTP Simulator.app" "$USER_APPS/CL MIDI RTP Simulator.app" "Ableton Lecteur — Simulateur RTP" "ableton-reader"
   say ""; say "Ableton Lecteur — Activation du démarrage automatique RTP"
-  /usr/bin/open -gj "$USER_APPS/CL MIDI RTP Agent.app" || fail "impossible de démarrer CL MIDI RTP Agent"
+  # LaunchServices peut retourner -1712 alors que l’agent a bien démarré :
+  # l’état réel (processus + LaunchAgent) fait foi.
+  /usr/bin/open -gj "$USER_APPS/CL MIDI RTP Agent.app" >/dev/null 2>&1 || true
   for _ in 1 2 3 4 5; do
-    [[ -f "$INSTALL_HOME/Library/LaunchAgents/com.claudio.midi-rtp-agent.plist" ]] && break
+    if [[ -f "$INSTALL_HOME/Library/LaunchAgents/com.claudio.midi-rtp-agent.plist" ]] \
+      && /usr/bin/pgrep -f -x "$USER_APPS/CL MIDI RTP Agent.app/Contents/MacOS/CL MIDI RTP Agent" >/dev/null 2>&1; then
+      break
+    fi
     sleep 1
   done
   [[ -f "$INSTALL_HOME/Library/LaunchAgents/com.claudio.midi-rtp-agent.plist" ]] \
     || fail "CL MIDI RTP Agent n’a pas enregistré son démarrage automatique"
+  /usr/bin/pgrep -f -x "$USER_APPS/CL MIDI RTP Agent.app/Contents/MacOS/CL MIDI RTP Agent" >/dev/null 2>&1 \
+    || fail "CL MIDI RTP Agent ne fonctionne pas après son lancement"
   say "  ✓ Agent RTP actif et enregistré pour les prochaines ouvertures de session"
 fi
 if [[ "$INSTALL_BUILDER" == 1 ]]; then
@@ -311,12 +390,9 @@ if [[ "$INSTALL_MIDI_CONSOLE" == 1 ]]; then
   [[ "$INSTALL_CONTROLLER" != 1 ]] && install_item "$MIDI_TOOLS_SOURCE" "$MIDI_TOOLS_TARGET" "MIDI Console — Outils réseau" "midi-console"
   [[ "$INSTALL_CONTROLLER" != 1 ]] && install_item "$APPLICATIONS_SOURCE/CL MIDI Network Assistant.app" "$USER_APPS/CL MIDI Network Assistant.app" "MIDI Console — Assistant réseau" "midi-console"
 fi
-[[ "$INSTALL_MIDI_RECEIVER" == 1 ]] && install_item "$APPLICATIONS_SOURCE/CL MIDI RTP Simulator.app" "$USER_APPS/CL MIDI RTP Simulator.app" "RTP — Simulateur de console" "midi-receiver"
-
 if [[ ( "$INSTALL_CONTROLLER" == 1 || "$INSTALL_MIDI_CONSOLE" == 1 ) && "$INSTALL_HOME" == "$HOME" && "${CL_SUITE_SKIP_POSTINSTALL:-0}" != "1" ]]; then
   say ""; say "Télécommande — Activation de la reconnexion RTP au démarrage"
-  /usr/bin/open -gj "$USER_APPS/CL MIDI Network Assistant.app" --args --background-monitor \
-    || fail "impossible de lancer le moniteur réseau MIDI"
+  /usr/bin/open -gj "$USER_APPS/CL MIDI Network Assistant.app" --args --background-monitor >/dev/null 2>&1 || true
   for _ in 1 2 3 4 5; do
     [[ -f "$HOME/Library/LaunchAgents/com.claudio.midi-network-monitor.plist" ]] && break
     sleep 1
@@ -334,6 +410,7 @@ say "User Library : $ABLETON_LIBRARY"
 say "Composants installés :"
 while IFS=$'\t' read -r label target status; do say "  ✓ $label"; say "    → $target"; done < "$INSTALLED_LIST"
 say "Manifeste : $INSTALL_MANIFEST"
+[[ -d "$TRASH_SESSION" ]] && say "Anciennes versions déplacées dans : $TRASH_SESSION"
 [[ -s "$WARNINGS" ]] && { say "Avertissements :"; cat "$WARNINGS" | tee -a "$REPORT"; }
 save_report
 say "Rapport copié dans : $SUPPORT_DIR"

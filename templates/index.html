@@ -71,6 +71,8 @@
     .status.disconnected { color: #ef9a9a; }
 
     .midi-returns { display:grid; grid-template-columns:1fr 1fr; gap:5px; }
+    .midi-title-mode { grid-column:1 / -1; display:flex; justify-content:flex-end; align-items:center; gap:6px; color:var(--muted); font-size:9px; }
+    .midi-title-mode select { min-height:24px; border:1px solid var(--border); border-radius:7px; background:#15181d; color:var(--text); font-size:9px; padding:2px 7px; }
     .midi-return { border:1px solid var(--border); border-radius:8px; padding:5px 7px; background:#15181d; color:var(--muted); font-size:9px; font-weight:750; }
     .midi-return strong { display:block; color:#ffcf62; font-size:11px; }
     .midi-return-title { display:block; margin-top:2px; color:#c8cdd5; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -611,6 +613,9 @@
     </nav>
 
     <section class="midi-returns" aria-label="Retours MIDI consoles">
+      <label class="midi-title-mode">Titres consoles
+        <select id="consoleTitleMode"><option value="ableton_context">Contexte Ableton (secours)</option><option value="console_file">Fichiers CL5 / QL1</option></select>
+      </label>
       <div class="midi-return" id="webCl5Return"><strong id="webCl5Program">CL5 · scène —</strong><span class="midi-return-title" id="webCl5Title">Titre en attente</span><span class="midi-return-state" id="webCl5State">En attente du premier retour</span></div>
       <div class="midi-return" id="webQl1Return"><strong id="webQl1Program">QL1 · scène —</strong><span class="midi-return-title" id="webQl1Title">Titre en attente</span><span class="midi-return-state" id="webQl1State">En attente du premier retour</span></div>
     </section>
@@ -667,6 +672,7 @@
     const ltcTimecodeEl = document.getElementById('ltcTimecode');
     const webCl5Return = document.getElementById('webCl5Return');
     const webQl1Return = document.getElementById('webQl1Return');
+    const consoleTitleMode = document.getElementById('consoleTitleMode');
 
     let actionBusy = false;
     let lastKnownState = null;
@@ -683,6 +689,18 @@
     let countdownStartedAt = null;
     let countdownPausedRemaining = null;
     let countdownMode = 'stopped';
+
+    consoleTitleMode.addEventListener('change', async () => {
+      try {
+        const response = await fetch('/action', {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({action: 'console_title_mode', mode: consoleTitleMode.value})
+        });
+        if (!response.ok) throw new Error('Mode refusé');
+      } catch (_) {
+        consoleTitleMode.value = lastKnownState?.console_title_mode || 'ableton_context';
+      }
+    });
     let lastAcceptedGeneration = -1;
 
     function resetSessionUiForGeneration() {
@@ -1040,6 +1058,9 @@
       if (!acceptStateGeneration(state)) return;
       if (window.CLRemoteLTC) window.CLRemoteLTC.render(ltcTimecodeEl, state);
       const midi = state.midi_console || {};
+      if (document.activeElement !== consoleTitleMode) {
+        consoleTitleMode.value = state.console_title_mode || 'ableton_context';
+      }
       const formatMidiAge = (seconds) => {
         seconds = Math.max(0, Math.floor(seconds));
         if (seconds < 60) return seconds < 2 ? 'à l’instant' : 'il y a ' + seconds + ' s';
@@ -1054,11 +1075,17 @@
         const receivedAt = Number(value.received_at || 0);
         const age = receivedAt ? Math.max(0, Date.now() / 1000 - receivedAt) : Infinity;
         const recent = Boolean(value.received && age <= 12);
+        const expected = value.display_source === 'ableton_scene';
+        const localFallback = state.console_return_mode === 'local_fallback';
         card.classList.toggle('ok', recent);
-        card.classList.toggle('remembered', Boolean(value.received && !recent));
-        document.getElementById(programId).textContent = name + ' · scène ' + (value.program ?? '—');
-        document.getElementById(titleId).textContent = value.title || state.playing_scene_name || 'Titre en attente';
-        document.getElementById(stateId).textContent = value.received
+        card.classList.toggle('remembered', Boolean(value.received && !recent && !expected));
+        document.getElementById(programId).textContent = name + ' · PGM ' + (value.program ?? '—');
+        document.getElementById(titleId).textContent = value.resolved_scene && value.title
+          ? value.title
+          : 'Titre non résolu';
+        document.getElementById(stateId).textContent = expected
+          ? (localFallback ? 'Lecture locale de secours · non confirmée par la console' : 'Commande Ableton prévue · retour console en attente')
+          : value.received
           ? (recent ? '✓ Scène reçue · ' : (age <= 60 ? 'Dernière scène reçue · ' : 'Aucun retour récent · dernier ')) + (receivedAt ? formatMidiAge(age) : 'heure inconnue')
           : 'En attente du premier retour';
       };
@@ -1116,7 +1143,10 @@
       }
 
       if (pauseButton) {
-        const shouldShowPlay = !playing || paused;
+        const transportPlaying = Boolean(
+          state && state.is_playing && !state.is_paused
+        );
+        const shouldShowPlay = !transportPlaying;
         pauseButton.textContent = shouldShowPlay ? 'PLAY' : 'PAUSE';
         pauseButton.classList.toggle('is-play', shouldShowPlay);
         pauseButton.disabled = Boolean(sessionStoppedByUser && shouldShowPlay);
