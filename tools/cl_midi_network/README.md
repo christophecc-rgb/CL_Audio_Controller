@@ -1,5 +1,15 @@
 # CL MIDI Network Tools
 
+CLAudioConfigurationChecker compare en lecture seule l’état du Mac à un profil
+JSON versionné. Il distingue explicitement session RTP locale, endpoint CoreMIDI
+local, nom Bonjour et peer distant. Les profils utilisateur sont stockés dans :
+
+    ~/Library/Application Support/CL Audio/Configuration Profiles/
+
+Rapport JSON non destructif :
+
+    ./build/CLAudioConfigurationChecker --inspect-json
+
 Trois outils natifs macOS fondés sur CoreMIDI :
 
 - `CLMIDINetworkGuardian` active la session RTP-MIDI et reconnecte un correspondant Bonjour.

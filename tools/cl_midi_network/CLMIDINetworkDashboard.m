@@ -141,6 +141,7 @@ static BOOL CLPostDoubleClickFromConnectorReason(NSString *reason) {
 @property NSView *simulatorPanel;
 @property NSPopUpButton *simulatorModeMenu;
 @property NSPopUpButton *simulatorEndpointMenu;
+@property NSPopUpButton *simulatorInputEndpointMenu;
 @property NSTextField *simulatorDelayField;
 @property NSTextField *simulatorStatusLabel;
 @property NSTextField *simulatorCL5MemoryField;
@@ -222,6 +223,31 @@ static BOOL CLIsRTPReturnEndpointName(NSString *name) {
         [name isEqualToString:CLLocalReturnEndpointName]) return NO;
     return [name rangeOfString:@"RTP" options:NSCaseInsensitiveSearch].location != NSNotFound ||
         [name rangeOfString:@"Réseau" options:NSCaseInsensitiveSearch].location != NSNotFound;
+}
+
+static NSArray<NSString *> *CLLocalRTPEndpointNames(void) {
+    NSArray<NSString *> *sources = EndpointNames(YES);
+    NSSet<NSString *> *destinations = [NSSet setWithArray:EndpointNames(NO)];
+    NSMutableOrderedSet<NSString *> *names = [NSMutableOrderedSet orderedSet];
+    for (NSString *name in sources) {
+        if (CLIsRTPReturnEndpointName(name) && [destinations containsObject:name]) [names addObject:name];
+    }
+    return names.array;
+}
+
+static NSString *CLPreferredLocalRTPEndpoint(NSArray<NSString *> *endpoints) {
+    NSString *saved = [NSUserDefaults.standardUserDefaults stringForKey:@"simulatorLocalRtpEndpoint"];
+    if (saved.length && [endpoints containsObject:saved]) return saved;
+    for (NSString *keyword in @[@"QL1 simulator", @"simulator", @"QL1"]) {
+        for (NSString *name in endpoints) {
+            if ([name rangeOfString:keyword options:NSCaseInsensitiveSearch].location != NSNotFound) return name;
+        }
+    }
+    return endpoints.firstObject;
+}
+
+static NSArray<NSString *> *CLSimulatorInputEndpointNames(void) {
+    return EndpointNames(YES);
 }
 
 static void CLPassiveExpectedRead(const MIDIPacketList *packetList, void *readProcRefCon, void *srcConnRefCon) {
@@ -1569,6 +1595,27 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     if (selected.length && [candidates containsObject:selected]) [self.endpointMenu selectItemWithTitle:selected];
     [self stylePopup:self.endpointMenu accent:[NSColor colorWithRed:0.67 green:0.53 blue:1.0 alpha:1.0]];
 
+    if (self.simulatorEndpointMenu && self.simulatorModeMenu.indexOfSelectedItem == 1) {
+        NSArray<NSString *> *localRTPEndpoints = CLLocalRTPEndpointNames();
+        NSString *current = self.simulatorEndpointMenu.titleOfSelectedItem;
+        NSString *preferred = [localRTPEndpoints containsObject:current]
+            ? current : CLPreferredLocalRTPEndpoint(localRTPEndpoints);
+        [self.simulatorEndpointMenu removeAllItems];
+        [self.simulatorEndpointMenu addItemsWithTitles:localRTPEndpoints.count
+            ? localRTPEndpoints : @[@"Aucun endpoint RTP local détecté"]];
+        if (preferred.length) [self.simulatorEndpointMenu selectItemWithTitle:preferred];
+        self.simulatorEndpointMenu.enabled = localRTPEndpoints.count > 0;
+
+        NSArray<NSString *> *sources = CLSimulatorInputEndpointNames();
+        NSString *savedInput = [NSUserDefaults.standardUserDefaults stringForKey:@"simulatorInputEndpoint"] ?: @"";
+        NSString *selectedInput = [sources containsObject:savedInput] ? savedInput : @"Aucune";
+        [self.simulatorInputEndpointMenu removeAllItems];
+        [self.simulatorInputEndpointMenu addItemWithTitle:@"Aucune"];
+        [self.simulatorInputEndpointMenu addItemsWithTitles:sources];
+        [self.simulatorInputEndpointMenu selectItemWithTitle:selectedInput];
+        self.simulatorInputEndpointMenu.enabled = YES;
+    }
+
     NSString *endpoint = self.endpointMenu.selectedItem.title ?: @"";
     // Chaque rôle est reconnecté indépendamment. L'absence d'un endpoint ne
     // doit jamais déconnecter l'autre source encore valide.
@@ -1586,8 +1633,8 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
         (unsigned long)sources.count, (unsigned long)destinations.count, (unsigned long)candidates.count,
         (sources.count || destinations.count) ? @"opérationnel" : @"aucun port"];
     self.technicalSelection.stringValue = [NSString stringWithFormat:
-        @"Source Ableton / attendu : %@ · %@\nSource console / retour : %@ · %@",
-        CLExpectedEndpointName, self.expectedMonitorSource ? @"connectée" : @"indisponible",
+        @"Source expected Ableton (indépendante du RTP) : %@ · %@\nSource console / retour RTP : %@ · %@",
+        CLExpectedEndpointName, self.expectedMonitorSource ? @"connectée" : @"indisponible (sans effet sur la liaison RTP)",
         self.localReturnMode ? CLLocalReturnEndpointName : CLRTPReturnEndpointName,
         self.localReturnMode ? (self.localReturnDestination ? @"connectée" : @"indisponible") :
             (self.returnMonitorSource ? @"connectée" : @"indisponible")];
@@ -1764,7 +1811,7 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
                 BOOL loopDetected = [output rangeOfString:@"LOOP_DETECTED"].location != NSNotFound;
                 if (loopDetected) self.loopDetectedEndpoint = endpoint;
                 NSString *reason = loopDetected ? @"boucle MIDI détectée · désactivez Entrée RTP > Piste dans Ableton"
-                    : ([output rangeOfString:@"TIMEOUT"].location != NSNotFound ? @"envoi réussi · aucun retour distant reçu"
+                    : ([output rangeOfString:@"TIMEOUT"].location != NSNotFound ? @"envoi RTP réussi · aucun simulateur de retour actif sur le Mac distant"
                     : ([output rangeOfString:@"COREMIDI_CLIENT_ERROR"].location != NSNotFound ? @"CoreMIDI indisponible"
                     : ([output rangeOfString:@"RTP_ENDPOINTS_NOT_FOUND"].location != NSNotFound ? @"port RTP introuvable"
                     : ([output rangeOfString:@"COREMIDI_SEND_ERROR"].location != NSNotFound ? @"envoi CoreMIDI refusé" : @"test impossible"))));
@@ -1985,21 +2032,29 @@ static NSString * const CLSimulatorDevicesDefaultsKey = @"CLSimulatorDevicesV1";
     [content addSubview:title];
     [content addSubview:[self button:@"Afficher les détails" frame:NSMakeRect(326, 156, 128, 26) action:@selector(toggleShowMode:)]];
 
-    [content addSubview:[self label:@"MODE" frame:NSMakeRect(14, 132, 44, 18) size:8 bold:YES]];
-    self.simulatorModeMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(58, 126, 190, 28) pullsDown:NO];
+    [content addSubview:[self label:@"MODE" frame:NSMakeRect(14, 146, 80, 18) size:8 bold:YES]];
+    self.simulatorModeMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(14, 122, 140, 28) pullsDown:NO];
     [self.simulatorModeMenu addItemsWithTitles:@[@"Test local · retour dédié", @"Test distant · RTP"]];
     self.simulatorModeMenu.target = self;
     self.simulatorModeMenu.action = @selector(simulatorModeChanged:);
     [self stylePopup:self.simulatorModeMenu accent:[NSColor colorWithRed:0.92 green:0.58 blue:0.26 alpha:1.0]];
     [content addSubview:self.simulatorModeMenu];
 
-    self.simulatorEndpointMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(258, 126, 196, 28) pullsDown:NO];
-    NSMutableOrderedSet<NSString *> *endpointSet = [NSMutableOrderedSet orderedSetWithObjects:CLLocalReturnEndpointName, CLRTPReturnEndpointName, nil];
-    [endpointSet addObjectsFromArray:[self allMidiEndpointNames]];
-    NSArray<NSString *> *endpoints = endpointSet.array;
-    [self.simulatorEndpointMenu addItemsWithTitles:endpoints.count ? endpoints : @[@"Aucun port MIDI"]];
+    self.simulatorEndpointMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(160, 122, 140, 28) pullsDown:NO];
+    [self.simulatorEndpointMenu addItemWithTitle:CLLocalReturnEndpointName];
+    self.simulatorEndpointMenu.target = self;
+    self.simulatorEndpointMenu.action = @selector(simulatorEndpointChanged:);
     [self stylePopup:self.simulatorEndpointMenu accent:[NSColor colorWithRed:0.44 green:0.76 blue:1.0 alpha:1.0]];
     [content addSubview:self.simulatorEndpointMenu];
+    [content addSubview:[self label:@"DESTINATION RTP" frame:NSMakeRect(164, 148, 120, 14) size:8 bold:YES]];
+
+    [content addSubview:[self label:@"SOURCE AUTOMATIQUE" frame:NSMakeRect(310, 148, 144, 14) size:8 bold:YES]];
+    self.simulatorInputEndpointMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(306, 122, 148, 28) pullsDown:NO];
+    [self.simulatorInputEndpointMenu addItemWithTitle:@"Aucune"];
+    self.simulatorInputEndpointMenu.target = self;
+    self.simulatorInputEndpointMenu.action = @selector(simulatorInputEndpointChanged:);
+    [self stylePopup:self.simulatorInputEndpointMenu accent:[NSColor colorWithRed:0.62 green:0.62 blue:0.68 alpha:1.0]];
+    [content addSubview:self.simulatorInputEndpointMenu];
 
     [content addSubview:[self label:@"CL5 · Canal MIDI 1 · Mémoire" frame:NSMakeRect(14, 94, 204, 20) size:10 bold:YES]];
     self.simulatorCL5MemoryField = [[NSTextField alloc] initWithFrame:NSMakeRect(220, 90, 54, 26)];
@@ -2035,17 +2090,24 @@ static NSString * const CLSimulatorDevicesDefaultsKey = @"CLSimulatorDevicesV1";
         self.simulatorStatusLabel.textColor = NSColor.systemRedColor;
         return;
     }
-    for (NSMutableDictionary *device in self.simulatorDevices) {
-        if ([device[@"channel"] integerValue] == channel && [device[@"built_in"] boolValue]) {
-            if (!self.simulatorTasks[device[@"id"]].running) [self startSimulatorDevice:device];
-            break;
-        }
+    NSString *endpoint = self.localReturnMode ? CLExpectedEndpointName : self.simulatorEndpointMenu.titleOfSelectedItem;
+    if (!self.localReturnMode && ![CLLocalRTPEndpointNames() containsObject:endpoint]) {
+        self.simulatorStatusLabel.stringValue = @"Endpoint RTP local introuvable";
+        self.simulatorStatusLabel.textColor = NSColor.systemRedColor;
+        return;
     }
-    NSString *endpoint = self.localReturnMode ? CLExpectedEndpointName : CLRTPReturnEndpointName;
     NSTask *task = [[NSTask alloc] init];
-    task.executableURL = [NSURL fileURLWithPath:[self toolPath:@"CLMIDIRoundTripTester"]];
-    task.arguments = @[@"--endpoint", endpoint, @"--program", [NSString stringWithFormat:@"%ld", (long)sceneMemory],
-                       @"--channel", [NSString stringWithFormat:@"%ld", (long)channel], @"--timeout", @"0.2"];
+    if (self.localReturnMode) {
+        task.executableURL = [NSURL fileURLWithPath:[self toolPath:@"CLMIDIRoundTripTester"]];
+        task.arguments = @[@"--endpoint", endpoint, @"--program", [NSString stringWithFormat:@"%ld", (long)sceneMemory],
+                           @"--channel", [NSString stringWithFormat:@"%ld", (long)channel], @"--timeout", @"0.2"];
+    } else {
+        task.executableURL = [NSURL fileURLWithPath:[self toolPath:@"CLYamahaConsoleSimulator"]];
+        task.arguments = @[@"--label", channel == 1 ? @"CL5" : @"QL1",
+                           @"--channel", [NSString stringWithFormat:@"%ld", (long)channel],
+                           @"--transport", @"rtp", @"--endpoint", endpoint,
+                           @"--send-program", [NSString stringWithFormat:@"%ld", (long)sceneMemory], @"--no-echo"];
+    }
     task.standardOutput = NSFileHandle.fileHandleWithNullDevice;
     task.standardError = NSFileHandle.fileHandleWithNullDevice;
     NSError *error = nil;
@@ -2064,9 +2126,18 @@ static NSString * const CLSimulatorDevicesDefaultsKey = @"CLSimulatorDevicesV1";
     NSInteger mode = self.simulatorModeMenu.indexOfSelectedItem;
     self.localReturnMode = mode == 0;
     [self updateRoundTripPanelForCurrentMode];
-    NSString *returnEndpoint = self.localReturnMode ? CLLocalReturnEndpointName : CLRTPReturnEndpointName;
-    [self.simulatorEndpointMenu selectItemWithTitle:returnEndpoint];
-    self.simulatorEndpointMenu.enabled = NO;
+    if (self.localReturnMode) {
+        [self.simulatorEndpointMenu removeAllItems];
+        [self.simulatorEndpointMenu addItemWithTitle:CLLocalReturnEndpointName];
+        self.simulatorEndpointMenu.enabled = NO;
+        [self.simulatorInputEndpointMenu removeAllItems];
+        if ([CLSimulatorInputEndpointNames() containsObject:CLExpectedEndpointName]) {
+            [self.simulatorInputEndpointMenu addItemWithTitle:CLExpectedEndpointName];
+        } else {
+            [self.simulatorInputEndpointMenu addItemWithTitle:@"Aucune"];
+        }
+        self.simulatorInputEndpointMenu.enabled = NO;
+    }
     if (self.returnMonitorSource && self.returnMonitorInputPort) {
         MIDIPortDisconnectSource(self.returnMonitorInputPort, self.returnMonitorSource);
         self.returnMonitorSource = 0;
@@ -2077,12 +2148,34 @@ static NSString * const CLSimulatorDevicesDefaultsKey = @"CLSimulatorDevicesV1";
     [self refreshEndpoints];
 }
 
+- (void)simulatorEndpointChanged:(id)sender {
+    (void)sender;
+    NSString *endpoint = self.simulatorEndpointMenu.titleOfSelectedItem ?: @"";
+    if ([CLLocalRTPEndpointNames() containsObject:endpoint]) {
+        [NSUserDefaults.standardUserDefaults setObject:endpoint forKey:@"simulatorLocalRtpEndpoint"];
+    }
+}
+
+- (void)simulatorInputEndpointChanged:(id)sender {
+    (void)sender;
+    NSString *input = self.simulatorInputEndpointMenu.titleOfSelectedItem ?: @"Aucune";
+    if ([input isEqualToString:@"Aucune"]) [NSUserDefaults.standardUserDefaults removeObjectForKey:@"simulatorInputEndpoint"];
+    else [NSUserDefaults.standardUserDefaults setObject:input forKey:@"simulatorInputEndpoint"];
+}
+
 - (NSTask *)launchSimulatorDevice:(NSMutableDictionary *)device transport:(NSString *)transport endpoint:(NSString *)endpoint delay:(NSInteger)delay {
     NSTask *task = [[NSTask alloc] init];
     task.executableURL = [NSURL fileURLWithPath:[self toolPath:@"CLYamahaConsoleSimulator"]];
-    task.arguments = @[@"--label", device[@"name"], @"--channel", [device[@"channel"] stringValue], @"--transport", transport,
-                       @"--input-endpoint", CLExpectedEndpointName, @"--endpoint", endpoint ?: @"",
-                       @"--delay-ms", [NSString stringWithFormat:@"%ld", (long)delay]];
+    NSMutableArray<NSString *> *arguments = [NSMutableArray arrayWithArray:
+        @[@"--label", device[@"name"], @"--channel", [device[@"channel"] stringValue], @"--transport", transport,
+          @"--endpoint", endpoint ?: @"", @"--delay-ms", [NSString stringWithFormat:@"%ld", (long)delay]]];
+    NSString *input = self.localReturnMode ?
+        ([CLSimulatorInputEndpointNames() containsObject:CLExpectedEndpointName] ? CLExpectedEndpointName : @"") :
+        self.simulatorInputEndpointMenu.titleOfSelectedItem;
+    if (input.length && ![input isEqualToString:@"Aucune"]) {
+        [arguments addObjectsFromArray:@[@"--input-endpoint", input]];
+    }
+    task.arguments = arguments;
     NSPipe *output = [NSPipe pipe];
     task.standardOutput = output;
     task.standardError = NSFileHandle.fileHandleWithNullDevice;
@@ -2136,7 +2229,20 @@ static NSString * const CLSimulatorDevicesDefaultsKey = @"CLSimulatorDevicesV1";
         self.simulatorStatusLabel.textColor = NSColor.systemRedColor;
         return NO;
     }
-    NSString *requiredEndpoint = mode == 0 ? CLLocalReturnEndpointName : CLRTPReturnEndpointName;
+    NSString *requiredEndpoint = mode == 0 ? CLLocalReturnEndpointName : selectedEndpoint;
+    if (mode == 1 && ![CLLocalRTPEndpointNames() containsObject:requiredEndpoint]) {
+        self.simulatorStatusLabel.stringValue = @"Endpoint RTP local introuvable";
+        self.simulatorStatusLabel.textColor = NSColor.systemRedColor;
+        return NO;
+    }
+    if (mode == 1) {
+        NSString *input = self.simulatorInputEndpointMenu.titleOfSelectedItem ?: @"Aucune";
+        if (![input isEqualToString:@"Aucune"] && ![CLSimulatorInputEndpointNames() containsObject:input]) {
+            [self.simulatorInputEndpointMenu selectItemWithTitle:@"Aucune"];
+            self.simulatorStatusLabel.stringValue = [NSString stringWithFormat:@"Source automatique indisponible : %@ · envoi manuel RTP disponible", input];
+        }
+        [NSUserDefaults.standardUserDefaults setObject:requiredEndpoint forKey:@"simulatorLocalRtpEndpoint"];
+    }
     if (transport) *transport = mode == 0 ? @"iac" : @"rtp";
     if (endpoint) *endpoint = requiredEndpoint;
     if (delay) *delay = MAX(0, self.simulatorDelayField.integerValue);

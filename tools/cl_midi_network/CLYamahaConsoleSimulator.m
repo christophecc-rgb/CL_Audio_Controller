@@ -114,6 +114,11 @@ static NSString *argumentValue(NSArray<NSString *> *arguments, NSString *name, N
     return fallback;
 }
 
+static BOOL hasArgument(NSArray<NSString *> *arguments, NSString *name) {
+    NSUInteger index = [arguments indexOfObject:name];
+    return index != NSNotFound && index + 1 < arguments.count;
+}
+
 static NSString *endpointName(MIDIEndpointRef endpoint) {
     CFStringRef value = NULL;
     if (MIDIObjectGetStringProperty(endpoint, kMIDIPropertyDisplayName, &value) != noErr || value == NULL) {
@@ -124,23 +129,16 @@ static NSString *endpointName(MIDIEndpointRef endpoint) {
 
 static MIDIEndpointRef findEndpoint(BOOL source, NSString *preferredName) {
     ItemCount count = source ? MIDIGetNumberOfSources() : MIDIGetNumberOfDestinations();
-    MIDIEndpointRef fallback = 0;
     for (ItemCount index = 0; index < count; index++) {
         MIDIEndpointRef endpoint = source ? MIDIGetSource(index) : MIDIGetDestination(index);
         NSString *name = endpointName(endpoint);
         fprintf(stdout, "MIDI_%s index=%lu name=%s\n", source ? "SOURCE" : "DESTINATION",
                 (unsigned long)index, name.UTF8String);
-        if ([name rangeOfString:preferredName options:NSCaseInsensitiveSearch].location != NSNotFound) {
+        if ([name caseInsensitiveCompare:preferredName] == NSOrderedSame) {
             return endpoint;
         }
-        if (fallback == 0 &&
-            ([name rangeOfString:@"network" options:NSCaseInsensitiveSearch].location != NSNotFound ||
-             [name rangeOfString:@"réseau" options:NSCaseInsensitiveSearch].location != NSNotFound ||
-             [name rangeOfString:@"session" options:NSCaseInsensitiveSearch].location != NSNotFound)) {
-            fallback = endpoint;
-        }
     }
-    return fallback;
+    return 0;
 }
 
 static void sendProgramChange(UInt8 status, UInt8 program) {
@@ -209,61 +207,70 @@ int main(int argc, const char *argv[]) {
                              [processName containsString:@"RTP Receiver"] ||
                              [processName containsString:@"RTP Simulator"];
         if ([arguments containsObject:@"--help"]) {
-            puts("Usage: CLYamahaConsoleSimulator [--label QL1] [--transport rtp|iac] [--endpoint name] [--channel 1-16] [--delay-ms 80] [--no-echo]");
+            puts("Usage: CLYamahaConsoleSimulator [--label QL1] [--transport rtp|iac] [--endpoint name] [--input-endpoint name] [--channel 1-16] [--delay-ms 80] [--send-program 1-128] [--no-echo]");
             return 0;
         }
         consoleLabel = argumentValue(arguments, @"--label", responderMode ? @"RTP RESPONDER" : @"QL1");
         NSString *endpointSearchName = argumentValue(arguments, @"--endpoint", @"Réseau Rtp MB Chris");
-        NSString *inputEndpointName = argumentValue(arguments, @"--input-endpoint", @"Gestionnaire IAC Bus 1");
+        BOOL inputWasConfigured = hasArgument(arguments, @"--input-endpoint") || responderMode;
+        NSString *inputEndpointName = argumentValue(arguments, @"--input-endpoint",
+                                                     responderMode ? endpointSearchName : @"");
         NSString *transport = [argumentValue(arguments, @"--transport", @"rtp") lowercaseString];
         BOOL localCoreMIDI = [transport isEqualToString:@"iac"];
         echoDelayMs = (NSUInteger)[argumentValue(arguments, @"--delay-ms", @"80") integerValue];
         acceptedChannel = (NSUInteger)[argumentValue(arguments, @"--channel", @"0") integerValue];
         if (acceptedChannel > 16) acceptedChannel = 0;
-        echoEnabled = ![arguments containsObject:@"--no-echo"];
+        BOOL manualSend = hasArgument(arguments, @"--send-program");
+        NSInteger manualScene = [argumentValue(arguments, @"--send-program", @"0") integerValue];
+        if (manualSend && (manualScene < 1 || manualScene > 128 || acceptedChannel < 1)) {
+            fputs("Manual Program Change requires --send-program 1...128 and --channel 1...16\n", stderr);
+            return 2;
+        }
+        echoEnabled = inputWasConfigured && ![arguments containsObject:@"--no-echo"];
         signal(SIGINT, stopHandler);
         signal(SIGTERM, stopHandler);
 
         MIDINetworkSession *session = [MIDINetworkSession defaultSession];
         MIDIEndpointRef networkSource = 0;
-        if (localCoreMIDI) {
-            // En mode IAC, respecter strictement le port choisi. L'ancienne
-            // logique basculait silencieusement sur RTP dès qu'il était actif.
-            networkSource = findEndpoint(YES, inputEndpointName);
-            networkDestination = findEndpoint(NO, endpointSearchName);
-        } else {
+        if (!localCoreMIDI) {
             session.enabled = YES;
             session.connectionPolicy = MIDINetworkConnectionPolicy_Anyone;
-            NSUInteger endpointAttempts = responderMode ? 600 : 50;
-            for (NSUInteger attempt = 0; attempt < endpointAttempts; attempt++) {
-                networkSource = session.sourceEndpoint;
-                networkDestination = session.destinationEndpoint;
-                if (networkSource != 0 && networkDestination != 0) break;
-                [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
-            }
-            if (networkSource == 0) networkSource = findEndpoint(YES, endpointSearchName);
-            if (networkDestination == 0) networkDestination = findEndpoint(NO, endpointSearchName);
         }
-        if (networkSource == 0 || networkDestination == 0) {
-            fprintf(stderr, "RTP session endpoints unavailable source=%u destination=%u\n",
-                    (unsigned int)networkSource, (unsigned int)networkDestination);
+        networkDestination = findEndpoint(NO, endpointSearchName);
+        if (networkDestination == 0) {
+            fprintf(stderr, "Endpoint RTP local introuvable: %s\n", endpointSearchName.UTF8String);
             return 1;
+        }
+        if (inputWasConfigured) networkSource = findEndpoint(YES, inputEndpointName);
+        if (inputWasConfigured && networkSource == 0) {
+            echoEnabled = NO;
+            fprintf(stderr, "Source automatique indisponible: %s\nEnvoi manuel RTP disponible.\n",
+                    inputEndpointName.UTF8String);
         }
 
         MIDIClientRef client = 0;
         MIDIPortRef inputPort = 0;
         OSStatus clientStatus = MIDIClientCreate(CFSTR("CL Yamaha Console Simulator"), NULL, NULL, &client);
-        OSStatus inputStatus = MIDIInputPortCreate(client, CFSTR("RTP input"), midiRead, NULL, &inputPort);
+        OSStatus inputStatus = networkSource != 0
+            ? MIDIInputPortCreate(client, CFSTR("RTP input"), midiRead, NULL, &inputPort) : noErr;
         OSStatus outputStatus = MIDIOutputPortCreate(client, CFSTR("RTP confirmation"), &outputPort);
-        OSStatus connectStatus = MIDIPortConnectSource(inputPort, networkSource, NULL);
+        OSStatus connectStatus = networkSource != 0 ? MIDIPortConnectSource(inputPort, networkSource, NULL) : noErr;
         if (clientStatus || inputStatus || outputStatus || connectStatus) {
             fprintf(stderr, "CoreMIDI setup failed client=%d input=%d output=%d connect=%d\n",
                     (int)clientStatus, (int)inputStatus, (int)outputStatus, (int)connectStatus);
             return 1;
         }
 
+        if (manualSend) {
+            sendProgramChange((UInt8)(0xC0 | (acceptedChannel - 1)), (UInt8)(manualScene - 1));
+            MIDIPortDispose(outputPort);
+            MIDIClientDispose(client);
+            return 0;
+        }
+
         fprintf(stdout, "READY console=%s transport=%s input=%s endpoint=%s delay_ms=%lu echo=%s session=%s port=%lu\n",
-                consoleLabel.UTF8String, transport.UTF8String, inputEndpointName.UTF8String,
+                consoleLabel.UTF8String, transport.UTF8String,
+                networkSource != 0 ? inputEndpointName.UTF8String : "none",
                 endpointSearchName.UTF8String,
                 (unsigned long)echoDelayMs,
                 echoEnabled ? "on" : "off", session.localName.UTF8String,
@@ -273,8 +280,8 @@ int main(int argc, const char *argv[]) {
         while (keepRunning) {
             [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.25]];
         }
-        MIDIPortDisconnectSource(inputPort, networkSource);
-        MIDIPortDispose(inputPort);
+        if (inputPort && networkSource) MIDIPortDisconnectSource(inputPort, networkSource);
+        if (inputPort) MIDIPortDispose(inputPort);
         MIDIPortDispose(outputPort);
         MIDIClientDispose(client);
     }

@@ -27,7 +27,7 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn("(status & 0xF0) == 0xC0", source)
         self.assertIn("MIDISend", source)
         self.assertIn("program + 1", source)
-        self.assertIn("RTP session endpoints unavailable", source)
+        self.assertIn("Endpoint RTP local introuvable", source)
         self.assertIn("findEndpoint", source)
         self.assertIn("consumeSelfEcho", source)
         self.assertIn("IGNORED_SELF_ECHO", source)
@@ -76,7 +76,7 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('${1:-$SCRIPT_DIR/build}', source)
         self.assertIn("-framework CoreMIDI", source)
         self.assertIn("-arch arm64 -arch x86_64", source)
-        self.assertEqual(source.count("-mmacosx-version-min=10.15"), 8)
+        self.assertEqual(source.count("-mmacosx-version-min=10.15"), 9)
         self.assertIn("CLMIDINetworkGuardian", source)
         self.assertIn("CLYamahaConsoleSimulator", source)
         self.assertIn("CLMIDIRoundTripTester", source)
@@ -142,7 +142,7 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('CL MIDI Network Assistant.log', source)
         self.assertIn('rtp-connect-pending', source)
         self.assertIn('round-trip-result', source)
-        self.assertIn('envoi réussi · aucun retour distant reçu', source)
+        self.assertIn('envoi RTP réussi · aucun simulateur de retour actif sur le Mac distant', source)
         self.assertIn('@"DIAGNOSTIC DISTANT · VÉRIFIER RTP"', source)
         self.assertIn('@"Vérifier RTP"', source)
         simulator_method = source.split('- (void)createIntegratedSimulatorPanelInView:', 1)[1].split('- (BOOL)applicationShouldTerminateAfterLastWindowClosed:', 1)[0]
@@ -486,7 +486,7 @@ class MidiNetworkToolsTests(unittest.TestCase):
     def test_iac_simulator_is_explicitly_refused_to_protect_expected_role(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
         self.assertIn('Gestionnaire IAC Bus 1 est exclusivement la source expected', source)
-        self.assertIn('@"--input-endpoint", CLExpectedEndpointName', source)
+        self.assertIn('[CLSimulatorInputEndpointNames() containsObject:CLExpectedEndpointName]', source)
 
     def test_local_and_rtp_return_transports_keep_expected_monitor_independent(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
@@ -498,8 +498,106 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertNotIn('expectedMonitorSource = 0', mode)
         self.assertNotIn('expectedCL5Program = -1', mode)
         self.assertNotIn('expectedQL1Program = -1', mode)
-        self.assertIn('mode == 0 ? CLLocalReturnEndpointName : CLRTPReturnEndpointName', transport)
+        self.assertIn('mode == 0 ? CLLocalReturnEndpointName : selectedEndpoint', transport)
         self.assertIn('mode == 0 ? @"iac" : @"rtp"', transport)
+
+    def test_remote_simulator_selects_and_validates_a_local_rtp_endpoint(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        setup = source.split('- (void)createIntegratedSimulatorPanelInView:', 1)[1].split('- (void)sendSimulatorMemory:', 1)[0]
+        refresh = source.split('- (void)refreshEndpoints', 1)[1].split('- (NSString *)toolPath:', 1)[0]
+        mode = source.split('- (void)simulatorModeChanged:', 1)[1].split('- (NSTask *)launchSimulatorDevice:', 1)[0]
+        transport = source.split('- (BOOL)simulatorTransport:', 1)[1].split('- (void)startSimulatorDevice:', 1)[0]
+        self.assertIn('@selector(simulatorEndpointChanged:)', setup)
+        self.assertIn('CLLocalRTPEndpointNames()', refresh)
+        self.assertIn('simulatorLocalRtpEndpoint', source)
+        self.assertIn('@"QL1 simulator"', source)
+        self.assertIn('self.simulatorEndpointMenu.enabled = localRTPEndpoints.count > 0', refresh)
+        self.assertNotIn('[self.simulatorEndpointMenu selectItemWithTitle:CLRTPReturnEndpointName]', mode)
+        self.assertIn('[CLLocalRTPEndpointNames() containsObject:requiredEndpoint]', transport)
+        self.assertIn('Endpoint RTP local introuvable', transport)
+        self.assertNotIn('mode == 0 ? CLLocalReturnEndpointName : CLRTPReturnEndpointName', transport)
+
+    def test_remote_simulator_input_and_output_are_independent(self):
+        dashboard = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        engine = (TOOLS / "CLYamahaConsoleSimulator.m").read_text(encoding="utf-8")
+        launch = dashboard.split('- (NSTask *)launchSimulatorDevice:', 1)[1].split(
+            '- (BOOL)simulatorTransport:', 1
+        )[0]
+        manual = dashboard.split('- (void)sendSimulatorMemory:', 1)[1].split(
+            '- (void)simulatorModeChanged:', 1
+        )[0]
+        self.assertIn('@"DESTINATION RTP"', dashboard)
+        self.assertIn('@"SOURCE AUTOMATIQUE"', dashboard)
+        self.assertIn('@"Aucune"', dashboard)
+        self.assertIn('CLSimulatorInputEndpointNames()', dashboard)
+        self.assertIn('if (input.length && ![input isEqualToString:@"Aucune"])', launch)
+        self.assertIn('addObjectsFromArray:@[@"--input-endpoint", input]', launch)
+        self.assertNotIn('@"--input-endpoint", CLExpectedEndpointName', launch)
+        self.assertIn('argumentValue(arguments, @"--input-endpoint",', engine)
+        self.assertIn('responderMode ? endpointSearchName : @""', engine)
+        self.assertIn('echoEnabled = inputWasConfigured', engine)
+        self.assertIn('Source automatique indisponible', engine)
+        self.assertIn('Envoi manuel RTP disponible', engine)
+
+        self.assertNotIn('startSimulatorDevice:', manual)
+        self.assertIn('self.simulatorEndpointMenu.titleOfSelectedItem', manual)
+        self.assertIn('@"--channel"', manual)
+        self.assertIn('[self toolPath:@"CLYamahaConsoleSimulator"]', manual)
+        self.assertIn('@"--send-program"', manual)
+        self.assertIn('@"--no-echo"', manual)
+        self.assertIn('channel == 1 ? self.simulatorCL5MemoryField : self.simulatorQL1MemoryField', manual)
+
+    def test_remote_simulator_compact_layout_keeps_controls_on_separate_rows(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        setup = source.split('- (void)createIntegratedSimulatorPanelInView:', 1)[1].split(
+            '- (void)sendSimulatorMemory:', 1
+        )[0]
+        self.assertIn('NSMakeRect(14, 122, 140, 28)', setup)
+        self.assertIn('NSMakeRect(160, 122, 140, 28)', setup)
+        self.assertIn('NSMakeRect(306, 122, 148, 28)', setup)
+        self.assertIn('NSMakeRect(220, 90, 54, 26)', setup)
+        self.assertNotIn('NSMakeRect(258, 86, 196, 28)', setup)
+
+    def test_rtp_timeout_explains_missing_remote_return_without_blame_on_iac(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        self.assertIn('Source expected Ableton (indépendante du RTP)', source)
+        self.assertIn('indisponible (sans effet sur la liaison RTP)', source)
+        self.assertIn('aucun simulateur de retour actif sur le Mac distant', source)
+
+    def test_remote_simulator_accepts_bidirectional_rtp_endpoints_with_the_same_name(self):
+        dashboard = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        engine = (TOOLS / "CLYamahaConsoleSimulator.m").read_text(encoding="utf-8")
+        refresh = dashboard.split('- (void)refreshEndpoints', 1)[1].split('- (NSString *)toolPath:', 1)[0]
+        endpoint_changed = dashboard.split('- (void)simulatorEndpointChanged:', 1)[1].split(
+            '- (void)simulatorInputEndpointChanged:', 1
+        )[0]
+        input_changed = dashboard.split('- (void)simulatorInputEndpointChanged:', 1)[1].split(
+            '- (NSTask *)launchSimulatorDevice:', 1
+        )[0]
+        transport = dashboard.split('- (BOOL)simulatorTransport:', 1)[1].split(
+            '- (void)startSimulatorDevice:', 1
+        )[0]
+        self.assertIn('Endpoint RTP local introuvable', engine)
+        self.assertIn('networkDestination = findEndpoint(NO, endpointSearchName)', engine)
+        self.assertIn('networkSource = findEndpoint(YES, inputEndpointName)', engine)
+        self.assertNotIn('caseInsensitiveCompare:endpointSearchName', engine)
+        self.assertNotIn('Boucle MIDI refusée', engine)
+        self.assertIn('[sources containsObject:savedInput] ? savedInput : @"Aucune"', refresh)
+        self.assertNotIn('isEqualToString:endpoint', endpoint_changed)
+        self.assertNotIn('isEqualToString:output', input_changed)
+        self.assertNotIn('isEqualToString:requiredEndpoint', transport)
+
+    def test_manual_program_change_preserves_channels_and_scene_offset(self):
+        tester = (TOOLS / "CLMIDIRoundTripTester.m").read_text(encoding="utf-8")
+        dashboard = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        self.assertIn('expectedProgram = (UInt8)(sceneNumber - 1)', tester)
+        self.assertIn('0xC0 | (expectedChannel - 1)', tester)
+        self.assertIn('UInt8 message[2]', tester)
+        self.assertIn('sendCL5.tag = 1', dashboard)
+        self.assertIn('sendQL1.tag = 2', dashboard)
+        engine = (TOOLS / "CLYamahaConsoleSimulator.m").read_text(encoding="utf-8")
+        self.assertIn('(UInt8)(0xC0 | (acceptedChannel - 1))', engine)
+        self.assertIn('(UInt8)(manualScene - 1)', engine)
 
     def test_dashboard_never_falls_back_to_ableton_for_expected_console_title(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
