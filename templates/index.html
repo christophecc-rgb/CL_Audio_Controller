@@ -614,9 +614,8 @@
     </nav>
 
     <section class="midi-returns" aria-label="Retours MIDI consoles">
-      <div class="midi-title-mode">Source titres consoles : Fichiers Yamaha CL5 / QL1</div>
-      <div class="midi-return" id="webCl5Return"><strong id="webCl5Program">CL5 · scène —</strong><span class="midi-return-title" id="webCl5Title">Titre en attente</span><span class="midi-return-state" id="webCl5State">En attente du premier retour</span></div>
-      <div class="midi-return" id="webQl1Return"><strong id="webQl1Program">QL1 · scène —</strong><span class="midi-return-title" id="webQl1Title">Titre en attente</span><span class="midi-return-state" id="webQl1State">En attente du premier retour</span></div>
+      <div class="midi-return" id="webCl5Return"><div class="midi-return-heading"><span class="midi-return-console">CL5</span><strong id="webCl5Program">— &nbsp; Titre en attente</strong></div><span class="midi-return-state" id="webCl5State">En attente du premier retour</span><span class="midi-return-title" id="webCl5Title">Attendu — · Reçu —</span></div>
+      <div class="midi-return" id="webQl1Return"><div class="midi-return-heading"><span class="midi-return-console">QL1</span><strong id="webQl1Program">— &nbsp; Titre en attente</strong></div><span class="midi-return-state" id="webQl1State">En attente du premier retour</span><span class="midi-return-title" id="webQl1Title">Attendu — · Reçu —</span></div>
     </section>
 
     <div class="scene-cards">
@@ -652,6 +651,11 @@
       </select>
       <button class="goto-button" id="gotoButton" type="button">ALLER À LA SCÈNE</button>
     </section>
+
+    <details class="advanced-options">
+      <summary>Options avancées</summary>
+      <div class="advanced-options__content">Sources titres consoles : Fichiers Yamaha CL5 / QL1</div>
+    </details>
 
 <!-- Removed temporary test banner -->
   </main>
@@ -1060,10 +1064,18 @@
         card.classList.toggle('ok', status === 'confirmed');
         card.classList.toggle('mismatch', status === 'mismatch');
         card.classList.toggle('remembered', status === 'stale');
-        document.getElementById(programId).textContent = name + ' · ATTENDU · Mémoire ' + (value.expected_scene_memory ?? '—');
-        document.getElementById(titleId).textContent = (value.expected_title || 'Titre non résolu')
-          + ' · REÇU · Mémoire ' + (value.returned_scene_memory ?? '—')
-          + ' · ' + (value.returned_title || 'Titre non résolu');
+        const expectedNumber = value.expected_scene_memory ?? '—';
+        const expectedTitle = value.expected_title || 'Titre non résolu';
+        const returnedNumber = value.returned_scene_memory ?? '—';
+        const returnedTitle = value.returned_title || 'Titre non résolu';
+        const mainNumber = value.returned_scene_memory ?? value.expected_scene_memory ?? '—';
+        const mainTitle = value.returned_scene_memory != null ? returnedTitle : expectedTitle;
+        document.getElementById(programId).textContent = mainNumber + '  ' + mainTitle;
+        document.getElementById(titleId).textContent = 'Attendu ' + expectedNumber + ' ' + expectedTitle
+          + ' · Reçu ' + returnedNumber + ' ' + returnedTitle
+          + ' · Offset ' + Number(value.title_offset || 0).toLocaleString('fr-FR', {signDisplay:'exceptZero'})
+          + ' · lookup ' + (value.expected_title_lookup_memory ?? '—')
+          + '/' + (value.returned_title_lookup_memory ?? '—');
         const validationLabel = status === 'confirmed'
           ? '✓ Confirmé par la console'
           : status === 'mismatch'
@@ -1075,10 +1087,7 @@
           : status === 'waiting'
           ? 'En attente du retour console'
           : 'Programme attendu indisponible';
-        document.getElementById(stateId).textContent = validationLabel
-          + ' · Offset titre ' + Number(value.title_offset || 0).toLocaleString('fr-FR', {signDisplay:'exceptZero'})
-          + ' · lookup attendu ' + (value.expected_title_lookup_memory ?? '—')
-          + ' / reçu ' + (value.returned_title_lookup_memory ?? '—');
+        document.getElementById(stateId).textContent = validationLabel;
       };
       renderConsoleReturn('CL5', midi.cl5, webCl5Return, 'webCl5Program', 'webCl5Title', 'webCl5State');
       renderConsoleReturn('QL1', midi.ql1, webQl1Return, 'webQl1Program', 'webQl1Title', 'webQl1State');

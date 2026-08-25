@@ -431,9 +431,8 @@ body.is-arrangement-paused .card.current {
     <nav class="topnav"><a href="/">Session</a><a href="/ab">A/B</a><a href="/arrangement" class="active">Arrangement</a></nav>
 
     <section class="midi-returns" aria-label="Retours MIDI consoles">
-      <div class="midi-title-mode">Source titres consoles : Fichiers Yamaha CL5 / QL1</div>
-      <div class="midi-return" id="arrCl5Return"><strong id="arrCl5Program">CL5 · scène —</strong><span class="midi-return-title" id="arrCl5Title">Titre en attente</span><span class="midi-return-state" id="arrCl5State">En attente du premier retour</span></div>
-      <div class="midi-return" id="arrQl1Return"><strong id="arrQl1Program">QL1 · scène —</strong><span class="midi-return-title" id="arrQl1Title">Titre en attente</span><span class="midi-return-state" id="arrQl1State">En attente du premier retour</span></div>
+      <div class="midi-return" id="arrCl5Return"><div class="midi-return-heading"><span class="midi-return-console">CL5</span><strong id="arrCl5Program">— &nbsp; Titre en attente</strong></div><span class="midi-return-state" id="arrCl5State">En attente du premier retour</span><span class="midi-return-title" id="arrCl5Title">Attendu — · Reçu —</span></div>
+      <div class="midi-return" id="arrQl1Return"><div class="midi-return-heading"><span class="midi-return-console">QL1</span><strong id="arrQl1Program">— &nbsp; Titre en attente</strong></div><span class="midi-return-state" id="arrQl1State">En attente du premier retour</span><span class="midi-return-title" id="arrQl1Title">Attendu — · Reçu —</span></div>
     </section>
 
     <section class="ltc-display ltc-display--disconnected" aria-live="polite" aria-label="Retour LTC timecode">
@@ -481,6 +480,11 @@ body.is-arrangement-paused .card.current {
 
   </section>
 </div>
+
+<details class="advanced-options">
+  <summary>Options avancées</summary>
+  <div class="advanced-options__content">Sources titres consoles : Fichiers Yamaha CL5 / QL1</div>
+</details>
 
 </main>
 
@@ -780,10 +784,18 @@ body.is-arrangement-paused .card.current {
         card.classList.toggle('ok', status === 'confirmed');
         card.classList.toggle('mismatch', status === 'mismatch');
         card.classList.toggle('remembered', status === 'stale');
-        document.getElementById(programId).textContent = name + ' · ATTENDU · Mémoire ' + (value.expected_scene_memory ?? '—');
-        document.getElementById(titleId).textContent = (value.expected_title || 'Titre non résolu')
-          + ' · REÇU · Mémoire ' + (value.returned_scene_memory ?? '—')
-          + ' · ' + (value.returned_title || 'Titre non résolu');
+        const expectedNumber = value.expected_scene_memory ?? '—';
+        const expectedTitle = value.expected_title || 'Titre non résolu';
+        const returnedNumber = value.returned_scene_memory ?? '—';
+        const returnedTitle = value.returned_title || 'Titre non résolu';
+        const mainNumber = value.returned_scene_memory ?? value.expected_scene_memory ?? '—';
+        const mainTitle = value.returned_scene_memory != null ? returnedTitle : expectedTitle;
+        document.getElementById(programId).textContent = mainNumber + '  ' + mainTitle;
+        document.getElementById(titleId).textContent = 'Attendu ' + expectedNumber + ' ' + expectedTitle
+          + ' · Reçu ' + returnedNumber + ' ' + returnedTitle
+          + ' · Offset ' + Number(value.title_offset || 0).toLocaleString('fr-FR', {signDisplay:'exceptZero'})
+          + ' · lookup ' + (value.expected_title_lookup_memory ?? '—')
+          + '/' + (value.returned_title_lookup_memory ?? '—');
         const validationLabel = status === 'confirmed'
           ? '✓ Confirmé par la console'
           : status === 'mismatch'
@@ -795,10 +807,7 @@ body.is-arrangement-paused .card.current {
           : status === 'waiting'
           ? 'En attente du retour console'
           : 'Programme attendu indisponible';
-        document.getElementById(stateId).textContent = validationLabel
-          + ' · Offset titre ' + Number(value.title_offset || 0).toLocaleString('fr-FR', {signDisplay:'exceptZero'})
-          + ' · lookup attendu ' + (value.expected_title_lookup_memory ?? '—')
-          + ' / reçu ' + (value.returned_title_lookup_memory ?? '—');
+        document.getElementById(stateId).textContent = validationLabel;
       };
       renderConsoleReturn('CL5', midi.cl5, arrCl5Return, 'arrCl5Program', 'arrCl5Title', 'arrCl5State');
       renderConsoleReturn('QL1', midi.ql1, arrQl1Return, 'arrQl1Program', 'arrQl1Title', 'arrQl1State');
