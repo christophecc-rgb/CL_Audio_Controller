@@ -6,6 +6,7 @@ a = Analysis(
     binaries=[],
     datas=[
         ('app.py', '.'),
+        ('console_title_library.py', '.'),
         ('remote_window.py', '.'),
         ('cl_audio_logo.png', '.'),
         ('templates', 'templates'),

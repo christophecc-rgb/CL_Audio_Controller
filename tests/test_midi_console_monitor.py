@@ -79,7 +79,7 @@ class MidiConsoleMonitorTests(unittest.TestCase):
                          "oscformat cl midi-monitor outgoing cl5")
         self.assertEqual(boxes["outgoing-ql1-osc"]["text"],
                          "oscformat cl midi-monitor outgoing ql1")
-        self.assertEqual(boxes["outgoing-udp"]["text"], "udpsend 127.0.0.1 11001")
+        self.assertEqual(boxes["outgoing-udp"]["text"], "udpsend")
         self.assertIn({"source": ["event-gate", 0],
                        "destination": ["outgoing-cl5-osc", 0]}, lines)
         self.assertIn({"source": ["event-gate", 1],
@@ -88,6 +88,32 @@ class MidiConsoleMonitorTests(unittest.TestCase):
                        "destination": ["outgoing-ql1-osc", 0]}, lines)
         self.assertFalse(any(line["destination"][0] == "midi-out" and
                              line["source"][0].startswith("outgoing-") for line in lines))
+
+    def test_outgoing_destination_is_persistent_and_configurable(self):
+        temporary, output = self.build_device()
+        self.addCleanup(temporary.cleanup)
+        patcher = json.loads((output / "CL MIDI Console Monitor.maxpat").read_text())["patcher"]
+        boxes = {item["box"]["id"]: item["box"] for item in patcher["boxes"]}
+        lines = [item["patchline"] for item in patcher["lines"]]
+        self.assertEqual(boxes["destination-host"]["text"], "127.0.0.1")
+        self.assertIn("@initial 127.0.0.1", boxes["destination-host-pattr"]["text"])
+        self.assertIn("@initial 11001", boxes["destination-port-pattr"]["text"])
+        self.assertEqual(boxes["destination-host-message"]["text"], "prepend host")
+        self.assertEqual(boxes["destination-port-message"]["text"], "prepend port")
+        self.assertIn({"source": ["role-defer", 0], "destination": ["destination-host-pattr", 0]}, lines)
+        self.assertIn({"source": ["role-defer", 0], "destination": ["destination-port-pattr", 0]}, lines)
+        self.assertIn({"source": ["destination-host-message", 0], "destination": ["outgoing-udp", 0]}, lines)
+        self.assertIn({"source": ["destination-port-message", 0], "destination": ["outgoing-udp", 0]}, lines)
+
+    def test_outgoing_osc_preserves_raw_midi_program_range(self):
+        temporary, output = self.build_device()
+        self.addCleanup(temporary.cleanup)
+        patcher = json.loads((output / "CL MIDI Console Monitor.maxpat").read_text())["patcher"]
+        lines = [item["patchline"] for item in patcher["lines"]]
+        for outlet, formatter in ((0, "outgoing-cl5-osc"), (1, "outgoing-ql1-osc"), (2, "outgoing-ql1-osc")):
+            self.assertIn({"source": ["event-gate", outlet], "destination": [formatter, 0]}, lines)
+        self.assertFalse(any(line["destination"][0].startswith("outgoing-") and
+                             line["source"][0].startswith("status-plus-") for line in lines))
 
     def test_command_and_return_roles_feed_two_physical_console_rows(self):
         temporary, output = self.build_device()

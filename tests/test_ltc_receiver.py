@@ -60,6 +60,79 @@ class LTCReceiverTests(unittest.TestCase):
         self.target = SimpleNamespace(mode="remote", host="192.168.1.22")
         self.assertEqual(self.send(b"tc,s01:02:03:04", "192.168.1.22"), 1)
         self.assertEqual(self.send(b"tc,s05:06:07:08", "192.168.1.23"), 0)
+        self.assertEqual(self.diagnostics["ltc_last_rejection_reason"], "source-not-allowed")
+
+    def test_remote_hostname_resolves_to_source_and_is_cached(self):
+        self.target = SimpleNamespace(mode="remote", host="MacBook-Pro.local")
+        resolver = mock.Mock(return_value=[
+            (socket.AF_INET, socket.SOCK_DGRAM, 17, "", ("192.168.1.108", 0)),
+        ])
+        self.receiver._hostname_resolver = resolver
+
+        self.assertEqual(self.send(b"tc,s01:02:03:04", "192.168.1.108"), 1)
+        self.assertEqual(self.send(b"tc,s01:02:03:05", "192.168.1.108"), 1)
+        resolver.assert_called_once_with(
+            "MacBook-Pro.local", None, socket.AF_INET, socket.SOCK_DGRAM
+        )
+
+    def test_remote_hostname_rejects_different_source_after_resolution(self):
+        self.target = SimpleNamespace(mode="remote", host="MacBook-Pro.local")
+        self.receiver._hostname_resolver = mock.Mock(return_value=[
+            (socket.AF_INET, socket.SOCK_DGRAM, 17, "", ("192.168.1.108", 0)),
+        ])
+
+        self.assertEqual(self.send(b"tc,s01:02:03:04", "192.168.1.109"), 0)
+        self.assertEqual(
+            self.diagnostics["ltc_last_rejection_reason"], "resolved-source-mismatch"
+        )
+
+    def test_remote_hostname_accepts_any_returned_ipv4_address(self):
+        self.target = SimpleNamespace(mode="remote", host="MacBook-Pro.local")
+        self.receiver._hostname_resolver = mock.Mock(return_value=[
+            (socket.AF_INET, socket.SOCK_DGRAM, 17, "", ("192.168.1.107", 0)),
+            (socket.AF_INET, socket.SOCK_DGRAM, 17, "", ("192.168.1.108", 0)),
+        ])
+
+        self.assertEqual(self.send(b"tc,s01:02:03:04", "192.168.1.108"), 1)
+
+    def test_remote_hostname_resolution_failure_rejects_without_exception(self):
+        self.target = SimpleNamespace(mode="remote", host="missing.local")
+        self.receiver._hostname_resolver = mock.Mock(
+            side_effect=socket.gaierror("not found")
+        )
+
+        self.assertEqual(self.send(b"tc,s01:02:03:04", "192.168.1.108"), 0)
+        self.assertEqual(
+            self.diagnostics["ltc_last_rejection_reason"], "hostname-resolution-failed"
+        )
+
+    def test_hostname_cache_is_invalidated_when_target_changes(self):
+        self.target = SimpleNamespace(mode="remote", host="first.local")
+        resolver = mock.Mock(side_effect=[
+            [(socket.AF_INET, socket.SOCK_DGRAM, 17, "", ("192.168.1.107", 0))],
+            [(socket.AF_INET, socket.SOCK_DGRAM, 17, "", ("192.168.1.108", 0))],
+        ])
+        self.receiver._hostname_resolver = resolver
+
+        self.assertEqual(self.send(b"tc,s01:02:03:04", "192.168.1.107"), 1)
+        self.target.host = "second.local"
+        self.assertEqual(self.send(b"tc,s01:02:03:05", "192.168.1.108"), 1)
+        self.assertEqual(resolver.call_count, 2)
+
+    def test_hostname_cache_expires(self):
+        self.target = SimpleNamespace(mode="remote", host="MacBook-Pro.local")
+        clock = mock.Mock(side_effect=[100.0, 129.0, 130.0])
+        resolver = mock.Mock(side_effect=[
+            [(socket.AF_INET, socket.SOCK_DGRAM, 17, "", ("192.168.1.108", 0))],
+            [(socket.AF_INET, socket.SOCK_DGRAM, 17, "", ("192.168.1.109", 0))],
+        ])
+        self.receiver._cache_clock = clock
+        self.receiver._hostname_resolver = resolver
+
+        self.assertEqual(self.send(b"tc,s01:02:03:04", "192.168.1.108"), 1)
+        self.assertEqual(self.send(b"tc,s01:02:03:05", "192.168.1.108"), 1)
+        self.assertEqual(self.send(b"tc,s01:02:03:06", "192.168.1.109"), 1)
+        self.assertEqual(resolver.call_count, 2)
 
     def test_target_change_and_return_to_local_take_effect_immediately(self):
         self.target = SimpleNamespace(mode="remote", host="192.168.1.22")

@@ -21,6 +21,7 @@ import multiprocessing
 import time
 import uuid
 import secrets
+import subprocess
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Tuple
 from pathlib import Path
@@ -29,6 +30,7 @@ from flask import Flask, jsonify, render_template, request, send_from_directory
 from build_identity import BUILD_ID, IDENTITY_PROTOCOL_VERSION, SERVICE_NAME
 from ableton_targets import DEFAULT_CONFIG_PATH, load_target
 from server_ownership import OwnershipRecordError, write_record
+from console_title_library import ConsoleLibraryStore, LibraryImportError, MAX_FILE_SIZE, parse_import
 
 multiprocessing.freeze_support()
 
@@ -121,13 +123,46 @@ MIDI_MONITOR_SCENE_PORT = 9002
 MIDI_OUTGOING_OSC_PREFIX = "/cl/midi-monitor/outgoing/"
 MIDI_CONSOLE_STATE_PATH = Path("/private/tmp/CL_MIDI_Console_State.json")
 MIDI_CONSOLE_TITLE_OVERRIDES: Dict[str, Tuple[float, str]] = {}
-CONSOLE_SCENE_FILE_PATHS = {
-    "cl5": Path(os.environ.get("CL5_SCENE_FILE", str(Path.home() / "Desktop" / "CL5.CLF"))),
-    "ql1": Path(os.environ.get("QL1_SCENE_FILE", str(Path.home() / "Desktop" / "ql1.CLF"))),
-}
+CONSOLE_FILES_ROOT = DEFAULT_CONFIG_PATH.parent / "Console Files"
+CONSOLE_LIBRARY_STORE = ConsoleLibraryStore(CONSOLE_FILES_ROOT)
+CONSOLE_TITLE_PREFERENCES_PATH = DEFAULT_CONFIG_PATH.with_name("console-title-preferences.json")
 CONSOLE_TITLE_OFFSET_MIN = -5
 CONSOLE_TITLE_OFFSET_MAX = 5
 CONSOLE_TITLE_OFFSETS_PATH = DEFAULT_CONFIG_PATH.with_name("console-title-offsets.json")
+MIDI_RETURN_VISUAL_TIMEOUT_SECONDS = 2.0
+
+
+def console_visual_state(validation_status: str, expected_activated_at: Any,
+                         now: Optional[float] = None) -> str:
+    """Traduit l'état MIDI canonique en état visuel, sans refaire sa validation."""
+    status = str(validation_status or "unavailable")
+    if status in ("waiting", "stale", "local_fallback"):
+        try:
+            age = max(0.0, float(now if now is not None else time.time()) - float(expected_activated_at))
+        except (TypeError, ValueError):
+            age = 0.0
+        return "timeout" if age >= MIDI_RETURN_VISUAL_TIMEOUT_SECONDS else "waiting"
+    if status in ("confirmed", "mismatch"):
+        return status
+    return "idle"
+
+
+def load_console_title_mode(path: Path = CONSOLE_TITLE_PREFERENCES_PATH) -> str:
+    try:
+        mode = str(json.loads(path.read_text(encoding="utf-8")).get("mode") or "")
+    except (OSError, ValueError, TypeError):
+        mode = "imported_library"
+    return mode if mode in ("ableton", "imported_library") else "imported_library"
+
+
+def save_console_title_mode(mode: str, path: Path = CONSOLE_TITLE_PREFERENCES_PATH) -> None:
+    if mode not in ("ableton", "imported_library"):
+        raise ValueError("mode de titres invalide")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    temporary.write_text(json.dumps({"schema_version": 1, "mode": mode}, indent=2) + "\n", encoding="utf-8")
+    os.chmod(temporary, 0o600)
+    temporary.replace(path)
 
 
 def clamp_console_title_offset(value: Any) -> int:
@@ -495,10 +530,7 @@ def load_console_scene_library(path: Path, expected_family: str) -> Dict[int, st
 
 
 def load_console_scene_libraries() -> Dict[str, Dict[int, str]]:
-    return {
-        "cl5": load_console_scene_library(CONSOLE_SCENE_FILE_PATHS["cl5"], "CL"),
-        "ql1": load_console_scene_library(CONSOLE_SCENE_FILE_PATHS["ql1"], "QL"),
-    }
+    return {name: CONSOLE_LIBRARY_STORE.load(name).get("library", {}) for name in ("cl5", "ql1")}
 
 
 class ConsoleSceneResolution(dict):
@@ -530,7 +562,22 @@ def resolve_console_scene_title(
     ).strip()
     return ConsoleSceneResolution({"midi_program": raw_program, "scene_memory": scene_memory, "program": scene_memory,
             "title_lookup_memory": lookup_memory, "title": title or "Titre non résolu",
-            "title_source": "console_clf" if title else "unresolved", "title_offset": offset})
+            "title_source": "imported_library" if title else "unresolved", "title_offset": offset})
+
+
+def resolve_display_title(mode: str, imported: Dict[str, Any], ableton_title: Any,
+                          console: str) -> Dict[str, Any]:
+    """Choisit explicitement une source sans repli implicite entre les deux modes."""
+    if mode == "ableton":
+        title = str(ableton_title or "").strip()
+        result = dict(imported)
+        result.update(title=title or "Titre Ableton non résolu",
+                      title_source="ableton" if title else "unresolved")
+        return ConsoleSceneResolution(result)
+    result = dict(imported)
+    if result.get("title_source") == "unresolved":
+        result["title"] = f"Titre non résolu dans la bibliothèque {str(console).upper()}"
+    return ConsoleSceneResolution(result)
 
 
 resolve_console_return_title = resolve_console_scene_title
@@ -672,7 +719,7 @@ state: Dict[str, Any] = {
     "ableton_midi_output": {"cl5": None, "ql1": None},
     "expected_scene_signature": None,
     "expected_activated_at": None,
-    "console_title_mode": "console_file",
+    "console_title_mode": load_console_title_mode(),
     "console_title_offsets": load_console_title_offsets(),
     "console_scene_libraries": load_console_scene_libraries(),
     "is_paused": False,
@@ -915,17 +962,19 @@ def state_snapshot_locked() -> Dict[str, Any]:
     snapshot["ableton_target"] = ableton_target.to_dict()
     snapshot["osc_transport"] = ableton_transport.diagnostics()
     snapshot["console_scene_map"] = state.get("console_scene_map") or {"cl5": {}, "ql1": {}}
-    snapshot["console_title_mode"] = "console_file"
-    snapshot["console_title_source"] = "Fichiers Yamaha CL5 / QL1"
+    title_mode = str(state.get("console_title_mode") or "imported_library")
+    snapshot["console_title_mode"] = title_mode
+    snapshot["console_title_source"] = (
+        "Titres Ableton" if title_mode == "ableton" else "Bibliothèque de titres importée"
+    )
     snapshot["console_title_offsets"] = dict(state.get("console_title_offsets") or {"cl5": 0, "ql1": 0})
     snapshot["console_title_offset_range"] = {"min": CONSOLE_TITLE_OFFSET_MIN, "max": CONSOLE_TITLE_OFFSET_MAX}
-    snapshot["console_scene_library_status"] = {
-        name: {
-            "path": str(CONSOLE_SCENE_FILE_PATHS[name]),
-            "scene_count": len((state.get("console_scene_libraries") or {}).get(name) or {}),
+    snapshot["console_scene_library_status"] = {}
+    for name, metadata in CONSOLE_LIBRARY_STORE.status().items():
+        snapshot["console_scene_library_status"][name] = {
+            key: value for key, value in metadata.items() if key != "library"
         }
-        for name in ("cl5", "ql1")
-    }
+        snapshot["console_scene_library_status"][name]["scene_count"] = len(metadata.get("library") or {})
     active_scene = snapshot.get("playing_scene")
     try:
         active_scene = int(active_scene)
@@ -990,6 +1039,10 @@ def state_snapshot_locked() -> Dict[str, Any]:
                 == "Gestionnaire IAC Bus 1"
                 and int(midi_console.get("expected_monitor_status", -1)) == 0
             )
+            # Vérité canonique EXPECTED :
+            # uniquement le Program Change réellement observé sur l'IAC.
+            # Les intentions M4L et noms de clips Ableton ne doivent jamais
+            # se faire passer pour un Program Change effectivement émis.
             if (
                 native_iac_monitor_ready
                 and native_iac_program is not None
@@ -1000,20 +1053,9 @@ def state_snapshot_locked() -> Dict[str, Any]:
                 console_expected_activated_at = float(
                     console_state.get("expected_activated_at") or expected_activated_at
                 )
-            elif outgoing_intent.get("midi_program") is not None:
-                expected_midi_program = int(outgoing_intent["midi_program"])
-                expected_program_source = "ableton_m4l_fallback"
-                console_expected_activated_at = float(
-                    outgoing_intent.get("activated_at") or expected_activated_at
-                )
             else:
-                # Compatibilité explicitement dégradée tant que le moniteur
-                # transparent n'est pas présent sur cette piste Live.
-                expected_midi_program = expected.get("midi_program") if expected else None
-                expected_program_source = (
-                    "degraded_ableton_clip_name"
-                    if expected_midi_program is not None else "unavailable"
-                )
+                expected_midi_program = None
+                expected_program_source = "unavailable"
                 console_expected_activated_at = expected_activated_at
             expected_program = (
                 int(expected_midi_program) + 1
@@ -1025,6 +1067,19 @@ def state_snapshot_locked() -> Dict[str, Any]:
             )
             returned_resolution = resolve_console_scene_title(
                 state.get("console_scene_libraries") or {}, console_name, console_midi_program, title_offset,
+            )
+            expected_resolution = resolve_display_title(
+                title_mode, expected_resolution, (expected or {}).get("title") or active_title, console_name,
+            )
+            returned_resolution = resolve_display_title(
+                title_mode, returned_resolution, monitor_title or (expected or {}).get("title") or active_title,
+                console_name,
+            )
+            library_info = snapshot["console_scene_library_status"].get(console_name, {})
+            title_source_detail = (
+                "Ableton" if title_mode == "ableton" else
+                " · ".join(filter(None, [str(library_info.get("source_format") or "Bibliothèque importée"),
+                                          str(library_info.get("source_name") or "")]))
             )
             return_after_intent = bool(
                 return_recent and received_at >= console_expected_activated_at
@@ -1055,6 +1110,7 @@ def state_snapshot_locked() -> Dict[str, Any]:
             console_state["expected_title"] = expected_resolution["title"]
             console_state["expected_program_source"] = expected_program_source
             console_state["expected_title_source"] = expected_resolution["title_source"]
+            console_state["expected_title_source_detail"] = title_source_detail
             console_state["expected_title_lookup_memory"] = expected_resolution["title_lookup_memory"]
             console_state["title_offset"] = expected_resolution["title_offset"]
             console_state["expected_scene_index"] = active_scene if active_scene >= 0 else None
@@ -1080,6 +1136,7 @@ def state_snapshot_locked() -> Dict[str, Any]:
                 ("physical_midi" if console_midi_program is not None else "unavailable")
             )
             console_state["returned_title_source"] = returned_resolution["title_source"]
+            console_state["returned_title_source_detail"] = title_source_detail
             console_state["returned_at"] = received_at or None
             console_state["last_return_age_seconds"] = (
                 max(0.0, now - received_at) if received_at else None
@@ -1095,6 +1152,9 @@ def state_snapshot_locked() -> Dict[str, Any]:
                 else "mismatch" if mismatched
                 else "local_fallback" if console_return_mode == "local_fallback"
                 else "waiting"
+            )
+            console_state["visual_state"] = console_visual_state(
+                console_state["validation_status"], console_expected_activated_at, now,
             )
             console_state["title_source"] = returned_resolution["title_source"]
             console_state["ableton_title"] = active_title
@@ -1132,16 +1192,12 @@ def state_snapshot_locked() -> Dict[str, Any]:
             outgoing_intent = dict(
                 (state.get("ableton_midi_output") or {}).get(console_name) or {}
             )
-            expected_midi_program = outgoing_intent.get("midi_program")
-            source = "ableton_m4l_fallback"
-            activated_at = outgoing_intent.get("activated_at")
-            if expected_midi_program is None:
-                expected_midi_program = (expected or {}).get("midi_program")
-                source = (
-                    "degraded_ableton_clip_name"
-                    if expected_midi_program is not None else "unavailable"
-                )
-                activated_at = expected_activated_at
+            # Si l'état du moniteur MIDI natif est indisponible,
+            # aucun Program Change n'est déclaré "attendu".
+            # On refuse tout fallback calculé depuis Ableton/M4L.
+            expected_midi_program = None
+            source = "unavailable"
+            activated_at = expected_activated_at
             expected_program = (
                 int(expected_midi_program) + 1
                 if expected_midi_program is not None else None
@@ -1151,6 +1207,13 @@ def state_snapshot_locked() -> Dict[str, Any]:
                 state.get("console_scene_libraries") or {}, console_name,
                 expected_midi_program, title_offset,
             )
+            expected_resolution = resolve_display_title(
+                title_mode, expected_resolution, (expected or {}).get("title") or active_title, console_name,
+            )
+            library_info = snapshot["console_scene_library_status"].get(console_name, {})
+            title_source_detail = ("Ableton" if title_mode == "ableton" else
+                " · ".join(filter(None, [str(library_info.get("source_format") or "Bibliothèque importée"),
+                                          str(library_info.get("source_name") or "")])))
             fallback_console[console_name] = {
                 "program": expected_program,
                 "midi_program": expected_midi_program,
@@ -1167,11 +1230,14 @@ def state_snapshot_locked() -> Dict[str, Any]:
                 "title": str((expected or {}).get("title") or active_title),
                 "expected_program_source": source,
                 "expected_title_source": expected_resolution["title_source"],
+                "expected_title_source_detail": title_source_detail,
                 "returned_program_source": "unavailable",
                 "returned_midi_program": None,
                 "returned_program": None,
                 "returned_title_source": "unresolved",
-                "returned_title": "Titre non résolu",
+                "returned_title_source_detail": title_source_detail,
+                "returned_title": ("Titre Ableton non résolu" if title_mode == "ableton"
+                                   else f"Titre non résolu dans la bibliothèque {console_name.upper()}"),
                 "returned_title_lookup_memory": None,
                 "returned_scene_memory": None,
                 "returned_at": None,
@@ -1180,7 +1246,8 @@ def state_snapshot_locked() -> Dict[str, Any]:
                 "expected_generation": int(snapshot.get("set_generation", 0)),
                 "expected_activated_at": activated_at,
                 "display_source": "ableton_expected",
-                "validation_status": "local_fallback" if expected_midi_program is not None else "unavailable",
+                "validation_status": "unavailable",
+                "visual_state": "idle",
                 "confirmed": False,
                 "mismatch": False,
                 "matched": False,
@@ -1285,7 +1352,7 @@ def generation_is_current(expected_generation: int) -> bool:
         return int(state.get("set_generation", 0)) == int(expected_generation)
 
 
-def osc_reply(address, *args):
+def osc_reply(address, *args, source_host=None):
     if address.startswith(MIDI_OUTGOING_OSC_PREFIX):
         console_name = address[len(MIDI_OUTGOING_OSC_PREFIX):].strip().lower()
         if args and record_ableton_midi_output(console_name, args[0]):
@@ -1293,6 +1360,7 @@ def osc_reply(address, *args):
                 "ableton_midi_output_received",
                 console=console_name,
                 midi_program=int(args[0]),
+                source_host=str(source_host or "unknown"),
             )
         return
     if address == "/live/startup":
@@ -3034,7 +3102,7 @@ def status():
 
 @app.route("/console-scene-title")
 def console_scene_title():
-    """Lookup CLF canonique pour les consommateurs natifs, sans relire leur état."""
+    """Lookup canonique pour les consommateurs natifs, sans parseur local."""
     console = str(request.args.get("console") or "").strip().lower()
     raw_value = request.args.get("midi_program")
     if console not in ("cl5", "ql1"):
@@ -3049,11 +3117,62 @@ def console_scene_title():
         libraries = state.get("console_scene_libraries") or {}
         offset = (state.get("console_title_offsets") or {}).get(console, 0)
         resolved = resolve_console_scene_title(libraries, console, midi_program, offset)
+        mode = str(state.get("console_title_mode") or "imported_library")
+        ableton = expected_console_scene_for_index(
+            state.get("console_scene_map") or {}, console, state.get("playing_scene", -1)
+        ) or {}
+        resolved = resolve_display_title(mode, resolved, ableton.get("title") or state.get("playing_scene_name"), console)
     return jsonify({
-        "ok": resolved["title_source"] == "console_clf",
+        "ok": resolved["title_source"] in ("ableton", "imported_library"),
         "console": console,
+        "mode": mode,
         **resolved,
     })
+
+
+def _local_request() -> bool:
+    return str(request.remote_addr or "") in ("127.0.0.1", "::1")
+
+
+@app.route("/console-library/import/<console>", methods=["POST"])
+def import_console_library(console: str):
+    """Import local uniquement; le client ne choisit jamais le chemin de destination."""
+    if not _local_request():
+        return jsonify(ok=False, message="Import réservé au Mac serveur"), 403
+    if console.lower() not in ("cl5", "ql1"):
+        return jsonify(ok=False, message="Console invalide"), 400
+    upload = request.files.get("file")
+    if upload is None:
+        return jsonify(ok=False, message="Fichier absent"), 400
+    try:
+        payload = upload.stream.read(MAX_FILE_SIZE + 1)
+        parsed = parse_import(payload, upload.filename or "", console.lower())
+        preview = parsed.canonical_for(console.lower())
+        if request.form.get("preview") == "1":
+            return jsonify(ok=True, preview={**preview, "entry_count": len(preview["entries"]),
+                                             "entries": preview["entries"][:5]})
+        metadata = CONSOLE_LIBRARY_STORE.install(parsed, console.lower())
+        with lock:
+            state["console_scene_libraries"] = load_console_scene_libraries()
+            state["message"] = f"Bibliothèque {console.upper()} importée ({parsed.source_format})"
+            response_state = state_snapshot_locked()
+        return jsonify(ok=True, message=state["message"], library={k: v for k, v in metadata.items() if k != "library"}, state=response_state)
+    except (LibraryImportError, OSError, ValueError) as exc:
+        return jsonify(ok=False, message=str(exc)), 400
+
+
+@app.route("/console-library/reveal/<console>", methods=["POST"])
+def reveal_console_library(console: str):
+    if not _local_request() or console.lower() not in ("cl5", "ql1"):
+        return jsonify(ok=False, message="Action non autorisée"), 403
+    target = CONSOLE_LIBRARY_STORE.canonical_path(console.lower())
+    if not target.exists():
+        return jsonify(ok=False, message="Aucune bibliothèque installée"), 404
+    try:
+        subprocess.Popen(["open", "-R", str(target)], close_fds=True)
+    except OSError as exc:
+        return jsonify(ok=False, message=f"Finder indisponible: {exc}"), 500
+    return jsonify(ok=True)
 
 
 @app.route("/transport/test", methods=["POST"])
@@ -3675,14 +3794,15 @@ def action():
         selected = int(state.get("selected_scene", 0))
 
     if action_name == "console_title_mode":
-        requested_mode = str(data.get("mode") or "console_file").strip()
-        if requested_mode != "console_file":
-            return jsonify({"ok": False, "message": "Les titres consoles utilisent les fichiers Yamaha"}), 400
-        libraries = load_console_scene_libraries()
+        requested_mode = str(data.get("mode") or "imported_library").strip()
+        if requested_mode not in ("ableton", "imported_library"):
+            return jsonify({"ok": False, "message": "Mode de titres invalide"}), 400
+        save_console_title_mode(requested_mode)
         with lock:
-            state["console_title_mode"] = "console_file"
-            state["console_scene_libraries"] = libraries
-            state["message"] = "Titres issus des fichiers Yamaha CL5 / QL1"
+            state["console_title_mode"] = requested_mode
+            state["console_scene_libraries"] = load_console_scene_libraries()
+            state["message"] = ("Titres Ableton actifs" if requested_mode == "ableton"
+                                else "Bibliothèque de titres importée active")
             response_state = state_snapshot_locked()
         return jsonify({"ok": True, "message": state["message"], "state": response_state})
     if action_name == "console_title_offset":
@@ -4050,6 +4170,11 @@ if __name__ == "__main__":
         ensure_runtime_identity()
     except OwnershipRecordError as exc:
         raise SystemExit(f"Propriété serveur impossible à sécuriser : {exc}") from exc
+    migrated = CONSOLE_LIBRARY_STORE.migrate_legacy(Path.home() / "Desktop")
+    if migrated:
+        with lock:
+            state["console_scene_libraries"] = load_console_scene_libraries()
+            state["message"] = "Bibliothèques historiques migrées sans supprimer les originaux"
     threading.Thread(target=start_osc_server, daemon=True).start()
     threading.Thread(target=start_ltc_udp_listener, daemon=True).start()
     threading.Thread(target=background_refresh, daemon=True).start()

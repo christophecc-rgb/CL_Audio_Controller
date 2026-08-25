@@ -301,10 +301,196 @@
           "patching_rect": [
             525.0,
             810.0,
-            160.0,
+            70.0,
             22.0
           ],
-          "text": "udpsend 127.0.0.1 11001"
+          "text": "udpsend"
+        }
+      },
+      {
+        "box": {
+          "id": "destination-host",
+          "maxclass": "textedit",
+          "numinlets": 1,
+          "numoutlets": 1,
+          "patching_rect": [
+            120.0,
+            132.0,
+            235.0,
+            22.0
+          ],
+          "presentation": 1,
+          "presentation_rect": [
+            120.0,
+            128.0,
+            235.0,
+            22.0
+          ],
+          "varname": "osc_destination_host",
+          "text": "127.0.0.1",
+          "rounded": 5
+        }
+      },
+      {
+        "box": {
+          "id": "destination-host-label",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            14.0,
+            134.0,
+            102.0,
+            18.0
+          ],
+          "presentation": 1,
+          "presentation_rect": [
+            14.0,
+            130.0,
+            102.0,
+            18.0
+          ],
+          "text": "SERVEUR OSC",
+          "fontsize": 8.0,
+          "textcolor": [
+            0.58,
+            0.64,
+            0.72,
+            1.0
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "destination-host-route",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 1,
+          "patching_rect": [
+            605.0,
+            810.0,
+            62.0,
+            22.0
+          ],
+          "text": "route text"
+        }
+      },
+      {
+        "box": {
+          "id": "destination-host-message",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 1,
+          "patching_rect": [
+            675.0,
+            810.0,
+            82.0,
+            22.0
+          ],
+          "text": "prepend host"
+        }
+      },
+      {
+        "box": {
+          "id": "destination-host-pattr",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 1,
+          "patching_rect": [
+            605.0,
+            845.0,
+            390.0,
+            22.0
+          ],
+          "text": "pattr osc_destination_host_state @bindto osc_destination_host @initial 127.0.0.1 @type symbol @parameter_enable 1"
+        }
+      },
+      {
+        "box": {
+          "id": "destination-port",
+          "maxclass": "live.numbox",
+          "numinlets": 1,
+          "numoutlets": 1,
+          "patching_rect": [
+            420.0,
+            132.0,
+            70.0,
+            22.0
+          ],
+          "presentation": 1,
+          "presentation_rect": [
+            420.0,
+            128.0,
+            70.0,
+            22.0
+          ],
+          "varname": "osc_destination_port",
+          "parameter_enable": 1,
+          "parameter_mmin": 1.0,
+          "parameter_mmax": 65535.0,
+          "parameter_initial": [
+            11001.0
+          ],
+          "parameter_initial_enable": 1
+        }
+      },
+      {
+        "box": {
+          "id": "destination-port-label",
+          "maxclass": "comment",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            365.0,
+            134.0,
+            50.0,
+            18.0
+          ],
+          "presentation": 1,
+          "presentation_rect": [
+            365.0,
+            130.0,
+            50.0,
+            18.0
+          ],
+          "text": "PORT",
+          "fontsize": 8.0,
+          "textcolor": [
+            0.58,
+            0.64,
+            0.72,
+            1.0
+          ]
+        }
+      },
+      {
+        "box": {
+          "id": "destination-port-message",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 1,
+          "patching_rect": [
+            765.0,
+            810.0,
+            78.0,
+            22.0
+          ],
+          "text": "prepend port"
+        }
+      },
+      {
+        "box": {
+          "id": "destination-port-pattr",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 1,
+          "patching_rect": [
+            605.0,
+            880.0,
+            350.0,
+            22.0
+          ],
+          "text": "pattr osc_destination_port_state @bindto osc_destination_port @initial 11001 @type int @parameter_enable 1"
         }
       },
       {
@@ -2290,6 +2476,114 @@
           ],
           "destination": [
             "outgoing-udp",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "destination-host",
+            0
+          ],
+          "destination": [
+            "destination-host-route",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "destination-host-route",
+            0
+          ],
+          "destination": [
+            "destination-host-message",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "destination-host-message",
+            0
+          ],
+          "destination": [
+            "outgoing-udp",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "destination-host-pattr",
+            0
+          ],
+          "destination": [
+            "destination-host-message",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "destination-port",
+            0
+          ],
+          "destination": [
+            "destination-port-message",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "destination-port-message",
+            0
+          ],
+          "destination": [
+            "outgoing-udp",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "destination-port-pattr",
+            0
+          ],
+          "destination": [
+            "destination-port-message",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "role-defer",
+            0
+          ],
+          "destination": [
+            "destination-host-pattr",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "role-defer",
+            0
+          ],
+          "destination": [
+            "destination-port-pattr",
             0
           ]
         }

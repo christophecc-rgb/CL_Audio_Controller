@@ -43,8 +43,12 @@ sur UDP 11001 reste un fallback et ne peut pas écraser une intention IAC.
 Le moniteur se place en dernier effet MIDI sur la piste de commande CL5 ou
 QL1. `midiin` reste relié directement à `midiout` : les octets MIDI traversent
 le périphérique sans transformation. La sortie Program Change de `midiparse`
-est copiée en OSC local vers `/cl/midi-monitor/outgoing/cl5` ou
-`/cl/midi-monitor/outgoing/ql1` sur UDP 11001 selon le rôle choisi.
+est copiée en OSC vers `/cl/midi-monitor/outgoing/cl5` ou
+`/cl/midi-monitor/outgoing/ql1` selon le rôle choisi. La destination persistante
+reste `127.0.0.1:11001` en mode local. Sur le Mac Ableton distant, renseigner
+dans le périphérique l'hôte du Mac serveur et le `osc_reply_port` du profil
+(11001 par défaut). La destination est réappliquée au chargement et dès qu'un
+champ est modifié; UDP ne nécessite pas de connexion MIDI ou IAC.
 
 Cette branche OSC est une observation passive : elle ne rejoint jamais
 `midiout`, n'envoie aucun second message aux consoles et ne peut donc créer ni

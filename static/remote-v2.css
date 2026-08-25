@@ -337,65 +337,6 @@ select {
 .v2-workspace > .wrap { padding: 10px !important; gap: 8px !important; }
 .v2-workspace { place-items: start center; }
 
-.midi-returns { min-height: 0 !important; gap: 7px !important; }
-.midi-return {
-  position: relative;
-  min-width: 0 !important;
-  min-height: 104px !important;
-  padding: 9px 10px 8px !important;
-  border-radius: 11px !important;
-  justify-content: flex-start !important;
-  overflow: hidden;
-}
-.midi-return-heading { display: grid; min-width: 0; }
-.midi-return-console {
-  width: max-content;
-  color: var(--v2-muted);
-  font-size: 16px;
-  font-weight: 850;
-  line-height: 1;
-  letter-spacing: .08em;
-}
-.midi-return strong {
-  display: block;
-  min-width: 0;
-  margin-top: 9px;
-  color: #b9cee2 !important;
-  font-size: clamp(17px, 2.2vw, 22px) !important;
-  font-weight: 780 !important;
-  line-height: 1.08 !important;
-  letter-spacing: -.01em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.midi-return-state {
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  max-width: calc(100% - 64px);
-  margin: 0 !important;
-  font-size: 8px !important;
-  font-weight: 750;
-  line-height: 1;
-  letter-spacing: .06em;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-.midi-return-title {
-  display: block;
-  max-width: min(100%, 50ch);
-  margin-top: 7px !important;
-  color: var(--v2-dim) !important;
-  font-size: 8.5px !important;
-  line-height: 1.35;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-  white-space: normal;
-}
-
 .scene-cards { gap: 8px !important; }
 .scene-cards .card { min-height: 112px !important; padding: 12px 14px !important; }
 .scene-cards .label { margin-bottom: 5px !important; }
@@ -446,9 +387,6 @@ select {
 }
 
 @media (max-width: 370px) {
-  .midi-returns { grid-template-columns: 1fr !important; }
-  .midi-return { min-height: 100px !important; }
-  .midi-return strong { font-size: 19px !important; }
   .v2-brand img { width: 100px; height: 36px; }
   .v2-health { gap: 6px; }
   .scene-cards { grid-template-columns: 1fr !important; }

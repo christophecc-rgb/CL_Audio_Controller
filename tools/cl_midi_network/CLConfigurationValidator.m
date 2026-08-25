@@ -30,7 +30,7 @@ static NSString *CLArgument(NSString *command, NSString *name) {
     NSMutableSet *sourceNames = [NSMutableSet set], *destinationNames = [NSMutableSet set];
     for (NSDictionary *endpoint in endpoints) { NSString *name = endpoint[@"name"] ?: @""; if ([endpoint[@"direction"] isEqualToString:@"source"]) [sourceNames addObject:name]; else [destinationNames addObject:name]; }
     BOOL endpointOK = expectedEndpoint.length && [sourceNames containsObject:expectedEndpoint] && [destinationNames containsObject:expectedEndpoint];
-    [items addObject:CLItem(endpointOK ? CLCheckLevelOK : CLCheckLevelError, @"CoreMIDI", @"Endpoint RTP local", expectedEndpoint, endpointOK ? expectedEndpoint : @"Absent comme paire entrée/sortie", @"Le peer Bonjour et l’endpoint CoreMIDI local sont des propriétés indépendantes.", @"Sélectionner dans Configuration audio et MIDI l’endpoint RTP local défini par ce profil.")];
+    [items addObject:CLItem(!expectedEndpoint.length ? CLCheckLevelInfo : (endpointOK ? CLCheckLevelOK : CLCheckLevelError), @"CoreMIDI", @"Endpoint RTP local", expectedEndpoint, !expectedEndpoint.length ? @"Non défini dans le profil" : (endpointOK ? expectedEndpoint : @"Absent comme paire entrée/sortie"), @"Une source et une destination CoreMIDI de même nom constituent la paire normale d’une session RTP-MIDI.", @"Sélectionner dans Configuration audio et MIDI l’endpoint RTP local défini par ce profil.")];
     for (NSString *name in @[@"Gestionnaire IAC Bus 1", @"CL MIDI Return Test"]) if ([sourceNames containsObject:name] || [destinationNames containsObject:name]) [items addObject:CLItem(CLCheckLevelOK, @"CoreMIDI", name, name, name, @"Endpoint local détecté.", @"")];
 
     NSString *sessionExpected = expectedRTP[@"local_session_name"] ?: @"", *sessionActual = actualRTP[@"local_session_name"] ?: @"";
@@ -44,10 +44,12 @@ static NSString *CLArgument(NSString *command, NSString *name) {
     NSDictionary *simulatorProfile = values[@"simulator"] ?: @{}; NSDictionary *midi = values[@"midi"] ?: @{};
     for (NSDictionary *process in processes) {
         NSString *command = process[@"command"] ?: @"", *path = process[@"path"] ?: @"";
-        for (NSString *name in @[@"CL MIDI Network Assistant", @"CL MIDI RTP Agent", @"CLMIDINetworkGuardian", @"CLYamahaConsoleSimulator", @"app.py"]) if ([command containsString:name]) counts[name] = @([counts[name] integerValue] + 1);
+        NSString *executable = process[@"executable"] ?: path.lastPathComponent;
+        NSDictionary *processNames = @{@"CL MIDI Network Assistant": @"CL MIDI Network Assistant", @"CL MIDI RTP Agent": @"CL MIDI RTP Agent", @"CLMIDIRTPAgent": @"CL MIDI RTP Agent", @"CLMIDINetworkGuardian": @"CLMIDINetworkGuardian", @"CLYamahaConsoleSimulator": @"CLYamahaConsoleSimulator", @"Python": @"app.py", @"python3": @"app.py"};
+        NSString *processKind = processNames[executable]; if (processKind) counts[processKind] = @([counts[processKind] integerValue] + 1);
         if ([process[@"app_translocation"] boolValue]) [items addObject:CLItem(CLCheckLevelError, @"Processus", @"App Translocation", @"~/Applications ou /Applications", path, @"Une application transloquée peut charger des ressources depuis un chemin temporaire instable.", @"Fermer cette instance et lancer l’application installée.")];
         else if ([process[@"development_build"] boolValue]) [items addObject:CLItem(CLCheckLevelWarning, @"Processus", @"Build de développement active", @"Application installée", path, @"Cette instance provient d’un dossier de développement ou de distribution.", @"Fermer cette instance puis lancer l’application installée.")];
-        if (![command containsString:@"CLYamahaConsoleSimulator"]) continue; foundSimulator = YES;
+        if (![executable isEqualToString:@"CLYamahaConsoleSimulator"]) continue; foundSimulator = YES;
         NSString *label = CLArgument(command, @"--label"), *endpoint = CLArgument(command, @"--endpoint"), *transport = CLArgument(command, @"--transport"), *channel = CLArgument(command, @"--channel"), *delay = CLArgument(command, @"--delay-ms");
         NSString *expectedChannel = [label caseInsensitiveCompare:@"CL5"] == NSOrderedSame ? [midi[@"cl5_channel"] stringValue] : [midi[@"ql1_channel"] stringValue];
         BOOL endpointMatches = [endpoint isEqualToString:simulatorProfile[@"endpoint"] ?: @""] && [sourceNames containsObject:endpoint] && [destinationNames containsObject:endpoint];
@@ -76,15 +78,39 @@ static NSString *CLArgument(NSString *command, NSString *name) {
         BOOL returnOK = status.count && (![expectedReturn[@"mode"] length] || [mode isEqualToString:expectedReturn[@"mode"]]) && (![expectedReturn[@"source"] length] || [source isEqualToString:expectedReturn[@"source"]]);
         [items addObject:CLItem(returnOK ? CLCheckLevelOK : CLCheckLevelError, @"Retour console", @"État serveur /status", [NSString stringWithFormat:@"mode %@ · source %@", expectedReturn[@"mode"], expectedReturn[@"source"]], status.count ? [NSString stringWithFormat:@"mode %@ · source %@", mode, source] : @"Serveur indisponible", @"Lecture non destructive de l’état expected / returned publié par le serveur.", @"Vérifier le serveur et la source de retour configurée.")];
         NSDictionary *midiConsole = [status[@"midi_console"] isKindOfClass:NSDictionary.class] ? status[@"midi_console"] : @{};
+        NSString *(^statusString)(NSString *) = ^NSString *(NSString *key) { id value = status[key] ?: midiConsole[key]; return [value isKindOfClass:NSString.class] ? value : @""; };
+        id (^statusValue)(NSString *) = ^id(NSString *key) { return status[key] ?: midiConsole[key]; };
+        if (status.count) {
+        NSString *expectedMonitorSource = statusString(@"expected_monitor_source"); id expectedMonitorStatus = statusValue(@"expected_monitor_status");
+        BOOL expectedMonitorActive = expectedMonitorStatus && expectedMonitorStatus != NSNull.null && [expectedMonitorStatus integerValue] == 0;
+        [items addObject:CLItem(expectedMonitorActive ? CLCheckLevelOK : CLCheckLevelWarning, @"Moniteurs MIDI", @"Expected monitor", expectedMonitorSource, expectedMonitorActive ? @"Actif" : @"Inactif", @"État CoreMIDI réellement publié par /status, distinct de la configuration attendue.", @"Vérifier le moniteur expected si la confirmation MIDI native est requise.")];
+        NSString *returnMonitorSource = statusString(@"return_monitor_source"); id returnMonitorStatus = statusValue(@"return_monitor_status");
+        BOOL returnMonitorActive = returnMonitorStatus && returnMonitorStatus != NSNull.null && [returnMonitorStatus integerValue] == 0;
+        [items addObject:CLItem(returnMonitorActive ? CLCheckLevelOK : CLCheckLevelWarning, @"Moniteurs MIDI", @"Return monitor", returnMonitorSource, returnMonitorActive ? @"Actif" : @"Inactif", @"État du moniteur de retour publié par /status.", @"Vérifier la source de retour configurée et son endpoint CoreMIDI.")];
         for (NSString *consoleName in @[@"cl5", @"ql1"]) {
             NSDictionary *console = [midiConsole[consoleName] isKindOfClass:NSDictionary.class] ? midiConsole[consoleName] : @{};
             id expected = console[@"expected_midi_program"] ?: console[@"expected_program"]; id returned = console[@"returned_midi_program"] ?: console[@"returned_program"];
             if (expected == NSNull.null) expected = nil; if (returned == NSNull.null) returned = nil;
-            if (!expected && !returned) continue; BOOL synchronized = expected && returned && [expected integerValue] == [returned integerValue];
-            [items addObject:CLItem(synchronized ? CLCheckLevelOK : CLCheckLevelWarning, @"Retour console", [consoleName.uppercaseString stringByAppendingString:@" · expected / returned"], [expected description], [returned description], @"Comparaison passive des derniers Program Change publiés par le serveur.", @"Vérifier l’âge du retour et le routage console si les valeurs divergent.")];
+            NSString *programSource = console[@"expected_program_source"] ?: @"";
+            if ([programSource isEqualToString:@"degraded_ableton_clip_name"]) [items addObject:CLItem(CLCheckLevelWarning, @"Moniteurs MIDI", [consoleName.uppercaseString stringByAppendingString:@" · mode dégradé"], @"Observation MIDI native", @"degraded_ableton_clip_name", @"La valeur attendue est déduite du nom de clip Ableton car le moniteur expected est indisponible.", @"Réactiver le moniteur expected pour obtenir une observation MIDI native.")];
+            NSString *validation = console[@"validation_status"] ?: @""; id age = console[@"last_return_age_seconds"];
+            if (!validation.length) {
+                if (!expected) validation = @"unavailable";
+                else if (age != nil && age != NSNull.null && [age doubleValue] > 12.0) validation = @"stale";
+                else if (returned && [expected integerValue] == [returned integerValue]) validation = @"confirmed";
+                else if (returned) validation = @"mismatch"; else validation = @"waiting";
+            }
+            CLCheckLevel level = [validation isEqualToString:@"confirmed"] ? CLCheckLevelOK : ([validation isEqualToString:@"mismatch"] ? CLCheckLevelWarning : CLCheckLevelInfo);
+            NSString *actual = @"En attente / indisponible";
+            if ([validation isEqualToString:@"stale"]) actual = [NSString stringWithFormat:@"Retour périmé%@", age && age != NSNull.null ? [NSString stringWithFormat:@" · âge %.1f s", [age doubleValue]] : @""];
+            else if ([validation isEqualToString:@"confirmed"]) actual = [NSString stringWithFormat:@"Confirmé · %@", returned ?: @"—"];
+            else if ([validation isEqualToString:@"mismatch"]) actual = [NSString stringWithFormat:@"Divergence active · retourné %@", returned ?: @"—"];
+            [items addObject:CLItem(level, @"Retour console", [consoleName.uppercaseString stringByAppendingString:@" · expected / returned"], expected ? [expected description] : @"Aucune valeur attendue", actual, @"Le statut canonique et l’âge publiés par /status priment sur une comparaison brute.", @"Vérifier le routage uniquement pour une divergence récente.")];
+        }
         }
     }
-    NSDictionary *clf = values[@"clf"] ?: @{}; for (NSString *key in @[@"cl5_path", @"ql1_path"]) { NSString *path = clf[key] ?: @""; BOOL readable = [NSFileManager.defaultManager isReadableFileAtPath:path]; [items addObject:CLItem(readable ? CLCheckLevelOK : (server ? CLCheckLevelError : CLCheckLevelInfo), @"CLF", [key hasPrefix:@"cl5"] ? @"Bibliothèque CL5" : @"Bibliothèque QL1", path, readable ? @"Présente et lisible" : @"Absente", @"Le Checker ne modifie ni offsets ni lookups CLF.", @"Choisir un chemin CLF lisible dans le profil.")]; }
+    NSDictionary *libraryProfile = values[@"console_libraries"] ?: @{}; NSDictionary *libraries = inspection[@"console_libraries"] ?: @{};
+    for (NSString *consoleName in @[@"cl5", @"ql1"]) { NSDictionary *library = libraries[consoleName] ?: @{}; NSString *path = libraryProfile[[consoleName stringByAppendingString:@"_path"]] ?: library[@"path"] ?: @""; BOOL valid = [library[@"valid"] boolValue]; NSString *origin = library[@"source_name"] ?: library[@"migrated_from"] ?: @"Non renseignée"; NSString *actual = valid ? [NSString stringWithFormat:@"Valide · %@ entrées utilisables · origine %@", library[@"entry_count"] ?: @0, origin] : (library[@"validation"] ?: @"Absente"); [items addObject:CLItem(valid ? CLCheckLevelOK : (server ? CLCheckLevelError : CLCheckLevelInfo), @"Bibliothèques de titres", [consoleName.uppercaseString stringByAppendingString:@" · bibliothèque canonique"], path, actual, @"Le fichier .titles.json canonique remplace le CLF du Bureau comme bibliothèque active.", @"Importer une bibliothèque valide dans CL Audio Controller.")]; }
     return [[CLConfigurationReport alloc] initWithItems:items];
 }
 @end

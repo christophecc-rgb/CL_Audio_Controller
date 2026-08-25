@@ -56,16 +56,8 @@
 .status.connected { color: #8bc34a; }
 .status.disconnected { color: #ef9a9a; }
 
-.midi-returns { display:grid; grid-template-columns:1fr 1fr; gap:7px; min-height:116px; }
 .midi-title-mode { grid-column:1 / -1; display:flex; justify-content:flex-end; align-items:center; gap:7px; color:var(--muted); font-size:10px; }
 .midi-title-mode select { min-height:28px; border:1px solid var(--border); border-radius:8px; background:#15181d; color:var(--text); font-size:10px; padding:3px 8px; }
-.midi-return { border:1.5px solid var(--border); border-radius:16px; padding:14px 12px; background:linear-gradient(180deg,#1a1f27 0%,#12161c 100%); color:var(--muted); font-size:11px; font-weight:750; min-width:0; display:flex; flex-direction:column; justify-content:center; box-shadow:0 8px 18px rgba(0,0,0,.20); }
-.midi-return strong { display:block; color:#ffcf62; font-size:16px; line-height:1.1; }
-.midi-return-title { display:block; margin-top:7px; color:#e1e5eb; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.midi-return-state { display:block; margin-top:6px; font-size:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.midi-return.ok { border-color:#43a047; color:#8bc34a; }
-.midi-return.mismatch { border-color:#e05252; color:#ff8a80; }
-.midi-return.remembered { border-color:rgba(67,160,71,.48); color:#a7bbaa; }
 
 .topnav {
   display: grid;
@@ -422,8 +414,178 @@ body.is-arrangement-paused .card.current {
   .next .scene-name { font-size:clamp(26px,5vw,46px); }
   .small { display:none; }
 }
-    
-  </style>
+
+
+    /* Program Change — définition unique. */
+    .midi-returns {
+      display:grid !important;
+      grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+      gap:6px !important;
+      align-items:stretch !important;
+      min-height:0 !important;
+    }
+
+    .midi-return {
+      box-sizing:border-box !important;
+      position:relative;
+      min-width:0 !important;
+      min-height:48px;
+      height:48px;
+      padding:4px 8px 5px;
+      border:1px solid var(--border);
+      border-radius:9px !important;
+      overflow:hidden !important;
+      background:#15181d;
+      transition:border-color .16s,background .16s,box-shadow .16s;
+    }
+
+    .midi-return-heading {
+      display:flex;
+      align-items:baseline;
+      gap:clamp(12px,4vw,28px);
+      min-width:0;
+      height:21px;
+    }
+
+    .midi-return-console {
+      display:block !important;
+      margin:0 !important;
+      padding:0 !important;
+      flex:0 0 auto;
+      font-size:11px !important;
+      line-height:1;
+      font-weight:900 !important;
+      letter-spacing:.08em !important;
+    }
+
+    .midi-return strong {
+      display:block !important;
+      min-width:0;
+      margin:0 !important;
+      padding:0 !important;
+      line-height:20px;
+    }
+
+    .midi-return-memory {
+      display:block !important;
+      font-size:20px;
+      line-height:20px;
+      font-weight:900;
+    }
+
+    .midi-return-main-title {
+      display:block !important;
+      min-width:0 !important;
+      overflow:hidden !important;
+      text-overflow:ellipsis !important;
+      white-space:nowrap !important;
+      font-size:12.5px;
+      line-height:16px;
+      font-weight:750;
+      color:#b8cbe3;
+    }
+
+    .midi-return-state {
+      display:block !important;
+      min-height:0 !important;
+      position:absolute;
+      width:1px;
+      height:1px;
+      margin:-1px;
+      padding:0 !important;
+      overflow:hidden !important;
+      clip:rect(0 0 0 0);
+      white-space:nowrap;
+    }
+
+    #webCl5Return,
+    #arrCl5Return {
+      --console-accent:#9b6bd6;
+      --console-text:#c09af2;
+    }
+
+    #webQl1Return,
+    #arrQl1Return {
+      --console-accent:#3f9b59;
+      --console-text:#70d386;
+    }
+
+    .midi-return .midi-return-console,
+    .midi-return .midi-return-memory {
+      color:var(--console-text) !important;
+    }
+
+    .midi-return.state-idle {
+      border-color:var(--console-accent) !important;
+      background:#15181d !important;
+      box-shadow:none !important;
+    }
+
+    .midi-return.state-waiting {
+      border-color:#ffd34f !important;
+      background:rgba(239,193,79,.08) !important;
+      box-shadow:0 0 0 1px rgba(239,193,79,.12) !important;
+      animation:midiWaitingPulse .3s ease-in-out infinite alternate !important;
+    }
+
+    .midi-return.state-confirmed {
+      border-color:#5fd478 !important;
+      background:rgba(58,139,77,.30) !important;
+      box-shadow:0 0 0 2px rgba(95,212,120,.18),0 0 14px rgba(95,212,120,.30) !important;
+      animation:none !important;
+    }
+
+    .midi-return.state-mismatch {
+      border-color:#ff5c5c !important;
+      background:rgba(151,39,39,.30) !important;
+      box-shadow:0 0 0 2px rgba(255,92,92,.16),0 0 12px rgba(255,92,92,.22) !important;
+      animation:none !important;
+    }
+
+    .midi-return.state-timeout {
+      border-color:#e8913a !important;
+      background:rgba(130,75,24,.28) !important;
+      box-shadow:0 0 0 2px rgba(232,145,58,.18),0 0 12px rgba(232,145,58,.20) !important;
+      animation:none !important;
+    }
+
+    @keyframes midiWaitingPulse {
+      from {
+        background:rgba(239,193,79,.06);
+        box-shadow:0 0 0 0 rgba(239,193,79,.08);
+      }
+      to {
+        background:rgba(239,193,79,.38);
+        box-shadow:0 0 0 3px rgba(239,193,79,.34),0 0 16px rgba(239,193,79,.44);
+      }
+    }
+
+    @media (prefers-reduced-motion:reduce) {
+      .midi-return.state-waiting {
+        animation-duration:.65s !important;
+      }
+    }
+
+    @media (max-width:390px) {
+      .midi-returns {
+        grid-template-columns:repeat(2,minmax(0,1fr)) !important;
+      }
+
+      .midi-return {
+        height:48px;
+        padding:4px 6px 5px;
+      }
+
+      .midi-return-memory {
+        font-size:19px;
+      }
+
+      .midi-return-main-title {
+        font-size:11.5px !important;
+      }
+    }
+
+</style>
 </head>
 <body>
   <main class="wrap">
@@ -431,8 +593,8 @@ body.is-arrangement-paused .card.current {
     <nav class="topnav"><a href="/">Session</a><a href="/ab">A/B</a><a href="/arrangement" class="active">Arrangement</a></nav>
 
     <section class="midi-returns" aria-label="Retours MIDI consoles">
-      <div class="midi-return" id="arrCl5Return"><div class="midi-return-heading"><span class="midi-return-console">CL5</span><strong id="arrCl5Program">— &nbsp; Titre en attente</strong></div><span class="midi-return-state" id="arrCl5State">En attente du premier retour</span><span class="midi-return-title" id="arrCl5Title">Attendu — · Reçu —</span></div>
-      <div class="midi-return" id="arrQl1Return"><div class="midi-return-heading"><span class="midi-return-console">QL1</span><strong id="arrQl1Program">— &nbsp; Titre en attente</strong></div><span class="midi-return-state" id="arrQl1State">En attente du premier retour</span><span class="midi-return-title" id="arrQl1Title">Attendu — · Reçu —</span></div>
+      <div class="midi-return state-idle" id="arrCl5Return"><div class="midi-return-heading"><span class="midi-return-console">CL5</span><strong id="arrCl5Program"><span class="midi-return-memory">—</span></strong></div><span class="midi-return-main-title">Titre en attente</span><span class="midi-return-state" id="arrCl5State"></span></div>
+      <div class="midi-return state-idle" id="arrQl1Return"><div class="midi-return-heading"><span class="midi-return-console">QL1</span><strong id="arrQl1Program"><span class="midi-return-memory">—</span></strong></div><span class="midi-return-main-title">Titre en attente</span><span class="midi-return-state" id="arrQl1State"></span></div>
     </section>
 
     <section class="ltc-display ltc-display--disconnected" aria-live="polite" aria-label="Retour LTC timecode">
@@ -483,12 +645,22 @@ body.is-arrangement-paused .card.current {
 
 <details class="advanced-options">
   <summary>Options avancées</summary>
-  <div class="advanced-options__content">Sources titres consoles : Fichiers Yamaha CL5 / QL1</div>
+  <div class="advanced-options__content">
+    <label>Source des titres consoles
+      <select id="consoleTitleMode">
+        <option value="ableton">Titres Ableton</option>
+        <option value="imported_library">Bibliothèque de titres importée</option>
+      </select>
+    </label>
+    <div id="consoleTitleSource">Source active : —</div>
+    <div id="consoleLibrariesStatus">Bibliothèques CL5 / QL1 : —</div>
+  </div>
 </details>
 
 </main>
 
 
+  <script src="/static/midi-return-visual.js"></script>
   <script>
     const statusEl = document.getElementById('status');
     const currentNameEl = document.getElementById('currentName');
@@ -500,6 +672,13 @@ body.is-arrangement-paused .card.current {
     const nextCardEl = document.querySelector('.card.next');
     const arrCl5Return = document.getElementById('arrCl5Return');
     const arrQl1Return = document.getElementById('arrQl1Return');
+    const consoleTitleMode = document.getElementById('consoleTitleMode');
+    const consoleTitleSource = document.getElementById('consoleTitleSource');
+    const consoleLibrariesStatus = document.getElementById('consoleLibrariesStatus');
+    consoleTitleMode.addEventListener('change', async () => {
+      await fetch('/action', {method:'POST', headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({action:'console_title_mode', mode:consoleTitleMode.value})});
+    });
     const markerSelectEl = document.getElementById('markerSelect');
     const gotoBtn = document.getElementById('gotoBtn');
     const goBtn = document.getElementById('goBtn');
@@ -770,6 +949,15 @@ body.is-arrangement-paused .card.current {
       lastState = state;
       if (window.CLRemoteLTC) window.CLRemoteLTC.render(ltcTimecodeEl, state);
       const midi = state.midi_console || {};
+      consoleTitleMode.value = state.console_title_mode || 'imported_library';
+      consoleTitleSource.textContent = 'Source active : ' + (state.console_title_source || '—');
+      const libraries = state.console_scene_library_status || {};
+      consoleLibrariesStatus.textContent = ['cl5', 'ql1'].map(name => {
+        const info = libraries[name] || {};
+        return name.toUpperCase() + ' : ' + (info.status || 'Aucun fichier installé')
+          + ' · ' + (info.scene_count || 0) + ' titre(s)'
+          + (info.migrated_from ? ' · migrée depuis le Bureau' : '');
+      }).join(' · ');
       const formatMidiAge = (seconds) => {
         seconds = Math.max(0, Math.floor(seconds));
         if (seconds < 60) return seconds < 2 ? 'à l’instant' : 'il y a ' + seconds + ' s';
@@ -778,39 +966,78 @@ body.is-arrangement-paused .card.current {
         const hours = Math.floor(minutes / 60), rest = minutes % 60;
         return 'il y a ' + hours + ' h' + (rest ? ' ' + rest + ' min' : '');
       };
-      const renderConsoleReturn = (name, value, card, programId, titleId, stateId) => {
+      const renderConsoleReturn = (name, value, card, programId, stateId) => {
         value = value || {};
         const status = value.validation_status || 'unavailable';
-        card.classList.toggle('ok', status === 'confirmed');
-        card.classList.toggle('mismatch', status === 'mismatch');
-        card.classList.toggle('remembered', status === 'stale');
-        const expectedNumber = value.expected_scene_memory ?? '—';
+        const expectedKey = [
+          value.expected_midi_program ?? '',
+          value.expected_activated_at ?? ''
+        ].join(':');
+        const hasExpected = value.expected_midi_program != null;
+        const finalKey = [
+          value.expected_midi_program ?? '',
+          value.returned_midi_program ?? '',
+          value.returned_at ?? ''
+        ].join(':');
+        if (!card._visualController) {
+          card._visualController = window.CLMidiReturnVisual.createController({
+            waitingMs: 600,
+            confirmedMs: 500,
+            applyState: visualState => {
+              ['idle','waiting','confirmed','mismatch','timeout'].forEach(item => {
+                card.classList.toggle(`state-${item}`, visualState === item);
+              });
+            }
+          });
+        }
+        const visualState = card._visualController.update({
+          expectedKey,
+          hasExpected,
+          backendState: value.visual_state || 'idle',
+          finalKey
+        });
+
         const expectedTitle = value.expected_title || 'Titre non résolu';
-        const returnedNumber = value.returned_scene_memory ?? '—';
         const returnedTitle = value.returned_title || 'Titre non résolu';
-        const mainNumber = value.returned_scene_memory ?? value.expected_scene_memory ?? '—';
-        const mainTitle = value.returned_scene_memory != null ? returnedTitle : expectedTitle;
-        document.getElementById(programId).textContent = mainNumber + '  ' + mainTitle;
-        document.getElementById(titleId).textContent = 'Attendu ' + expectedNumber + ' ' + expectedTitle
-          + ' · Reçu ' + returnedNumber + ' ' + returnedTitle
-          + ' · Offset ' + Number(value.title_offset || 0).toLocaleString('fr-FR', {signDisplay:'exceptZero'})
-          + ' · lookup ' + (value.expected_title_lookup_memory ?? '—')
-          + '/' + (value.returned_title_lookup_memory ?? '—');
-        const validationLabel = status === 'confirmed'
-          ? '✓ Confirmé par la console'
-          : status === 'mismatch'
-          ? '⚠ Retour PGM ' + (value.returned_program ?? value.return_program ?? '—') + ' · attendu ' + (value.expected_program ?? '—')
-          : status === 'local_fallback'
-          ? 'En attente du retour MIDI'
-          : status === 'stale'
-          ? 'Retour ancien · ' + formatMidiAge(value.last_return_age_seconds || 0)
-          : status === 'waiting'
-          ? 'En attente du retour console'
-          : 'Programme attendu indisponible';
+
+        const showReturned =
+          status === 'confirmed' ||
+          status === 'mismatch' ||
+          !value.expected_scene_memory;
+
+        const mainNumber =
+          (showReturned
+            ? value.returned_scene_memory
+            : value.expected_scene_memory) ?? '—';
+
+        const mainTitle =
+          showReturned && value.returned_scene_memory != null
+            ? returnedTitle
+            : expectedTitle;
+
+        const programEl = document.getElementById(programId);
+        programEl.textContent = '';
+
+        const memoryEl = document.createElement('span');
+        memoryEl.className = 'midi-return-memory';
+        memoryEl.textContent = mainNumber;
+
+        const mainTitleEl = card.querySelector('.midi-return-main-title');
+        mainTitleEl.textContent = mainTitle;
+
+        programEl.append(memoryEl);
+
+        const validationLabel =
+          visualState === 'confirmed' ? '✓ Boucle confirmée' :
+          visualState === 'mismatch'  ? '⚠ Retour différent' :
+          visualState === 'waiting'   ? 'Retour en attente…' :
+          visualState === 'timeout'   ? '⚠ Retour absent' :
+          '';
+
         document.getElementById(stateId).textContent = validationLabel;
       };
-      renderConsoleReturn('CL5', midi.cl5, arrCl5Return, 'arrCl5Program', 'arrCl5Title', 'arrCl5State');
-      renderConsoleReturn('QL1', midi.ql1, arrQl1Return, 'arrQl1Program', 'arrQl1Title', 'arrQl1State');
+      renderConsoleReturn('CL5', midi.cl5, arrCl5Return, 'arrCl5Program', 'arrCl5State');
+      renderConsoleReturn('QL1', midi.ql1, arrQl1Return, 'arrQl1Program', 'arrQl1State');
       const connected = Boolean(state && state.connected);
       const arrangementMode = Boolean(state && state.play_mode === 'arrangement');
       if (arrangementMode) arrangementReturnActive = true;
@@ -1052,7 +1279,7 @@ goBtn.addEventListener('click', runArrangementGo);
       markerSelectIsOpen = false;
       renderConduite();
 });
-    
+
 markerSelectEl.addEventListener('change', () => {
   const idx = Number(markerSelectEl.value || 0);
   markerSelectIsOpen = false;

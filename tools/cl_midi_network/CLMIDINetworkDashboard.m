@@ -9,6 +9,32 @@
 #import <unistd.h>
 
 static int CLBackgroundMonitorLock = -1;
+static NSString *const CLExpectedDiagnosticPath = @"/private/tmp/CL_MIDI_EXPECTED_DIAGNOSTIC.log";
+
+static void CLResetExpectedDiagnostic(void) {
+    [NSData.data writeToFile:CLExpectedDiagnosticPath atomically:YES];
+}
+
+static void CLExpectedDiagnostic(NSString *event, NSString *detail) {
+    NSString *line = [NSString stringWithFormat:@"%@ %@\n", event ?: @"EXPECTED_EVENT", detail ?: @""];
+    NSData *data = [line dataUsingEncoding:NSUTF8StringEncoding];
+    @synchronized(NSFileHandle.class) {
+        if (![NSFileManager.defaultManager fileExistsAtPath:CLExpectedDiagnosticPath]) {
+            [data writeToFile:CLExpectedDiagnosticPath atomically:YES];
+            return;
+        }
+        NSFileHandle *handle = [NSFileHandle fileHandleForWritingAtPath:CLExpectedDiagnosticPath];
+        [handle seekToEndOfFile];
+        [handle writeData:data];
+        [handle closeFile];
+    }
+}
+
+static SInt32 CLEndpointUniqueID(MIDIEndpointRef endpoint) {
+    SInt32 uniqueID = 0;
+    MIDIObjectGetIntegerProperty(endpoint, kMIDIPropertyUniqueID, &uniqueID);
+    return uniqueID;
+}
 
 static void CLInstallApplicationMenu(void) {
     NSMenu *mainMenu = [[NSMenu alloc] initWithTitle:@""];
@@ -107,6 +133,7 @@ static BOOL CLPostDoubleClickFromConnectorReason(NSString *reason) {
 @property BOOL showModeEnabled;
 @property BOOL backgroundMonitorOnly;
 @property BOOL ownsPassiveReturnMonitor;
+@property BOOL expectedSourceEnumerationLogged;
 @property NSString *lastCL5Test;
 @property NSString *lastQL1Test;
 @property NSView *lamp;
@@ -197,10 +224,13 @@ static BOOL CLPostDoubleClickFromConnectorReason(NSString *reason) {
 @property NSDate *lastQL1ProgramAt;
 @property NSString *lastCL5Title;
 @property NSString *lastQL1Title;
+@property NSString *lastCL5TitleSource;
+@property NSString *lastQL1TitleSource;
 @property NSInteger expectedCL5Program;
 @property NSInteger expectedQL1Program;
 @property NSDate *expectedCL5ProgramAt;
 @property NSDate *expectedQL1ProgramAt;
+@property UInt8 expectedRunningStatus;
 @property NSUInteger sceneTitleTraceSequence;
 @property NSUInteger cl5SceneTitleLookupGeneration;
 @property NSUInteger ql1SceneTitleLookupGeneration;
@@ -217,12 +247,25 @@ static BOOL CLPostDoubleClickFromConnectorReason(NSString *reason) {
 static NSString *const CLExpectedEndpointName = @"Gestionnaire IAC Bus 1";
 static NSString *const CLLocalReturnEndpointName = @"CL MIDI Return Test";
 static NSString *const CLRTPReturnEndpointName = @"Réseau RTP MB Chris";
+static NSString *const CLConsoleReturnEndpointPreference = @"consoleReturnEndpoint";
 
 static BOOL CLIsRTPReturnEndpointName(NSString *name) {
     if (!name.length || [name isEqualToString:CLExpectedEndpointName] ||
         [name isEqualToString:CLLocalReturnEndpointName]) return NO;
     return [name rangeOfString:@"RTP" options:NSCaseInsensitiveSearch].location != NSNotFound ||
         [name rangeOfString:@"Réseau" options:NSCaseInsensitiveSearch].location != NSNotFound;
+}
+
+static NSString *CLPreferredConsoleReturnEndpoint(NSArray<NSString *> *sources) {
+    NSString *saved = [NSUserDefaults.standardUserDefaults stringForKey:CLConsoleReturnEndpointPreference];
+    if (saved.length && [sources containsObject:saved]) return saved;
+    for (NSString *name in sources) {
+        if ([name caseInsensitiveCompare:CLRTPReturnEndpointName] == NSOrderedSame) return name;
+    }
+    for (NSString *name in sources) {
+        if (CLIsRTPReturnEndpointName(name)) return name;
+    }
+    return nil;
 }
 
 static NSArray<NSString *> *CLLocalRTPEndpointNames(void) {
@@ -251,20 +294,47 @@ static NSArray<NSString *> *CLSimulatorInputEndpointNames(void) {
 }
 
 static void CLPassiveExpectedRead(const MIDIPacketList *packetList, void *readProcRefCon, void *srcConnRefCon) {
-    (void)srcConnRefCon;
     CLNetworkDelegate *delegate = (__bridge CLNetworkDelegate *)readProcRefCon;
+    UInt32 byteCount = 0;
+    const MIDIPacket *countedPacket = &packetList->packet[0];
+    for (UInt32 packetIndex = 0; packetIndex < packetList->numPackets; packetIndex++) {
+        byteCount += countedPacket->length;
+        countedPacket = MIDIPacketNext(countedPacket);
+    }
+    CLExpectedDiagnostic(@"EXPECTED_CALLBACK_ENTER", [NSString stringWithFormat:
+        @"packet_count=%u byte_count=%u read_context=%p source_context=%p",
+        (unsigned)packetList->numPackets, (unsigned)byteCount, readProcRefCon, srcConnRefCon]);
+    UInt8 runningStatus = delegate.expectedRunningStatus;
     const MIDIPacket *packet = &packetList->packet[0];
     for (UInt32 packetIndex = 0; packetIndex < packetList->numPackets; packetIndex++) {
+        NSMutableString *hex = [NSMutableString string];
+        UInt16 loggedLength = MIN(packet->length, (UInt16)64);
+        for (UInt16 byteIndex = 0; byteIndex < loggedLength; byteIndex++) {
+            [hex appendFormat:@"%@%02X", byteIndex ? @" " : @"", packet->data[byteIndex]];
+        }
+        if (packet->length > loggedLength) [hex appendFormat:@" …(+%u)", packet->length - loggedLength];
+        CLExpectedDiagnostic(@"EXPECTED_PACKET", [NSString stringWithFormat:@"bytes=%@", hex]);
         UInt16 index = 0;
         while (index < packet->length) {
-            UInt8 status = packet->data[index];
-            if ((status & 0xF0) == 0xC0 && index + 1 < packet->length) {
-                [delegate queueExpectedProgram:packet->data[index + 1] channel:(status & 0x0F) + 1];
-                index += 2;
-            } else index += 1;
+            UInt8 byte = packet->data[index++];
+            if (byte >= 0xF8) continue; // MIDI realtime n'annule jamais le running status.
+            if (byte & 0x80) {
+                runningStatus = byte < 0xF0 ? byte : 0;
+                continue;
+            }
+            if ((runningStatus & 0xF0) == 0xC0) {
+                UInt8 channel = (runningStatus & 0x0F) + 1;
+                if (channel == 1 || channel == 2) {
+                    CLExpectedDiagnostic(@"EXPECTED_PROGRAM_DECODED", [NSString stringWithFormat:
+                        @"channel=%u raw_program=%u console=%@", channel, byte,
+                        channel == 1 ? @"CL5" : @"QL1"]);
+                    [delegate queueExpectedProgram:byte channel:channel];
+                }
+            }
         }
         packet = MIDIPacketNext(packet);
     }
+    delegate.expectedRunningStatus = runningStatus;
 }
 
 static void CLPassiveReturnRead(const MIDIPacketList *packetList, void *readProcRefCon, void *srcConnRefCon) {
@@ -367,6 +437,7 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
             [NSApp terminate:nil];
             return;
     }
+    if (self.ownsPassiveReturnMonitor) CLResetExpectedDiagnostic();
     NSString *bundleExecutablePath = NSBundle.mainBundle.executablePath ?: @"";
     BOOL runningFromAppBundle = [bundleExecutablePath containsString:@".app/Contents/MacOS/"];
     if (runningFromAppBundle) {
@@ -719,6 +790,9 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
 }
 
 - (void)writeConsoleReturnState {
+    // Une seule instance possède le verrou et publie l'état canonique. L'UI
+    // secondaire ne doit jamais écraser le JSON du moniteur de fond.
+    if (!self.ownsPassiveReturnMonitor) return;
     NSString *endpoint = self.endpointMenu.selectedItem.title ?: @"";
     NSString *returnMode = self.localReturnMode ? @"local_dedicated" : @"rtp_remote";
     NSString *peer = self.targetMenu.selectedItem.title ?: @"";
@@ -818,16 +892,15 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
                 [self.expectedCL5State[@"expected_midi_program"] integerValue] == self.expectedCL5Program)
                 ? (self.expectedCL5State[@"expected_title"] ?: @"Titre non résolu") : @"Titre non résolu",
             @"expected_program_source": self.expectedCL5Program >= 0 ? @"ableton_iac_output" : @"unavailable",
-            @"expected_title_source": (self.expectedCL5Program >= 0 &&
-                [self.expectedCL5State[@"expected_title_source"] isEqual:@"console_clf"])
-                ? @"console_clf" : @"unresolved",
+            @"expected_title_source": self.expectedCL5Program >= 0
+                ? (self.expectedCL5State[@"expected_title_source"] ?: @"unresolved") : @"unresolved",
             @"expected_activated_at": self.expectedCL5ProgramAt ? @([self.expectedCL5ProgramAt timeIntervalSince1970]) : NSNull.null,
             @"returned_midi_program": self.lastCL5Program >= 0 ? @(self.lastCL5Program) : NSNull.null,
             @"returned_program": self.lastCL5Program >= 0 ? @(self.lastCL5Program + 1) : NSNull.null,
             @"returned_scene_memory": self.lastCL5Program >= 0 ? @(self.lastCL5Program + 1) : NSNull.null,
             @"returned_title": self.lastCL5Title.length ? self.lastCL5Title : @"Titre non résolu",
             @"returned_program_source": self.lastCL5Program >= 0 ? @"physical_midi" : @"unavailable",
-            @"returned_title_source": self.lastCL5Title.length ? @"console_clf" : @"unresolved",
+            @"returned_title_source": self.lastCL5Title.length ? (self.lastCL5TitleSource ?: @"unresolved") : @"unresolved",
             @"returned_at": self.lastCL5ProgramAt ? @([self.lastCL5ProgramAt timeIntervalSince1970]) : NSNull.null,
             @"program": self.lastCL5Program >= 0
                 ? @(self.lastCL5Program + 1)
@@ -858,16 +931,15 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
                 [self.expectedQL1State[@"expected_midi_program"] integerValue] == self.expectedQL1Program)
                 ? (self.expectedQL1State[@"expected_title"] ?: @"Titre non résolu") : @"Titre non résolu",
             @"expected_program_source": self.expectedQL1Program >= 0 ? @"ableton_iac_output" : @"unavailable",
-            @"expected_title_source": (self.expectedQL1Program >= 0 &&
-                [self.expectedQL1State[@"expected_title_source"] isEqual:@"console_clf"])
-                ? @"console_clf" : @"unresolved",
+            @"expected_title_source": self.expectedQL1Program >= 0
+                ? (self.expectedQL1State[@"expected_title_source"] ?: @"unresolved") : @"unresolved",
             @"expected_activated_at": self.expectedQL1ProgramAt ? @([self.expectedQL1ProgramAt timeIntervalSince1970]) : NSNull.null,
             @"returned_midi_program": self.lastQL1Program >= 0 ? @(self.lastQL1Program) : NSNull.null,
             @"returned_program": self.lastQL1Program >= 0 ? @(self.lastQL1Program + 1) : NSNull.null,
             @"returned_scene_memory": self.lastQL1Program >= 0 ? @(self.lastQL1Program + 1) : NSNull.null,
             @"returned_title": self.lastQL1Title.length ? self.lastQL1Title : @"Titre non résolu",
             @"returned_program_source": self.lastQL1Program >= 0 ? @"physical_midi" : @"unavailable",
-            @"returned_title_source": self.lastQL1Title.length ? @"console_clf" : @"unresolved",
+            @"returned_title_source": self.lastQL1Title.length ? (self.lastQL1TitleSource ?: @"unresolved") : @"unresolved",
             @"returned_at": self.lastQL1ProgramAt ? @([self.lastQL1ProgramAt timeIntervalSince1970]) : NSNull.null,
             @"program": self.lastQL1Program >= 0
                 ? @(self.lastQL1Program + 1)
@@ -919,11 +991,8 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
           @"stateLabels": @[self.ql1ReturnState ?: NSNull.null, self.assistantQL1ReturnState ?: NSNull.null]}
     ];
     for (NSDictionary *console in consoles) {
-        NSInteger program = [console[@"program"] integerValue];
-        NSDate *date = console[@"date"] == NSNull.null ? nil : console[@"date"];
-        NSTimeInterval age = date ? -date.timeIntervalSinceNow : DBL_MAX;
         NSDictionary *expected = console[@"expected"];
-        id expectedProgramValue = expected[@"expected_program"] ?: expected[@"program"];
+        id expectedProgramValue = expected[@"expected_scene_memory"];
         BOOL hasExpectedProgram = expectedProgramValue && expectedProgramValue != NSNull.null;
         NSInteger expectedProgram = hasExpectedProgram ? [expectedProgramValue integerValue] : -1;
         NSString *expectedTitle = [expected[@"expected_title"] isKindOfClass:NSString.class]
@@ -932,41 +1001,60 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
             ? expected[@"returned_title"] : @"Titre non résolu";
         id returnedSceneValue = expected[@"returned_scene_memory"];
         BOOL hasCanonicalReturn = returnedSceneValue && returnedSceneValue != NSNull.null;
-        BOOL hasReturn = program >= 0 && date != nil && hasCanonicalReturn;
-        BOOL stale = hasReturn && age > 12.0;
+        BOOL hasReturn = hasCanonicalReturn;
         NSInteger receivedScene = hasReturn ? [returnedSceneValue integerValue] : -1;
         NSString *validationStatus = [expected[@"validation_status"] isKindOfClass:NSString.class] ? expected[@"validation_status"] : @"unavailable";
         BOOL confirmed = [validationStatus isEqualToString:@"confirmed"];
         BOOL mismatch = [validationStatus isEqualToString:@"mismatch"];
+        BOOL stale = [validationStatus isEqualToString:@"stale"];
+        BOOL localFallback = [validationStatus isEqualToString:@"local_fallback"];
+        BOOL unavailable = [validationStatus isEqualToString:@"unavailable"];
+        NSNumber *ageValue = [expected[@"last_return_age_seconds"] isKindOfClass:NSNumber.class]
+            ? expected[@"last_return_age_seconds"] : nil;
+        NSNumber *latencyValue = [expected[@"confirmation_latency_ms"] isKindOfClass:NSNumber.class]
+            ? expected[@"confirmation_latency_ms"] : nil;
+        NSString *expectedSource = [expected[@"expected_title_source_detail"] isKindOfClass:NSString.class]
+            ? expected[@"expected_title_source_detail"] : ([expected[@"expected_title_source"] isKindOfClass:NSString.class]
+                ? expected[@"expected_title_source"] : @"unresolved");
+        NSString *returnedSource = [expected[@"returned_title_source_detail"] isKindOfClass:NSString.class]
+            ? expected[@"returned_title_source_detail"] : ([expected[@"returned_title_source"] isKindOfClass:NSString.class]
+                ? expected[@"returned_title_source"] : @"unresolved");
+        NSString *expectedProgramSource = [expected[@"expected_program_source"] isKindOfClass:NSString.class]
+            ? expected[@"expected_program_source"] : @"unavailable";
+        NSString *returnedProgramSource = [expected[@"returned_program_source"] isKindOfClass:NSString.class]
+            ? expected[@"returned_program_source"] : @"unavailable";
         NSArray *cards = console[@"cards"], *programLabels = console[@"programLabels"], *titleLabels = console[@"titleLabels"], *stateLabels = console[@"stateLabels"];
         for (NSUInteger index = 0; index < cards.count; index++) {
             if (cards[index] == NSNull.null) continue;
             NSView *card = cards[index]; NSTextField *programLabel = programLabels[index]; NSTextField *titleLabel = titleLabels[index]; NSTextField *stateLabel = stateLabels[index];
-            NSString *expectedText = hasExpectedProgram
-                ? [NSString stringWithFormat:@"Scène attendue n°%ld", (long)expectedProgram]
-                : @"Scène attendue n°—";
-            NSString *receivedText = hasReturn
-                ? [NSString stringWithFormat:@"Scène reçue n°%ld", (long)receivedScene]
-                : @"";
-            programLabel.stringValue = receivedText.length
-                ? [NSString stringWithFormat:@"%@ · %@\n%@", console[@"name"], expectedText, receivedText]
-                : [NSString stringWithFormat:@"%@ · %@", console[@"name"], expectedText];
+            NSInteger mainProgram = hasReturn ? receivedScene : expectedProgram;
+            NSString *mainTitle = hasReturn ? returnedTitle : expectedTitle;
+            programLabel.stringValue = mainProgram >= 0
+                ? [NSString stringWithFormat:@"%@ · Mémoire %ld · %@", console[@"name"], (long)mainProgram, mainTitle]
+                : [NSString stringWithFormat:@"%@ · Mémoire — · Titre non résolu", console[@"name"]];
             programLabel.maximumNumberOfLines = 2;
-            stateLabel.stringValue = !hasReturn
-                ? @"En attente du premier retour MIDI"
-                : stale
-                ? [NSString stringWithFormat:@"Dernière scène reçue %@", CLMidiAgeDescription(age)]
-                : confirmed
-                ? @"✓ Confirmée"
+            stateLabel.stringValue = confirmed
+                ? @"✓ Confirmé par la console"
                 : mismatch
-                ? [NSString stringWithFormat:@"Attendue : %ld · Reçue : %ld · ✕ Mauvaise scène", (long)expectedProgram, (long)receivedScene]
-                : @"Retour MIDI reçu · scène attendue indisponible";
+                ? [NSString stringWithFormat:@"Mismatch · reçu %ld · attendu %ld", (long)receivedScene, (long)expectedProgram]
+                : stale
+                ? [NSString stringWithFormat:@"Retour ancien · %@", ageValue ? CLMidiAgeDescription(ageValue.doubleValue) : @"âge indisponible"]
+                : unavailable
+                ? @"Attendu indisponible"
+                : localFallback
+                ? @"Secours local · en attente du retour"
+                : @"En attente du retour";
             NSNumber *titleOffset = [expected[@"title_offset"] isKindOfClass:NSNumber.class] ? expected[@"title_offset"] : @0;
             id expectedLookup = expected[@"expected_title_lookup_memory"] ?: NSNull.null;
             id returnedLookup = expected[@"returned_title_lookup_memory"] ?: NSNull.null;
-            titleLabel.stringValue = hasReturn
-                ? [NSString stringWithFormat:@"Attendu : %@ · Reçu : %@ · offset %@%ld · lookup %@/%@", expectedTitle, returnedTitle, titleOffset.integerValue > 0 ? @"+" : @"", (long)titleOffset.integerValue, expectedLookup, returnedLookup]
-                : [NSString stringWithFormat:@"Attendu : %@", expectedTitle];
+            titleLabel.stringValue = [NSString stringWithFormat:
+                @"Attendu %ld %@ · Reçu %@ %@ · offset %@%ld · lookup %@/%@ · titres %@/%@ · programmes %@/%@%@",
+                (long)expectedProgram, expectedTitle,
+                hasReturn ? [NSString stringWithFormat:@"%ld", (long)receivedScene] : @"—", returnedTitle,
+                titleOffset.integerValue > 0 ? @"+" : @"", (long)titleOffset.integerValue,
+                expectedLookup, returnedLookup, expectedSource, returnedSource,
+                expectedProgramSource, returnedProgramSource,
+                latencyValue ? [NSString stringWithFormat:@" · latence %@ ms", latencyValue] : @""];
             card.layer.backgroundColor = [NSColor colorWithRed:0.070 green:0.086 blue:0.110 alpha:1.0].CGColor;
             card.layer.borderColor = confirmed
                 ? [NSColor colorWithRed:0.16 green:0.64 blue:0.32 alpha:1.0].CGColor
@@ -1045,6 +1133,8 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
             [payload[@"title"] isKindOfClass:NSString.class]
         ) ? payload[@"title"] : @"";
         NSString *resolvedName = receivedName;
+        NSString *resolvedSource = [payload[@"title_source"] isKindOfClass:NSString.class]
+            ? payload[@"title_source"] : @"unresolved";
         dispatch_async(dispatch_get_main_queue(), ^{
             NSInteger currentProgram = channel == 1 ? self.lastCL5Program : self.lastQL1Program;
             NSUInteger currentGeneration = channel == 1
@@ -1055,8 +1145,8 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
                            midiProgram:midiProgram channel:channel lookupIndex:lookupIndex
                           receivedName:receivedName resolvedName:resolvedName];
             if (stale) return;
-            if (channel == 1) self.lastCL5Title = resolvedName;
-            else self.lastQL1Title = resolvedName;
+            if (channel == 1) { self.lastCL5Title = resolvedName; self.lastCL5TitleSource = resolvedSource; }
+            else { self.lastQL1Title = resolvedName; self.lastQL1TitleSource = resolvedSource; }
             NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
             [defaults setObject:resolvedName forKey:channel == 1 ? @"lastCL5Title" : @"lastQL1Title"];
             [self writeConsoleReturnState];
@@ -1065,11 +1155,15 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
 }
 
 - (void)setupPassiveReturnMonitor {
+    if (!self.ownsPassiveReturnMonitor) return;
     OSStatus clientStatus = MIDIClientCreate(CFSTR("CL Passive Console Return Monitor"), NULL, NULL, &_returnMonitorClient);
     OSStatus expectedPortStatus = clientStatus == noErr
         ? MIDIInputPortCreate(self.returnMonitorClient, CFSTR("Ableton expected input"), CLPassiveExpectedRead,
                               (__bridge void *)self, &_expectedMonitorInputPort)
         : clientStatus;
+    CLExpectedDiagnostic(@"EXPECTED_INPUT_PORT_CREATED", [NSString stringWithFormat:
+        @"status=%d port=%u read_context=%p callback=CLPassiveExpectedRead",
+        (int)expectedPortStatus, (unsigned)self.expectedMonitorInputPort, (__bridge void *)self]);
     OSStatus portStatus = clientStatus == noErr
         ? MIDIInputPortCreate(self.returnMonitorClient, CFSTR("Console return input"), CLPassiveReturnRead,
                               (__bridge void *)self, &_returnMonitorInputPort)
@@ -1090,7 +1184,9 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     [self selectPassiveExpectedSourceNamed:CLExpectedEndpointName];
     self.localReturnMode = self.returnModeMenu.indexOfSelectedItem == 1;
     self.returnMonitorStatus = localStatus;
-    if (!self.localReturnMode) [self selectPassiveReturnSourceNamed:CLRTPReturnEndpointName];
+    if (!self.localReturnMode) {
+        [self selectPassiveReturnSourceNamed:CLPreferredConsoleReturnEndpoint(EndpointNames(YES))];
+    }
     [self updateRoundTripPanelForCurrentMode];
 }
 
@@ -1098,21 +1194,42 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     MIDIEndpointRef selectedSource = 0;
     for (ItemCount index = 0; index < MIDIGetNumberOfSources(); index++) {
         MIDIEndpointRef source = MIDIGetSource(index);
-        if ([EndpointName(source) isEqualToString:name]) { selectedSource = source; break; }
+        NSString *sourceName = EndpointName(source);
+        if (!self.expectedSourceEnumerationLogged) {
+            CLExpectedDiagnostic(@"EXPECTED_SOURCE_ENUM", [NSString stringWithFormat:
+                @"index=%lu endpoint=%u unique_id=%d name=%@", (unsigned long)index,
+                (unsigned)source, (int)CLEndpointUniqueID(source), sourceName]);
+        }
+        if ([sourceName isEqualToString:name]) {
+            selectedSource = source;
+            CLExpectedDiagnostic(@"EXPECTED_SOURCE_SELECTED", [NSString stringWithFormat:
+                @"index=%lu endpoint=%u unique_id=%d name=%@ comparison=exact", (unsigned long)index,
+                (unsigned)source, (int)CLEndpointUniqueID(source), sourceName]);
+            break;
+        }
     }
+    self.expectedSourceEnumerationLogged = YES;
     if (selectedSource == self.expectedMonitorSource) return;
     if (self.expectedMonitorSource && self.expectedMonitorInputPort) {
         MIDIPortDisconnectSource(self.expectedMonitorInputPort, self.expectedMonitorSource);
     }
     self.expectedMonitorSource = 0;
-    if (selectedSource && self.expectedMonitorInputPort &&
-        (self.expectedMonitorStatus = MIDIPortConnectSource(
-            self.expectedMonitorInputPort, selectedSource, NULL)) == noErr) {
+    if (selectedSource && self.expectedMonitorInputPort) {
+        self.expectedMonitorStatus = MIDIPortConnectSource(
+            self.expectedMonitorInputPort, selectedSource, NULL);
+        CLExpectedDiagnostic(@"EXPECTED_SOURCE_CONNECTED", [NSString stringWithFormat:
+            @"status=%d source=%u unique_id=%d name=%@ port=%u source_context=%p",
+            (int)self.expectedMonitorStatus, (unsigned)selectedSource,
+            (int)CLEndpointUniqueID(selectedSource), EndpointName(selectedSource),
+            (unsigned)self.expectedMonitorInputPort, NULL]);
+    }
+    if (selectedSource && self.expectedMonitorInputPort && self.expectedMonitorStatus == noErr) {
         self.expectedMonitorSource = selectedSource;
     } else if (!selectedSource) self.expectedMonitorStatus = kMIDIUnknownEndpoint;
 }
 
 - (void)selectPassiveReturnSourceNamed:(NSString *)name {
+    if (!self.ownsPassiveReturnMonitor) return;
     if ([name isEqualToString:CLExpectedEndpointName] || [name isEqualToString:CLLocalReturnEndpointName]) {
         self.returnMonitorStatus = kMIDIUnknownEndpoint;
         return;
@@ -1125,7 +1242,12 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
             break;
         }
     }
-    if (selectedSource == self.returnMonitorSource) return;
+    // Deux références nulles signifient « introuvable », pas « déjà connecté ».
+    if (selectedSource && selectedSource == self.returnMonitorSource) {
+        self.returnMonitorStatus = noErr;
+        [self writeConsoleReturnState];
+        return;
+    }
     if (self.returnMonitorSource && self.returnMonitorInputPort) {
         MIDIPortDisconnectSource(self.returnMonitorInputPort, self.returnMonitorSource);
     }
@@ -1187,6 +1309,8 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
             self.expectedQL1Program = program;
             self.expectedQL1ProgramAt = receivedAt;
         }
+        CLExpectedDiagnostic(@"EXPECTED_STATE_UPDATED", [NSString stringWithFormat:
+            @"console=%@ expected_midi_program=%u", channel == 1 ? @"CL5" : @"QL1", program]);
         CLAppendDiagnostic(@"expected-midi", [NSString stringWithFormat:
             @"endpoint=%@ channel=%u midi_program=%u console=%@ role=expected",
             CLExpectedEndpointName, channel, program, channel == 1 ? @"CL5" : @"QL1"]);
@@ -1294,9 +1418,15 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
 
     NSString *endpoint = self.endpointMenu.selectedItem.title ?: @"";
     if ([endpoint isEqualToString:CLExpectedEndpointName] || [endpoint isEqualToString:CLLocalReturnEndpointName]) {
-        [self.endpointMenu selectItemWithTitle:CLRTPReturnEndpointName];
+        NSString *preferred = CLPreferredConsoleReturnEndpoint(EndpointNames(YES));
+        if (preferred.length) [self.endpointMenu selectItemWithTitle:preferred];
         self.lastTest.stringValue = @"Endpoint interne refusé comme console distante";
         return;
+    }
+
+    if (endpoint.length && ![endpoint hasPrefix:@"Aucun"]) {
+        [NSUserDefaults.standardUserDefaults setObject:endpoint forKey:CLConsoleReturnEndpointPreference];
+        if (!self.localReturnMode) [self selectPassiveReturnSourceNamed:endpoint];
     }
 
     if (
@@ -1328,8 +1458,9 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
         self.returnMonitorStatus = self.localReturnDestination ? noErr : kMIDIUnknownEndpoint;
         self.lastTest.stringValue = @"Test local · retour dédié";
     } else {
-        [self.endpointMenu selectItemWithTitle:CLRTPReturnEndpointName];
-        [self selectPassiveReturnSourceNamed:CLRTPReturnEndpointName];
+        NSString *preferred = CLPreferredConsoleReturnEndpoint(EndpointNames(YES));
+        if (preferred.length) [self.endpointMenu selectItemWithTitle:preferred];
+        [self selectPassiveReturnSourceNamed:preferred];
         self.lastTest.stringValue = @"RTP distant · choisissez la console distante";
     }
     [self refreshEndpoints];
@@ -1592,7 +1723,13 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     }
     [self.endpointMenu removeAllItems];
     [self.endpointMenu addItemsWithTitles:candidates.array.count ? candidates.array : @[@"Aucun port MIDI détecté"]];
-    if (selected.length && [candidates containsObject:selected]) [self.endpointMenu selectItemWithTitle:selected];
+    NSString *saved = [NSUserDefaults.standardUserDefaults stringForKey:CLConsoleReturnEndpointPreference];
+    NSString *preferred = ([candidates containsObject:selected] ? selected : nil) ?:
+        ([candidates containsObject:saved] ? saved : CLPreferredConsoleReturnEndpoint(sources));
+    if (preferred.length && [candidates containsObject:preferred]) {
+        [self.endpointMenu selectItemWithTitle:preferred];
+        [NSUserDefaults.standardUserDefaults setObject:preferred forKey:CLConsoleReturnEndpointPreference];
+    }
     [self stylePopup:self.endpointMenu accent:[NSColor colorWithRed:0.67 green:0.53 blue:1.0 alpha:1.0]];
 
     if (self.simulatorEndpointMenu && self.simulatorModeMenu.indexOfSelectedItem == 1) {
@@ -1620,7 +1757,7 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     // Chaque rôle est reconnecté indépendamment. L'absence d'un endpoint ne
     // doit jamais déconnecter l'autre source encore valide.
     [self selectPassiveExpectedSourceNamed:CLExpectedEndpointName];
-    if (!self.localReturnMode) [self selectPassiveReturnSourceNamed:CLRTPReturnEndpointName];
+    if (!self.localReturnMode) [self selectPassiveReturnSourceNamed:preferred];
     BOOL hasSource = [sources containsObject:endpoint];
     BOOL hasDestination = [destinations containsObject:endpoint];
     MIDINetworkSession *session = [MIDINetworkSession defaultSession];
@@ -1635,7 +1772,7 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     self.technicalSelection.stringValue = [NSString stringWithFormat:
         @"Source expected Ableton (indépendante du RTP) : %@ · %@\nSource console / retour RTP : %@ · %@",
         CLExpectedEndpointName, self.expectedMonitorSource ? @"connectée" : @"indisponible (sans effet sur la liaison RTP)",
-        self.localReturnMode ? CLLocalReturnEndpointName : CLRTPReturnEndpointName,
+        self.localReturnMode ? CLLocalReturnEndpointName : (preferred ?: @"aucune"),
         self.localReturnMode ? (self.localReturnDestination ? @"connectée" : @"indisponible") :
             (self.returnMonitorSource ? @"connectée" : @"indisponible")];
     if (self.showModeEnabled) [self updateCompactSummary];
@@ -2143,8 +2280,11 @@ static NSString * const CLSimulatorDevicesDefaultsKey = @"CLSimulatorDevicesV1";
         self.returnMonitorSource = 0;
     }
     if (self.localReturnMode) self.returnMonitorStatus = self.localReturnDestination ? noErr : kMIDIUnknownEndpoint;
-    else [self selectPassiveReturnSourceNamed:CLRTPReturnEndpointName];
-    if (!self.localReturnMode) [self.endpointMenu selectItemWithTitle:CLRTPReturnEndpointName];
+    else {
+        NSString *preferred = CLPreferredConsoleReturnEndpoint(EndpointNames(YES));
+        if (preferred.length) [self.endpointMenu selectItemWithTitle:preferred];
+        [self selectPassiveReturnSourceNamed:preferred];
+    }
     [self refreshEndpoints];
 }
 

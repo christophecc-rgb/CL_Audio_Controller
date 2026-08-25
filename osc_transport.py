@@ -150,7 +150,9 @@ class OSCTransport:
         client = udp_client.SimpleUDPClient(resolved_host, int(port))
         client.send_message(address, list(args))
 
-    def _receive(self, address: str, *args: Any) -> None:
+    def _receive(
+        self, address: str, *args: Any, source_host: Optional[str] = None,
+    ) -> None:
         now = time.time()
         with self._state_lock:
             self.connected = True
@@ -167,11 +169,22 @@ class OSCTransport:
                 return
         handler = self._unsolicited_handler
         if handler is not None:
-            handler(address, *args)
+            if source_host is None:
+                handler(address, *args)
+            else:
+                handler(address, *args, source_host=source_host)
+
+    def _receive_datagram(
+        self, client_address: Tuple[str, int], address: str, *args: Any,
+    ) -> None:
+        """Conserve l'hôte UDP pour les diagnostics des messages spontanés."""
+        self._receive(address, *args, source_host=str(client_address[0]))
 
     def serve_forever(self, bind_host: str = "0.0.0.0") -> None:
         osc_dispatcher = dispatcher.Dispatcher()
-        osc_dispatcher.set_default_handler(self._receive)
+        osc_dispatcher.set_default_handler(
+            self._receive_datagram, needs_reply_address=True,
+        )
         server = osc_server.ThreadingOSCUDPServer((bind_host, self.reply_port), osc_dispatcher)
         with self._state_lock:
             self._reply_server = server

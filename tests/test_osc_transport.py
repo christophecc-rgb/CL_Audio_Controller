@@ -154,6 +154,20 @@ class OSCTransportTests(unittest.TestCase):
         transport._receive("/live/startup")
         self.assertEqual(received, [("/live/startup", ())])
 
+    def test_udp_source_host_reaches_unsolicited_handler(self):
+        received = []
+        def handler(address, *args, source_host=None):
+            received.append((address, args, source_host))
+        transport = self.make_transport(handler)
+        transport._receive_datagram(
+            ("192.168.50.27", 54321),
+            "/cl/midi-monitor/outgoing/cl5",
+            127,
+        )
+        self.assertEqual(received, [
+            ("/cl/midi-monitor/outgoing/cl5", (127,), "192.168.50.27"),
+        ])
+
     def test_abletonosc_client_is_not_constructed_in_business_code(self):
         source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
         direct_clients = [line for line in source.splitlines() if "SimpleUDPClient(" in line]

@@ -8,6 +8,20 @@ static NSString *const CLConfigurationErrorDomain = @"com.claudio.configuration-
 
 @implementation CLConfigurationProfile
 
+static NSDictionary *CLPersistentProfileValues(NSDictionary *values) {
+    NSMutableDictionary *clean = [values mutableCopy];
+    // These keys describe one observation.  They must never become reference
+    // requirements when a profile is imported, duplicated, or exported.
+    for (NSString *key in @[@"inspection", @"operational_state", @"server_status",
+                             @"midi_console", @"captured_at"]) [clean removeObjectForKey:key];
+    NSMutableDictionary *midi = [clean[@"midi"] mutableCopy];
+    for (NSString *key in @[@"expected_midi_program", @"returned_midi_program",
+                             @"last_return_age_seconds", @"validation_status"])
+        [midi removeObjectForKey:key];
+    if (midi) clean[@"midi"] = midi;
+    return clean;
+}
+
 + (instancetype)profileWithValues:(NSDictionary *)values error:(NSError **)error {
     NSMutableArray *problems = [NSMutableArray array];
     if (![values isKindOfClass:NSDictionary.class]) [problems addObject:@"racine JSON invalide"];
@@ -29,7 +43,7 @@ static NSString *const CLConfigurationErrorDomain = @"com.claudio.configuration-
         return nil;
     }
     CLConfigurationProfile *profile = [self new];
-    profile.values = [values copy];
+    profile.values = CLPersistentProfileValues(values);
     return profile;
 }
 
@@ -44,7 +58,10 @@ static NSString *const CLConfigurationErrorDomain = @"com.claudio.configuration-
         @"midi": @{@"cl5_channel": @1, @"ql1_channel": @2},
         @"simulator": @{@"transport": @"rtp", @"endpoint": @"", @"delay_ms": @80},
         @"console_return": @{@"mode": remote ? @"" : @"rtp_remote", @"source": @""},
-        @"clf": @{@"cl5_path": [NSHomeDirectory() stringByAppendingPathComponent:@"Desktop/CL5.CLF"], @"ql1_path": [NSHomeDirectory() stringByAppendingPathComponent:@"Desktop/ql1.CLF"]},
+        @"console_libraries": @{
+            @"cl5_path": [NSHomeDirectory() stringByAppendingPathComponent:@"Library/Application Support/CL Audio Controller/Console Files/CL5.titles.json"],
+            @"ql1_path": [NSHomeDirectory() stringByAppendingPathComponent:@"Library/Application Support/CL Audio Controller/Console Files/QL1.titles.json"],
+        },
     };
     return [self profileWithValues:values error:nil];
 }

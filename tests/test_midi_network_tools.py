@@ -177,7 +177,7 @@ class MidiNetworkToolsTests(unittest.TestCase):
         local_branch = refresh.split('if (self.localReturnMode)', 1)[1].split('} else if', 1)[0]
         self.assertNotIn('retour distant', local_branch)
         self.assertIn('CLLocalReturnEndpointName', refresh)
-        self.assertIn('CLRTPReturnEndpointName', mode_changed)
+        self.assertIn('CLPreferredConsoleReturnEndpoint(EndpointNames(YES))', mode_changed)
 
     def test_round_trip_panel_tracks_simulator_mode_immediately(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
@@ -252,15 +252,15 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('@"lastQL1Program"', source)
         self.assertIn('CLMidiAgeDescription', source)
         self.assertIn('@"En attente du premier retour MIDI"', source)
-        self.assertIn('@"✓ Confirmée"', source)
-        self.assertIn('✕ Mauvaise scène', source)
-        self.assertIn('@"Dernière scène reçue %@"', source)
+        self.assertIn('@"✓ Confirmé par la console"', source)
+        self.assertIn('Mismatch · reçu %ld · attendu %ld', source)
+        self.assertIn('@"Retour ancien · %@"', source)
         return_cards = source.split('- (void)updateConsoleReturnCards {', 1)[1].split('- (void)refreshAbletonSceneTitle {', 1)[0]
-        self.assertNotIn('local_fallback', return_cards)
+        self.assertIn('local_fallback', return_cards)
         self.assertNotIn('non confirmée', return_cards)
         self.assertIn('expected[@"validation_status"]', return_cards)
         self.assertNotIn('receivedScene == expectedProgram', return_cards)
-        self.assertIn('age > 12.0', return_cards)
+        self.assertIn('validationStatus isEqualToString:@"stale"', return_cards)
         self.assertIn('@"expected_program"', source)
         self.assertNotIn('pendingCL5Program', source)
         self.assertNotIn('pendingQL1Program', source)
@@ -402,14 +402,15 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertEqual(refresh.count('CLIsRTPReturnEndpointName(name)'), 2)
         self.assertIn('CLRTPReturnEndpointName = @"Réseau RTP MB Chris"', source)
 
-    def test_return_mode_selects_fixed_sources_and_guards_rtp_diagnostics(self):
+    def test_return_mode_selects_saved_dynamic_source_and_guards_rtp_diagnostics(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
         changed = source.split('- (void)returnModeChanged:', 1)[1].split('- (void)targetChanged:', 1)[0]
         run_test = source.split('- (void)runTest:', 1)[1].split('- (void)openMidiSetup:', 1)[0]
         selector = source.split('- (void)selectPassiveReturnSourceNamed:', 1)[1].split('- (void)updateCompactSummary', 1)[0]
         self.assertIn('self.localReturnMode = self.returnModeMenu.indexOfSelectedItem == 1', changed)
         self.assertIn('self.returnMonitorStatus = self.localReturnDestination ? noErr', changed)
-        self.assertIn('[self selectPassiveReturnSourceNamed:CLRTPReturnEndpointName]', changed)
+        self.assertIn('CLPreferredConsoleReturnEndpoint(EndpointNames(YES))', changed)
+        self.assertIn('[self selectPassiveReturnSourceNamed:preferred]', changed)
         self.assertIn('if (self.localReturnMode)', run_test)
         self.assertIn('[name isEqualToString:CLExpectedEndpointName]', selector)
         self.assertIn('[name isEqualToString:CLLocalReturnEndpointName]', selector)
@@ -435,12 +436,11 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertNotIn('/status', method)
         self.assertNotIn('localFallback ? @""', source)
         self.assertNotIn('returnModeMenu.indexOfSelectedItem == 1 ? @"" : endpoint', source)
-        self.assertIn(
-            '[self selectPassiveReturnSourceNamed:CLRTPReturnEndpointName]',
-            source,
-        )
+        self.assertIn('CLConsoleReturnEndpointPreference = @"consoleReturnEndpoint"', source)
+        self.assertIn('CLPreferredConsoleReturnEndpoint', source)
         endpoint_changed = source.split('- (void)endpointChanged:', 1)[1].split('- (void)returnModeChanged:', 1)[0]
-        self.assertNotIn('[self selectPassiveReturnSourceNamed:endpoint]', endpoint_changed)
+        self.assertIn('[self selectPassiveReturnSourceNamed:endpoint]', endpoint_changed)
+        self.assertIn('setObject:endpoint forKey:CLConsoleReturnEndpointPreference', endpoint_changed)
         self.assertIn('@"return_source": endpoint', source)
         self.assertIn('@"monitor_source": self.localReturnMode ? CLLocalReturnEndpointName', source)
         self.assertIn('@"monitor_status": @(self.returnMonitorStatus)', source)
@@ -481,7 +481,37 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertNotIn('expectedQL1Program = program', returned)
         refresh = source.split('- (void)refreshEndpoints', 1)[1].split('- (NSString *)toolPath:', 1)[0]
         self.assertIn('selectPassiveExpectedSourceNamed:CLExpectedEndpointName', refresh)
-        self.assertIn('selectPassiveReturnSourceNamed:CLRTPReturnEndpointName', refresh)
+        self.assertIn('selectPassiveReturnSourceNamed:preferred', refresh)
+
+    def test_expected_parser_handles_running_status_and_packet_boundaries(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        parser = source.split('static void CLPassiveExpectedRead', 1)[1].split(
+            'static void CLPassiveReturnRead', 1
+        )[0]
+        self.assertIn('UInt8 runningStatus = delegate.expectedRunningStatus', parser)
+        self.assertIn('if (byte >= 0xF8) continue;', parser)
+        self.assertIn('runningStatus = byte < 0xF0 ? byte : 0;', parser)
+        self.assertIn('(runningStatus & 0xF0) == 0xC0', parser)
+        self.assertIn('channel == 1 || channel == 2', parser)
+        self.assertIn('[delegate queueExpectedProgram:byte channel:channel]', parser)
+        self.assertIn('delegate.expectedRunningStatus = runningStatus', parser)
+        self.assertNotIn('queueReturnedProgram:', parser)
+
+    def test_expected_diagnostic_instruments_connection_callback_and_state_only(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        self.assertIn('/private/tmp/CL_MIDI_EXPECTED_DIAGNOSTIC.log', source)
+        for event in (
+            "EXPECTED_SOURCE_ENUM", "EXPECTED_SOURCE_SELECTED",
+            "EXPECTED_INPUT_PORT_CREATED", "EXPECTED_SOURCE_CONNECTED",
+            "EXPECTED_CALLBACK_ENTER", "EXPECTED_PACKET",
+            "EXPECTED_PROGRAM_DECODED", "EXPECTED_STATE_UPDATED",
+        ):
+            self.assertIn(f'@"{event}"', source)
+        self.assertIn('MIDIObjectGetIntegerProperty(endpoint, kMIDIPropertyUniqueID', source)
+        self.assertIn('callback=CLPassiveExpectedRead', source)
+        self.assertIn('[sourceName isEqualToString:name]', source)
+        self.assertIn('if (self.ownsPassiveReturnMonitor) CLResetExpectedDiagnostic();', source)
+        self.assertNotIn('EXPECTED_HEARTBEAT', source)
 
     def test_iac_simulator_is_explicitly_refused_to_protect_expected_role(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
@@ -494,12 +524,31 @@ class MidiNetworkToolsTests(unittest.TestCase):
         mode = source.split('- (void)simulatorModeChanged:', 1)[1].split('- (NSTask *)launchSimulatorDevice:', 1)[0]
         transport = source.split('- (BOOL)simulatorTransport:', 1)[1].split('- (void)startSimulatorDevice:', 1)[0]
         self.assertIn('selectPassiveExpectedSourceNamed:CLExpectedEndpointName', refresh)
-        self.assertIn('if (!self.localReturnMode) [self selectPassiveReturnSourceNamed:CLRTPReturnEndpointName]', refresh)
+        self.assertIn('if (!self.localReturnMode) [self selectPassiveReturnSourceNamed:preferred]', refresh)
         self.assertNotIn('expectedMonitorSource = 0', mode)
         self.assertNotIn('expectedCL5Program = -1', mode)
         self.assertNotIn('expectedQL1Program = -1', mode)
         self.assertIn('mode == 0 ? CLLocalReturnEndpointName : selectedEndpoint', transport)
         self.assertIn('mode == 0 ? @"iac" : @"rtp"', transport)
+
+    def test_return_monitor_handles_missing_source_and_has_single_publisher(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        selector = source.split('- (void)selectPassiveReturnSourceNamed:', 1)[1].split(
+            '- (void)updateCompactSummary', 1
+        )[0]
+        writer = source.split('- (void)writeConsoleReturnState', 1)[1].split(
+            '- (void)resolveSceneTitleForMIDIProgram:', 1
+        )[0]
+        setup = source.split('- (void)setupPassiveReturnMonitor', 1)[1].split(
+            '- (void)selectPassiveExpectedSourceNamed:', 1
+        )[0]
+        self.assertNotIn('if (selectedSource == self.returnMonitorSource) return;', selector)
+        self.assertIn('if (selectedSource && selectedSource == self.returnMonitorSource)', selector)
+        self.assertIn('self.returnMonitorStatus = kMIDIUnknownEndpoint', selector)
+        self.assertIn('if (!self.ownsPassiveReturnMonitor) return;', selector)
+        self.assertIn('if (!self.ownsPassiveReturnMonitor) return;', writer)
+        self.assertIn('if (!self.ownsPassiveReturnMonitor) return;', setup)
+        self.assertIn('flock(CLBackgroundMonitorLock, LOCK_EX | LOCK_NB)', source)
 
     def test_remote_simulator_selects_and_validates_a_local_rtp_endpoint(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
@@ -607,6 +656,24 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('expected[@"expected_title"]', method)
         self.assertIn('@"Titre non résolu"', method)
         self.assertNotIn("currentAbletonSceneTitle", method)
+
+    def test_dashboard_cards_render_the_canonical_status_model(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        method = source.rsplit("- (void)updateConsoleReturnCards", 1)[1].split(
+            "- (void)refreshAbletonSceneTitle", 1
+        )[0]
+        for field in (
+            "expected_scene_memory", "expected_title", "expected_program_source",
+            "returned_scene_memory", "returned_title", "returned_program_source",
+            "title_offset", "expected_title_lookup_memory", "returned_title_lookup_memory",
+            "validation_status", "last_return_age_seconds", "confirmation_latency_ms",
+        ):
+            self.assertIn(f'expected[@"{field}"]', method)
+        for status in ("confirmed", "mismatch", "stale", "local_fallback", "unavailable"):
+            self.assertIn(f'@"{status}"', method)
+        self.assertIn('@"✓ Confirmé par la console"', method)
+        self.assertIn('@"En attente du retour"', method)
+        self.assertNotIn("date.timeIntervalSinceNow", method)
 
     def test_yamaha_simulator_dashboard_supports_independent_consoles(self):
         source = (TOOLS / "CLYamahaSimulatorDashboard.m").read_text()

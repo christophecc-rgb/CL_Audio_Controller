@@ -75,6 +75,70 @@ class ConfigurationCheckerTests(unittest.TestCase):
         ):
             self.assertIn(expected, source)
 
+    def test_same_named_rtp_source_and_destination_form_a_valid_pair(self):
+        source = (TOOLS / "CLConfigurationValidator.m").read_text()
+        self.assertIn("[sourceNames containsObject:expectedEndpoint]", source)
+        self.assertIn("[destinationNames containsObject:expectedEndpoint]", source)
+        self.assertNotIn("sourceNames intersectsSet:destinationNames", source)
+
+    def test_processes_are_counted_by_executable_not_bundle_path(self):
+        inspector = (TOOLS / "CLConfigurationInspector.m").read_text()
+        validator = (TOOLS / "CLConfigurationValidator.m").read_text()
+        self.assertIn('@"executable": executable', inspector)
+        self.assertIn('processNames[executable]', validator)
+        self.assertIn('@"CLMIDINetworkGuardian": @"CLMIDINetworkGuardian"', validator)
+        self.assertNotIn('if ([command containsString:name]) counts[name]', validator)
+
+    def test_return_states_use_status_and_age_without_false_mismatch(self):
+        source = (TOOLS / "CLConfigurationValidator.m").read_text()
+        for expected in (
+            'console[@"validation_status"]',
+            'console[@"last_return_age_seconds"]',
+            '@"confirmed"',
+            '@"mismatch"',
+            '@"stale"',
+            '@"waiting"',
+            '@"unavailable"',
+            'Retour périmé',
+            'if (!expected) validation = @"unavailable"',
+        ):
+            self.assertIn(expected, source)
+
+    def test_canonical_title_libraries_replace_desktop_clf_requirements(self):
+        profile = (TOOLS / "CLConfigurationProfile.m").read_text()
+        inspector = (TOOLS / "CLConfigurationInspector.m").read_text()
+        validator = (TOOLS / "CLConfigurationValidator.m").read_text()
+        for filename in ("CL5.titles.json", "QL1.titles.json"):
+            self.assertIn(filename, profile)
+        self.assertNotIn("Desktop/CL5.CLF", profile)
+        self.assertNotIn("Desktop/ql1.CLF", profile)
+        for field in ('@"entries"', '@"source_format"', '@"source_name"', '@"migrated_from"', '@"entry_count"'):
+            self.assertIn(field, inspector)
+        self.assertIn('Bibliothèques de titres', validator)
+
+    def test_monitor_state_and_degraded_mode_are_explicit(self):
+        source = (TOOLS / "CLConfigurationValidator.m").read_text()
+        for expected in (
+            'expected_monitor_source', 'expected_monitor_status',
+            'return_monitor_source', 'return_monitor_status',
+            'Expected monitor', 'Return monitor',
+            'degraded_ableton_clip_name', 'mode dégradé',
+        ):
+            self.assertIn(expected, source)
+
+    def test_profiles_strip_transient_program_change_observations(self):
+        profile = (TOOLS / "CLConfigurationProfile.m").read_text()
+        app = (TOOLS / "CLConfigurationCheckerApp.m").read_text()
+        for transient in (
+            'operational_state', 'server_status', 'midi_console', 'captured_at',
+            'expected_midi_program', 'returned_midi_program',
+            'last_return_age_seconds', 'validation_status',
+        ):
+            self.assertIn(transient, profile)
+        self.assertIn('CLPersistentProfileValues(values)', profile)
+        self.assertIn('console_return_mode', app)
+        self.assertIn('console_return_source', app)
+
     def test_ui_exposes_safe_check_and_profile_workflow(self):
         source = (TOOLS / "CLConfigurationCheckerApp.m").read_text()
         for expected in (

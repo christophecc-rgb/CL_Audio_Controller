@@ -58,6 +58,13 @@
     NSMutableSet *sources = [NSMutableSet set], *destinations = [NSMutableSet set]; for (NSDictionary *endpoint in self.inspection[@"midi_endpoints"] ?: @[]) if ([endpoint[@"classification"] isEqualToString:@"rtp"]) { if ([endpoint[@"direction"] isEqualToString:@"source"]) [sources addObject:endpoint[@"name"]]; else [destinations addObject:endpoint[@"name"]]; }
     for (NSString *candidate in sources) if ([destinations containsObject:candidate]) { rtp[@"local_endpoint"] = candidate; break; } values[@"rtp"] = rtp;
     NSMutableDictionary *simulator = [values[@"simulator"] mutableCopy]; if ([rtp[@"local_endpoint"] length]) simulator[@"endpoint"] = rtp[@"local_endpoint"]; values[@"simulator"] = simulator;
+    NSDictionary *status = self.inspection[@"server_status"] ?: @{};
+    if ([self.profile.machineRole isEqualToString:@"server"] && status.count) {
+        NSMutableDictionary *consoleReturn = [values[@"console_return"] mutableCopy] ?: [NSMutableDictionary dictionary];
+        if ([status[@"console_return_mode"] isKindOfClass:NSString.class]) consoleReturn[@"mode"] = status[@"console_return_mode"];
+        if ([status[@"console_return_source"] isKindOfClass:NSString.class]) consoleReturn[@"source"] = status[@"console_return_source"];
+        values[@"console_return"] = consoleReturn;
+    }
     return [CLConfigurationProfile profileWithValues:values error:nil];
 }
 - (void)showError:(NSError *)error { NSAlert *alert = [NSAlert new]; alert.messageText = @"Opération impossible"; alert.informativeText = error.localizedDescription ?: @"Erreur inconnue"; [alert runModal]; }

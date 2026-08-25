@@ -17,6 +17,7 @@ class PackagingTests(unittest.TestCase):
         self.assertNotIn("('M4L', 'M4L')", spec)
         self.assertIn("'CFBundleShortVersionString': '2.2.0'", spec)
         self.assertIn("'CFBundleVersion': '6'", spec)
+        self.assertIn("('console_title_library.py', '.')", spec)
 
     def test_release_contains_offline_dependencies_and_clear_installation_files(self):
         script = (PROJECT_ROOT / "scripts/build_release.sh").read_text(encoding="utf-8")

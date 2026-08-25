@@ -7,12 +7,13 @@ import re
 import socket
 import threading
 import time
-from typing import Callable, Optional, Tuple
+from typing import Callable, FrozenSet, Optional, Tuple
 
 
 LTC_BIND_HOST = "0.0.0.0"
 LTC_PORT = 63123
 LTC_MAX_PACKET_SIZE = 8192
+LTC_HOST_CACHE_TTL = 30.0
 LTC_PATTERN = re.compile(r"tc,s?(\d{1,2}):(\d{2}):(\d{2}):(\d{2})")
 
 
@@ -30,6 +31,9 @@ class LTCReceiver:
         max_packet_size: int = LTC_MAX_PACKET_SIZE,
         connection_timeout: float = 2.0,
         socket_factory: Callable[..., socket.socket] = socket.socket,
+        hostname_cache_ttl: float = LTC_HOST_CACHE_TTL,
+        hostname_resolver: Callable[..., list] = socket.getaddrinfo,
+        cache_clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self._target_provider = target_provider
         self._publish = publish
@@ -39,6 +43,13 @@ class LTCReceiver:
         self.max_packet_size = int(max_packet_size)
         self.connection_timeout = float(connection_timeout)
         self._socket_factory = socket_factory
+        self._hostname_cache_ttl = float(hostname_cache_ttl)
+        self._hostname_resolver = hostname_resolver
+        self._cache_clock = cache_clock
+        self._cached_hostname: Optional[str] = None
+        self._cached_addresses: FrozenSet[ipaddress.IPv4Address] = frozenset()
+        self._hostname_cache_expires_at = 0.0
+        self._source_rejection_reason = "source-not-allowed"
         self._socket: Optional[socket.socket] = None
         self._stop_event = threading.Event()
         self._rejected_count = 0
@@ -55,14 +66,53 @@ class LTCReceiver:
     def _source_allowed(self, source_ip: str) -> bool:
         try:
             source = ipaddress.ip_address(source_ip)
-            target = self._target_provider()
-            mode = str(getattr(target, "mode", "local")).lower()
-            if mode == "local":
-                return source.is_loopback
-            target_address = ipaddress.ip_address(str(getattr(target, "host", "")))
-            return source == target_address
         except (TypeError, ValueError):
+            self._source_rejection_reason = "source-not-allowed"
             return False
+
+        target = self._target_provider()
+        mode = str(getattr(target, "mode", "local")).lower()
+        target_host = str(getattr(target, "host", "")).strip()
+        if target_host != self._cached_hostname:
+            self._cached_hostname = None
+            self._cached_addresses = frozenset()
+            self._hostname_cache_expires_at = 0.0
+
+        if mode == "local":
+            self._source_rejection_reason = "source-not-allowed"
+            return source.is_loopback
+
+        try:
+            target_address = ipaddress.ip_address(target_host)
+        except (TypeError, ValueError):
+            target_address = None
+        if target_address is not None:
+            self._source_rejection_reason = "source-not-allowed"
+            return source == target_address
+
+        now = self._cache_clock()
+        if self._cached_hostname != target_host or now >= self._hostname_cache_expires_at:
+            addresses = set()
+            try:
+                results = self._hostname_resolver(
+                    target_host, None, socket.AF_INET, socket.SOCK_DGRAM
+                )
+                for result in results:
+                    try:
+                        addresses.add(ipaddress.IPv4Address(result[4][0]))
+                    except (IndexError, TypeError, ValueError):
+                        continue
+            except (OSError, TypeError, ValueError):
+                addresses.clear()
+            self._cached_hostname = target_host
+            self._cached_addresses = frozenset(addresses)
+            self._hostname_cache_expires_at = now + self._hostname_cache_ttl
+
+        if not self._cached_addresses:
+            self._source_rejection_reason = "hostname-resolution-failed"
+            return False
+        self._source_rejection_reason = "resolved-source-mismatch"
+        return source in self._cached_addresses
 
     @staticmethod
     def _valid_timecode(parts: Tuple[str, str, str, str]) -> bool:
@@ -78,7 +128,7 @@ class LTCReceiver:
         """Valide et publie un datagramme. Retourne le nombre de TC publiés."""
         source_ip = str(address[0])
         if not self._source_allowed(source_ip):
-            self._reject("source-not-allowed", source_ip)
+            self._reject(self._source_rejection_reason, source_ip)
             return 0
         if not data:
             self._reject("empty-packet", source_ip)

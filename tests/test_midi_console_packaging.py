@@ -1,4 +1,6 @@
 import plistlib
+import json
+import struct
 import subprocess
 import tempfile
 import unittest
@@ -35,6 +37,17 @@ class MidiConsolePackagingTests(unittest.TestCase):
             self.assertIn(required, source)
         self.assertIn("hdiutil create", source)
         self.assertIn("ditto -c -k", source)
+
+    def test_packaged_device_source_and_amxd_are_the_configurable_version(self):
+        device = ROOT / "M4L" / "Devices" / "CL MIDI Console Monitor"
+        source = json.loads((device / "CL MIDI Console Monitor.maxpat").read_text())
+        raw = (device / "CL MIDI Console Monitor.amxd").read_bytes()
+        length = struct.unpack("<I", raw[28:32])[0]
+        self.assertEqual(source, json.loads(raw[32:32 + length]))
+        boxes = {item["box"]["id"]: item["box"] for item in source["patcher"]["boxes"]}
+        self.assertEqual(boxes["outgoing-udp"]["text"], "udpsend")
+        self.assertIn("@initial 127.0.0.1", boxes["destination-host-pattr"]["text"])
+        self.assertIn("@initial 11001", boxes["destination-port-pattr"]["text"])
 
     def test_complete_suite_installer_offers_midi_console_as_a_separate_component(self):
         source = (ROOT / "packaging" / "Installer_Toute_La_Suite_CL.command").read_text()

@@ -66,9 +66,37 @@ static NSArray *CLProcesses(void) {
         char buffer[PROC_PIDPATHINFO_MAXSIZE] = {0}; int length = proc_pidpath((int)pid, buffer, sizeof(buffer));
         NSString *path = length > 0 ? [NSString stringWithUTF8String:buffer] : @"";
         NSString *location = path.length ? path : command;
-        [items addObject:@{@"pid": @(pid), @"path": path, @"command": command, @"app_translocation": @([location containsString:@"/AppTranslocation/"]), @"development_build": @([location containsString:@"/Documents/Codex/"] || [location containsString:@"/work/"] || [location containsString:@"/dist/"])}];
+        NSString *executable = path.lastPathComponent;
+        if (!executable.length) {
+            NSString *first = [command componentsSeparatedByCharactersInSet:NSCharacterSet.whitespaceCharacterSet].firstObject ?: @"";
+            executable = first.lastPathComponent;
+        }
+        [items addObject:@{@"pid": @(pid), @"path": path, @"command": command,
+                           @"executable": executable ?: @"",
+                           @"app_translocation": @([location containsString:@"/AppTranslocation/"]),
+                           @"development_build": @([location containsString:@"/Documents/Codex/"] || [location containsString:@"/work/"] || [location containsString:@"/dist/"])}];
     }];
     return items;
+}
+
+static NSDictionary *CLConsoleLibrary(NSString *consoleName) {
+    NSString *filename = [consoleName.uppercaseString stringByAppendingString:@".titles.json"];
+    NSString *path = [[NSHomeDirectory() stringByAppendingPathComponent:@"Library/Application Support/CL Audio Controller/Console Files"] stringByAppendingPathComponent:filename];
+    NSError *error = nil; NSData *data = [NSData dataWithContentsOfFile:path options:0 error:&error];
+    NSMutableDictionary *result = [@{@"path": path, @"format": @"CL Audio titles JSON",
+                                     @"present": @(data != nil), @"valid": @NO, @"entry_count": @0} mutableCopy];
+    if (!data) { result[@"validation"] = @"Absent"; return result; }
+    id payload = [NSJSONSerialization JSONObjectWithData:data options:0 error:&error];
+    if (![payload isKindOfClass:NSDictionary.class]) { result[@"validation"] = @"JSON illisible"; return result; }
+    NSArray *entries = [payload[@"entries"] isKindOfClass:NSArray.class] ? payload[@"entries"] : @[];
+    NSUInteger usable = 0;
+    for (id item in entries) if ([item isKindOfClass:NSDictionary.class] && [item[@"memory"] respondsToSelector:@selector(integerValue)] && [item[@"title"] isKindOfClass:NSString.class] && [item[@"title"] length]) usable++;
+    BOOL valid = [payload[@"schema_version"] integerValue] == 1 && [payload[@"console"] caseInsensitiveCompare:consoleName] == NSOrderedSame && usable > 0;
+    result[@"valid"] = @(valid); result[@"entry_count"] = @(usable); result[@"validation"] = valid ? @"Valide" : @"Format canonique invalide";
+    for (NSString *key in @[@"source_format", @"source_name", @"migrated_from", @"imported_at"]) if (payload[key]) result[key] = payload[key];
+    NSDictionary *attributes = [NSFileManager.defaultManager attributesOfItemAtPath:path error:nil];
+    if (attributes.fileModificationDate) result[@"modified_at"] = @([attributes.fileModificationDate timeIntervalSince1970]);
+    return result;
 }
 
 static NSDictionary *CLPorts(void) {
@@ -104,6 +132,7 @@ static NSDictionary *CLServerStatus(void) {
         @"midi_endpoints": CLMidiEndpoints(),
         @"rtp": @{@"local_session_name": session.localName ?: @"", @"bonjour_name": session.networkName ?: @"", @"port": @(session.networkPort), @"enabled": @(session.isEnabled), @"connections": connections},
         @"processes": CLProcesses(), @"ports": CLPorts(), @"server_status": CLServerStatus(),
+        @"console_libraries": @{@"cl5": CLConsoleLibrary(@"CL5"), @"ql1": CLConsoleLibrary(@"QL1")},
     };
     if (client) MIDIClientDispose(client); return result;
 }

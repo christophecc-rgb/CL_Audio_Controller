@@ -28,7 +28,7 @@ class KeyboardDiagnosticAPI:
             print(f"[KEYBOARD] écriture impossible: {exc}", flush=True)
         return True
 
-REMOTE_URL = "http://127.0.0.1:5050"
+REMOTE_URL = 'http://127.0.0.1:5050/'
 BASE_WIDTH = 390
 BASE_HEIGHT = 760
 
