@@ -95,6 +95,7 @@ static BOOL CLPostDoubleClickFromConnectorReason(NSString *reason) {
 @property NSView *statusPanel;
 @property NSView *targetPanel;
 @property NSView *testPanel;
+@property NSTextField *rtpTestTitle;
 @property NSView *technicalPanel;
 @property NSTextField *appTitleLabel;
 @property NSTextField *appSubtitleLabel;
@@ -103,7 +104,6 @@ static BOOL CLPostDoubleClickFromConnectorReason(NSString *reason) {
 @property NSButton *showModeButton;
 @property NSButton *settingsButton;
 @property NSButton *refreshButton;
-@property NSButton *simulatorButton;
 @property BOOL showModeEnabled;
 @property BOOL backgroundMonitorOnly;
 @property BOOL ownsPassiveReturnMonitor;
@@ -138,14 +138,17 @@ static BOOL CLPostDoubleClickFromConnectorReason(NSString *reason) {
 @property NSString *lastRTPTestMessage;
 @property NSDate *lastRTPTestAt;
 @property NSString *loopDetectedEndpoint;
-@property NSTask *simulatorDashboardTask;
-@property NSWindow *simulatorWindow;
+@property NSView *simulatorPanel;
 @property NSPopUpButton *simulatorModeMenu;
 @property NSPopUpButton *simulatorEndpointMenu;
 @property NSTextField *simulatorDelayField;
 @property NSTextField *simulatorStatusLabel;
-@property NSTask *simulatorCL5Task;
-@property NSTask *simulatorQL1Task;
+@property NSTextField *simulatorCL5MemoryField;
+@property NSTextField *simulatorQL1MemoryField;
+@property NSMutableArray<NSMutableDictionary *> *simulatorDevices;
+@property NSMutableDictionary<NSString *, NSTask *> *simulatorTasks;
+@property NSMutableDictionary<NSString *, NSMutableData *> *simulatorOutputBuffers;
+@property NSStackView *simulatorDeviceRows;
 @property NSTask *guardianTask;
 @property NSString *guardianPeer;
 @property NSString *guardianHost;
@@ -176,24 +179,67 @@ static BOOL CLPostDoubleClickFromConnectorReason(NSString *reason) {
 @property NSTextField *assistantCL5ReturnTitle;
 @property NSTextField *assistantQL1ReturnTitle;
 @property NSString *currentAbletonSceneTitle;
+@property NSDictionary *expectedCL5State;
+@property NSDictionary *expectedQL1State;
 @property MIDIClientRef returnMonitorClient;
+@property MIDIEndpointRef localReturnDestination;
+@property BOOL localReturnMode;
+@property MIDIPortRef expectedMonitorInputPort;
+@property MIDIEndpointRef expectedMonitorSource;
+@property OSStatus expectedMonitorStatus;
 @property MIDIPortRef returnMonitorInputPort;
 @property MIDIEndpointRef returnMonitorSource;
-@property NSInteger pendingCL5Program;
-@property NSInteger pendingQL1Program;
+@property OSStatus returnMonitorStatus;
 @property NSInteger lastCL5Program;
 @property NSInteger lastQL1Program;
 @property NSDate *lastCL5ProgramAt;
 @property NSDate *lastQL1ProgramAt;
 @property NSString *lastCL5Title;
 @property NSString *lastQL1Title;
-@property BOOL returnUpdateScheduled;
+@property NSInteger expectedCL5Program;
+@property NSInteger expectedQL1Program;
+@property NSDate *expectedCL5ProgramAt;
+@property NSDate *expectedQL1ProgramAt;
 @property NSUInteger sceneTitleTraceSequence;
+@property NSUInteger cl5SceneTitleLookupGeneration;
+@property NSUInteger ql1SceneTitleLookupGeneration;
 - (void)queueReturnedProgram:(UInt8)program channel:(UInt8)channel;
+- (void)queueExpectedProgram:(UInt8)program channel:(UInt8)channel;
 - (void)resolveSceneTitleForMIDIProgram:(NSInteger)midiProgram channel:(UInt8)channel;
 - (void)updateConsoleReturnCards;
+- (void)updateRoundTripPanelForCurrentMode;
 - (void)refreshAbletonSceneTitle;
+- (void)recordSimulatorProgram:(NSInteger)program channel:(NSInteger)channel;
+- (void)recordSimulatorProgram:(NSInteger)program deviceID:(NSString *)deviceID;
 @end
+
+static NSString *const CLExpectedEndpointName = @"Gestionnaire IAC Bus 1";
+static NSString *const CLLocalReturnEndpointName = @"CL MIDI Return Test";
+static NSString *const CLRTPReturnEndpointName = @"Réseau RTP MB Chris";
+
+static BOOL CLIsRTPReturnEndpointName(NSString *name) {
+    if (!name.length || [name isEqualToString:CLExpectedEndpointName] ||
+        [name isEqualToString:CLLocalReturnEndpointName]) return NO;
+    return [name rangeOfString:@"RTP" options:NSCaseInsensitiveSearch].location != NSNotFound ||
+        [name rangeOfString:@"Réseau" options:NSCaseInsensitiveSearch].location != NSNotFound;
+}
+
+static void CLPassiveExpectedRead(const MIDIPacketList *packetList, void *readProcRefCon, void *srcConnRefCon) {
+    (void)srcConnRefCon;
+    CLNetworkDelegate *delegate = (__bridge CLNetworkDelegate *)readProcRefCon;
+    const MIDIPacket *packet = &packetList->packet[0];
+    for (UInt32 packetIndex = 0; packetIndex < packetList->numPackets; packetIndex++) {
+        UInt16 index = 0;
+        while (index < packet->length) {
+            UInt8 status = packet->data[index];
+            if ((status & 0xF0) == 0xC0 && index + 1 < packet->length) {
+                [delegate queueExpectedProgram:packet->data[index + 1] channel:(status & 0x0F) + 1];
+                index += 2;
+            } else index += 1;
+        }
+        packet = MIDIPacketNext(packet);
+    }
+}
 
 static void CLPassiveReturnRead(const MIDIPacketList *packetList, void *readProcRefCon, void *srcConnRefCon) {
     (void)srcConnRefCon;
@@ -309,14 +355,14 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     self.window.title = @"CL MIDI Network Assistant";
     self.lastCL5Test = @"non testé";
     self.lastQL1Test = @"non testé";
-    self.pendingCL5Program = -1;
-    self.pendingQL1Program = -1;
     self.lastRTPTestStatus = @"idle";
     self.lastRTPTestLatencyMs = nil;
     self.lastRTPTestMessage = @"Aucun aller-retour validé";
     self.lastRTPTestAt = nil;
     self.lastCL5Program = -1;
     self.lastQL1Program = -1;
+    self.expectedCL5Program = -1;
+    self.expectedQL1Program = -1;
     NSUserDefaults *returnDefaults = NSUserDefaults.standardUserDefaults;
     if ([returnDefaults objectForKey:@"lastCL5Program"] != nil) {
         self.lastCL5Program = [returnDefaults integerForKey:@"lastCL5Program"];
@@ -433,50 +479,53 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     targetPanel.wantsLayer = YES; targetPanel.layer.cornerRadius = 12; targetPanel.layer.borderWidth = 1;
     targetPanel.layer.backgroundColor = [NSColor colorWithRed:0.075 green:0.088 blue:0.11 alpha:1.0].CGColor;
     targetPanel.layer.borderColor = [NSColor colorWithWhite:0.24 alpha:1.0].CGColor; [content addSubview:targetPanel];
-    [targetPanel addSubview:[self label:@"1 · CHOISIR ET CONNECTER L’AUTRE MAC" frame:NSMakeRect(16, 68, 300, 20) size:10 bold:YES]];
-    self.targetMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(16, 24, 308, 34) pullsDown:NO];
+    [targetPanel addSubview:[self label:@"MODE RETOUR" frame:NSMakeRect(16, 68, 150, 20) size:10 bold:YES]];
+    [targetPanel addSubview:[self label:@"CONSOLE DISTANTE RTP" frame:NSMakeRect(194, 68, 180, 20) size:10 bold:YES]];
+    self.returnModeMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(16, 24, 168, 34) pullsDown:NO];
+    [self.returnModeMenu addItemsWithTitles:@[@"RTP distant", @"Test local dédié"]];
+    self.returnModeMenu.target = self;
+    self.returnModeMenu.action = @selector(returnModeChanged:);
+    NSString *savedReturnMode = [NSUserDefaults.standardUserDefaults stringForKey:@"consoleReturnMode"];
+    [self.returnModeMenu selectItemAtIndex:[savedReturnMode isEqualToString:@"local_dedicated"] ? 1 : 0];
+    self.localReturnMode = self.returnModeMenu.indexOfSelectedItem == 1;
+    [self stylePopup:self.returnModeMenu accent:[NSColor colorWithRed:0.92 green:0.58 blue:0.26 alpha:1.0]];
+    [targetPanel addSubview:self.returnModeMenu];
+    self.targetMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(194, 24, 166, 34) pullsDown:NO];
     self.targetMenu.target = self;
     self.targetMenu.action = @selector(targetChanged:);
     [self.targetMenu addItemWithTitle:@"Recherche des correspondants…"];
     [self stylePopup:self.targetMenu accent:[NSColor colorWithRed:0.34 green:0.72 blue:1.0 alpha:1.0]];
     [targetPanel addSubview:self.targetMenu];
-    self.connectButton = [self accentButton:@"Connecter" frame:NSMakeRect(334, 23, 118, 36) action:@selector(connectSelectedPeer:) color:[NSColor colorWithRed:0.12 green:0.42 blue:0.82 alpha:1.0]];
+    self.connectButton = [self accentButton:@"Connecter" frame:NSMakeRect(370, 23, 82, 36) action:@selector(connectSelectedPeer:) color:[NSColor colorWithRed:0.12 green:0.42 blue:0.82 alpha:1.0]];
     [targetPanel addSubview:self.connectButton];
 
-    NSView *testPanel = self.testPanel = [[NSView alloc] initWithFrame:NSMakeRect(16, 390, 468, 145)];
+    NSView *testPanel = self.testPanel = [[NSView alloc] initWithFrame:NSMakeRect(16, 390, 468, 96)];
     testPanel.wantsLayer = YES; testPanel.layer.cornerRadius = 12; testPanel.layer.borderWidth = 1;
     testPanel.layer.backgroundColor = [NSColor colorWithRed:0.065 green:0.073 blue:0.09 alpha:1.0].CGColor;
     testPanel.layer.borderColor = [NSColor colorWithRed:0.38 green:0.30 blue:0.65 alpha:0.7].CGColor; [content addSubview:testPanel];
-    [testPanel addSubview:[self label:@"2 · CHOISIR LA CONSOLE   3 · VÉRIFIER LE RETOUR" frame:NSMakeRect(16, 115, 340, 20) size:10 bold:YES]];
-    self.endpointMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(16, 76, 194, 32) pullsDown:NO];
+    self.rtpTestTitle = [self label:@"DIAGNOSTIC DISTANT · VÉRIFIER RTP" frame:NSMakeRect(16, 68, 340, 18) size:10 bold:YES];
+    [testPanel addSubview:self.rtpTestTitle];
+    self.endpointMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(16, 30, 156, 30) pullsDown:NO];
     self.endpointMenu.target = self;
     self.endpointMenu.action = @selector(endpointChanged:);
     [self stylePopup:self.endpointMenu accent:[NSColor colorWithRed:0.67 green:0.53 blue:1.0 alpha:1.0]];
     [testPanel addSubview:self.endpointMenu];
-    self.returnModeMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(16, 48, 194, 24) pullsDown:NO];
-    [self.returnModeMenu addItemsWithTitles:@[@"Retour Yamaha", @"Lecture locale · secours"]];
-    self.returnModeMenu.target = self;
-    self.returnModeMenu.action = @selector(returnModeChanged:);
-    NSString *savedReturnMode = [NSUserDefaults.standardUserDefaults stringForKey:@"consoleReturnMode"];
-    [self.returnModeMenu selectItemAtIndex:[savedReturnMode isEqualToString:@"local_fallback"] ? 1 : 0];
-    [self stylePopup:self.returnModeMenu accent:[NSColor colorWithRed:0.35 green:0.72 blue:1.0 alpha:1.0]];
-    [testPanel addSubview:self.returnModeMenu];
-    self.testTargetMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(218, 76, 108, 32) pullsDown:NO];
+    self.testTargetMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(180, 30, 105, 30) pullsDown:NO];
     [self.testTargetMenu addItemsWithTitles:@[@"CL5 · Ch.1", @"QL1 · Ch.2"]];
     [self stylePopup:self.testTargetMenu accent:[NSColor colorWithRed:0.35 green:0.72 blue:1.0 alpha:1.0]];
     [testPanel addSubview:self.testTargetMenu];
-    self.programField = [[NSTextField alloc] initWithFrame:NSMakeRect(334, 76, 52, 32)];
+    self.programField = [[NSTextField alloc] initWithFrame:NSMakeRect(293, 30, 50, 30)];
     self.programField.stringValue = @"42";
     self.programField.alignment = NSTextAlignmentCenter;
     self.programField.font = [NSFont boldSystemFontOfSize:14.0];
     self.programField.textColor = [NSColor colorWithRed:0.55 green:0.90 blue:0.68 alpha:1.0];
     self.programField.backgroundColor = [NSColor colorWithRed:0.055 green:0.070 blue:0.095 alpha:1.0];
     [testPanel addSubview:self.programField];
-    self.testButton = [self accentButton:@"Vérifier" frame:NSMakeRect(390, 75, 62, 34) action:@selector(runTest:) color:[NSColor colorWithRed:0.08 green:0.58 blue:0.32 alpha:1.0]];
+    self.testButton = [self accentButton:@"Vérifier RTP" frame:NSMakeRect(351, 29, 101, 32) action:@selector(runTest:) color:[NSColor colorWithRed:0.08 green:0.58 blue:0.32 alpha:1.0]];
     [testPanel addSubview:self.testButton];
 
-    self.lastTest = [self label:@"Aucun aller-retour validé" frame:NSMakeRect(218, 38, 234, 32) size:10 bold:YES];
-    self.lastTest.maximumNumberOfLines = 2;
+    self.lastTest = [self label:@"Aucun aller-retour validé" frame:NSMakeRect(16, 6, 436, 18) size:9 bold:YES];
+    self.lastTest.maximumNumberOfLines = 1;
     [testPanel addSubview:self.lastTest];
 
     NSView *technicalPanel = self.technicalPanel = [[NSView alloc] initWithFrame:NSMakeRect(16, 132, 468, 250)];
@@ -528,6 +577,7 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
         card.layer.backgroundColor = [NSColor colorWithRed:0.045 green:0.055 blue:0.070 alpha:1.0].CGColor;
         card.layer.borderColor = [NSColor colorWithWhite:0.22 alpha:1.0].CGColor;
         [technicalPanel addSubview:card];
+        card.hidden = YES;
     }
     self.cl5ReturnProgram = [self label:@"CL5 · scène n° —" frame:NSMakeRect(10, 33, 190, 16) size:11 bold:YES];
     self.ql1ReturnProgram = [self label:@"QL1 · scène n° —" frame:NSMakeRect(10, 33, 196, 16) size:11 bold:YES];
@@ -538,28 +588,29 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     [self.cl5ReturnCard addSubview:self.cl5ReturnProgram]; [self.cl5ReturnCard addSubview:self.cl5ReturnTitle]; [self.cl5ReturnCard addSubview:self.cl5ReturnState];
     [self.ql1ReturnCard addSubview:self.ql1ReturnProgram]; [self.ql1ReturnCard addSubview:self.ql1ReturnTitle]; [self.ql1ReturnCard addSubview:self.ql1ReturnState];
 
-    self.assistantReturnPanel = [[NSView alloc] initWithFrame:NSMakeRect(16, 66, 468, 66)];
+    self.assistantReturnPanel = [[NSView alloc] initWithFrame:NSMakeRect(16, 66, 468, 88)];
     [content addSubview:self.assistantReturnPanel];
-    self.assistantCL5ReturnCard = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 228, 66)];
-    self.assistantQL1ReturnCard = [[NSView alloc] initWithFrame:NSMakeRect(240, 0, 228, 66)];
+    self.assistantCL5ReturnCard = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 228, 88)];
+    self.assistantQL1ReturnCard = [[NSView alloc] initWithFrame:NSMakeRect(240, 0, 228, 88)];
     for (NSView *card in @[self.assistantCL5ReturnCard, self.assistantQL1ReturnCard]) {
         card.wantsLayer = YES;
         card.layer.cornerRadius = 9;
         card.layer.borderWidth = 2;
         [self.assistantReturnPanel addSubview:card];
     }
-    self.assistantCL5ReturnProgram = [self label:@"CL5 · scène n° —" frame:NSMakeRect(11, 42, 206, 18) size:13 bold:YES];
-    self.assistantQL1ReturnProgram = [self label:@"QL1 · scène n° —" frame:NSMakeRect(11, 42, 206, 18) size:13 bold:YES];
-    self.assistantCL5ReturnTitle = [self label:@"Titre Ableton en attente" frame:NSMakeRect(11, 24, 206, 16) size:10 bold:YES];
-    self.assistantQL1ReturnTitle = [self label:@"Titre Ableton en attente" frame:NSMakeRect(11, 24, 206, 16) size:10 bold:YES];
-    self.assistantCL5ReturnState = [self label:@"Aucun retour Program Change" frame:NSMakeRect(11, 7, 206, 15) size:9 bold:NO];
-    self.assistantQL1ReturnState = [self label:@"Aucun retour Program Change" frame:NSMakeRect(11, 7, 206, 15) size:9 bold:NO];
+    self.assistantCL5ReturnProgram = [self label:@"CL5 · Scène attendue n°—" frame:NSMakeRect(11, 49, 206, 32) size:12 bold:YES];
+    self.assistantQL1ReturnProgram = [self label:@"QL1 · Scène attendue n°—" frame:NSMakeRect(11, 49, 206, 32) size:12 bold:YES];
+    self.assistantCL5ReturnTitle = [self label:@"Titre Ableton en attente" frame:NSMakeRect(11, 29, 206, 18) size:11 bold:YES];
+    self.assistantQL1ReturnTitle = [self label:@"Titre Ableton en attente" frame:NSMakeRect(11, 29, 206, 18) size:11 bold:YES];
+    self.assistantCL5ReturnState = [self label:@"En attente du premier retour MIDI" frame:NSMakeRect(11, 7, 206, 20) size:9 bold:NO];
+    self.assistantQL1ReturnState = [self label:@"En attente du premier retour MIDI" frame:NSMakeRect(11, 7, 206, 20) size:9 bold:NO];
+    self.assistantCL5ReturnState.maximumNumberOfLines = 2; self.assistantQL1ReturnState.maximumNumberOfLines = 2;
     [self.assistantCL5ReturnCard addSubview:self.assistantCL5ReturnProgram]; [self.assistantCL5ReturnCard addSubview:self.assistantCL5ReturnTitle]; [self.assistantCL5ReturnCard addSubview:self.assistantCL5ReturnState];
     [self.assistantQL1ReturnCard addSubview:self.assistantQL1ReturnProgram]; [self.assistantQL1ReturnCard addSubview:self.assistantQL1ReturnTitle]; [self.assistantQL1ReturnCard addSubview:self.assistantQL1ReturnState];
 
     self.settingsButton = [self accentButton:@"Réglages réseau MIDI" frame:NSMakeRect(16, 88, 228, 36) action:@selector(openMidiSetup:) color:[NSColor colorWithRed:0.27 green:0.36 blue:0.49 alpha:1.0]]; [content addSubview:self.settingsButton];
     self.refreshButton = [self accentButton:@"Actualiser le diagnostic" frame:NSMakeRect(256, 88, 228, 36) action:@selector(refreshNow:) color:[NSColor colorWithRed:0.30 green:0.35 blue:0.43 alpha:1.0]]; [content addSubview:self.refreshButton];
-    self.simulatorButton = [self accentButton:@"Simulateur de consoles intégré…" frame:NSMakeRect(16, 38, 468, 42) action:@selector(startSimulator:) color:[NSColor colorWithRed:0.45 green:0.34 blue:0.24 alpha:1.0]]; [content addSubview:self.simulatorButton];
+    [self createIntegratedSimulatorPanelInView:content];
     NSTextField *footer = self.footerLabel = [self label:@"CL AUDIO · MIDI NETWORK · 2026" frame:NSMakeRect(16, 10, 468, 18) size:8 bold:YES];
     footer.alignment = NSTextAlignmentCenter; footer.textColor = [NSColor colorWithWhite:0.38 alpha:1.0]; [content addSubview:footer];
     self.compactSummary = [self label:@"Aucun test aller-retour validé" frame:NSMakeRect(24, 66, 452, 54) size:12 bold:YES];
@@ -612,26 +663,38 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     NSDictionary *payload = data.length ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
     if (![payload[@"service"] isEqualToString:@"cl-midi-console-monitor"]) return;
     NSDictionary *cl5 = payload[@"cl5"], *ql1 = payload[@"ql1"];
+    if (cl5[@"expected_midi_program"] != nil && cl5[@"expected_midi_program"] != NSNull.null) {
+        self.expectedCL5Program = [cl5[@"expected_midi_program"] integerValue];
+        self.expectedCL5ProgramAt = [NSDate dateWithTimeIntervalSince1970:[cl5[@"expected_activated_at"] doubleValue]];
+    }
+    if (ql1[@"expected_midi_program"] != nil && ql1[@"expected_midi_program"] != NSNull.null) {
+        self.expectedQL1Program = [ql1[@"expected_midi_program"] integerValue];
+        self.expectedQL1ProgramAt = [NSDate dateWithTimeIntervalSince1970:[ql1[@"expected_activated_at"] doubleValue]];
+    }
     if ([cl5[@"received"] boolValue]) {
         self.lastCL5Program = cl5[@"midi_program"] != nil && cl5[@"midi_program"] != NSNull.null
             ? [cl5[@"midi_program"] integerValue]
             : [cl5[@"program"] integerValue] - 1;
         self.lastCL5ProgramAt = [NSDate dateWithTimeIntervalSince1970:[cl5[@"received_at"] doubleValue]];
-        self.lastCL5Title = [cl5[@"title"] isKindOfClass:NSString.class] ? cl5[@"title"] : @"";
+        self.lastCL5Title = @"Titre non résolu";
+        [self resolveSceneTitleForMIDIProgram:self.lastCL5Program channel:1];
+        [self recordSimulatorProgram:self.lastCL5Program channel:1];
     }
     if ([ql1[@"received"] boolValue]) {
         self.lastQL1Program = ql1[@"midi_program"] != nil && ql1[@"midi_program"] != NSNull.null
             ? [ql1[@"midi_program"] integerValue]
             : [ql1[@"program"] integerValue] - 1;
         self.lastQL1ProgramAt = [NSDate dateWithTimeIntervalSince1970:[ql1[@"received_at"] doubleValue]];
-        self.lastQL1Title = [ql1[@"title"] isKindOfClass:NSString.class] ? ql1[@"title"] : @"";
+        self.lastQL1Title = @"Titre non résolu";
+        [self resolveSceneTitleForMIDIProgram:self.lastQL1Program channel:2];
+        [self recordSimulatorProgram:self.lastQL1Program channel:2];
     }
     [self updateConsoleReturnCards];
 }
 
 - (void)writeConsoleReturnState {
     NSString *endpoint = self.endpointMenu.selectedItem.title ?: @"";
-    NSString *returnMode = self.returnModeMenu.indexOfSelectedItem == 1 ? @"local_fallback" : @"console_return";
+    NSString *returnMode = self.localReturnMode ? @"local_dedicated" : @"rtp_remote";
     NSString *peer = self.targetMenu.selectedItem.title ?: @"";
     NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
 
@@ -670,13 +733,22 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
         self.lastRTPTestLatencyMs ?: NSNull.null;
 
     NSDictionary *payload = @{
-        @"schema_version": @2,
+        @"schema_version": @3,
         @"service": @"cl-midi-console-monitor",
         @"source": @"CL MIDI Network Assistant",
         @"updated_at": @(now),
         @"online": @YES,
         @"return_mode": returnMode,
         @"return_source": endpoint,
+        @"monitor_source": self.localReturnMode ? CLLocalReturnEndpointName :
+            (self.returnMonitorSource ? EndpointName(self.returnMonitorSource) : @""),
+        @"monitor_status": @(self.returnMonitorStatus),
+        @"expected_monitor_source": self.expectedMonitorSource
+            ? EndpointName(self.expectedMonitorSource) : @"",
+        @"expected_monitor_status": @(self.expectedMonitorStatus),
+        @"return_monitor_source": self.localReturnMode ? CLLocalReturnEndpointName :
+            (self.returnMonitorSource ? EndpointName(self.returnMonitorSource) : @""),
+        @"return_monitor_status": @(self.returnMonitorStatus),
 
         @"rtp": @{
             @"peer": peer,
@@ -713,6 +785,24 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
         },
 
         @"cl5": @{
+            @"expected_midi_program": self.expectedCL5Program >= 0 ? @(self.expectedCL5Program) : NSNull.null,
+            @"expected_program": self.expectedCL5Program >= 0 ? @(self.expectedCL5Program + 1) : NSNull.null,
+            @"expected_scene_memory": self.expectedCL5Program >= 0 ? @(self.expectedCL5Program + 1) : NSNull.null,
+            @"expected_title": (self.expectedCL5State[@"expected_midi_program"] != NSNull.null &&
+                [self.expectedCL5State[@"expected_midi_program"] integerValue] == self.expectedCL5Program)
+                ? (self.expectedCL5State[@"expected_title"] ?: @"Titre non résolu") : @"Titre non résolu",
+            @"expected_program_source": self.expectedCL5Program >= 0 ? @"ableton_iac_output" : @"unavailable",
+            @"expected_title_source": (self.expectedCL5Program >= 0 &&
+                [self.expectedCL5State[@"expected_title_source"] isEqual:@"console_clf"])
+                ? @"console_clf" : @"unresolved",
+            @"expected_activated_at": self.expectedCL5ProgramAt ? @([self.expectedCL5ProgramAt timeIntervalSince1970]) : NSNull.null,
+            @"returned_midi_program": self.lastCL5Program >= 0 ? @(self.lastCL5Program) : NSNull.null,
+            @"returned_program": self.lastCL5Program >= 0 ? @(self.lastCL5Program + 1) : NSNull.null,
+            @"returned_scene_memory": self.lastCL5Program >= 0 ? @(self.lastCL5Program + 1) : NSNull.null,
+            @"returned_title": self.lastCL5Title.length ? self.lastCL5Title : @"Titre non résolu",
+            @"returned_program_source": self.lastCL5Program >= 0 ? @"physical_midi" : @"unavailable",
+            @"returned_title_source": self.lastCL5Title.length ? @"console_clf" : @"unresolved",
+            @"returned_at": self.lastCL5ProgramAt ? @([self.lastCL5ProgramAt timeIntervalSince1970]) : NSNull.null,
             @"program": self.lastCL5Program >= 0
                 ? @(self.lastCL5Program + 1)
                 : NSNull.null,
@@ -735,6 +825,24 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
         },
 
         @"ql1": @{
+            @"expected_midi_program": self.expectedQL1Program >= 0 ? @(self.expectedQL1Program) : NSNull.null,
+            @"expected_program": self.expectedQL1Program >= 0 ? @(self.expectedQL1Program + 1) : NSNull.null,
+            @"expected_scene_memory": self.expectedQL1Program >= 0 ? @(self.expectedQL1Program + 1) : NSNull.null,
+            @"expected_title": (self.expectedQL1State[@"expected_midi_program"] != NSNull.null &&
+                [self.expectedQL1State[@"expected_midi_program"] integerValue] == self.expectedQL1Program)
+                ? (self.expectedQL1State[@"expected_title"] ?: @"Titre non résolu") : @"Titre non résolu",
+            @"expected_program_source": self.expectedQL1Program >= 0 ? @"ableton_iac_output" : @"unavailable",
+            @"expected_title_source": (self.expectedQL1Program >= 0 &&
+                [self.expectedQL1State[@"expected_title_source"] isEqual:@"console_clf"])
+                ? @"console_clf" : @"unresolved",
+            @"expected_activated_at": self.expectedQL1ProgramAt ? @([self.expectedQL1ProgramAt timeIntervalSince1970]) : NSNull.null,
+            @"returned_midi_program": self.lastQL1Program >= 0 ? @(self.lastQL1Program) : NSNull.null,
+            @"returned_program": self.lastQL1Program >= 0 ? @(self.lastQL1Program + 1) : NSNull.null,
+            @"returned_scene_memory": self.lastQL1Program >= 0 ? @(self.lastQL1Program + 1) : NSNull.null,
+            @"returned_title": self.lastQL1Title.length ? self.lastQL1Title : @"Titre non résolu",
+            @"returned_program_source": self.lastQL1Program >= 0 ? @"physical_midi" : @"unavailable",
+            @"returned_title_source": self.lastQL1Title.length ? @"console_clf" : @"unresolved",
+            @"returned_at": self.lastQL1ProgramAt ? @([self.lastQL1ProgramAt timeIntervalSince1970]) : NSNull.null,
             @"program": self.lastQL1Program >= 0
                 ? @(self.lastQL1Program + 1)
                 : NSNull.null,
@@ -772,11 +880,13 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
 - (void)updateConsoleReturnCards {
     NSArray<NSDictionary *> *consoles = @[
         @{@"name": @"CL5", @"program": @(self.lastCL5Program), @"date": self.lastCL5ProgramAt ?: NSNull.null, @"title": self.lastCL5Title ?: @"",
+          @"expected": self.expectedCL5State ?: @{},
           @"cards": @[self.cl5ReturnCard ?: NSNull.null, self.assistantCL5ReturnCard ?: NSNull.null],
           @"programLabels": @[self.cl5ReturnProgram ?: NSNull.null, self.assistantCL5ReturnProgram ?: NSNull.null],
           @"titleLabels": @[self.cl5ReturnTitle ?: NSNull.null, self.assistantCL5ReturnTitle ?: NSNull.null],
           @"stateLabels": @[self.cl5ReturnState ?: NSNull.null, self.assistantCL5ReturnState ?: NSNull.null]},
         @{@"name": @"QL1", @"program": @(self.lastQL1Program), @"date": self.lastQL1ProgramAt ?: NSNull.null, @"title": self.lastQL1Title ?: @"",
+          @"expected": self.expectedQL1State ?: @{},
           @"cards": @[self.ql1ReturnCard ?: NSNull.null, self.assistantQL1ReturnCard ?: NSNull.null],
           @"programLabels": @[self.ql1ReturnProgram ?: NSNull.null, self.assistantQL1ReturnProgram ?: NSNull.null],
           @"titleLabels": @[self.ql1ReturnTitle ?: NSNull.null, self.assistantQL1ReturnTitle ?: NSNull.null],
@@ -786,26 +896,58 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
         NSInteger program = [console[@"program"] integerValue];
         NSDate *date = console[@"date"] == NSNull.null ? nil : console[@"date"];
         NSTimeInterval age = date ? -date.timeIntervalSinceNow : DBL_MAX;
-        BOOL recent = program >= 0 && age <= 12.0;
-        NSString *rememberedTitle = console[@"title"];
+        NSDictionary *expected = console[@"expected"];
+        id expectedProgramValue = expected[@"expected_program"] ?: expected[@"program"];
+        BOOL hasExpectedProgram = expectedProgramValue && expectedProgramValue != NSNull.null;
+        NSInteger expectedProgram = hasExpectedProgram ? [expectedProgramValue integerValue] : -1;
+        NSString *expectedTitle = [expected[@"expected_title"] isKindOfClass:NSString.class]
+            ? expected[@"expected_title"] : @"Titre non résolu";
+        NSString *returnedTitle = [expected[@"returned_title"] isKindOfClass:NSString.class]
+            ? expected[@"returned_title"] : @"Titre non résolu";
+        id returnedSceneValue = expected[@"returned_scene_memory"];
+        BOOL hasCanonicalReturn = returnedSceneValue && returnedSceneValue != NSNull.null;
+        BOOL hasReturn = program >= 0 && date != nil && hasCanonicalReturn;
+        BOOL stale = hasReturn && age > 12.0;
+        NSInteger receivedScene = hasReturn ? [returnedSceneValue integerValue] : -1;
+        NSString *validationStatus = [expected[@"validation_status"] isKindOfClass:NSString.class] ? expected[@"validation_status"] : @"unavailable";
+        BOOL confirmed = [validationStatus isEqualToString:@"confirmed"];
+        BOOL mismatch = [validationStatus isEqualToString:@"mismatch"];
         NSArray *cards = console[@"cards"], *programLabels = console[@"programLabels"], *titleLabels = console[@"titleLabels"], *stateLabels = console[@"stateLabels"];
         for (NSUInteger index = 0; index < cards.count; index++) {
             if (cards[index] == NSNull.null) continue;
             NSView *card = cards[index]; NSTextField *programLabel = programLabels[index]; NSTextField *titleLabel = titleLabels[index]; NSTextField *stateLabel = stateLabels[index];
-            programLabel.stringValue = program >= 0
-                ? [NSString stringWithFormat:@"%@ · scène n° %ld", console[@"name"], (long)program + 1]
-                : [NSString stringWithFormat:@"%@ · scène n° —", console[@"name"]];
-            stateLabel.stringValue = program >= 0
-                ? [NSString stringWithFormat:recent ? @"✓ Scène reçue · %@" : @"Dernière scène reçue · %@", CLMidiAgeDescription(age)]
-                : @"En attente du premier retour";
-            titleLabel.stringValue = rememberedTitle.length ? rememberedTitle : @"Titre Ableton en attente";
+            NSString *expectedText = hasExpectedProgram
+                ? [NSString stringWithFormat:@"Scène attendue n°%ld", (long)expectedProgram]
+                : @"Scène attendue n°—";
+            NSString *receivedText = hasReturn
+                ? [NSString stringWithFormat:@"Scène reçue n°%ld", (long)receivedScene]
+                : @"";
+            programLabel.stringValue = receivedText.length
+                ? [NSString stringWithFormat:@"%@ · %@\n%@", console[@"name"], expectedText, receivedText]
+                : [NSString stringWithFormat:@"%@ · %@", console[@"name"], expectedText];
+            programLabel.maximumNumberOfLines = 2;
+            stateLabel.stringValue = !hasReturn
+                ? @"En attente du premier retour MIDI"
+                : stale
+                ? [NSString stringWithFormat:@"Dernière scène reçue %@", CLMidiAgeDescription(age)]
+                : confirmed
+                ? @"✓ Confirmée"
+                : mismatch
+                ? [NSString stringWithFormat:@"Attendue : %ld · Reçue : %ld · ✕ Mauvaise scène", (long)expectedProgram, (long)receivedScene]
+                : @"Retour MIDI reçu · scène attendue indisponible";
+            NSNumber *titleOffset = [expected[@"title_offset"] isKindOfClass:NSNumber.class] ? expected[@"title_offset"] : @0;
+            id expectedLookup = expected[@"expected_title_lookup_memory"] ?: NSNull.null;
+            id returnedLookup = expected[@"returned_title_lookup_memory"] ?: NSNull.null;
+            titleLabel.stringValue = hasReturn
+                ? [NSString stringWithFormat:@"Attendu : %@ · Reçu : %@ · offset %@%ld · lookup %@/%@", expectedTitle, returnedTitle, titleOffset.integerValue > 0 ? @"+" : @"", (long)titleOffset.integerValue, expectedLookup, returnedLookup]
+                : [NSString stringWithFormat:@"Attendu : %@", expectedTitle];
             card.layer.backgroundColor = [NSColor colorWithRed:0.070 green:0.086 blue:0.110 alpha:1.0].CGColor;
-            card.layer.borderColor = recent
+            card.layer.borderColor = confirmed
                 ? [NSColor colorWithRed:0.16 green:0.64 blue:0.32 alpha:1.0].CGColor
-                : (program >= 0 ? [NSColor colorWithRed:0.16 green:0.42 blue:0.25 alpha:1.0].CGColor : [NSColor colorWithWhite:0.23 alpha:1.0].CGColor);
+                : (mismatch ? [NSColor colorWithRed:0.78 green:0.22 blue:0.22 alpha:1.0].CGColor : (stale ? [NSColor colorWithRed:0.76 green:0.48 blue:0.16 alpha:1.0].CGColor : [NSColor colorWithWhite:0.23 alpha:1.0].CGColor));
             programLabel.textColor = [NSColor colorWithRed:0.93 green:0.77 blue:0.34 alpha:1.0];
             titleLabel.textColor = [NSColor colorWithWhite:0.78 alpha:1.0];
-            stateLabel.textColor = recent ? [NSColor colorWithRed:0.35 green:0.88 blue:0.55 alpha:1.0] : (program >= 0 ? [NSColor colorWithRed:0.55 green:0.70 blue:0.59 alpha:1.0] : [NSColor colorWithWhite:0.52 alpha:1.0]);
+            stateLabel.textColor = confirmed ? [NSColor colorWithRed:0.35 green:0.88 blue:0.55 alpha:1.0] : (mismatch ? [NSColor colorWithRed:1.0 green:0.40 blue:0.36 alpha:1.0] : (stale ? [NSColor colorWithRed:1.0 green:0.68 blue:0.30 alpha:1.0] : [NSColor colorWithWhite:0.62 alpha:1.0]));
         }
     }
 }
@@ -817,8 +959,15 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
         if (error || !data.length) return;
         NSDictionary *payload = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
         NSString *title = [payload[@"playing_scene_name"] isKindOfClass:NSString.class] ? payload[@"playing_scene_name"] : nil;
-        if (!title.length || [title isEqualToString:@"—"]) return;
-        dispatch_async(dispatch_get_main_queue(), ^{ self.currentAbletonSceneTitle = title; [self updateConsoleReturnCards]; });
+        NSDictionary *midiConsole = [payload[@"midi_console"] isKindOfClass:NSDictionary.class] ? payload[@"midi_console"] : @{};
+        NSDictionary *cl5 = [midiConsole[@"cl5"] isKindOfClass:NSDictionary.class] ? midiConsole[@"cl5"] : @{};
+        NSDictionary *ql1 = [midiConsole[@"ql1"] isKindOfClass:NSDictionary.class] ? midiConsole[@"ql1"] : @{};
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (title.length && ![title isEqualToString:@"—"]) self.currentAbletonSceneTitle = title;
+            self.expectedCL5State = cl5;
+            self.expectedQL1State = ql1;
+            [self updateConsoleReturnCards];
+        });
     }] resume];
 }
 
@@ -845,32 +994,41 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
 }
 
 - (void)resolveSceneTitleForMIDIProgram:(NSInteger)midiProgram channel:(UInt8)channel {
-    NSInteger lookupIndex = midiProgram;
+    NSInteger lookupIndex = midiProgram + 1;
+    NSUInteger lookupGeneration;
+    @synchronized (self) {
+        if (channel == 1) lookupGeneration = ++self.cl5SceneTitleLookupGeneration;
+        else lookupGeneration = ++self.ql1SceneTitleLookupGeneration;
+    }
     [self traceSceneTitleEvent:@"lookup-requested" midiProgram:midiProgram channel:channel
                   lookupIndex:lookupIndex receivedName:nil resolvedName:nil];
-    NSURL *url = [NSURL URLWithString:@"http://127.0.0.1:5050/status"];
+    NSString *consoleKey = channel == 1 ? @"cl5" : @"ql1";
+    NSString *urlString = [NSString stringWithFormat:
+        @"http://127.0.0.1:5050/console-scene-title?console=%@&midi_program=%ld",
+        consoleKey, (long)midiProgram];
+    NSURL *url = [NSURL URLWithString:urlString];
     [[[NSURLSession sharedSession] dataTaskWithURL:url completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
         (void)response;
         NSDictionary *payload = (!error && data.length)
             ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil]
             : nil;
-        NSDictionary *midiConsole = [payload[@"midi_console"] isKindOfClass:NSDictionary.class]
-            ? payload[@"midi_console"] : nil;
-        NSString *consoleKey = channel == 1 ? @"cl5" : @"ql1";
-        NSDictionary *consoleState = [midiConsole[consoleKey] isKindOfClass:NSDictionary.class]
-            ? midiConsole[consoleKey] : nil;
-        NSInteger returnedMIDIProgram = [consoleState[@"midi_program"] integerValue];
+        id returnedValue = payload[@"midi_program"];
+        NSInteger returnedMIDIProgram = [returnedValue integerValue];
         NSString *receivedName = (
-            returnedMIDIProgram == midiProgram && [consoleState[@"title"] isKindOfClass:NSString.class]
-        ) ? consoleState[@"title"] : @"";
+            [payload[@"ok"] boolValue] && returnedMIDIProgram == midiProgram &&
+            [payload[@"title"] isKindOfClass:NSString.class]
+        ) ? payload[@"title"] : @"";
         NSString *resolvedName = receivedName;
         dispatch_async(dispatch_get_main_queue(), ^{
             NSInteger currentProgram = channel == 1 ? self.lastCL5Program : self.lastQL1Program;
-            BOOL stale = currentProgram != midiProgram;
+            NSUInteger currentGeneration = channel == 1
+                ? self.cl5SceneTitleLookupGeneration
+                : self.ql1SceneTitleLookupGeneration;
+            BOOL stale = currentProgram != midiProgram || currentGeneration != lookupGeneration;
             [self traceSceneTitleEvent:stale ? @"lookup-stale" : @"lookup-completed"
                            midiProgram:midiProgram channel:channel lookupIndex:lookupIndex
                           receivedName:receivedName resolvedName:resolvedName];
-            if (stale || !resolvedName.length) return;
+            if (stale) return;
             if (channel == 1) self.lastCL5Title = resolvedName;
             else self.lastQL1Title = resolvedName;
             NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
@@ -882,19 +1040,57 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
 
 - (void)setupPassiveReturnMonitor {
     OSStatus clientStatus = MIDIClientCreate(CFSTR("CL Passive Console Return Monitor"), NULL, NULL, &_returnMonitorClient);
+    OSStatus expectedPortStatus = clientStatus == noErr
+        ? MIDIInputPortCreate(self.returnMonitorClient, CFSTR("Ableton expected input"), CLPassiveExpectedRead,
+                              (__bridge void *)self, &_expectedMonitorInputPort)
+        : clientStatus;
     OSStatus portStatus = clientStatus == noErr
         ? MIDIInputPortCreate(self.returnMonitorClient, CFSTR("Console return input"), CLPassiveReturnRead,
                               (__bridge void *)self, &_returnMonitorInputPort)
         : clientStatus;
-    if (clientStatus != noErr || portStatus != noErr) {
-        self.lastTest.stringValue = @"Écoute passive des retours consoles indisponible";
+    OSStatus localStatus = clientStatus == noErr
+        ? MIDIDestinationCreate(self.returnMonitorClient, (__bridge CFStringRef)CLLocalReturnEndpointName,
+                                CLPassiveReturnRead, (__bridge void *)self, &_localReturnDestination)
+        : clientStatus;
+    self.returnMonitorStatus = portStatus;
+    self.expectedMonitorStatus = expectedPortStatus;
+    if (clientStatus != noErr || portStatus != noErr || expectedPortStatus != noErr || localStatus != noErr) {
+        self.lastTest.stringValue = @"Une écoute passive CoreMIDI est indisponible";
     }
     [self writeConsoleReturnState];
-    [self selectPassiveReturnSourceNamed:self.returnModeMenu.indexOfSelectedItem == 1
-        ? @"" : (self.endpointMenu.selectedItem.title ?: @"")];
+    // Le mode de présentation ne doit pas couper l'écoute MIDI. Les retours
+    // physiques et ceux du simulateur restent des événements reçus, même si
+    // l'utilisateur a choisi la lecture locale de secours.
+    [self selectPassiveExpectedSourceNamed:CLExpectedEndpointName];
+    self.localReturnMode = self.returnModeMenu.indexOfSelectedItem == 1;
+    self.returnMonitorStatus = localStatus;
+    if (!self.localReturnMode) [self selectPassiveReturnSourceNamed:CLRTPReturnEndpointName];
+    [self updateRoundTripPanelForCurrentMode];
+}
+
+- (void)selectPassiveExpectedSourceNamed:(NSString *)name {
+    MIDIEndpointRef selectedSource = 0;
+    for (ItemCount index = 0; index < MIDIGetNumberOfSources(); index++) {
+        MIDIEndpointRef source = MIDIGetSource(index);
+        if ([EndpointName(source) isEqualToString:name]) { selectedSource = source; break; }
+    }
+    if (selectedSource == self.expectedMonitorSource) return;
+    if (self.expectedMonitorSource && self.expectedMonitorInputPort) {
+        MIDIPortDisconnectSource(self.expectedMonitorInputPort, self.expectedMonitorSource);
+    }
+    self.expectedMonitorSource = 0;
+    if (selectedSource && self.expectedMonitorInputPort &&
+        (self.expectedMonitorStatus = MIDIPortConnectSource(
+            self.expectedMonitorInputPort, selectedSource, NULL)) == noErr) {
+        self.expectedMonitorSource = selectedSource;
+    } else if (!selectedSource) self.expectedMonitorStatus = kMIDIUnknownEndpoint;
 }
 
 - (void)selectPassiveReturnSourceNamed:(NSString *)name {
+    if ([name isEqualToString:CLExpectedEndpointName] || [name isEqualToString:CLLocalReturnEndpointName]) {
+        self.returnMonitorStatus = kMIDIUnknownEndpoint;
+        return;
+    }
     MIDIEndpointRef selectedSource = 0;
     for (ItemCount index = 0; index < MIDIGetNumberOfSources(); index++) {
         MIDIEndpointRef source = MIDIGetSource(index);
@@ -909,41 +1105,33 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     }
     self.returnMonitorSource = 0;
     if (selectedSource && self.returnMonitorInputPort &&
-        MIDIPortConnectSource(self.returnMonitorInputPort, selectedSource, NULL) == noErr) {
+        (self.returnMonitorStatus = MIDIPortConnectSource(
+            self.returnMonitorInputPort, selectedSource, NULL
+        )) == noErr) {
         self.returnMonitorSource = selectedSource;
+    } else if (!selectedSource) {
+        self.returnMonitorStatus = kMIDIUnknownEndpoint;
     }
+    [self writeConsoleReturnState];
 }
 
 - (void)queueReturnedProgram:(UInt8)program channel:(UInt8)channel {
-    if (self.returnModeMenu.indexOfSelectedItem == 1) return;
-    if (channel != 1 && channel != 2) return;
+    if (channel < 1 || channel > 16) return;
+    dispatch_async(dispatch_get_main_queue(), ^{ [self recordSimulatorProgram:program channel:channel]; });
+    if (channel != 1 && channel != 2) {
+        return;
+    }
     [self traceSceneTitleEvent:@"midi-callback" midiProgram:program channel:channel
                   lookupIndex:program receivedName:nil resolvedName:nil];
-    @synchronized (self) {
-        if (channel == 1) self.pendingCL5Program = program;
-        else self.pendingQL1Program = program;
-        if (self.returnUpdateScheduled) return;
-        self.returnUpdateScheduled = YES;
-    }
-    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 60 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
-        __block BOOL updatedCL5 = NO;
-        __block BOOL updatedQL1 = NO;
-        @synchronized (self) {
-            if (self.pendingCL5Program >= 0) {
-                updatedCL5 = YES;
-                self.lastCL5Program = self.pendingCL5Program;
-                self.lastCL5ProgramAt = [NSDate date];
-                self.lastCL5Title = @"";
-            }
-            if (self.pendingQL1Program >= 0) {
-                updatedQL1 = YES;
-                self.lastQL1Program = self.pendingQL1Program;
-                self.lastQL1ProgramAt = [NSDate date];
-                self.lastQL1Title = @"";
-            }
-            self.pendingCL5Program = -1;
-            self.pendingQL1Program = -1;
-            self.returnUpdateScheduled = NO;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (channel == 1) {
+            self.lastCL5Program = program;
+            self.lastCL5ProgramAt = [NSDate date];
+            self.lastCL5Title = @"";
+        } else {
+            self.lastQL1Program = program;
+            self.lastQL1ProgramAt = [NSDate date];
+            self.lastQL1Title = @"";
         }
         NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
         if (self.lastCL5Program >= 0) {
@@ -957,8 +1145,27 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
             [defaults setObject:self.lastQL1Title ?: @"" forKey:@"lastQL1Title"];
         }
         [self writeConsoleReturnState];
-        if (updatedCL5) [self resolveSceneTitleForMIDIProgram:self.lastCL5Program channel:1];
-        if (updatedQL1) [self resolveSceneTitleForMIDIProgram:self.lastQL1Program channel:2];
+        [self resolveSceneTitleForMIDIProgram:program channel:channel];
+        [self refreshAbletonSceneTitle];
+    });
+}
+
+- (void)queueExpectedProgram:(UInt8)program channel:(UInt8)channel {
+    if (channel != 1 && channel != 2) return;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        NSDate *receivedAt = [NSDate date];
+        if (channel == 1) {
+            self.expectedCL5Program = program;
+            self.expectedCL5ProgramAt = receivedAt;
+        } else {
+            self.expectedQL1Program = program;
+            self.expectedQL1ProgramAt = receivedAt;
+        }
+        CLAppendDiagnostic(@"expected-midi", [NSString stringWithFormat:
+            @"endpoint=%@ channel=%u midi_program=%u console=%@ role=expected",
+            CLExpectedEndpointName, channel, program, channel == 1 ? @"CL5" : @"QL1"]);
+        [self writeConsoleReturnState];
+        [self refreshAbletonSceneTitle];
     });
 }
 
@@ -977,28 +1184,49 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
 
 - (void)applyPresentationMode {
     BOOL detailed = self.showModeEnabled;
-    self.targetPanel.hidden = NO; self.testPanel.hidden = NO;
+    self.targetPanel.hidden = NO;
     self.technicalPanel.hidden = !detailed; self.settingsButton.hidden = !detailed;
-    self.refreshButton.hidden = !detailed; self.simulatorButton.hidden = !detailed;
+    self.refreshButton.hidden = !detailed;
     self.assistantReturnPanel.hidden = detailed;
+    self.simulatorPanel.hidden = NO;
     self.compactSummary.hidden = YES;
     self.showModeButton.title = detailed ? @"Vue Assistant" : @"Diagnostic détaillé";
+    [self updateRoundTripPanelForCurrentMode];
     if (detailed) {
-        [self.window setContentSize:NSMakeSize(500, 900)];
-        self.headerPanel.frame = NSMakeRect(16, 796, 468, 88);
-        self.appTitleLabel.frame = NSMakeRect(20, 744, 270, 24);
-        self.appSubtitleLabel.frame = NSMakeRect(286, 746, 94, 20);
-        self.showModeButton.frame = NSMakeRect(354, 741, 130, 30);
-        self.statusPanel.frame = NSMakeRect(16, 651, 468, 84);
-        self.targetPanel.frame = NSMakeRect(16, 543, 468, 100); self.testPanel.frame = NSMakeRect(16, 390, 468, 145);
+        [self.window setContentSize:NSMakeSize(500, 1100)];
+        self.headerPanel.frame = NSMakeRect(16, 996, 468, 88);
+        self.appTitleLabel.frame = NSMakeRect(20, 944, 270, 24);
+        self.appSubtitleLabel.frame = NSMakeRect(286, 946, 94, 20);
+        self.showModeButton.frame = NSMakeRect(354, 941, 130, 30);
+        self.statusPanel.frame = NSMakeRect(16, 851, 468, 84);
+        self.targetPanel.frame = NSMakeRect(16, 743, 468, 100); self.testPanel.frame = NSMakeRect(16, 639, 468, 96);
+        self.technicalPanel.frame = NSMakeRect(16, 381, 468, 250);
+        self.simulatorPanel.frame = NSMakeRect(16, 183, 468, 190);
         self.footerLabel.frame = NSMakeRect(16, 10, 468, 18);
     } else {
-        [self.window setContentSize:NSMakeSize(500, 650)];
-        self.headerPanel.frame = NSMakeRect(16, 546, 468, 88);
-        self.appTitleLabel.frame = NSMakeRect(20, 494, 270, 24); self.appSubtitleLabel.frame = NSMakeRect(286, 496, 68, 20);
-        self.showModeButton.frame = NSMakeRect(354, 491, 130, 30); self.statusPanel.frame = NSMakeRect(16, 401, 468, 84);
-        self.targetPanel.frame = NSMakeRect(16, 293, 468, 100); self.testPanel.frame = NSMakeRect(16, 140, 468, 145);
+        [self.window setContentSize:NSMakeSize(500, 850)];
+        self.headerPanel.frame = NSMakeRect(16, 746, 468, 88);
+        self.appTitleLabel.frame = NSMakeRect(20, 694, 270, 24); self.appSubtitleLabel.frame = NSMakeRect(286, 696, 68, 20);
+        self.showModeButton.frame = NSMakeRect(354, 691, 130, 30); self.statusPanel.frame = NSMakeRect(16, 601, 468, 84);
+        self.targetPanel.frame = NSMakeRect(16, 493, 468, 100); self.testPanel.frame = NSMakeRect(16, 389, 468, 96);
+        self.assistantReturnPanel.frame = NSMakeRect(16, 293, 468, 88);
+        self.simulatorPanel.frame = NSMakeRect(16, 93, 468, 190);
         self.footerLabel.frame = NSMakeRect(16, 10, 468, 18);
+    }
+}
+
+- (void)updateRoundTripPanelForCurrentMode {
+    BOOL rtpMode = !self.localReturnMode;
+    self.testPanel.hidden = !rtpMode;
+    self.endpointMenu.enabled = rtpMode;
+    self.testTargetMenu.enabled = rtpMode;
+    self.programField.enabled = rtpMode;
+    self.testButton.enabled = rtpMode;
+    if (rtpMode) {
+        self.rtpTestTitle.stringValue = @"DIAGNOSTIC DISTANT · VÉRIFIER RTP";
+        self.testButton.title = @"Vérifier RTP";
+    } else {
+        self.lastTest.stringValue = @"Validation locale passive · expected / returned";
     }
 }
 
@@ -1039,6 +1267,11 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     (void)sender;
 
     NSString *endpoint = self.endpointMenu.selectedItem.title ?: @"";
+    if ([endpoint isEqualToString:CLExpectedEndpointName] || [endpoint isEqualToString:CLLocalReturnEndpointName]) {
+        [self.endpointMenu selectItemWithTitle:CLRTPReturnEndpointName];
+        self.lastTest.stringValue = @"Endpoint interne refusé comme console distante";
+        return;
+    }
 
     if (
         self.validatedEndpoint.length &&
@@ -1058,14 +1291,22 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
 }
 - (void)returnModeChanged:(id)sender {
     (void)sender;
-    BOOL localFallback = self.returnModeMenu.indexOfSelectedItem == 1;
-    [NSUserDefaults.standardUserDefaults setObject:(localFallback ? @"local_fallback" : @"console_return")
+    self.localReturnMode = self.returnModeMenu.indexOfSelectedItem == 1;
+    [NSUserDefaults.standardUserDefaults setObject:(self.localReturnMode ? @"local_dedicated" : @"rtp_remote")
                                             forKey:@"consoleReturnMode"];
-    [self selectPassiveReturnSourceNamed:localFallback ? @"" : (self.endpointMenu.selectedItem.title ?: @"")];
-    self.lastTest.stringValue = localFallback
-        ? @"Lecture locale de secours · aucun retour Yamaha confirmé"
-        : @"Retour Yamaha · choisissez la source RTP de la console";
-    [self writeConsoleReturnState];
+    if (self.returnMonitorSource && self.returnMonitorInputPort) {
+        MIDIPortDisconnectSource(self.returnMonitorInputPort, self.returnMonitorSource);
+        self.returnMonitorSource = 0;
+    }
+    if (self.localReturnMode) {
+        self.returnMonitorStatus = self.localReturnDestination ? noErr : kMIDIUnknownEndpoint;
+        self.lastTest.stringValue = @"Test local · retour dédié";
+    } else {
+        [self.endpointMenu selectItemWithTitle:CLRTPReturnEndpointName];
+        [self selectPassiveReturnSourceNamed:CLRTPReturnEndpointName];
+        self.lastTest.stringValue = @"RTP distant · choisissez la console distante";
+    }
+    [self refreshEndpoints];
 }
 - (void)targetChanged:(id)sender {
     (void)sender;
@@ -1318,10 +1559,10 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     NSString *selected = self.endpointMenu.selectedItem.title;
     NSMutableOrderedSet<NSString *> *candidates = [NSMutableOrderedSet orderedSet];
     for (NSString *name in sources) {
-        if (name.length) [candidates addObject:name];
+        if (CLIsRTPReturnEndpointName(name)) [candidates addObject:name];
     }
     for (NSString *name in destinations) {
-        if (name.length) [candidates addObject:name];
+        if (CLIsRTPReturnEndpointName(name)) [candidates addObject:name];
     }
     [self.endpointMenu removeAllItems];
     [self.endpointMenu addItemsWithTitles:candidates.array.count ? candidates.array : @[@"Aucun port MIDI détecté"]];
@@ -1329,7 +1570,10 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     [self stylePopup:self.endpointMenu accent:[NSColor colorWithRed:0.67 green:0.53 blue:1.0 alpha:1.0]];
 
     NSString *endpoint = self.endpointMenu.selectedItem.title ?: @"";
-    [self selectPassiveReturnSourceNamed:self.returnModeMenu.indexOfSelectedItem == 1 ? @"" : endpoint];
+    // Chaque rôle est reconnecté indépendamment. L'absence d'un endpoint ne
+    // doit jamais déconnecter l'autre source encore valide.
+    [self selectPassiveExpectedSourceNamed:CLExpectedEndpointName];
+    if (!self.localReturnMode) [self selectPassiveReturnSourceNamed:CLRTPReturnEndpointName];
     BOOL hasSource = [sources containsObject:endpoint];
     BOOL hasDestination = [destinations containsObject:endpoint];
     MIDINetworkSession *session = [MIDINetworkSession defaultSession];
@@ -1341,11 +1585,23 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     self.technicalEndpoints.stringValue = [NSString stringWithFormat:@"Entrées : %lu   Sorties : %lu\nPorts MIDI détectés : %lu\nCoreMIDI : %@",
         (unsigned long)sources.count, (unsigned long)destinations.count, (unsigned long)candidates.count,
         (sources.count || destinations.count) ? @"opérationnel" : @"aucun port"];
-    self.technicalSelection.stringValue = [NSString stringWithFormat:@"%@\nEntrée : %@   Sortie : %@",
-        endpoint.length ? endpoint : @"Aucun port", hasSource ? @"OUI" : @"NON", hasDestination ? @"OUI" : @"NON"];
+    self.technicalSelection.stringValue = [NSString stringWithFormat:
+        @"Source Ableton / attendu : %@ · %@\nSource console / retour : %@ · %@",
+        CLExpectedEndpointName, self.expectedMonitorSource ? @"connectée" : @"indisponible",
+        self.localReturnMode ? CLLocalReturnEndpointName : CLRTPReturnEndpointName,
+        self.localReturnMode ? (self.localReturnDestination ? @"connectée" : @"indisponible") :
+            (self.returnMonitorSource ? @"connectée" : @"indisponible")];
     if (self.showModeEnabled) [self updateCompactSummary];
 
-    if (self.loopDetectedEndpoint && [self.loopDetectedEndpoint isEqualToString:endpoint]) {
+    [self updateRoundTripPanelForCurrentMode];
+    if (self.localReturnMode) {
+        [self setLamp:
+            self.localReturnDestination ? [NSColor systemGreenColor] : [NSColor systemOrangeColor]
+            title:@"RETOUR LOCAL DÉDIÉ"
+            detail:self.localReturnDestination
+                ? @"Expected et returned sont observés passivement sur leurs ports dédiés."
+                : @"Le port CL MIDI Return Test est indisponible."];
+    } else if (self.loopDetectedEndpoint && [self.loopDetectedEndpoint isEqualToString:endpoint]) {
         [self setLamp:[NSColor systemRedColor] title:@"BOUCLE MIDI DÉTECTÉE" detail:@"Dans Ableton : désactivez Entrée RTP > Piste, puis relancez le test."];
     } else if (
         [self.lastRTPTestStatus isEqualToString:@"validated"] &&
@@ -1444,7 +1700,16 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
 
 - (void)runTest:(id)sender {
     (void)sender;
+    if (self.localReturnMode) {
+        // Le mode local repose exclusivement sur les moniteurs expected/returned
+        // dédiés. Il ne doit jamais lancer l'ancien aller-retour générique.
+        return;
+    }
     NSString *endpoint = self.endpointMenu.selectedItem.title ?: @"";
+    if ([endpoint isEqualToString:CLExpectedEndpointName] || [endpoint isEqualToString:CLLocalReturnEndpointName]) {
+        self.lastTest.stringValue = @"Diagnostic RTP refusé sur un endpoint interne";
+        return;
+    }
     NSInteger program = self.programField.integerValue;
     NSInteger channel = self.testTargetMenu.indexOfSelectedItem + 1;
     NSString *console = channel == 2 ? @"QL1" : @"CL5";
@@ -1568,10 +1833,8 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
 
 - (void)startSimulator:(id)sender {
     (void)sender;
-    if (!self.simulatorWindow) [self createIntegratedSimulatorWindow];
-    [self.window addChildWindow:self.simulatorWindow ordered:NSWindowAbove];
-    [self.simulatorWindow makeKeyAndOrderFront:nil];
-    [NSApp activateIgnoringOtherApps:YES];
+    self.showModeEnabled = NO;
+    [self applyPresentationMode];
 }
 
 - (NSArray<NSString *> *)allMidiEndpointNames {
@@ -1581,155 +1844,395 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     return names.array;
 }
 
-- (void)createIntegratedSimulatorWindow {
-    self.simulatorWindow = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 520, 330)
-        styleMask:(NSWindowStyleMaskTitled | NSWindowStyleMaskClosable)
-        backing:NSBackingStoreBuffered defer:NO];
-    self.simulatorWindow.title = @"Simulateur de consoles · CL MIDI Network Assistant";
-    self.simulatorWindow.backgroundColor = [NSColor colorWithRed:0.035 green:0.045 blue:0.060 alpha:1.0];
-    self.simulatorWindow.delegate = self;
-    [self.simulatorWindow center];
-    NSView *content = self.simulatorWindow.contentView;
+static NSString * const CLSimulatorDevicesDefaultsKey = @"CLSimulatorDevicesV1";
 
-    NSTextField *title = [self label:@"SIMULATEUR DE CONSOLES" frame:NSMakeRect(20, 286, 310, 26) size:17 bold:YES];
-    title.textColor = [NSColor colorWithRed:0.48 green:0.80 blue:1.0 alpha:1.0];
+- (NSMutableDictionary *)simulatorDeviceWithID:(NSString *)deviceID name:(NSString *)name channel:(NSInteger)channel enabled:(BOOL)enabled builtIn:(BOOL)builtIn {
+    return [@{
+        @"id": deviceID,
+        @"name": name,
+        @"channel": @(channel),
+        @"enabled": @(enabled),
+        @"built_in": @(builtIn),
+        @"last_program": NSNull.null,
+        @"last_event_at": NSNull.null,
+        @"last_title": @"",
+        @"event_history": [NSMutableArray array],
+    } mutableCopy];
+}
+
+- (void)loadSimulatorDevices {
+    self.simulatorDevices = [NSMutableArray array];
+    NSArray *saved = [NSUserDefaults.standardUserDefaults arrayForKey:CLSimulatorDevicesDefaultsKey];
+    for (NSDictionary *item in saved ?: @[]) {
+        NSString *deviceID = [item[@"id"] isKindOfClass:NSString.class] ? item[@"id"] : @"";
+        NSString *name = [item[@"name"] isKindOfClass:NSString.class] ? [item[@"name"] stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet] : @"";
+        NSInteger channel = [item[@"channel"] integerValue];
+        if (!deviceID.length || !name.length || channel < 1 || channel > 16) continue;
+        BOOL builtIn = [deviceID isEqualToString:@"cl5"] || [deviceID isEqualToString:@"ql1"];
+        if ([deviceID isEqualToString:@"cl5"]) { name = @"CL5"; channel = 1; }
+        if ([deviceID isEqualToString:@"ql1"]) { name = @"QL1"; channel = 2; }
+        [self.simulatorDevices addObject:[self simulatorDeviceWithID:deviceID name:name channel:channel enabled:[item[@"enabled"] boolValue] builtIn:builtIn]];
+    }
+    BOOL hasCL5 = NO, hasQL1 = NO;
+    for (NSDictionary *device in self.simulatorDevices) {
+        hasCL5 |= [device[@"id"] isEqualToString:@"cl5"];
+        hasQL1 |= [device[@"id"] isEqualToString:@"ql1"];
+    }
+    if (!hasCL5) [self.simulatorDevices insertObject:[self simulatorDeviceWithID:@"cl5" name:@"CL5" channel:1 enabled:YES builtIn:YES] atIndex:0];
+    if (!hasQL1) [self.simulatorDevices insertObject:[self simulatorDeviceWithID:@"ql1" name:@"QL1" channel:2 enabled:YES builtIn:YES] atIndex:MIN(1, self.simulatorDevices.count)];
+    self.simulatorTasks = [NSMutableDictionary dictionary];
+    self.simulatorOutputBuffers = [NSMutableDictionary dictionary];
+    [self persistSimulatorDevices];
+}
+
+- (void)persistSimulatorDevices {
+    NSMutableArray *saved = [NSMutableArray array];
+    for (NSDictionary *device in self.simulatorDevices) {
+        [saved addObject:@{
+            @"id": device[@"id"], @"name": device[@"name"],
+            @"channel": device[@"channel"], @"enabled": device[@"enabled"],
+        }];
+    }
+    [NSUserDefaults.standardUserDefaults setObject:saved forKey:CLSimulatorDevicesDefaultsKey];
+}
+
+- (NSMutableDictionary *)simulatorDeviceForID:(NSString *)deviceID {
+    for (NSMutableDictionary *device in self.simulatorDevices) {
+        if ([device[@"id"] isEqualToString:deviceID]) return device;
+    }
+    return nil;
+}
+
+- (NSString *)channelCollisionForChannel:(NSInteger)channel excludingID:(NSString *)excludedID {
+    for (NSDictionary *device in self.simulatorDevices) {
+        if (![device[@"id"] isEqualToString:excludedID] && [device[@"channel"] integerValue] == channel) {
+            return device[@"name"];
+        }
+    }
+    return nil;
+}
+
+- (void)updateSimulatorSafetyStatus {
+    NSUInteger running = 0;
+    for (NSTask *task in self.simulatorTasks.allValues) if (task.running) running += 1;
+    if (running) {
+        self.simulatorStatusLabel.stringValue = [NSString stringWithFormat:@"Simulation active · %lu device%@", (unsigned long)running, running > 1 ? @"s" : @""];
+        self.simulatorStatusLabel.textColor = [NSColor colorWithRed:1.0 green:0.62 blue:0.25 alpha:1.0];
+        self.footerLabel.stringValue = [NSString stringWithFormat:@"Simulation active · %lu device%@", (unsigned long)running, running > 1 ? @"s" : @""];
+        self.footerLabel.textColor = [NSColor colorWithRed:1.0 green:0.62 blue:0.25 alpha:1.0];
+    } else {
+        self.simulatorStatusLabel.stringValue = @"Simulation désactivée · mode spectacle sûr";
+        self.simulatorStatusLabel.textColor = [NSColor colorWithRed:0.45 green:0.88 blue:0.60 alpha:1.0];
+        self.footerLabel.stringValue = @"CL AUDIO · MIDI NETWORK · 2026";
+        self.footerLabel.textColor = [NSColor colorWithWhite:0.38 alpha:1.0];
+    }
+}
+
+- (NSString *)simulatorSceneTitleForProgram:(NSInteger)program channel:(NSInteger)channel {
+    NSDictionary *state = channel == 1 ? self.expectedCL5State : (channel == 2 ? self.expectedQL1State : nil);
+    id returnedValue = state[@"returned_midi_program"];
+    NSString *title = [state[@"returned_title"] isKindOfClass:NSString.class] ? state[@"returned_title"] : nil;
+    if (returnedValue && returnedValue != NSNull.null && [returnedValue integerValue] == program && title.length) return title;
+    return @"Titre non résolu";
+}
+
+- (void)rebuildSimulatorDeviceRows {
+    if (!self.simulatorDeviceRows) { [self updateSimulatorSafetyStatus]; return; }
+    for (NSView *view in self.simulatorDeviceRows.arrangedSubviews.copy) [self.simulatorDeviceRows removeArrangedSubview:view], [view removeFromSuperview];
+    for (NSDictionary *device in self.simulatorDevices) {
+        NSView *row = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 610, 68)];
+        row.wantsLayer = YES; row.layer.cornerRadius = 7; row.layer.backgroundColor = [NSColor colorWithWhite:0.09 alpha:1.0].CGColor;
+        NSButton *enabled = [[NSButton alloc] initWithFrame:NSMakeRect(8, 22, 22, 24)];
+        enabled.buttonType = NSButtonTypeSwitch; enabled.state = [device[@"enabled"] boolValue] ? NSControlStateValueOn : NSControlStateValueOff;
+        enabled.identifier = device[@"id"]; enabled.target = self; enabled.action = @selector(toggleSimulatorDeviceEnabled:); [row addSubview:enabled];
+        NSInteger channel = [device[@"channel"] integerValue];
+        NSTextField *name = [self label:device[@"name"] frame:NSMakeRect(36, 42, 145, 18) size:12 bold:YES]; [row addSubview:name];
+        NSTextField *detail = [self label:[NSString stringWithFormat:@"Canal %ld", (long)channel] frame:NSMakeRect(36, 23, 145, 16) size:9 bold:NO]; [row addSubview:detail];
+        id lastProgram = device[@"last_program"];
+        NSDate *lastAt = [device[@"last_event_at"] isKindOfClass:NSDate.class] ? device[@"last_event_at"] : nil;
+        NSString *event = @"Aucun Program Change reçu";
+        NSString *scene = @"En attente du retour MIDI";
+        if (lastProgram != NSNull.null && lastAt) {
+            NSDateFormatter *clock = [[NSDateFormatter alloc] init]; clock.dateFormat = @"HH:mm:ss";
+            event = [NSString stringWithFormat:@"PGM %ld · %@ · %@", (long)[lastProgram integerValue] + 1, [clock stringFromDate:lastAt], CLMidiAgeDescription(-lastAt.timeIntervalSinceNow)];
+            scene = [self simulatorSceneTitleForProgram:[lastProgram integerValue] channel:channel];
+        }
+        NSTextField *sceneLabel = [self label:scene frame:NSMakeRect(184, 39, 245, 18) size:10 bold:YES]; sceneLabel.lineBreakMode = NSLineBreakByTruncatingTail; [row addSubview:sceneLabel];
+        NSTextField *eventLabel = [self label:event frame:NSMakeRect(184, 18, 300, 18) size:9 bold:NO]; eventLabel.lineBreakMode = NSLineBreakByTruncatingTail; [row addSubview:eventLabel];
+        NSString *state = self.simulatorTasks[device[@"id"]].running ? @"ACTIF" : @"arrêté";
+        [row addSubview:[self label:state frame:NSMakeRect(36, 5, 145, 16) size:8 bold:YES]];
+        NSButton *startStop = [self button:self.simulatorTasks[device[@"id"]].running ? @"■" : @"▶" frame:NSMakeRect(494, 20, 32, 28) action:@selector(toggleSimulatorDeviceRunning:)]; startStop.toolTip = self.simulatorTasks[device[@"id"]].running ? @"Arrêter" : @"Démarrer"; startStop.identifier = device[@"id"]; [row addSubview:startStop];
+        NSButton *edit = [self button:@"✎" frame:NSMakeRect(532, 20, 32, 28) action:@selector(editSimulatorDevice:)]; edit.toolTip = @"Modifier"; edit.identifier = device[@"id"]; edit.enabled = ![device[@"built_in"] boolValue]; [row addSubview:edit];
+        if (![device[@"built_in"] boolValue]) { NSButton *remove = [self button:@"×" frame:NSMakeRect(570, 20, 32, 28) action:@selector(deleteSimulatorDevice:)]; remove.toolTip = @"Supprimer"; remove.identifier = device[@"id"]; [row addSubview:remove]; }
+        [self.simulatorDeviceRows addArrangedSubview:row];
+        [row.widthAnchor constraintEqualToConstant:610].active = YES; [row.heightAnchor constraintEqualToConstant:68].active = YES;
+    }
+    [self updateSimulatorSafetyStatus];
+}
+
+- (void)createIntegratedSimulatorPanelInView:(NSView *)parent {
+    [self loadSimulatorDevices];
+    self.simulatorTasks = [NSMutableDictionary dictionary];
+    self.simulatorOutputBuffers = [NSMutableDictionary dictionary];
+    NSView *content = self.simulatorPanel = [[NSView alloc] initWithFrame:NSMakeRect(16, 183, 468, 190)];
+    content.wantsLayer = YES; content.layer.cornerRadius = 12; content.layer.borderWidth = 1;
+    content.layer.backgroundColor = [NSColor colorWithRed:0.075 green:0.060 blue:0.045 alpha:1.0].CGColor;
+    content.layer.borderColor = [NSColor colorWithRed:0.72 green:0.43 blue:0.18 alpha:0.72].CGColor;
+    [parent addSubview:content];
+
+    NSTextField *title = [self label:@"SIMULATEUR DE RETOUR CONSOLE" frame:NSMakeRect(14, 160, 280, 20) size:11 bold:YES];
+    title.textColor = [NSColor colorWithRed:1.0 green:0.68 blue:0.28 alpha:1.0];
     [content addSubview:title];
-    NSTextField *warning = [self label:@"OUTIL DE TEST · toujours le désactiver avant une vraie exploitation" frame:NSMakeRect(20, 261, 480, 20) size:10 bold:YES];
-    warning.textColor = [NSColor colorWithRed:1.0 green:0.62 blue:0.28 alpha:1.0];
-    [content addSubview:warning];
+    [content addSubview:[self button:@"Afficher les détails" frame:NSMakeRect(326, 156, 128, 26) action:@selector(toggleShowMode:)]];
 
-    [content addSubview:[self label:@"MODE" frame:NSMakeRect(20, 225, 90, 18) size:9 bold:YES]];
-    self.simulatorModeMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(20, 190, 220, 32) pullsDown:NO];
-    [self.simulatorModeMenu addItemsWithTitles:@[@"Désactivé", @"Test local · IAC", @"Test réseau · RTP"]];
+    [content addSubview:[self label:@"MODE" frame:NSMakeRect(14, 132, 44, 18) size:8 bold:YES]];
+    self.simulatorModeMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(58, 126, 190, 28) pullsDown:NO];
+    [self.simulatorModeMenu addItemsWithTitles:@[@"Test local · retour dédié", @"Test distant · RTP"]];
     self.simulatorModeMenu.target = self;
     self.simulatorModeMenu.action = @selector(simulatorModeChanged:);
     [self stylePopup:self.simulatorModeMenu accent:[NSColor colorWithRed:0.92 green:0.58 blue:0.26 alpha:1.0]];
     [content addSubview:self.simulatorModeMenu];
 
-    [content addSubview:[self label:@"PORT MIDI / SESSION RTP" frame:NSMakeRect(260, 225, 230, 18) size:9 bold:YES]];
-    self.simulatorEndpointMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(260, 190, 240, 32) pullsDown:NO];
-    NSArray<NSString *> *endpoints = [self allMidiEndpointNames];
+    self.simulatorEndpointMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(258, 126, 196, 28) pullsDown:NO];
+    NSMutableOrderedSet<NSString *> *endpointSet = [NSMutableOrderedSet orderedSetWithObjects:CLLocalReturnEndpointName, CLRTPReturnEndpointName, nil];
+    [endpointSet addObjectsFromArray:[self allMidiEndpointNames]];
+    NSArray<NSString *> *endpoints = endpointSet.array;
     [self.simulatorEndpointMenu addItemsWithTitles:endpoints.count ? endpoints : @[@"Aucun port MIDI"]];
     [self stylePopup:self.simulatorEndpointMenu accent:[NSColor colorWithRed:0.44 green:0.76 blue:1.0 alpha:1.0]];
     [content addSubview:self.simulatorEndpointMenu];
 
-    NSView *mapping = [[NSView alloc] initWithFrame:NSMakeRect(20, 105, 480, 68)];
-    mapping.wantsLayer = YES; mapping.layer.cornerRadius = 9; mapping.layer.borderWidth = 1;
-    mapping.layer.backgroundColor = [NSColor colorWithWhite:0.08 alpha:1.0].CGColor;
-    mapping.layer.borderColor = [NSColor colorWithWhite:0.24 alpha:1.0].CGColor;
-    [content addSubview:mapping];
-    [mapping addSubview:[self label:@"CL5" frame:NSMakeRect(16, 38, 80, 18) size:12 bold:YES]];
-    [mapping addSubview:[self label:@"Canal 1 · retour automatique du Program Change reçu" frame:NSMakeRect(80, 38, 380, 18) size:10 bold:NO]];
-    [mapping addSubview:[self label:@"QL1" frame:NSMakeRect(16, 12, 80, 18) size:12 bold:YES]];
-    [mapping addSubview:[self label:@"Canal 2 · retour automatique du Program Change reçu" frame:NSMakeRect(80, 12, 380, 18) size:10 bold:NO]];
+    [content addSubview:[self label:@"CL5 · Canal MIDI 1 · Mémoire" frame:NSMakeRect(14, 94, 204, 20) size:10 bold:YES]];
+    self.simulatorCL5MemoryField = [[NSTextField alloc] initWithFrame:NSMakeRect(220, 90, 54, 26)];
+    self.simulatorCL5MemoryField.stringValue = @"81"; self.simulatorCL5MemoryField.alignment = NSTextAlignmentCenter; [content addSubview:self.simulatorCL5MemoryField];
+    NSButton *sendCL5 = [self accentButton:@"Envoyer" frame:NSMakeRect(282, 89, 80, 28) action:@selector(sendSimulatorMemory:) color:[NSColor colorWithRed:0.18 green:0.46 blue:0.72 alpha:1.0]];
+    sendCL5.tag = 1; [content addSubview:sendCL5];
+    [content addSubview:[self label:@"QL1 · Canal MIDI 2 · Mémoire" frame:NSMakeRect(14, 62, 204, 20) size:10 bold:YES]];
+    self.simulatorQL1MemoryField = [[NSTextField alloc] initWithFrame:NSMakeRect(220, 58, 54, 26)];
+    self.simulatorQL1MemoryField.stringValue = @"78"; self.simulatorQL1MemoryField.alignment = NSTextAlignmentCenter; [content addSubview:self.simulatorQL1MemoryField];
+    NSButton *sendQL1 = [self accentButton:@"Envoyer" frame:NSMakeRect(282, 57, 80, 28) action:@selector(sendSimulatorMemory:) color:[NSColor colorWithRed:0.18 green:0.46 blue:0.72 alpha:1.0]];
+    sendQL1.tag = 2; [content addSubview:sendQL1];
 
-    [content addSubview:[self label:@"Délai de réponse (ms)" frame:NSMakeRect(20, 76, 150, 18) size:9 bold:YES]];
-    self.simulatorDelayField = [[NSTextField alloc] initWithFrame:NSMakeRect(170, 70, 70, 28)];
+    self.simulatorDelayField = [[NSTextField alloc] initWithFrame:NSMakeRect(372, 89, 42, 26)];
     self.simulatorDelayField.stringValue = @"80";
     self.simulatorDelayField.alignment = NSTextAlignmentCenter;
     [content addSubview:self.simulatorDelayField];
-    [content addSubview:[self accentButton:@"ACTIVER LE TEST" frame:NSMakeRect(260, 64, 150, 36) action:@selector(startIntegratedSimulator:) color:[NSColor colorWithRed:0.10 green:0.56 blue:0.31 alpha:1.0]]];
-    [content addSubview:[self accentButton:@"ARRÊTER" frame:NSMakeRect(420, 64, 80, 36) action:@selector(stopIntegratedSimulator:) color:[NSColor colorWithRed:0.58 green:0.18 blue:0.20 alpha:1.0]]];
-    self.simulatorStatusLabel = [self label:@"Simulation désactivée · mode spectacle sûr" frame:NSMakeRect(20, 24, 480, 24) size:11 bold:YES];
+    [content addSubview:[self label:@"ms" frame:NSMakeRect(417, 94, 28, 18) size:8 bold:NO]];
+    [content addSubview:[self accentButton:@"ACTIVER TEST" frame:NSMakeRect(14, 20, 126, 30) action:@selector(startIntegratedSimulator:) color:[NSColor colorWithRed:0.10 green:0.56 blue:0.31 alpha:1.0]]];
+    [content addSubview:[self accentButton:@"ARRÊTER TOUT" frame:NSMakeRect(148, 20, 118, 30) action:@selector(stopIntegratedSimulator:) color:[NSColor colorWithRed:0.58 green:0.18 blue:0.20 alpha:1.0]]];
+    self.simulatorStatusLabel = [self label:@"Simulation désactivée" frame:NSMakeRect(276, 22, 178, 24) size:9 bold:YES];
+    self.simulatorStatusLabel.alignment = NSTextAlignmentRight;
     self.simulatorStatusLabel.textColor = [NSColor colorWithRed:0.45 green:0.88 blue:0.60 alpha:1.0];
     [content addSubview:self.simulatorStatusLabel];
     [self simulatorModeChanged:nil];
 }
 
-- (void)simulatorModeChanged:(id)sender {
-    (void)sender;
-    NSInteger mode = self.simulatorModeMenu.indexOfSelectedItem;
-    self.simulatorEndpointMenu.enabled = mode != 0;
-    if (mode == 1) {
-        BOOL foundIAC = NO;
-        for (NSMenuItem *item in self.simulatorEndpointMenu.itemArray) {
-            if ([item.title rangeOfString:@"IAC" options:NSCaseInsensitiveSearch].location != NSNotFound) {
-                [self.simulatorEndpointMenu selectItem:item];
-                foundIAC = YES;
-                break;
-            }
-        }
-        if (!foundIAC) {
-            self.simulatorStatusLabel.stringValue = @"IAC indisponible · activez un bus IAC dans Configuration audio et MIDI";
-            self.simulatorStatusLabel.textColor = NSColor.systemOrangeColor;
-        }
-    } else if (mode == 2) {
-        for (NSMenuItem *item in self.simulatorEndpointMenu.itemArray) {
-            if ([item.title rangeOfString:@"RTP" options:NSCaseInsensitiveSearch].location != NSNotFound ||
-                [item.title rangeOfString:@"Session" options:NSCaseInsensitiveSearch].location != NSNotFound) {
-                [self.simulatorEndpointMenu selectItem:item];
-                break;
-            }
-        }
-    } else {
-        [self stopIntegratedSimulator:nil];
+- (void)sendSimulatorMemory:(NSButton *)sender {
+    NSInteger channel = sender.tag;
+    NSTextField *field = channel == 1 ? self.simulatorCL5MemoryField : self.simulatorQL1MemoryField;
+    NSInteger sceneMemory = field.integerValue;
+    if (sceneMemory < 1 || sceneMemory > 128) {
+        self.simulatorStatusLabel.stringValue = @"Mémoire invalide · plage 1 à 128";
+        self.simulatorStatusLabel.textColor = NSColor.systemRedColor;
+        return;
     }
-}
-
-- (NSTask *)launchSimulatorConsole:(NSString *)label channel:(NSString *)channel transport:(NSString *)transport endpoint:(NSString *)endpoint delay:(NSInteger)delay {
+    for (NSMutableDictionary *device in self.simulatorDevices) {
+        if ([device[@"channel"] integerValue] == channel && [device[@"built_in"] boolValue]) {
+            if (!self.simulatorTasks[device[@"id"]].running) [self startSimulatorDevice:device];
+            break;
+        }
+    }
+    NSString *endpoint = self.localReturnMode ? CLExpectedEndpointName : CLRTPReturnEndpointName;
     NSTask *task = [[NSTask alloc] init];
-    task.executableURL = [NSURL fileURLWithPath:[self toolPath:@"CLYamahaConsoleSimulator"]];
-    task.arguments = @[@"--label", label, @"--channel", channel, @"--transport", transport,
-                       @"--endpoint", endpoint ?: @"", @"--delay-ms", [NSString stringWithFormat:@"%ld", (long)delay]];
+    task.executableURL = [NSURL fileURLWithPath:[self toolPath:@"CLMIDIRoundTripTester"]];
+    task.arguments = @[@"--endpoint", endpoint, @"--program", [NSString stringWithFormat:@"%ld", (long)sceneMemory],
+                       @"--channel", [NSString stringWithFormat:@"%ld", (long)channel], @"--timeout", @"0.2"];
     task.standardOutput = NSFileHandle.fileHandleWithNullDevice;
     task.standardError = NSFileHandle.fileHandleWithNullDevice;
     NSError *error = nil;
     if (![task launchAndReturnError:&error]) {
-        self.simulatorStatusLabel.stringValue = [NSString stringWithFormat:@"Échec %@ : %@", label, error.localizedDescription];
+        self.simulatorStatusLabel.stringValue = [NSString stringWithFormat:@"Envoi impossible : %@", error.localizedDescription];
+        self.simulatorStatusLabel.textColor = NSColor.systemRedColor;
+        return;
+    }
+    self.simulatorStatusLabel.stringValue = [NSString stringWithFormat:@"%@ · mémoire %ld envoyée", channel == 1 ? @"CL5" : @"QL1", (long)sceneMemory];
+    self.simulatorStatusLabel.textColor = [NSColor colorWithRed:1.0 green:0.68 blue:0.28 alpha:1.0];
+    CLAppendDiagnostic(@"integrated-simulator-manual-send", [NSString stringWithFormat:@"channel=%ld memory=%ld endpoint=%@", (long)channel, (long)sceneMemory, endpoint]);
+}
+
+- (void)simulatorModeChanged:(id)sender {
+    (void)sender;
+    NSInteger mode = self.simulatorModeMenu.indexOfSelectedItem;
+    self.localReturnMode = mode == 0;
+    [self updateRoundTripPanelForCurrentMode];
+    NSString *returnEndpoint = self.localReturnMode ? CLLocalReturnEndpointName : CLRTPReturnEndpointName;
+    [self.simulatorEndpointMenu selectItemWithTitle:returnEndpoint];
+    self.simulatorEndpointMenu.enabled = NO;
+    if (self.returnMonitorSource && self.returnMonitorInputPort) {
+        MIDIPortDisconnectSource(self.returnMonitorInputPort, self.returnMonitorSource);
+        self.returnMonitorSource = 0;
+    }
+    if (self.localReturnMode) self.returnMonitorStatus = self.localReturnDestination ? noErr : kMIDIUnknownEndpoint;
+    else [self selectPassiveReturnSourceNamed:CLRTPReturnEndpointName];
+    if (!self.localReturnMode) [self.endpointMenu selectItemWithTitle:CLRTPReturnEndpointName];
+    [self refreshEndpoints];
+}
+
+- (NSTask *)launchSimulatorDevice:(NSMutableDictionary *)device transport:(NSString *)transport endpoint:(NSString *)endpoint delay:(NSInteger)delay {
+    NSTask *task = [[NSTask alloc] init];
+    task.executableURL = [NSURL fileURLWithPath:[self toolPath:@"CLYamahaConsoleSimulator"]];
+    task.arguments = @[@"--label", device[@"name"], @"--channel", [device[@"channel"] stringValue], @"--transport", transport,
+                       @"--input-endpoint", CLExpectedEndpointName, @"--endpoint", endpoint ?: @"",
+                       @"--delay-ms", [NSString stringWithFormat:@"%ld", (long)delay]];
+    NSPipe *output = [NSPipe pipe];
+    task.standardOutput = output;
+    task.standardError = NSFileHandle.fileHandleWithNullDevice;
+    NSString *deviceID = device[@"id"];
+    self.simulatorOutputBuffers[deviceID] = [NSMutableData data];
+    __weak typeof(self) weakSelf = self;
+    output.fileHandleForReading.readabilityHandler = ^(NSFileHandle *handle) {
+        NSData *chunk = handle.availableData;
+        if (!chunk.length) { handle.readabilityHandler = nil; return; }
+        dispatch_async(dispatch_get_main_queue(), ^{
+            typeof(self) strongSelf = weakSelf;
+            NSMutableData *buffer = strongSelf.simulatorOutputBuffers[deviceID];
+            if (!strongSelf || !buffer) return;
+            [buffer appendData:chunk];
+            NSString *text = [[NSString alloc] initWithData:buffer encoding:NSUTF8StringEncoding];
+            if (!text) return;
+            NSArray<NSString *> *lines = [text componentsSeparatedByString:@"\n"];
+            [buffer setData:[lines.lastObject dataUsingEncoding:NSUTF8StringEncoding]];
+            for (NSUInteger index = 0; index + 1 < lines.count; index++) {
+                NSString *line = lines[index];
+                if (![line hasPrefix:@"RECEIVED "] && ![line hasPrefix:@"CONFIRMED "]) continue;
+                NSRange range = [line rangeOfString:@"program="];
+                if (range.location == NSNotFound) continue;
+                NSInteger midiProgram = [[line substringFromIndex:NSMaxRange(range)] integerValue];
+                if (midiProgram >= 0 && midiProgram <= 127) [strongSelf recordSimulatorProgram:midiProgram deviceID:deviceID];
+            }
+        });
+    };
+    task.terminationHandler = ^(NSTask *finished) {
+        (void)finished;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            if (self.simulatorTasks[deviceID] == task) [self.simulatorTasks removeObjectForKey:deviceID];
+            [self.simulatorOutputBuffers removeObjectForKey:deviceID];
+            [self rebuildSimulatorDeviceRows];
+        });
+    };
+    NSError *error = nil;
+    if (![task launchAndReturnError:&error]) {
+        self.simulatorStatusLabel.stringValue = [NSString stringWithFormat:@"Échec %@ : %@", device[@"name"], error.localizedDescription];
         return nil;
     }
+    self.simulatorTasks[deviceID] = task;
     return task;
+}
+
+- (BOOL)simulatorTransport:(NSString **)transport endpoint:(NSString **)endpoint delay:(NSInteger *)delay {
+    NSInteger mode = self.simulatorModeMenu.indexOfSelectedItem;
+    NSString *selectedEndpoint = self.simulatorEndpointMenu.titleOfSelectedItem ?: @"";
+    if ([selectedEndpoint isEqualToString:CLExpectedEndpointName]) {
+        self.simulatorStatusLabel.stringValue = @"Retour simulé refusé · Gestionnaire IAC Bus 1 est exclusivement la source expected";
+        self.simulatorStatusLabel.textColor = NSColor.systemRedColor;
+        return NO;
+    }
+    NSString *requiredEndpoint = mode == 0 ? CLLocalReturnEndpointName : CLRTPReturnEndpointName;
+    if (transport) *transport = mode == 0 ? @"iac" : @"rtp";
+    if (endpoint) *endpoint = requiredEndpoint;
+    if (delay) *delay = MAX(0, self.simulatorDelayField.integerValue);
+    return YES;
+}
+
+- (void)startSimulatorDevice:(NSMutableDictionary *)device {
+    if (!device || self.simulatorTasks[device[@"id"]].running) return;
+    NSString *transport, *endpoint; NSInteger delay;
+    if (![self simulatorTransport:&transport endpoint:&endpoint delay:&delay]) return;
+    [self launchSimulatorDevice:device transport:transport endpoint:endpoint delay:delay];
+    [self rebuildSimulatorDeviceRows];
+}
+
+- (void)stopSimulatorDeviceID:(NSString *)deviceID {
+    NSTask *task = self.simulatorTasks[deviceID];
+    if (task.running) [task terminate];
+    [self.simulatorTasks removeObjectForKey:deviceID];
+    [self rebuildSimulatorDeviceRows];
 }
 
 - (void)startIntegratedSimulator:(id)sender {
     (void)sender;
     [self stopIntegratedSimulator:nil];
-    NSInteger mode = self.simulatorModeMenu.indexOfSelectedItem;
-    if (mode == 0) {
-        self.simulatorStatusLabel.stringValue = @"Choisissez IAC local ou RTP réseau avant d’activer.";
-        return;
-    }
-    NSString *transport = mode == 1 ? @"iac" : @"rtp";
-    NSString *endpoint = self.simulatorEndpointMenu.titleOfSelectedItem ?: @"";
-    if (mode == 1 && [endpoint rangeOfString:@"IAC" options:NSCaseInsensitiveSearch].location == NSNotFound) {
-        self.simulatorStatusLabel.stringValue = @"Test IAC refusé · aucun bus IAC sélectionné";
-        self.simulatorStatusLabel.textColor = NSColor.systemRedColor;
-        return;
-    }
-    NSInteger delay = MAX(0, self.simulatorDelayField.integerValue);
-    self.simulatorCL5Task = [self launchSimulatorConsole:@"CL5" channel:@"1" transport:transport endpoint:endpoint delay:delay];
-    self.simulatorQL1Task = [self launchSimulatorConsole:@"QL1" channel:@"2" transport:transport endpoint:endpoint delay:delay];
-    if (!self.simulatorCL5Task || !self.simulatorQL1Task) {
-        [self stopIntegratedSimulator:nil];
-        self.simulatorStatusLabel.stringValue = @"Simulation impossible · vérifiez le port sélectionné";
-        self.simulatorStatusLabel.textColor = NSColor.systemRedColor;
-        return;
-    }
-    NSString *modeName = mode == 1 ? @"IAC LOCAL" : @"RTP RÉSEAU";
-    self.simulatorStatusLabel.stringValue = [NSString stringWithFormat:@"⚠ SIMULATION ACTIVE · %@ · CL5 ch.1 + QL1 ch.2", modeName];
-    self.simulatorStatusLabel.textColor = [NSColor colorWithRed:1.0 green:0.62 blue:0.25 alpha:1.0];
-    self.simulatorButton.title = [NSString stringWithFormat:@"⚠ Simulateur actif · %@", modeName];
-    CLAppendDiagnostic(@"integrated-simulator-started", [NSString stringWithFormat:@"mode=%@ endpoint=%@ delay=%ld", transport, endpoint, (long)delay]);
+    NSString *transport, *endpoint; NSInteger delay;
+    if (![self simulatorTransport:&transport endpoint:&endpoint delay:&delay]) return;
+    for (NSMutableDictionary *device in self.simulatorDevices) if ([device[@"enabled"] boolValue]) [self launchSimulatorDevice:device transport:transport endpoint:endpoint delay:delay];
+    [self rebuildSimulatorDeviceRows];
+    CLAppendDiagnostic(@"integrated-simulator-started", [NSString stringWithFormat:@"devices=%lu mode=%@ endpoint=%@ delay=%ld", (unsigned long)self.simulatorTasks.count, transport, endpoint, (long)delay]);
 }
 
 - (void)stopIntegratedSimulator:(id)sender {
     (void)sender;
-    if (self.simulatorCL5Task.running) [self.simulatorCL5Task terminate];
-    if (self.simulatorQL1Task.running) [self.simulatorQL1Task terminate];
-    self.simulatorCL5Task = nil;
-    self.simulatorQL1Task = nil;
-    self.simulatorStatusLabel.stringValue = @"Simulation désactivée · mode spectacle sûr";
-    self.simulatorStatusLabel.textColor = [NSColor colorWithRed:0.45 green:0.88 blue:0.60 alpha:1.0];
-    self.simulatorButton.title = @"Simulateur de consoles intégré…";
+    NSArray *tasks = self.simulatorTasks.allValues.copy;
+    [self.simulatorTasks removeAllObjects];
+    for (NSTask *task in tasks) if (task.running) [task terminate];
+    [self rebuildSimulatorDeviceRows];
     CLAppendDiagnostic(@"integrated-simulator-stopped", @"all local simulator tasks stopped");
 }
 
-- (void)windowWillClose:(NSNotification *)notification {
-    if (notification.object == self.simulatorWindow) {
-        [self stopIntegratedSimulator:nil];
-        [self.window removeChildWindow:self.simulatorWindow];
-        self.simulatorWindow = nil;
+- (void)toggleSimulatorDeviceEnabled:(NSButton *)sender {
+    NSMutableDictionary *device = [self simulatorDeviceForID:sender.identifier];
+    device[@"enabled"] = @(sender.state == NSControlStateValueOn); [self persistSimulatorDevices];
+    if (![device[@"enabled"] boolValue]) [self stopSimulatorDeviceID:device[@"id"]];
+}
+
+- (void)toggleSimulatorDeviceRunning:(NSButton *)sender {
+    NSString *deviceID = sender.identifier; NSMutableDictionary *device = [self simulatorDeviceForID:deviceID];
+    if (self.simulatorTasks[deviceID].running) [self stopSimulatorDeviceID:deviceID]; else [self startSimulatorDevice:device];
+}
+
+- (BOOL)editDevice:(NSMutableDictionary *)device title:(NSString *)title {
+    NSAlert *alert = [[NSAlert alloc] init]; alert.messageText = title;
+    NSView *form = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 300, 70)];
+    NSTextField *name = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 40, 300, 24)]; name.placeholderString = @"Nom du device"; name.stringValue = device[@"name"] ?: @""; [form addSubview:name];
+    NSTextField *channel = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 5, 100, 24)]; channel.placeholderString = @"Canal 1–16"; channel.stringValue = [device[@"channel"] stringValue] ?: @"1"; [form addSubview:channel];
+    alert.accessoryView = form; [alert addButtonWithTitle:@"Enregistrer"]; [alert addButtonWithTitle:@"Annuler"];
+    if ([alert runModal] != NSAlertFirstButtonReturn) return NO;
+    NSString *cleanName = [name.stringValue stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet]; NSInteger midiChannel = channel.integerValue;
+    if (!cleanName.length || midiChannel < 1 || midiChannel > 16) { [self showSimulatorMessage:@"Le nom est obligatoire et le canal doit être compris entre 1 et 16." title:@"Device invalide"]; return NO; }
+    NSString *collision = [self channelCollisionForChannel:midiChannel excludingID:device[@"id"]];
+    if (collision.length) { NSAlert *warning = [[NSAlert alloc] init]; warning.messageText = [NSString stringWithFormat:@"⚠ Canal déjà utilisé par %@", collision]; warning.informativeText = @"Ce doublon est autorisé uniquement pour les tests avancés."; [warning addButtonWithTitle:@"Continuer"]; [warning addButtonWithTitle:@"Annuler"]; if ([warning runModal] != NSAlertFirstButtonReturn) return NO; }
+    device[@"name"] = cleanName; device[@"channel"] = @(midiChannel); [self persistSimulatorDevices]; [self rebuildSimulatorDeviceRows]; return YES;
+}
+
+- (void)addSimulatorDevice:(id)sender { (void)sender; NSMutableDictionary *device = [self simulatorDeviceWithID:NSUUID.UUID.UUIDString name:@"" channel:3 enabled:YES builtIn:NO]; if ([self editDevice:device title:@"Ajouter un device MIDI"]) { [self.simulatorDevices addObject:device]; [self persistSimulatorDevices]; [self rebuildSimulatorDeviceRows]; } }
+- (void)editSimulatorDevice:(NSButton *)sender { NSMutableDictionary *device = [self simulatorDeviceForID:sender.identifier]; if (self.simulatorTasks[device[@"id"]].running) [self stopSimulatorDeviceID:device[@"id"]]; [self editDevice:device title:@"Modifier le device MIDI"]; }
+- (void)deleteSimulatorDevice:(NSButton *)sender { NSMutableDictionary *device = [self simulatorDeviceForID:sender.identifier]; if (!device || [device[@"built_in"] boolValue]) return; [self stopSimulatorDeviceID:device[@"id"]]; [self.simulatorDevices removeObject:device]; [self persistSimulatorDevices]; [self rebuildSimulatorDeviceRows]; }
+
+- (void)recordSimulatorProgram:(NSInteger)program channel:(NSInteger)channel {
+    for (NSMutableDictionary *device in self.simulatorDevices) {
+        if ([device[@"channel"] integerValue] == channel) [self recordSimulatorProgram:program deviceID:device[@"id"]];
     }
+    if (self.simulatorDeviceRows) [self rebuildSimulatorDeviceRows];
+}
+
+- (void)recordSimulatorProgram:(NSInteger)program deviceID:(NSString *)deviceID {
+    NSMutableDictionary *device = [self simulatorDeviceForID:deviceID];
+    if (!device || program < 0 || program > 127) return;
+    NSDate *now = NSDate.date;
+    NSString *title = [self simulatorSceneTitleForProgram:program channel:[device[@"channel"] integerValue]];
+    NSMutableArray *history = [device[@"event_history"] isKindOfClass:NSMutableArray.class]
+        ? device[@"event_history"] : [NSMutableArray array];
+    [history addObject:@{@"timestamp": now, @"channel": device[@"channel"], @"midi_program": @(program),
+                         @"program": @(program + 1), @"title": title, @"matched": @([title isEqualToString:self.currentAbletonSceneTitle ?: @""]),
+                         @"reason": @"simulator_event"}];
+    while (history.count > 10) [history removeObjectAtIndex:0];
+    device[@"event_history"] = history;
+    device[@"last_program"] = @(program);
+    device[@"last_event_at"] = now;
+    device[@"last_title"] = title;
+    if (self.simulatorDeviceRows) [self rebuildSimulatorDeviceRows];
+}
+
+- (void)windowWillClose:(NSNotification *)notification {
+    (void)notification;
 }
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender { (void)sender; return !self.backgroundMonitorOnly; }

@@ -64,6 +64,7 @@
 .midi-return-title { display:block; margin-top:7px; color:#e1e5eb; font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .midi-return-state { display:block; margin-top:6px; font-size:10px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .midi-return.ok { border-color:#43a047; color:#8bc34a; }
+.midi-return.mismatch { border-color:#e05252; color:#ff8a80; }
 .midi-return.remembered { border-color:rgba(67,160,71,.48); color:#a7bbaa; }
 
 .topnav {
@@ -430,9 +431,7 @@ body.is-arrangement-paused .card.current {
     <nav class="topnav"><a href="/">Session</a><a href="/ab">A/B</a><a href="/arrangement" class="active">Arrangement</a></nav>
 
     <section class="midi-returns" aria-label="Retours MIDI consoles">
-      <label class="midi-title-mode">Titres consoles
-        <select id="consoleTitleMode"><option value="ableton_context">Contexte Ableton (secours)</option><option value="console_file">Fichiers CL5 / QL1</option></select>
-      </label>
+      <div class="midi-title-mode">Source titres consoles : Fichiers Yamaha CL5 / QL1</div>
       <div class="midi-return" id="arrCl5Return"><strong id="arrCl5Program">CL5 · scène —</strong><span class="midi-return-title" id="arrCl5Title">Titre en attente</span><span class="midi-return-state" id="arrCl5State">En attente du premier retour</span></div>
       <div class="midi-return" id="arrQl1Return"><strong id="arrQl1Program">QL1 · scène —</strong><span class="midi-return-title" id="arrQl1Title">Titre en attente</span><span class="midi-return-state" id="arrQl1State">En attente du premier retour</span></div>
     </section>
@@ -497,7 +496,6 @@ body.is-arrangement-paused .card.current {
     const nextCardEl = document.querySelector('.card.next');
     const arrCl5Return = document.getElementById('arrCl5Return');
     const arrQl1Return = document.getElementById('arrQl1Return');
-    const consoleTitleMode = document.getElementById('consoleTitleMode');
     const markerSelectEl = document.getElementById('markerSelect');
     const gotoBtn = document.getElementById('gotoBtn');
     const goBtn = document.getElementById('goBtn');
@@ -507,6 +505,7 @@ body.is-arrangement-paused .card.current {
     const transportButtons = [...document.querySelectorAll('button[data-action]')];
 
     let busy = false;
+    let lastState = null;
     let markers = [];
     let markerSignature = '';
     let currentIndex = -1;
@@ -515,15 +514,6 @@ body.is-arrangement-paused .card.current {
     let selectedMarkerIndex = null;
     let markerSelectIsOpen = false;
 
-    consoleTitleMode.addEventListener('change', async () => {
-      try {
-        const response = await fetch('/action', {
-          method: 'POST', headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({action: 'console_title_mode', mode: consoleTitleMode.value})
-        });
-        if (!response.ok) throw new Error('Mode refusé');
-      } catch (_) {}
-    });
     let arrangementReturnActive = false;
     let pendingGotoIndex = null;
     let manualNextIndex = null;
@@ -773,11 +763,9 @@ body.is-arrangement-paused .card.current {
 
     function applyStatus(state) {
       if (!acceptStateGeneration(state)) return;
+      lastState = state;
       if (window.CLRemoteLTC) window.CLRemoteLTC.render(ltcTimecodeEl, state);
       const midi = state.midi_console || {};
-      if (document.activeElement !== consoleTitleMode) {
-        consoleTitleMode.value = state.console_title_mode || 'ableton_context';
-      }
       const formatMidiAge = (seconds) => {
         seconds = Math.max(0, Math.floor(seconds));
         if (seconds < 60) return seconds < 2 ? 'à l’instant' : 'il y a ' + seconds + ' s';
@@ -788,22 +776,29 @@ body.is-arrangement-paused .card.current {
       };
       const renderConsoleReturn = (name, value, card, programId, titleId, stateId) => {
         value = value || {};
-        const receivedAt = Number(value.received_at || 0);
-        const age = receivedAt ? Math.max(0, Date.now() / 1000 - receivedAt) : Infinity;
-        const recent = Boolean(value.received && age <= 12);
-        const expected = value.display_source === 'ableton_scene';
-        const localFallback = state.console_return_mode === 'local_fallback';
-        card.classList.toggle('ok', recent);
-        card.classList.toggle('remembered', Boolean(value.received && !recent && !expected));
-        document.getElementById(programId).textContent = name + ' · PGM ' + (value.program ?? '—');
-        document.getElementById(titleId).textContent = value.resolved_scene && value.title
-          ? value.title
-          : 'Titre non résolu';
-        document.getElementById(stateId).textContent = expected
-          ? (localFallback ? 'Lecture locale de secours · non confirmée par la console' : 'Commande Ableton prévue · retour console en attente')
-          : value.received
-          ? (recent ? '✓ Scène reçue · ' : (age <= 60 ? 'Dernière scène reçue · ' : 'Aucun retour récent · dernier ')) + (receivedAt ? formatMidiAge(age) : 'heure inconnue')
-          : 'En attente du premier retour';
+        const status = value.validation_status || 'unavailable';
+        card.classList.toggle('ok', status === 'confirmed');
+        card.classList.toggle('mismatch', status === 'mismatch');
+        card.classList.toggle('remembered', status === 'stale');
+        document.getElementById(programId).textContent = name + ' · ATTENDU · Mémoire ' + (value.expected_scene_memory ?? '—');
+        document.getElementById(titleId).textContent = (value.expected_title || 'Titre non résolu')
+          + ' · REÇU · Mémoire ' + (value.returned_scene_memory ?? '—')
+          + ' · ' + (value.returned_title || 'Titre non résolu');
+        const validationLabel = status === 'confirmed'
+          ? '✓ Confirmé par la console'
+          : status === 'mismatch'
+          ? '⚠ Retour PGM ' + (value.returned_program ?? value.return_program ?? '—') + ' · attendu ' + (value.expected_program ?? '—')
+          : status === 'local_fallback'
+          ? 'En attente du retour MIDI'
+          : status === 'stale'
+          ? 'Retour ancien · ' + formatMidiAge(value.last_return_age_seconds || 0)
+          : status === 'waiting'
+          ? 'En attente du retour console'
+          : 'Programme attendu indisponible';
+        document.getElementById(stateId).textContent = validationLabel
+          + ' · Offset titre ' + Number(value.title_offset || 0).toLocaleString('fr-FR', {signDisplay:'exceptZero'})
+          + ' · lookup attendu ' + (value.expected_title_lookup_memory ?? '—')
+          + ' / reçu ' + (value.returned_title_lookup_memory ?? '—');
       };
       renderConsoleReturn('CL5', midi.cl5, arrCl5Return, 'arrCl5Program', 'arrCl5Title', 'arrCl5State');
       renderConsoleReturn('QL1', midi.ql1, arrQl1Return, 'arrQl1Program', 'arrQl1Title', 'arrQl1State');

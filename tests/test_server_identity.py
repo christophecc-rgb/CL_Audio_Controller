@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 import unittest
@@ -106,6 +107,11 @@ class ServerIdentityTests(unittest.TestCase):
         payload = valid_status()
         payload.pop("server_instance_id")
         self.assertEqual(launcher.validate_server_identity(payload)["code"], "invalid-identity")
+
+    def test_missing_launch_identity_is_classified_as_unmanaged_server(self):
+        result = launcher.validate_server_identity(valid_status(launch_id=None))
+        self.assertEqual(result["code"], "unmanaged-server")
+        self.assertIn("hors de CL Audio Control", result["message"])
 
     def test_normal_start_validates_spawned_server(self):
         process = FakeProcess()
@@ -333,6 +339,23 @@ class ServerStatusContractTests(unittest.TestCase):
         self.assertIsInstance(payload["started_at"], float)
         self.assertGreaterEqual(payload["uptime_ms"], 0)
 
+    def test_direct_app_launch_creates_claimable_runtime_identity(self):
+        previous = (self.module.LAUNCH_ID, self.module.SHUTDOWN_TOKEN)
+        self.module.LAUNCH_ID = None
+        self.module.SHUTDOWN_TOKEN = None
+        try:
+            with mock.patch.object(self.module, "write_record") as write:
+                standalone = self.module.ensure_runtime_identity()
+            self.assertTrue(standalone)
+            uuid.UUID(self.module.LAUNCH_ID)
+            self.assertGreaterEqual(len(self.module.SHUTDOWN_TOKEN), 32)
+            persisted = write.call_args.args[0]
+            self.assertEqual(persisted["launch_id"], self.module.LAUNCH_ID)
+            self.assertEqual(persisted["server_instance_id"], self.module.SERVER_INSTANCE_ID)
+            self.assertEqual(persisted["server_process_id"], os.getpid())
+        finally:
+            self.module.LAUNCH_ID, self.module.SHUTDOWN_TOKEN = previous
+
     def test_status_exposes_ltc_receiver_diagnostics(self):
         payload = self.module.app.test_client().get("/status").get_json()
         self.assertFalse(payload["ltc_connected"])
@@ -502,14 +525,18 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
     def test_panel_integrates_the_published_midi_console_state(self):
         page = launcher.app.test_client().get("/").get_data(as_text=True)
         self.assertIn("MIDI &amp; CONSOLES", page)
-        self.assertIn("CL5 · scène n° —", page)
-        self.assertIn("QL1 · scène n° —", page)
+        self.assertIn("CONFIGURATION CONSOLES", page)
+        self.assertIn("CL5 · Offset titre", page)
+        self.assertIn("QL1 · Offset titre", page)
+        self.assertIn("Mémoire —", page)
         self.assertIn("s.midi_console", page)
-        self.assertIn("returnPresentation", page)
-        self.assertIn("age<=12", page)
-        self.assertIn("Dernière scène reçue · ", page)
-        self.assertIn("En attente du premier retour", page)
-        self.assertIn("formatMidiAge", page)
+        self.assertIn("value.returned_scene_memory", page)
+        self.assertIn("value.returned_title", page)
+        self.assertIn("value.validation_status", page)
+        self.assertIn("consoleSignatures", page)
+        self.assertIn("consoleRecall 1.8s", page)
+        self.assertIn("✓ Synchronisée", page)
+        self.assertIn("⚠ Divergence", page)
         self.assertIn("s.ltc_connected", page)
         self.assertIn("setInterval(refreshTelemetry,100)", page)
         self.assertIn("MODE LOCAL", page)
@@ -533,9 +560,25 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
         self.assertIn("grid-template-columns:1fr auto 1fr", page)
         self.assertIn(".network-timecode{justify-self:end;min-width:116px", page)
         self.assertIn("font:14px Menlo", page)
-        self.assertIn(".console-return.remembered{border-color:rgba(80,196,123,.38)", page)
+        self.assertIn(".console-return.remembered{border-color:#59616d", page)
+        self.assertIn(".console-return.mismatch{border-color:#e05252", page)
         self.assertIn("background:#89dfa6", page)
         self.assertIn("background:#e5a63b", page)
+
+    def test_console_title_offset_is_relayed_to_the_existing_server_action(self):
+        remote_response = mock.MagicMock()
+        remote_response.__enter__.return_value = remote_response
+        remote_response.status = 200
+        remote_response.read.return_value = json.dumps({
+            "ok": True, "message": "Offset titres CL5 : +1",
+        }).encode("utf-8")
+        with mock.patch.object(launcher.urllib.request, "urlopen", return_value=remote_response) as urlopen:
+            response = launcher.app.test_client().post(
+                "/console-title-offset", json={"console": "cl5", "offset": 1},
+            )
+        self.assertEqual(response.status_code, 200)
+        sent = json.loads(urlopen.call_args.args[0].data.decode("utf-8"))
+        self.assertEqual(sent, {"action": "console_title_offset", "console": "cl5", "offset": 1})
 
     def test_telemetry_route_exposes_only_ltc_fields(self):
         with mock.patch.object(

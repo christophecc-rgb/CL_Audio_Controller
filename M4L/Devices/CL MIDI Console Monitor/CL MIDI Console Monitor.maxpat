@@ -264,6 +264,51 @@
       },
       {
         "box": {
+          "id": "outgoing-cl5-osc",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 1,
+          "patching_rect": [
+            35.0,
+            810.0,
+            235.0,
+            22.0
+          ],
+          "text": "oscformat cl midi-monitor outgoing cl5"
+        }
+      },
+      {
+        "box": {
+          "id": "outgoing-ql1-osc",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 1,
+          "patching_rect": [
+            280.0,
+            810.0,
+            235.0,
+            22.0
+          ],
+          "text": "oscformat cl midi-monitor outgoing ql1"
+        }
+      },
+      {
+        "box": {
+          "id": "outgoing-udp",
+          "maxclass": "newobj",
+          "numinlets": 1,
+          "numoutlets": 0,
+          "patching_rect": [
+            525.0,
+            810.0,
+            160.0,
+            22.0
+          ],
+          "text": "udpsend 127.0.0.1 11001"
+        }
+      },
+      {
+        "box": {
           "id": "status-plus-cl5",
           "maxclass": "newobj",
           "numinlets": 1,
@@ -2001,6 +2046,30 @@
         "patchline": {
           "source": [
             "event-gate",
+            0
+          ],
+          "destination": [
+            "outgoing-cl5-osc",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "outgoing-cl5-osc",
+            0
+          ],
+          "destination": [
+            "outgoing-udp",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "event-gate",
             1
           ],
           "destination": [
@@ -2097,6 +2166,18 @@
         "patchline": {
           "source": [
             "event-gate",
+            1
+          ],
+          "destination": [
+            "outgoing-ql1-osc",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "event-gate",
             2
           ],
           "destination": [
@@ -2185,6 +2266,30 @@
           ],
           "destination": [
             "request-ql1-pgm",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "event-gate",
+            2
+          ],
+          "destination": [
+            "outgoing-ql1-osc",
+            0
+          ]
+        }
+      },
+      {
+        "patchline": {
+          "source": [
+            "outgoing-ql1-osc",
+            0
+          ],
+          "destination": [
+            "outgoing-udp",
             0
           ]
         }

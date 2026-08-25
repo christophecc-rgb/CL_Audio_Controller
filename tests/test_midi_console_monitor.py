@@ -69,6 +69,26 @@ class MidiConsoleMonitorTests(unittest.TestCase):
         self.assertIn({"source": ["role-index", 0], "destination": ["event-gate", 0]}, lines)
         self.assertNotIn("cc-label", boxes)
 
+    def test_outgoing_program_copy_is_osc_only_and_never_reenters_midi(self):
+        temporary, output = self.build_device()
+        self.addCleanup(temporary.cleanup)
+        patcher = json.loads((output / "CL MIDI Console Monitor.maxpat").read_text())["patcher"]
+        boxes = {item["box"]["id"]: item["box"] for item in patcher["boxes"]}
+        lines = [item["patchline"] for item in patcher["lines"]]
+        self.assertEqual(boxes["outgoing-cl5-osc"]["text"],
+                         "oscformat cl midi-monitor outgoing cl5")
+        self.assertEqual(boxes["outgoing-ql1-osc"]["text"],
+                         "oscformat cl midi-monitor outgoing ql1")
+        self.assertEqual(boxes["outgoing-udp"]["text"], "udpsend 127.0.0.1 11001")
+        self.assertIn({"source": ["event-gate", 0],
+                       "destination": ["outgoing-cl5-osc", 0]}, lines)
+        self.assertIn({"source": ["event-gate", 1],
+                       "destination": ["outgoing-ql1-osc", 0]}, lines)
+        self.assertIn({"source": ["event-gate", 2],
+                       "destination": ["outgoing-ql1-osc", 0]}, lines)
+        self.assertFalse(any(line["destination"][0] == "midi-out" and
+                             line["source"][0].startswith("outgoing-") for line in lines))
+
     def test_command_and_return_roles_feed_two_physical_console_rows(self):
         temporary, output = self.build_device()
         self.addCleanup(temporary.cleanup)

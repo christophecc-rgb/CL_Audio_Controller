@@ -323,6 +323,12 @@ def validate_server_identity(payload, expected_launch_id=None, expected_instance
 
     launch_id = payload.get("launch_id")
     instance_id = payload.get("server_instance_id")
+    if not launch_id and instance_id:
+        return {
+            "valid": False,
+            "code": "unmanaged-server",
+            "message": "Backend lancé hors de CL Audio Control : identité de lancement absente",
+        }
     try:
         uuid.UUID(str(launch_id))
         uuid.UUID(str(instance_id))
@@ -1219,7 +1225,9 @@ button{font:inherit}
 .ltc-destination{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;min-height:30px;padding:0 8px;border-radius:7px;border:1px solid rgba(84,224,132,.42);background:rgba(46,154,84,.10);font-size:9px;color:#9aa2ae;cursor:pointer;user-select:none}.ltc-destination:hover{border-color:#72e49a;background:rgba(46,154,84,.18)}.ltc-destination strong{font:11px Menlo,monospace;color:#72e49a}.ltc-destination span:first-child{font-weight:760;letter-spacing:.035em}
 .network-buttons{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:6px}.network-buttons .action{height:31px;font-size:10px}
 .badge{padding:4px 8px;border-radius:999px;background:rgba(67,200,111,.12);color:#7ee39e;border:1px solid rgba(67,200,111,.28);font-size:10px}
-.console-card{padding:10px}.console-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}.console-head strong{font-size:10px;letter-spacing:.075em}.rtp-control{display:flex;align-items:center;gap:6px}.rtp-badge{font-size:9px;color:#d7a64c}.rtp-badge.ok{color:#70d89a}.rtp-badge.error{color:#ed7e7e}.rtp-open{height:24px;padding:0 8px;border:1px solid #3f4b5d;border-radius:7px;background:#242b35;color:#cfd6e1;font-size:9px;cursor:pointer}.console-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.console-return{border:1px solid #343b47;border-radius:9px;background:#12161c;padding:8px}.console-program{font-size:15px;font-weight:800;color:#edc65b}.console-title{font-size:10px;color:#c4cad4;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.console-state{font-size:9px;color:#7d8592;margin-top:4px}.console-return.ok{border-color:rgba(80,196,123,.76);box-shadow:inset 0 0 0 1px rgba(80,196,123,.16)}.console-return.ok .console-state{color:#70d89a}.console-return.remembered{border-color:rgba(80,196,123,.38)}.console-return.remembered .console-state{color:#9eb8a8}
+.console-card{padding:10px}.console-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}.console-head strong{font-size:10px;letter-spacing:.075em}.rtp-control{display:flex;align-items:center;gap:6px}.rtp-badge{font-size:9px;color:#d7a64c}.rtp-badge.ok{color:#70d89a}.rtp-badge.error{color:#ed7e7e}.rtp-open{height:24px;padding:0 8px;border:1px solid #3f4b5d;border-radius:7px;background:#242b35;color:#cfd6e1;font-size:9px;cursor:pointer}.console-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.console-return{border:2px solid #3b414b;border-radius:11px;background:#12161c;padding:10px;transition:border-color .2s,background .2s,box-shadow .2s}.console-name{font-size:10px;font-weight:850;letter-spacing:.09em;color:#aeb5c0}.console-program{font-size:20px;font-weight:850;color:#f0cb68;margin-top:3px}.console-title{font-size:13px;font-weight:720;color:#eef1f5;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.console-state{font-size:10px;color:#a1a8b3;margin-top:7px}.console-meta{font-size:9px;color:#777f8b;margin-top:4px}.console-return.ok{border-color:#50c47b;background:rgba(52,146,87,.14);box-shadow:inset 0 0 0 1px rgba(80,196,123,.18),0 0 16px rgba(80,196,123,.12)}.console-return.ok .console-state{color:#79dfa0}.console-return.mismatch{border-color:#e05252;background:rgba(194,55,55,.15);box-shadow:0 0 18px rgba(224,82,82,.18)}.console-return.mismatch .console-state{color:#ff9690}.console-return.waiting{border-color:#b98439;background:rgba(185,132,57,.11)}.console-return.waiting .console-state{color:#e3b96d}.console-return.remembered{border-color:#59616d;background:#171b21}.console-return.remembered .console-state{color:#9ca4af}.console-config{display:grid;grid-template-columns:auto 1fr 1fr;gap:7px;align-items:center;margin-bottom:8px;padding:7px 8px;border:1px solid #303642;border-radius:9px;background:#11151b}.console-config-title{font-size:9px;font-weight:800;letter-spacing:.07em;color:#98a1ad}.offset-control{display:flex;align-items:center;justify-content:flex-end;gap:5px;font-size:9px;color:#aeb5c0}.offset-value{min-width:23px;text-align:center;font:11px Menlo,monospace;color:#f0cb68}.offset-button{width:25px;height:23px;padding:0;border:1px solid #424a56;border-radius:6px;background:#252b34;color:#e6eaf0;font-weight:800;cursor:pointer}.offset-button:hover{filter:brightness(1.18)}
+@keyframes consoleRecall{0%,100%{transform:scale(1)}20%{transform:scale(1.018);border-color:#ffb13b;background:rgba(217,91,40,.28);box-shadow:0 0 24px rgba(255,120,45,.46)}45%{transform:scale(1);border-color:#f05b45;background:rgba(192,50,39,.24)}70%{border-color:#ffb13b;background:rgba(217,91,40,.18)}}.console-return.recalled{animation:consoleRecall 1.8s ease-in-out}
+@media(prefers-reduced-motion:reduce){.console-return.recalled{animation:none;border-color:#ffb13b}}
 details{background:var(--card2);border:1px solid #292e37;border-radius:12px;overflow:hidden}
 details[open]{overflow:visible}
 summary{height:34px;padding:0 11px;display:flex;align-items:center;cursor:pointer;font-size:12px;color:#c5cad3;list-style:none}
@@ -1312,9 +1320,13 @@ body.show-mode .show-toggle{border-color:rgba(229,166,59,.72);background:rgba(22
 
   <section class="card console-card">
     <div class="console-head"><strong>MIDI &amp; CONSOLES</strong><div class="rtp-control"><span id="rtpBadge" class="rtp-badge">RTP · attente</span><button class="rtp-open" onclick="runAction('/midi-network-assistant','Ouverture du diagnostic RTP')">Diagnostic</button></div></div>
+    <div class="console-config"><span class="console-config-title">CONFIGURATION CONSOLES</span>
+      <div class="offset-control">CL5 · Offset titre <button class="offset-button" onclick="changeTitleOffset('cl5',-1)">−</button><strong id="cl5TitleOffset" class="offset-value">0</strong><button class="offset-button" onclick="changeTitleOffset('cl5',1)">+</button><button class="offset-button" onclick="changeTitleOffset('cl5',0,true)">0</button></div>
+      <div class="offset-control">QL1 · Offset titre <button class="offset-button" onclick="changeTitleOffset('ql1',-1)">−</button><strong id="ql1TitleOffset" class="offset-value">0</strong><button class="offset-button" onclick="changeTitleOffset('ql1',1)">+</button><button class="offset-button" onclick="changeTitleOffset('ql1',0,true)">0</button></div>
+    </div>
     <div class="console-grid">
-      <div id="cl5Return" class="console-return"><div id="cl5Program" class="console-program">CL5 · scène n° —</div><div id="cl5Title" class="console-title">Contexte Ableton en attente</div><div id="cl5State" class="console-state">En attente du premier retour</div></div>
-      <div id="ql1Return" class="console-return"><div id="ql1Program" class="console-program">QL1 · scène n° —</div><div id="ql1Title" class="console-title">Contexte Ableton en attente</div><div id="ql1State" class="console-state">En attente du premier retour</div></div>
+      <div id="cl5Return" class="console-return waiting"><div class="console-name">CL5</div><div id="cl5Program" class="console-program">Mémoire —</div><div id="cl5Title" class="console-title">Titre console en attente</div><div id="cl5State" class="console-state">En attente du retour console</div><div id="cl5Meta" class="console-meta">Offset titre 0</div></div>
+      <div id="ql1Return" class="console-return waiting"><div class="console-name">QL1</div><div id="ql1Program" class="console-program">Mémoire —</div><div id="ql1Title" class="console-title">Titre console en attente</div><div id="ql1State" class="console-state">En attente du retour console</div><div id="ql1Meta" class="console-meta">Offset titre 0</div></div>
     </div>
   </section>
 
@@ -1342,6 +1354,7 @@ let networkFormInitialized=false;
 let networkFormDirty=false;
 let networkVisibleMode=null;
 let networkDrafts={local:null,remote:null};
+const consoleSignatures={cl5:null,ql1:null};
 const el=id=>document.getElementById(id);
 function setTech(id,on){el(id).className='tech-item '+(on?'on':'');}
 function setBusy(label){el('systemCard').className='card system busy';el('stateTitle').textContent=label.toUpperCase();el('stateDetail').textContent='Veuillez patienter…';}
@@ -1366,18 +1379,16 @@ function render(s){
   const rtp=midi.rtp||{},rtpBadge=el('rtpBadge');
   rtpBadge.textContent=rtp.validated?('RTP VALIDÉ · '+(rtp.peer||'cible')):(rtp.loop_detected?'RTP · BOUCLE':(rtp.available?('RTP DISPONIBLE · '+(rtp.peer||'cible')):'RTP HORS LIGNE'));
   rtpBadge.className='rtp-badge '+(rtp.validated?'ok':(rtp.loop_detected?'error':''));
-  const formatMidiAge=(seconds)=>{seconds=Math.max(0,Math.floor(seconds));if(seconds<60)return seconds<2?'à l’instant':'il y a '+seconds+' s';const minutes=Math.floor(seconds/60);if(minutes<60)return'il y a '+minutes+' min';const hours=Math.floor(minutes/60),rest=minutes%60;return'il y a '+hours+' h'+(rest?' '+rest+' min':'');};
-  const returnPresentation=(value)=>{const at=Number(value.received_at||0),age=at?Math.max(0,Date.now()/1000-at):Infinity,recent=value.received&&age<=12;if(!value.received)return {className:'',text:'En attente du premier retour'};const prefix=recent?'✓ Scène reçue · ':(age<=60?'Dernière scène reçue · ':'Aucun retour récent · dernier ');return {className:recent?'ok':'remembered',text:prefix+(at?formatMidiAge(age):'heure inconnue')};};
-  const cl5Return=returnPresentation(cl5),ql1Return=returnPresentation(ql1);
-  el('cl5Return').className='console-return '+cl5Return.className;el('ql1Return').className='console-return '+ql1Return.className;
-  el('cl5Program').textContent='CL5 · scène n° '+(cl5.program??'—');el('ql1Program').textContent='QL1 · scène n° '+(ql1.program??'—');
-  el('cl5Title').textContent=cl5.title||s.playing_scene_name||'Titre en attente';el('ql1Title').textContent=ql1.title||s.playing_scene_name||'Titre en attente';
-  el('cl5State').textContent=cl5Return.text;el('ql1State').textContent=ql1Return.text;
+  const formatOffset=value=>Number(value||0).toLocaleString('fr-FR',{signDisplay:'exceptZero'});
+  const offsets=s.console_title_offsets||{};el('cl5TitleOffset').textContent=formatOffset(offsets.cl5);el('ql1TitleOffset').textContent=formatOffset(offsets.ql1);
+  const renderConsole=(key,name,value)=>{value=value||{};const status=value.validation_status||'waiting',card=el(key+'Return');const signature=String(value.returned_scene_memory??'')+'|'+String(value.returned_title||'');if(consoleSignatures[key]!==null&&signature!==consoleSignatures[key]&&(value.returned_scene_memory!=null||value.returned_title)){card.classList.remove('recalled');void card.offsetWidth;card.classList.add('recalled');setTimeout(()=>card.classList.remove('recalled'),1900);}consoleSignatures[key]=signature;const visual=status==='confirmed'?'ok':status==='mismatch'?'mismatch':status==='stale'?'remembered':'waiting';card.className='console-return '+visual+(card.classList.contains('recalled')?' recalled':'');el(key+'Program').textContent='Mémoire '+(value.returned_scene_memory??'—');el(key+'Title').textContent=value.returned_title||'Titre console non résolu';el(key+'State').textContent=status==='confirmed'?'✓ Synchronisée':status==='mismatch'?'⚠ Divergence · attendu mémoire '+(value.expected_scene_memory??'—'):status==='stale'?'Retour MIDI ancien':status==='local_fallback'?'En attente du retour MIDI':'En attente du retour console';el(key+'Meta').textContent='Offset titre '+formatOffset(value.title_offset??offsets[key]??0)+(value.received_at?' · retour reçu':'');};
+  renderConsole('cl5','CL5',cl5);renderConsole('ql1','QL1',ql1);
   const ltc=s.ltc_connected?s.ltc_timecode:'--:--:--:--';
   el('systemLtc').textContent=ltc;el('systemLtc').className='system-ltc'+(s.ltc_connected?'':' offline');
   el('networkLtc').textContent=ltc;el('networkLtc').className='network-timecode'+(s.ltc_connected?'':' offline');
 }
 async function refresh(){try{render(await(await fetch('/state')).json());}catch(e){el('systemCard').className='card system error';el('stateTitle').textContent='PANNEAU HORS LIGNE';el('stateDetail').textContent=String(e);}}
+async function changeTitleOffset(consoleName,delta,reset=false){const current=Number(latestState?.console_title_offsets?.[consoleName]||0),offset=reset?0:current+delta;try{const response=await fetch('/console-title-offset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({console:consoleName,offset})});const result=await response.json();if(!response.ok)throw new Error(result.error||result.message||'Réglage refusé');el('actionStatus').textContent='✓ '+result.message;await refresh();}catch(error){el('actionStatus').textContent='! '+error;}}
 async function runAction(path,label){setBusy(label);el('actionStatus').textContent=label+'…';try{const response=await fetch(path);const r=await response.json();el('actionStatus').textContent=response.ok?('✓ '+(r.message||'Action terminée')):('! Refus : '+(r.error||response.status));}catch(e){el('actionStatus').textContent='! '+e;}setTimeout(refresh,450);}
 async function runPostAction(path,label){setBusy(label);el('actionStatus').textContent=label+'…';try{const response=await fetch(path,{method:'POST'});const r=await response.json();el('actionStatus').textContent=response.ok?('✓ '+(r.message||'Action terminée')):('! Refus : '+(r.error||response.status));}catch(e){el('actionStatus').textContent='! '+e;}setTimeout(refresh,450);}
 function copyNetworkDraft(value,mode){
@@ -1552,6 +1563,8 @@ def state():
         ltc_destination=ltc_destination,
         ltc_port=LTC_PORT,
         midi_console=remote_state.get("midi_console") or read_midi_console_state((configured_target or {}).get("host")),
+        console_title_offsets=remote_state.get("console_title_offsets") or {"cl5": 0, "ql1": 0},
+        console_title_offset_range=remote_state.get("console_title_offset_range") or {"min": -20, "max": 20},
         orphan_actions_available=identity["code"] == "orphan-claimable",
         orphan_instance_id=(remote_state.get("server_instance_id") or "")[:8] or None,
         orphan_process_id=remote_state.get("server_process_id") if identity["code"] == "orphan-claimable" else None,
@@ -1579,6 +1592,42 @@ def state():
         "oscReturnPortPresent": response_payload["ret"],
     })
     return jsonify(response_payload)
+
+
+@app.route("/console-title-offset", methods=["POST"])
+def console_title_offset():
+    """Relaye la calibration d'affichage au serveur sans dupliquer sa logique."""
+    payload = request.get_json(silent=True) or {}
+    console = str(payload.get("console") or "").strip().lower()
+    try:
+        offset = int(payload.get("offset"))
+    except (TypeError, ValueError):
+        return jsonify(error="Offset invalide"), 400
+    if console not in ("cl5", "ql1"):
+        return jsonify(error="Console invalide"), 400
+    body = json.dumps({
+        "action": "console_title_offset",
+        "console": console,
+        "offset": offset,
+    }).encode("utf-8")
+    remote_request = urllib.request.Request(
+        f"{REMOTE_ROOT_URL}action",
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(remote_request, timeout=1.0) as response:
+            result = json.loads(response.read().decode("utf-8"))
+            return jsonify(result), response.status
+    except urllib.error.HTTPError as exc:
+        try:
+            result = json.loads(exc.read().decode("utf-8"))
+        except (ValueError, UnicodeDecodeError):
+            result = {"error": "Réglage refusé par le serveur"}
+        return jsonify(result), exc.code
+    except (OSError, ValueError) as exc:
+        return jsonify(error=f"Serveur de conduite indisponible : {exc}"), 503
 
 
 @app.route("/telemetry")

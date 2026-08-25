@@ -33,6 +33,24 @@ Max, la bibliothèque Ableton, les sauvegardes ou les dépôts inspectés. Cette
 dépendance doit être identifiée avant d'affirmer qu'une reconstruction depuis
 la seule source est totalement autonome. L'AMXD validé reste inchangé.
 
+### CL MIDI Console Monitor
+
+Depuis la double écoute native de `CL MIDI Network Assistant`, ce device est
+optionnel et conservé comme outil legacy/diagnostic. L’attendu canonique est le
+Program Change réellement observé sur `Gestionnaire IAC Bus 1`; l’OSC du device
+sur UDP 11001 reste un fallback et ne peut pas écraser une intention IAC.
+
+Le moniteur se place en dernier effet MIDI sur la piste de commande CL5 ou
+QL1. `midiin` reste relié directement à `midiout` : les octets MIDI traversent
+le périphérique sans transformation. La sortie Program Change de `midiparse`
+est copiée en OSC local vers `/cl/midi-monitor/outgoing/cl5` ou
+`/cl/midi-monitor/outgoing/ql1` sur UDP 11001 selon le rôle choisi.
+
+Cette branche OSC est une observation passive : elle ne rejoint jamais
+`midiout`, n'envoie aucun second message aux consoles et ne peut donc créer ni
+doublon ni boucle CoreMIDI/IAC/RTP. Le rôle `CL5 retour` ou `QL1 retour` reste
+réservé au flux physique reçu et n'alimente pas l'attendu Ableton.
+
 ## Installation
 
 Les éléments destinés à l'installation directe sont regroupés dans

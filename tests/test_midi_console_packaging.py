@@ -82,10 +82,10 @@ class MidiConsolePackagingTests(unittest.TestCase):
         self.assertNotIn("CL MIDI RTP Simulator.app", source)
         dashboard = (ROOT / "tools" / "cl_midi_network" / "CLMIDINetworkDashboard.m").read_text()
         engine = (ROOT / "tools" / "cl_midi_network" / "CLYamahaConsoleSimulator.m").read_text()
-        self.assertIn("Simulateur de consoles intégré", dashboard)
-        self.assertIn('@"Désactivé", @"Test local · IAC", @"Test réseau · RTP"', dashboard)
+        self.assertIn("SIMULATEUR DE RETOUR CONSOLE", dashboard)
+        self.assertIn('@"Test local · retour dédié", @"Test distant · RTP"', dashboard)
         self.assertIn('@"--transport", transport', dashboard)
-        self.assertIn("Test IAC refusé · aucun bus IAC sélectionné", dashboard)
+        self.assertIn("Gestionnaire IAC Bus 1 est exclusivement la source expected", dashboard)
         self.assertIn('localCoreMIDI', engine)
 
         export_source = (ROOT / "scripts" / "export_transport_kit.command").read_text()

@@ -213,7 +213,8 @@ int main(int argc, const char *argv[]) {
             return 0;
         }
         consoleLabel = argumentValue(arguments, @"--label", responderMode ? @"RTP RESPONDER" : @"QL1");
-        NSString *endpointSearchName = argumentValue(arguments, @"--endpoint", @"mb pro");
+        NSString *endpointSearchName = argumentValue(arguments, @"--endpoint", @"Réseau Rtp MB Chris");
+        NSString *inputEndpointName = argumentValue(arguments, @"--input-endpoint", @"Gestionnaire IAC Bus 1");
         NSString *transport = [argumentValue(arguments, @"--transport", @"rtp") lowercaseString];
         BOOL localCoreMIDI = [transport isEqualToString:@"iac"];
         echoDelayMs = (NSUInteger)[argumentValue(arguments, @"--delay-ms", @"80") integerValue];
@@ -228,7 +229,7 @@ int main(int argc, const char *argv[]) {
         if (localCoreMIDI) {
             // En mode IAC, respecter strictement le port choisi. L'ancienne
             // logique basculait silencieusement sur RTP dès qu'il était actif.
-            networkSource = findEndpoint(YES, endpointSearchName);
+            networkSource = findEndpoint(YES, inputEndpointName);
             networkDestination = findEndpoint(NO, endpointSearchName);
         } else {
             session.enabled = YES;
@@ -261,8 +262,9 @@ int main(int argc, const char *argv[]) {
             return 1;
         }
 
-        fprintf(stdout, "READY console=%s transport=%s endpoint=%s delay_ms=%lu echo=%s session=%s port=%lu\n",
-                consoleLabel.UTF8String, transport.UTF8String, endpointSearchName.UTF8String,
+        fprintf(stdout, "READY console=%s transport=%s input=%s endpoint=%s delay_ms=%lu echo=%s session=%s port=%lu\n",
+                consoleLabel.UTF8String, transport.UTF8String, inputEndpointName.UTF8String,
+                endpointSearchName.UTF8String,
                 (unsigned long)echoDelayMs,
                 echoEnabled ? "on" : "off", session.localName.UTF8String,
                 (unsigned long)session.networkPort);

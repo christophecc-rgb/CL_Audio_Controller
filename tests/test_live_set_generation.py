@@ -53,8 +53,204 @@ class LiveSetGenerationTests(unittest.TestCase):
             self.app.state["arrangement_marker"] = ""
             self.app.state["scenes"] = {7: "Ancienne en cours", 8: "Ancienne prochaine"}
             self.app.state["console_scene_map"] = {"cl5": {}, "ql1": {}}
+            self.app.state["ableton_midi_output"] = {"cl5": None, "ql1": None}
             self.app.state["console_title_mode"] = "ableton_context"
+            self.app.state["console_title_offsets"] = {"cl5": 0, "ql1": 0}
             self.app.state["console_scene_libraries"] = {"cl5": {}, "ql1": {}}
+
+    def outgoing_snapshot(self, console, program, activated_at, returned_program=None,
+                          returned_at=None, libraries=None):
+        self.assertTrue(self.app.record_ableton_midi_output(console, program, activated_at))
+        payload = {
+            "service": "cl-midi-console-monitor",
+            "updated_at": time.time(),
+            "return_mode": "console_return",
+            "cl5": {"received": False},
+            "ql1": {"received": False},
+        }
+        if returned_program is not None:
+            payload[console] = {
+                "received": True,
+                "received_at": returned_at,
+                "midi_program": returned_program,
+            }
+        with tempfile.TemporaryDirectory() as temporary:
+            state_path = Path(temporary) / "midi-state.json"
+            state_path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.app.lock:
+                self.app.state["console_scene_libraries"] = libraries or {"cl5": {}, "ql1": {}}
+                with mock.patch.object(self.app, "MIDI_CONSOLE_STATE_PATH", state_path):
+                    return self.app.state_snapshot_locked()["midi_console"][console]
+
+    def test_console_scene_title_endpoint_uses_scene_memory_plus_one_and_clf_only(self):
+        with self.app.lock:
+            self.app.state["console_scene_libraries"] = {
+                "cl5": {
+                    42: "En ROUTE ....",
+                    113: "ANNEES FOLLES",
+                    114: "shake it up",
+                },
+                "ql1": {42: "NAPOLEON Visavis"},
+            }
+        client = self.app.app.test_client()
+        for console, midi_program, scene_memory, title in (
+            ("cl5", 41, 42, "En ROUTE ...."),
+            ("cl5", 112, 113, "ANNEES FOLLES"),
+            ("cl5", 113, 114, "shake it up"),
+            ("ql1", 41, 42, "NAPOLEON Visavis"),
+        ):
+            with self.subTest(console=console, midi_program=midi_program):
+                response = client.get(
+                    f"/console-scene-title?console={console}&midi_program={midi_program}"
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.get_json(), {
+                    "ok": True, "console": console, "midi_program": midi_program,
+                    "program": scene_memory, "scene_memory": scene_memory,
+                    "title_lookup_memory": scene_memory, "title_offset": 0,
+                    "title": title, "title_source": "console_clf",
+                })
+
+    def test_gatsby_cl5_follows_each_actual_outgoing_program_change(self):
+        libraries = {"cl5": dict(zip(range(113, 119), [
+            "ANNEES FOLLES", "shake it up", "BTS", "PARTY", "THIS IS ME", "IN LEO",
+        ])), "ql1": {}}
+        observed = []
+        for index, program in enumerate(range(112, 118)):
+            console = self.outgoing_snapshot("cl5", program, 1000 + index, libraries=libraries)
+            observed.append((console["expected_scene_memory"], console["expected_title"]))
+            self.assertEqual(console["expected_program_source"], "ableton_m4l_fallback")
+        self.assertEqual(observed, list(zip(range(113, 119), libraries["cl5"].values())))
+
+    def test_gatsby_ql1_follows_each_actual_outgoing_program_change(self):
+        libraries = {"cl5": {}, "ql1": {
+            104: "ANNE FOLLES PARA", 105: "ANNE FOLLE LEO", 106: "ANNE FOLLES ROXY",
+        }}
+        observed = []
+        for index, program in enumerate((103, 104, 105)):
+            console = self.outgoing_snapshot("ql1", program, 2000 + index, libraries=libraries)
+            observed.append((console["expected_scene_memory"], console["expected_title"]))
+        self.assertEqual(observed, list(zip((104, 105, 106), libraries["ql1"].values())))
+
+    def test_actual_outgoing_and_physical_return_confirm_or_mismatch(self):
+        now = time.time()
+        confirmed = self.outgoing_snapshot("cl5", 112, now - 1, 112, now)
+        mismatch = self.outgoing_snapshot("cl5", 113, now + 1, 112, now + 2)
+        self.assertEqual(confirmed["validation_status"], "confirmed")
+        self.assertEqual(mismatch["validation_status"], "mismatch")
+
+    def test_late_return_cannot_confirm_a_rapid_second_program_change(self):
+        now = time.time()
+        self.assertTrue(self.app.record_ableton_midi_output("cl5", 112, now))
+        waiting = self.outgoing_snapshot("cl5", 113, now + 0.01, 112, now + 0.005)
+        self.assertEqual(waiting["expected_midi_program"], 113)
+        self.assertEqual(waiting["returned_midi_program"], 112)
+        self.assertEqual(waiting["validation_status"], "stale")
+
+    def native_iac_snapshot(self, console, expected_program, expected_at,
+                            returned_program=None, returned_at=None, libraries=None):
+        payload = {
+            "service": "cl-midi-console-monitor",
+            "updated_at": time.time(),
+            "return_mode": "console_return",
+            "expected_monitor_source": "Gestionnaire IAC Bus 1",
+            "expected_monitor_status": 0,
+            "return_monitor_source": "Réseau Rtp MB Chris",
+            "return_monitor_status": 0,
+            "cl5": {"received": False},
+            "ql1": {"received": False},
+        }
+        payload[console].update({
+            "expected_midi_program": expected_program,
+            "expected_program_source": "ableton_iac_output",
+            "expected_activated_at": expected_at,
+        })
+        if returned_program is not None:
+            payload[console].update({
+                "received": True,
+                "returned_midi_program": returned_program,
+                "returned_at": returned_at,
+                "received_at": returned_at,
+                "returned_program_source": "physical_midi",
+            })
+        with tempfile.TemporaryDirectory() as temporary:
+            state_path = Path(temporary) / "midi-state.json"
+            state_path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.app.lock:
+                self.app.state["console_scene_libraries"] = libraries or {"cl5": {}, "ql1": {}}
+                with mock.patch.object(self.app, "MIDI_CONSOLE_STATE_PATH", state_path):
+                    return self.app.state_snapshot_locked()["midi_console"]
+
+    def test_native_iac_updates_only_expected_and_rtp_only_returned(self):
+        now = time.time()
+        result = self.native_iac_snapshot(
+            "cl5", 112, now - 1, 112, now,
+            {"cl5": {113: "ANNEES FOLLES"}, "ql1": {}},
+        )
+        cl5, ql1 = result["cl5"], result["ql1"]
+        self.assertEqual((cl5["expected_midi_program"], cl5["expected_scene_memory"],
+                          cl5["expected_title"]), (112, 113, "ANNEES FOLLES"))
+        self.assertEqual((cl5["returned_midi_program"], cl5["returned_scene_memory"]),
+                         (112, 113))
+        self.assertEqual(cl5["expected_program_source"], "ableton_iac_output")
+        self.assertEqual(cl5["returned_program_source"], "physical_midi")
+        self.assertEqual(cl5["validation_status"], "confirmed")
+        self.assertIsNone(ql1["expected_midi_program"])
+        self.assertIsNone(ql1["returned_midi_program"])
+
+    def test_native_iac_wins_over_m4l_and_successive_programs_replace_expected(self):
+        now = time.time()
+        self.assertTrue(self.app.record_ableton_midi_output("cl5", 12, now))
+        first = self.native_iac_snapshot("cl5", 112, now + 1)["cl5"]
+        second = self.native_iac_snapshot("cl5", 113, now + 2)["cl5"]
+        self.assertEqual(first["expected_midi_program"], 112)
+        self.assertEqual(second["expected_midi_program"], 113)
+        self.assertEqual(second["expected_program_source"], "ableton_iac_output")
+
+    def test_old_rtp_return_cannot_confirm_new_iac_intention(self):
+        now = time.time()
+        stale = self.native_iac_snapshot("cl5", 113, now, 112, now - 0.01)["cl5"]
+        self.assertEqual(stale["validation_status"], "stale")
+
+    def test_native_iac_ql1_uses_real_raw_program_84(self):
+        now = time.time()
+        ql1 = self.native_iac_snapshot("ql1", 84, now)["ql1"]
+        self.assertEqual((ql1["expected_midi_program"], ql1["expected_scene_memory"]),
+                         (84, 85))
+
+    def test_unavailable_iac_uses_degraded_fallback_without_breaking_rtp(self):
+        now = time.time()
+        payload = {
+            "service": "cl-midi-console-monitor",
+            "updated_at": now,
+            "expected_monitor_source": "",
+            "expected_monitor_status": -10834,
+            "return_monitor_source": "Réseau Rtp MB Chris",
+            "return_monitor_status": 0,
+            "cl5": {
+                "received": True,
+                "returned_midi_program": 112,
+                "received_at": now,
+                "expected_midi_program": 99,
+                "expected_program_source": "ableton_iac_output",
+                "expected_activated_at": now - 1,
+            },
+            "ql1": {"received": False},
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            state_path = Path(temporary) / "midi-state.json"
+            state_path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.app.lock:
+                self.app.state["console_scene_map"] = {
+                    "cl5": {112: [{"scene_index": 7, "midi_program": 112,
+                                     "program": 113, "title": "Gatsby"}]},
+                    "ql1": {},
+                }
+                with mock.patch.object(self.app, "MIDI_CONSOLE_STATE_PATH", state_path):
+                    cl5 = self.app.state_snapshot_locked()["midi_console"]["cl5"]
+        self.assertEqual(cl5["expected_midi_program"], 112)
+        self.assertEqual(cl5["expected_program_source"], "degraded_ableton_clip_name")
+        self.assertEqual(cl5["returned_midi_program"], 112)
 
     def run_confirmed_go(self, request_id, generation, scene_number, sent):
         def confirm_selected(address, *args, **kwargs):
@@ -163,7 +359,8 @@ class LiveSetGenerationTests(unittest.TestCase):
             snapshot["midi_console"]["cl5"]["title"],
             "Titre résolu pour scène 42",
         )
-        self.assertEqual(snapshot["midi_console"]["cl5"]["title_source"], "console_scene_map")
+        self.assertEqual(snapshot["midi_console"]["cl5"]["returned_title"], "Titre non résolu")
+        self.assertEqual(snapshot["midi_console"]["cl5"]["title_source"], "unresolved")
 
     def test_unresolved_console_return_does_not_publish_stale_monitor_title(self):
         payload = {
@@ -179,9 +376,10 @@ class LiveSetGenerationTests(unittest.TestCase):
                 with mock.patch.object(self.app, "MIDI_CONSOLE_STATE_PATH", state_path):
                     snapshot = self.app.state_snapshot_locked()
 
-        self.assertEqual(snapshot["midi_console"]["cl5"]["title"], "")
+        self.assertEqual(snapshot["midi_console"]["cl5"]["title"], "Ancienne en cours")
         self.assertEqual(snapshot["midi_console"]["cl5"]["monitor_title"], "Ancien titre")
-        self.assertIsNone(snapshot["midi_console"]["cl5"]["resolved_scene"])
+        self.assertEqual(snapshot["midi_console"]["cl5"]["returned_title"], "Titre non résolu")
+        self.assertEqual(snapshot["midi_console"]["cl5"]["title_source"], "unresolved")
 
     def test_stale_console_return_uses_current_scene_expected_program_for_display(self):
         payload = {
@@ -207,7 +405,91 @@ class LiveSetGenerationTests(unittest.TestCase):
         self.assertEqual(returned["title"], "9- QUICK CHANGE")
         self.assertEqual(returned["display_source"], "ableton_scene")
 
-    def test_recent_program_change_validates_active_scene_title_regardless_of_program(self):
+    def test_expected_program_is_displayed_and_physical_return_only_validates_it(self):
+        mapping = {
+            "cl5": {117: [{"scene_index": 6, "program": 118, "midi_program": 117, "title": "L'HYMNE A L'AMOUR"}]},
+            "ql1": {102: [{"scene_index": 6, "program": 103, "midi_program": 102, "title": "L'HYMNE A L'AMOUR"}]},
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            state_path = Path(temporary) / "midi-state.json"
+            with self.app.lock:
+                self.app.state["set_generation"] = 9
+                self.app.state["play_mode"] = "session"
+                self.app.state["playing_scene"] = 6
+                self.app.state["playing_scene_name"] = "L'HYMNE A L'AMOUR"
+                self.app.state["console_scene_map"] = mapping
+                self.app.state["expected_scene_signature"] = (9, "session", 6)
+                self.app.state["expected_activated_at"] = time.time() - 1
+                state_path.write_text(json.dumps({
+                    "service": "cl-midi-console-monitor",
+                    "return_mode": "console_return",
+                    "cl5": {"received": True, "received_at": time.time(), "midi_program": 111},
+                    "ql1": {"received": True, "received_at": time.time(), "midi_program": 102},
+                }), encoding="utf-8")
+                with mock.patch.object(self.app, "MIDI_CONSOLE_STATE_PATH", state_path):
+                    snapshot = self.app.state_snapshot_locked()
+
+        cl5 = snapshot["midi_console"]["cl5"]
+        self.assertEqual(cl5["program"], 118)
+        self.assertEqual(cl5["returned_program"], 112)
+        self.assertEqual(cl5["title"], "L'HYMNE A L'AMOUR")
+        self.assertEqual(cl5["validation_status"], "mismatch")
+        self.assertFalse(cl5["confirmed"])
+        self.assertIsNone(cl5["confirmation_latency_ms"])
+        self.assertIsNotNone(cl5["last_return_age_seconds"])
+        ql1 = snapshot["midi_console"]["ql1"]
+        self.assertEqual(ql1["program"], 103)
+        self.assertEqual(ql1["validation_status"], "confirmed")
+        self.assertTrue(ql1["confirmed"])
+        self.assertGreaterEqual(ql1["confirmation_latency_ms"], 0)
+        self.assertIn("cl5", snapshot["midi_devices"])
+
+    def test_recent_local_fallback_return_is_still_published_as_mismatch(self):
+        payload = {
+            "service": "cl-midi-console-monitor",
+            "return_mode": "local_fallback",
+            "cl5": {
+                "received": True,
+                "received_at": time.time(),
+                "midi_program": 90,
+                "program": 91,
+                "title": "",
+            },
+            "ql1": {"received": False},
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            state_path = Path(temporary) / "midi-state.json"
+            state_path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.app.lock:
+                self.app.state["playing_scene"] = 6
+                self.app.state["expected_activated_at"] = time.time() - 1
+                self.app.state["expected_scene_signature"] = (
+                    int(self.app.state.get("set_generation", 0)),
+                    str(self.app.state.get("play_mode") or ""),
+                    6,
+                )
+                self.app.state["console_scene_map"] = {
+                    "cl5": {
+                        85: [{
+                            "scene_index": 6,
+                            "program": 86,
+                            "midi_program": 85,
+                            "title": "Attendu",
+                        }],
+                    },
+                    "ql1": {},
+                }
+                with mock.patch.object(self.app, "MIDI_CONSOLE_STATE_PATH", state_path):
+                    snapshot = self.app.state_snapshot_locked()
+
+        returned = snapshot["midi_console"]["cl5"]
+        self.assertEqual(returned["expected_program"], 86)
+        self.assertEqual(returned["returned_program"], 91)
+        self.assertTrue(returned["return_recent"])
+        self.assertEqual(returned["validation_status"], "mismatch")
+        self.assertEqual(returned["returned_title"], "Titre non résolu")
+
+    def test_recent_program_change_without_expected_program_is_not_validation(self):
         payload = {
             "service": "cl-midi-console-monitor",
             "cl5": {"received": True, "received_at": time.time(), "program": 127, "title": ""},
@@ -224,10 +506,11 @@ class LiveSetGenerationTests(unittest.TestCase):
                     snapshot = self.app.state_snapshot_locked()
 
         returned = snapshot["midi_console"]["cl5"]
-        self.assertEqual(returned["program"], 127)
+        self.assertIsNone(returned["program"])
+        self.assertEqual(returned["returned_program"], 127)
         self.assertEqual(returned["title"], "9- QUICK CHANGE")
-        self.assertEqual(returned["resolved_scene"]["scene_index"], 6)
-        self.assertEqual(returned["display_source"], "console_return")
+        self.assertEqual(returned["validation_status"], "unavailable")
+        self.assertEqual(returned["display_source"], "ableton_scene")
 
     def test_recent_program_change_in_arrangement_validates_active_marker_title(self):
         payload = {
@@ -247,22 +530,61 @@ class LiveSetGenerationTests(unittest.TestCase):
                     snapshot = self.app.state_snapshot_locked()
 
         returned = snapshot["midi_console"]["cl5"]
-        self.assertEqual(returned["program"], 81)
+        self.assertIsNone(returned["program"])
+        self.assertEqual(returned["returned_program"], 81)
         self.assertEqual(returned["title"], "4-CABARET NEW GAGA")
+        self.assertEqual(returned["validation_status"], "unavailable")
 
     def test_clf_scene_library_parser_reads_numbered_memapi_titles(self):
-        payload = bytearray(64)
+        payload = bytearray(0x38 + 3 * 8)
         payload[0x10:0x10 + len(b"QL [OSX, 5.8.1]")] = b"QL [OSX, 5.8.1]"
-        for title in (b"Initial Data", b"WELCOME", b"STAR IS BORN"):
-            payload.extend(b"MEMAPI" + b"\x00" * 6 + title + b"\x00" + b"\x00" * 32)
+        payload[0x0C:0x0E] = (3).to_bytes(2, "big")
+        for scene_number, title in ((1, b"WELCOME"), (3, b"STAR IS BORN")):
+            offset = len(payload)
+            entry = 0x30 + scene_number * 8
+            payload[entry:entry + 2] = scene_number.to_bytes(2, "big")
+            payload[entry + 4:entry + 8] = offset.to_bytes(4, "big")
+            payload.extend(b"\x03" + b"\x00" * 15 + b"MEMAPI" + b"\x00" * 6
+                           + title + b"\x00" + b"\x00" * 32)
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "ql1.CLF"
             path.write_bytes(payload)
             library = self.app.load_console_scene_library(path, "QL")
 
-        self.assertEqual(library[0], "Initial Data")
         self.assertEqual(library[1], "WELCOME")
-        self.assertEqual(library[2], "STAR IS BORN")
+        self.assertNotIn(2, library)
+        self.assertEqual(library[3], "STAR IS BORN")
+
+    def test_real_clf_scene_directories_match_yamaha_editor(self):
+        cl5_path = Path("/Users/mbprochris/Desktop/CL5.CLF")
+        ql1_path = Path("/Users/mbprochris/Desktop/ql1.CLF")
+        if not cl5_path.exists() or not ql1_path.exists():
+            self.skipTest("Fichiers CLF de production absents")
+        cl5 = self.app.load_console_scene_library(cl5_path, "CL")
+        ql1 = self.app.load_console_scene_library(ql1_path, "QL")
+        self.assertEqual({number: cl5.get(number) for number in (111, 112, 113, 119, 121)}, {
+            111: "SUPER HEROS", 112: "IN JADE LEO", 113: "ANNEES FOLLES",
+            119: "L HYMNE", 121: "CANCAN",
+        })
+        self.assertEqual({number: ql1.get(number) for number in (101, 102, 103, 104, 105, 106, 107, 109)}, {
+            101: "LAC DES CYGNES", 102: "SUPER HEROS", 103: "SUPER HEROS TALK",
+            104: "ANNE FOLLES PARA", 105: "ANNE FOLLE LEO",
+            106: "ANNE FOLLES ROXY", 107: "ANNE FOLLES TOUS",
+            109: "hymne \\ papaout",
+        })
+
+    def test_clf_parser_rejects_missing_wrong_family_and_malformed_files(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.assertEqual(self.app.load_console_scene_library(root / "missing.CLF", "CL"), {})
+            malformed = root / "malformed.CLF"
+            malformed.write_bytes(b"too short")
+            self.assertEqual(self.app.load_console_scene_library(malformed, "CL"), {})
+            wrong_family = root / "wrong-family.CLF"
+            payload = bytearray(0x40)
+            payload[0x10:0x10 + len(b"QL [OSX, 5.8.1]")] = b"QL [OSX, 5.8.1]"
+            wrong_family.write_bytes(payload)
+            self.assertEqual(self.app.load_console_scene_library(wrong_family, "CL"), {})
 
     def test_console_file_mode_does_not_use_program_as_clf_scene_number(self):
         payload = {
@@ -290,9 +612,11 @@ class LiveSetGenerationTests(unittest.TestCase):
                     snapshot = self.app.state_snapshot_locked()
 
         self.assertEqual(snapshot["midi_console"]["cl5"]["title"], "L'OBJET DU DÉSIR")
-        self.assertEqual(snapshot["midi_console"]["cl5"]["title_source"], "console_scene_map")
+        self.assertEqual(snapshot["midi_console"]["cl5"]["returned_title"], "PROUD MARY")
+        self.assertEqual(snapshot["midi_console"]["cl5"]["title_source"], "console_clf")
         self.assertEqual(snapshot["midi_console"]["ql1"]["title"], "L'OBJET DU DÉSIR")
-        self.assertEqual(snapshot["midi_console"]["ql1"]["title_source"], "console_scene_map")
+        self.assertEqual(snapshot["midi_console"]["ql1"]["returned_title"], "PEGAZ MENEUSE")
+        self.assertEqual(snapshot["midi_console"]["ql1"]["title_source"], "console_clf")
         self.assertNotIn("console_scene_libraries", snapshot)
 
     def test_recent_console_returns_resolve_defile_des_nations_for_both_consoles(self):
@@ -327,7 +651,258 @@ class LiveSetGenerationTests(unittest.TestCase):
 
         for console in ("cl5", "ql1"):
             self.assertEqual(snapshot["midi_console"][console]["title"], "DÉFILÉ DES NATIONS")
-            self.assertEqual(snapshot["midi_console"][console]["title_source"], "console_scene_map")
+            self.assertEqual(snapshot["midi_console"][console]["title_source"], "console_clf")
+
+    def test_physical_returns_resolve_human_program_to_scene_memory(self):
+        libraries = {
+            "cl5": {111: "SUPER HEROS", 112: "IN JADE LEO", 113: "ANNEES FOLLES"},
+            "ql1": {
+                102: "SUPER HEROS", 103: "SUPER HEROS TALK",
+                104: "ANNE FOLLES PARA", 105: "ANNE FOLLE LEO",
+                106: "ANNE FOLLES ROXY", 107: "ANNE FOLLES TOUS",
+            },
+        }
+        for console, expected in {
+            "cl5": {110: "SUPER HEROS", 111: "IN JADE LEO", 112: "ANNEES FOLLES"},
+            "ql1": {
+                101: "SUPER HEROS", 102: "SUPER HEROS TALK",
+                103: "ANNE FOLLES PARA", 104: "ANNE FOLLE LEO",
+                105: "ANNE FOLLES ROXY", 106: "ANNE FOLLES TOUS",
+            },
+        }.items():
+            for raw_midi, clf_title in expected.items():
+                with self.subTest(console=console, raw_midi=raw_midi):
+                    title, source = self.app.resolve_console_return_title(
+                        libraries, console, raw_midi,
+                    )
+                    self.assertEqual(title, clf_title)
+                    self.assertEqual(source, "console_clf")
+
+    def test_canonical_title_offsets_only_change_clf_lookup(self):
+        libraries = {"cl5": {80: "PREVIOUS", 81: "MISE ENTREE", 82: "NEXT"},
+                     "ql1": {78: "Test MPC"}}
+        zero = self.app.resolve_console_scene_title(libraries, "cl5", 80, 0)
+        plus = self.app.resolve_console_scene_title(libraries, "cl5", 80, 1)
+        minus = self.app.resolve_console_scene_title(libraries, "cl5", 80, -1)
+        ql1 = self.app.resolve_console_scene_title(libraries, "ql1", 77, 0)
+        self.assertEqual((zero["scene_memory"], zero["program"], zero["title_lookup_memory"], zero["title"]),
+                         (81, 81, 81, "MISE ENTREE"))
+        self.assertEqual((plus["scene_memory"], plus["program"], plus["title_lookup_memory"], plus["title"]),
+                         (81, 81, 82, "NEXT"))
+        self.assertEqual((minus["scene_memory"], minus["program"], minus["title_lookup_memory"], minus["title"]),
+                         (81, 81, 80, "PREVIOUS"))
+        self.assertEqual((ql1["scene_memory"], ql1["title_lookup_memory"], ql1["title"]),
+                         (78, 78, "Test MPC"))
+        self.assertEqual(self.app.clamp_console_title_offset(-99), -5)
+        self.assertEqual(self.app.clamp_console_title_offset(99), 5)
+
+    def test_offset_does_not_change_numeric_validation(self):
+        now = time.time()
+        with self.app.lock:
+            self.app.state["console_title_offsets"] = {"cl5": 1, "ql1": 0}
+        confirmed = self.outgoing_snapshot("cl5", 80, now - 1, 80, now,
+            {"cl5": {82: "OFFSET TITLE"}, "ql1": {}})
+        mismatch = self.outgoing_snapshot("cl5", 81, now - 1, 80, now,
+            {"cl5": {82: "OFFSET TITLE", 83: "EXPECTED TITLE"}, "ql1": {}})
+        self.assertEqual((confirmed["expected_scene_memory"], confirmed["returned_scene_memory"]), (81, 81))
+        self.assertEqual(confirmed["validation_status"], "confirmed")
+        self.assertEqual(confirmed["returned_title_lookup_memory"], 82)
+        self.assertEqual(mismatch["validation_status"], "mismatch")
+
+        libraries = {
+            "cl5": {111: "SUPER HEROS", 112: "IN JADE LEO", 113: "ANNEES FOLLES"},
+            "ql1": {102: "SUPER HEROS", 103: "SUPER HEROS TALK"},
+        }
+        with self.app.lock:
+            self.app.state["console_title_offsets"] = {"cl5": 0, "ql1": 0}
+            self.app.state["ableton_midi_output"] = {"cl5": None, "ql1": None}
+
+        mapping = {
+            "cl5": {110: [{"scene_index": 22, "program": 111, "midi_program": 110,
+                             "title": "28-ANNEEES FOLLES GATSBY"}]},
+            "ql1": {},
+        }
+        now = time.time()
+        payload = {
+            "service": "cl-midi-console-monitor", "return_mode": "console_return",
+            "cl5": {"received": True, "received_at": now, "midi_program": 111,
+                    "program": 12, "title": "Titre Ableton interdit"},
+            "ql1": {"received": True, "received_at": now, "midi_program": 102},
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            state_path = Path(temporary) / "midi-state.json"
+            state_path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.app.lock:
+                self.app.state["set_generation"] = 9
+                self.app.state["play_mode"] = "session"
+                self.app.state["playing_scene"] = 22
+                self.app.state["playing_scene_name"] = "28-ANNEEES FOLLES GATSBY"
+                self.app.state["console_scene_map"] = mapping
+                self.app.state["console_scene_libraries"] = libraries
+                self.app.state["expected_scene_signature"] = (9, "session", 22)
+                self.app.state["expected_activated_at"] = now - 1
+                with mock.patch.object(self.app, "MIDI_CONSOLE_STATE_PATH", state_path):
+                    snapshot = self.app.state_snapshot_locked()
+
+        cl5 = snapshot["midi_console"]["cl5"]
+        self.assertEqual(cl5["expected_title"], "SUPER HEROS")
+        self.assertEqual(cl5["expected_program"], 111)
+        self.assertEqual(cl5["expected_midi_program"], 110)
+        self.assertEqual(cl5["returned_midi_program"], 111)
+        self.assertEqual(cl5["returned_program"], 112)
+        self.assertEqual(cl5["returned_title"], "IN JADE LEO")
+        self.assertEqual(cl5["title_source"], "console_clf")
+        self.assertEqual(cl5["expected_program_source"], "degraded_ableton_clip_name")
+        self.assertEqual(cl5["expected_title_source"], "console_clf")
+        self.assertEqual(cl5["returned_program_source"], "physical_midi")
+        self.assertEqual(cl5["returned_title_source"], "console_clf")
+        self.assertNotEqual(cl5["expected_title"], "28-ANNEEES FOLLES GATSBY")
+        self.assertNotEqual(cl5["returned_title"], "28-ANNEEES FOLLES GATSBY")
+        self.assertEqual(cl5["validation_status"], "mismatch")
+        ql1 = snapshot["midi_console"]["ql1"]
+        self.assertIsNone(ql1["expected_program"])
+        self.assertIsNone(ql1["expected_midi_program"])
+        self.assertEqual(ql1["returned_midi_program"], 102)
+        self.assertEqual(ql1["returned_program"], 103)
+        self.assertEqual(ql1["returned_title"], "SUPER HEROS TALK")
+        self.assertEqual(ql1["validation_status"], "unavailable")
+
+    def test_expected_and_returned_titles_share_raw_midi_clf_lookup(self):
+        now = time.time()
+        libraries = {
+            "cl5": {96: "ANNEES FOLLES", 111: "MAUVAISE CLE BRUTE",
+                    112: "REC JADE", 113: "base uk 17 01"},
+            "ql1": {103: "INSHAYA HYMNE"},
+        }
+        mapping = {
+            "cl5": {95: [{"scene_index": 28, "program": 96, "midi_program": 95,
+                           "title": "28-ANNEEES FOLLES GATSBY",
+                           "program_source": "ableton_clip_name"}]},
+            "ql1": {},
+        }
+        payload = {
+            "service": "cl-midi-console-monitor", "return_mode": "console_return",
+            "cl5": {"received": True, "received_at": now, "midi_program": 95},
+            "ql1": {"received": True, "received_at": now, "midi_program": 102},
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            state_path = Path(temporary) / "midi-state.json"
+            state_path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.app.lock:
+                self.app.state["set_generation"] = 12
+                self.app.state["play_mode"] = "session"
+                self.app.state["playing_scene"] = 28
+                self.app.state["playing_scene_name"] = "28-ANNEEES FOLLES GATSBY"
+                self.app.state["console_scene_map"] = mapping
+                self.app.state["console_scene_libraries"] = libraries
+                self.app.state["expected_scene_signature"] = (12, "session", 28)
+                self.app.state["expected_activated_at"] = now - 1
+                with mock.patch.object(self.app, "MIDI_CONSOLE_STATE_PATH", state_path):
+                    confirmed = self.app.state_snapshot_locked()
+                payload["cl5"]["midi_program"] = 111
+                state_path.write_text(json.dumps(payload), encoding="utf-8")
+                with mock.patch.object(self.app, "MIDI_CONSOLE_STATE_PATH", state_path):
+                    mismatch = self.app.state_snapshot_locked()
+
+        cl5 = confirmed["midi_console"]["cl5"]
+        self.assertEqual((cl5["expected_midi_program"], cl5["expected_program"]), (95, 96))
+        self.assertEqual((cl5["returned_midi_program"], cl5["returned_program"]), (95, 96))
+        self.assertEqual((cl5["expected_title"], cl5["returned_title"]),
+                         ("ANNEES FOLLES", "ANNEES FOLLES"))
+        self.assertEqual(cl5["validation_status"], "confirmed")
+        changed = mismatch["midi_console"]["cl5"]
+        self.assertEqual((changed["returned_midi_program"], changed["returned_program"]), (111, 112))
+        self.assertEqual(changed["returned_title"], "REC JADE")
+        self.assertNotEqual(changed["returned_title"], libraries["cl5"][111])
+        self.assertEqual(changed["validation_status"], "mismatch")
+        ql1 = confirmed["midi_console"]["ql1"]
+        self.assertEqual((ql1["returned_midi_program"], ql1["returned_program"]), (102, 103))
+        self.assertEqual(ql1["returned_title"], "INSHAYA HYMNE")
+
+    def test_unknown_clf_title_keeps_numeric_confirmation_and_old_return_becomes_stale(self):
+        now = time.time()
+        payload = {
+            "service": "cl-midi-console-monitor", "return_mode": "console_return",
+            "cl5": {"received": True, "received_at": now, "midi_program": 50},
+            "ql1": {"received": False},
+        }
+        mapping = {"cl5": {50: [{"scene_index": 4, "program": 51, "midi_program": 50,
+                                    "title": "Titre Ableton A"}]}, "ql1": {}}
+        with tempfile.TemporaryDirectory() as temporary:
+            state_path = Path(temporary) / "midi-state.json"
+            state_path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.app.lock:
+                self.app.state["playing_scene"] = 4
+                self.app.state["playing_scene_name"] = "Titre Ableton A"
+                self.app.state["console_scene_map"] = mapping
+                self.app.state["console_scene_libraries"] = {"cl5": {}, "ql1": {}}
+                self.app.state["expected_scene_signature"] = (3, "session", 4)
+                self.app.state["expected_activated_at"] = now - 1
+                with mock.patch.object(self.app, "MIDI_CONSOLE_STATE_PATH", state_path):
+                    fresh = self.app.state_snapshot_locked()
+                payload["cl5"]["received_at"] = now - 20
+                state_path.write_text(json.dumps(payload), encoding="utf-8")
+                self.app.state["expected_activated_at"] = now - 30
+                with mock.patch.object(self.app, "MIDI_CONSOLE_STATE_PATH", state_path):
+                    stale = self.app.state_snapshot_locked()
+
+        returned = fresh["midi_console"]["cl5"]
+        self.assertEqual(returned["returned_midi_program"], 50)
+        self.assertEqual(returned["returned_program"], 51)
+        self.assertEqual(returned["returned_title"], "Titre non résolu")
+        self.assertEqual(returned["title_source"], "unresolved")
+        self.assertEqual(returned["validation_status"], "confirmed")
+        self.assertEqual(stale["midi_console"]["cl5"]["validation_status"], "stale")
+
+    def test_gatsby_keeps_ableton_context_separate_from_yamaha_scene_memories(self):
+        now = time.time()
+        mapping = {
+            "cl5": {110: [{"scene_index": 28, "program": 111, "midi_program": 110,
+                            "title": "28-ANNEEES FOLLES GATSBY",
+                            "program_source": "ableton_clip_name"}]},
+            "ql1": {},
+        }
+        libraries = {
+            "cl5": {111: "SUPER HEROS", 113: "ANNEES FOLLES"},
+            "ql1": {103: "SUPER HEROS TALK"},
+        }
+        payload = {
+            "service": "cl-midi-console-monitor", "return_mode": "console_return",
+            "cl5": {"received": True, "received_at": now, "midi_program": 112},
+            "ql1": {"received": True, "received_at": now, "midi_program": 102},
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            state_path = Path(temporary) / "midi-state.json"
+            state_path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.app.lock:
+                self.app.state["set_generation"] = 13
+                self.app.state["play_mode"] = "session"
+                self.app.state["playing_scene"] = 28
+                self.app.state["playing_scene_name"] = "28-ANNEEES FOLLES GATSBY"
+                self.app.state["console_scene_map"] = mapping
+                self.app.state["console_scene_libraries"] = libraries
+                self.app.state["expected_scene_signature"] = (13, "session", 28)
+                self.app.state["expected_activated_at"] = now - 1
+                with mock.patch.object(self.app, "MIDI_CONSOLE_STATE_PATH", state_path):
+                    snapshot = self.app.state_snapshot_locked()
+
+        cl5 = snapshot["midi_console"]["cl5"]
+        self.assertEqual((cl5["expected_midi_program"], cl5["expected_program"],
+                          cl5["expected_scene_memory"], cl5["expected_title"]),
+                         (110, 111, 111, "SUPER HEROS"))
+        self.assertEqual((cl5["returned_midi_program"], cl5["returned_program"],
+                          cl5["returned_scene_memory"], cl5["returned_title"]),
+                         (112, 113, 113, "ANNEES FOLLES"))
+        self.assertEqual(cl5["validation_status"], "mismatch")
+        ql1 = snapshot["midi_console"]["ql1"]
+        self.assertIsNone(ql1["expected_midi_program"])
+        self.assertEqual((ql1["returned_midi_program"], ql1["returned_program"],
+                          ql1["returned_scene_memory"], ql1["returned_title"]),
+                         (102, 103, 103, "SUPER HEROS TALK"))
+        self.assertEqual(ql1["validation_status"], "unavailable")
+        for console in (cl5, ql1):
+            self.assertNotEqual(console["expected_title"], "28-ANNEEES FOLLES GATSBY")
+            self.assertNotEqual(console["returned_title"], "28-ANNEEES FOLLES GATSBY")
 
     def test_console_scene_map_uses_aligned_main_cl5_and_ql1_clips(self):
         titles = ["", "10 - L'OBJET DU DÉSIR", "11 - DÉFILÉ DES NATIONS", "13 - H2O", "16 - I WILL ALWAYS...", "17 - BÊTE DE SEXE"]
