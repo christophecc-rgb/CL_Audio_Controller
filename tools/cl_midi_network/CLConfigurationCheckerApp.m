@@ -57,7 +57,7 @@
     NSArray *connections = actualRTP[@"connections"] ?: @[]; if (connections.count) rtp[@"expected_peer"] = connections.firstObject;
     NSMutableSet *sources = [NSMutableSet set], *destinations = [NSMutableSet set]; for (NSDictionary *endpoint in self.inspection[@"midi_endpoints"] ?: @[]) if ([endpoint[@"classification"] isEqualToString:@"rtp"]) { if ([endpoint[@"direction"] isEqualToString:@"source"]) [sources addObject:endpoint[@"name"]]; else [destinations addObject:endpoint[@"name"]]; }
     for (NSString *candidate in sources) if ([destinations containsObject:candidate]) { rtp[@"local_endpoint"] = candidate; break; } values[@"rtp"] = rtp;
-    NSMutableDictionary *simulator = [values[@"simulator"] mutableCopy]; if ([rtp[@"local_endpoint"] length]) simulator[@"endpoint"] = rtp[@"local_endpoint"]; values[@"simulator"] = simulator;
+    NSMutableDictionary *simulator = [values[@"simulator"] mutableCopy]; if ([simulator[@"transport"] isEqualToString:@"rtp"] && [rtp[@"local_endpoint"] length]) simulator[@"endpoint"] = rtp[@"local_endpoint"]; values[@"simulator"] = simulator;
     NSDictionary *status = self.inspection[@"server_status"] ?: @{};
     if ([self.profile.machineRole isEqualToString:@"server"] && status.count) {
         NSMutableDictionary *consoleReturn = [values[@"console_return"] mutableCopy] ?: [NSMutableDictionary dictionary];

@@ -34,6 +34,29 @@ class ConfigurationCheckerTests(unittest.TestCase):
             self.assertIn(key, profile)
         self.assertIn('peer distant attendu, jamais au nom de l’endpoint local', validator)
 
+    def test_server_profile_uses_local_dedicated_iac_scenario(self):
+        profile = (TOOLS / "CLConfigurationProfile.m").read_text()
+        validator = (TOOLS / "CLConfigurationValidator.m").read_text()
+        self.assertIn('remote ? @"rtp" : @"iac"', profile)
+        self.assertIn('remote ? @"" : @"CL MIDI Return Test"', profile)
+        self.assertIn('remote ? @"" : @"local_dedicated"', profile)
+        self.assertIn('BOOL rtpScenario = !server ||', validator)
+        self.assertIn('if (rtpScenario)', validator)
+        self.assertIn('@"endpoint local de retour"', validator)
+        self.assertNotIn('Sélectionner l’endpoint RTP local « %@ ».', validator)
+
+    def test_remote_profile_keeps_rtp_simulator_checks(self):
+        profile = (TOOLS / "CLConfigurationProfile.m").read_text()
+        validator = (TOOLS / "CLConfigurationValidator.m").read_text()
+        self.assertIn('remote ? @"rtp" : @"iac"', profile)
+        self.assertIn('rtpScenario ? ([sourceNames containsObject:endpoint] && [destinationNames containsObject:endpoint])', validator)
+        for title in ("Session RTP locale", "Nom Bonjour local", "Peer RTP attendu"):
+            self.assertIn(title, validator)
+
+    def test_saved_local_iac_profile_does_not_adopt_rtp_endpoint(self):
+        app = (TOOLS / "CLConfigurationCheckerApp.m").read_text()
+        self.assertIn('[simulator[@"transport"] isEqualToString:@"rtp"]', app)
+
     def test_inspector_is_read_only_and_collects_required_system_state(self):
         source = (TOOLS / "CLConfigurationInspector.m").read_text()
         for expected in (
@@ -65,7 +88,7 @@ class ConfigurationCheckerTests(unittest.TestCase):
             "--channel",
             "--transport",
             "--delay-ms",
-            "Le processus doit utiliser un endpoint présent sur ce Mac",
+            "Le processus doit utiliser un endpoint RTP présent sur ce Mac",
             "getaddrinfo",
             "expected_midi_program",
             "returned_midi_program",

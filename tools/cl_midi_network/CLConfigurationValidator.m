@@ -26,23 +26,30 @@ static NSString *CLArgument(NSString *command, NSString *name) {
 @implementation CLConfigurationValidator
 - (CLConfigurationReport *)validateProfile:(CLConfigurationProfile *)profile inspection:(NSDictionary *)inspection {
     NSMutableArray *items = [NSMutableArray array]; NSDictionary *values = profile.values; NSDictionary *expectedRTP = values[@"rtp"]; NSDictionary *actualRTP = inspection[@"rtp"];
+    BOOL server = [profile.machineRole isEqualToString:@"server"];
+    NSDictionary *simulatorProfile = values[@"simulator"] ?: @{};
+    BOOL rtpScenario = !server || [simulatorProfile[@"transport"] isEqualToString:@"rtp"];
     NSString *expectedEndpoint = expectedRTP[@"local_endpoint"] ?: @""; NSArray *endpoints = inspection[@"midi_endpoints"] ?: @[];
     NSMutableSet *sourceNames = [NSMutableSet set], *destinationNames = [NSMutableSet set];
     for (NSDictionary *endpoint in endpoints) { NSString *name = endpoint[@"name"] ?: @""; if ([endpoint[@"direction"] isEqualToString:@"source"]) [sourceNames addObject:name]; else [destinationNames addObject:name]; }
-    BOOL endpointOK = expectedEndpoint.length && [sourceNames containsObject:expectedEndpoint] && [destinationNames containsObject:expectedEndpoint];
-    NSString *endpointActual = endpointOK ? expectedEndpoint : [NSString stringWithFormat:@"Attendu « %@ » · sources trouvées [%@] · destinations trouvées [%@] · direction manquante %@", expectedEndpoint, [[sourceNames allObjects] componentsJoinedByString:@", "], [[destinationNames allObjects] componentsJoinedByString:@", "], ![sourceNames containsObject:expectedEndpoint] ? @"source" : @"destination"];
-    [items addObject:CLItem(!expectedEndpoint.length ? CLCheckLevelInfo : (endpointOK ? CLCheckLevelOK : CLCheckLevelError), @"CoreMIDI", @"Endpoint RTP local", expectedEndpoint, !expectedEndpoint.length ? @"Non défini dans le profil" : endpointActual, @"Le nom de session RTP et le nom d’endpoint CoreMIDI peuvent différer. Les routages actifs Source/Destination sur Aucun sont normaux et sûrs.", @"Vérifier le nom réellement publié et la direction manquante, sans sélectionner Bus 1 dans les routages actifs RTP.")];
+    if (rtpScenario) {
+        BOOL endpointOK = expectedEndpoint.length && [sourceNames containsObject:expectedEndpoint] && [destinationNames containsObject:expectedEndpoint];
+        NSString *endpointActual = endpointOK ? expectedEndpoint : [NSString stringWithFormat:@"Attendu « %@ » · sources trouvées [%@] · destinations trouvées [%@] · direction manquante %@", expectedEndpoint, [[sourceNames allObjects] componentsJoinedByString:@", "], [[destinationNames allObjects] componentsJoinedByString:@", "], ![sourceNames containsObject:expectedEndpoint] ? @"source" : @"destination"];
+        [items addObject:CLItem(!expectedEndpoint.length ? CLCheckLevelInfo : (endpointOK ? CLCheckLevelOK : CLCheckLevelError), @"CoreMIDI", @"Endpoint RTP local", expectedEndpoint, !expectedEndpoint.length ? @"Non défini dans le profil" : endpointActual, @"Le nom de session RTP et le nom d’endpoint CoreMIDI peuvent différer. Les routages actifs Source/Destination sur Aucun sont normaux et sûrs.", @"Vérifier le nom réellement publié et la direction manquante, sans sélectionner Bus 1 dans les routages actifs RTP.")];
+    }
     for (NSString *name in @[@"Gestionnaire IAC Bus 1", @"CL MIDI Return Test"]) if ([sourceNames containsObject:name] || [destinationNames containsObject:name]) [items addObject:CLItem(CLCheckLevelOK, @"CoreMIDI", name, name, name, @"Endpoint local détecté.", @"")];
 
-    NSString *sessionExpected = expectedRTP[@"local_session_name"] ?: @"", *sessionActual = actualRTP[@"local_session_name"] ?: @"";
-    [items addObject:CLItem(!sessionExpected.length ? CLCheckLevelInfo : ([sessionExpected isEqualToString:sessionActual] ? CLCheckLevelOK : CLCheckLevelError), @"RTP", @"Session RTP locale", sessionExpected, sessionActual, @"Nom de la session locale du Mac courant.", @"Corriger le profil ou la session locale dans Configuration audio et MIDI.")];
-    NSString *bonjourExpected = expectedRTP[@"bonjour_name"] ?: @"", *bonjourActual = actualRTP[@"bonjour_name"] ?: @"";
-    [items addObject:CLItem(!bonjourExpected.length ? CLCheckLevelInfo : ([bonjourExpected isEqualToString:bonjourActual] ? CLCheckLevelOK : CLCheckLevelWarning), @"RTP", @"Nom Bonjour local", bonjourExpected, bonjourActual, @"Ce nom annonce ce Mac sur le réseau ; ce n’est pas le peer distant.", @"Vérifier le nom réseau de la session RTP locale.")];
-    NSString *peer = expectedRTP[@"expected_peer"] ?: @""; NSArray *connections = actualRTP[@"connections"] ?: @[];
-    [items addObject:CLItem(!peer.length ? CLCheckLevelInfo : ([connections containsObject:peer] ? CLCheckLevelOK : CLCheckLevelError), @"RTP", @"Peer RTP attendu", peer, [connections componentsJoinedByString:@", "], @"La connexion active est comparée au peer distant attendu, jamais au nom de l’endpoint local.", @"Connecter le correspondant Bonjour attendu dans Configuration audio et MIDI.")];
+    if (rtpScenario) {
+        NSString *sessionExpected = expectedRTP[@"local_session_name"] ?: @"", *sessionActual = actualRTP[@"local_session_name"] ?: @"";
+        [items addObject:CLItem(!sessionExpected.length ? CLCheckLevelInfo : ([sessionExpected isEqualToString:sessionActual] ? CLCheckLevelOK : CLCheckLevelError), @"RTP", @"Session RTP locale", sessionExpected, sessionActual, @"Nom de la session locale du Mac courant.", @"Corriger le profil ou la session locale dans Configuration audio et MIDI.")];
+        NSString *bonjourExpected = expectedRTP[@"bonjour_name"] ?: @"", *bonjourActual = actualRTP[@"bonjour_name"] ?: @"";
+        [items addObject:CLItem(!bonjourExpected.length ? CLCheckLevelInfo : ([bonjourExpected isEqualToString:bonjourActual] ? CLCheckLevelOK : CLCheckLevelWarning), @"RTP", @"Nom Bonjour local", bonjourExpected, bonjourActual, @"Ce nom annonce ce Mac sur le réseau ; ce n’est pas le peer distant.", @"Vérifier le nom réseau de la session RTP locale.")];
+        NSString *peer = expectedRTP[@"expected_peer"] ?: @""; NSArray *connections = actualRTP[@"connections"] ?: @[];
+        [items addObject:CLItem(!peer.length ? CLCheckLevelInfo : ([connections containsObject:peer] ? CLCheckLevelOK : CLCheckLevelError), @"RTP", @"Peer RTP attendu", peer, [connections componentsJoinedByString:@", "], @"La connexion active est comparée au peer distant attendu, jamais au nom de l’endpoint local.", @"Connecter le correspondant Bonjour attendu dans Configuration audio et MIDI.")];
+    }
 
     NSArray *processes = inspection[@"processes"] ?: @[]; NSMutableDictionary *counts = [NSMutableDictionary dictionary]; BOOL foundSimulator = NO;
-    NSDictionary *simulatorProfile = values[@"simulator"] ?: @{}; NSDictionary *midi = values[@"midi"] ?: @{};
+    NSDictionary *midi = values[@"midi"] ?: @{};
     for (NSDictionary *process in processes) {
         NSString *command = process[@"command"] ?: @"", *path = process[@"path"] ?: @"";
         NSString *executable = process[@"executable"] ?: path.lastPathComponent;
@@ -53,15 +60,19 @@ static NSString *CLArgument(NSString *command, NSString *name) {
         if (![executable isEqualToString:@"CLYamahaConsoleSimulator"]) continue; foundSimulator = YES;
         NSString *label = CLArgument(command, @"--label"), *endpoint = CLArgument(command, @"--endpoint"), *transport = CLArgument(command, @"--transport"), *channel = CLArgument(command, @"--channel"), *delay = CLArgument(command, @"--delay-ms");
         NSString *expectedChannel = [label caseInsensitiveCompare:@"CL5"] == NSOrderedSame ? [midi[@"cl5_channel"] stringValue] : [midi[@"ql1_channel"] stringValue];
-        BOOL endpointMatches = [endpoint isEqualToString:simulatorProfile[@"endpoint"] ?: @""] && [sourceNames containsObject:endpoint] && [destinationNames containsObject:endpoint];
-        [items addObject:CLItem(endpointMatches ? CLCheckLevelOK : CLCheckLevelError, @"Simulateur", [NSString stringWithFormat:@"%@ · endpoint RTP local", label], simulatorProfile[@"endpoint"], endpoint, @"Le processus doit utiliser un endpoint présent sur ce Mac, pas une valeur provenant du Mac serveur.", [NSString stringWithFormat:@"Sélectionner l’endpoint RTP local « %@ ».", simulatorProfile[@"endpoint"] ?: @""])];
+        NSString *simulatorEndpoint = simulatorProfile[@"endpoint"] ?: @"";
+        BOOL endpointPresent = [sourceNames containsObject:endpoint] || [destinationNames containsObject:endpoint];
+        BOOL endpointMatches = simulatorEndpoint.length && [endpoint isEqualToString:simulatorEndpoint] && (rtpScenario ? ([sourceNames containsObject:endpoint] && [destinationNames containsObject:endpoint]) : endpointPresent);
+        NSString *endpointTitle = rtpScenario ? @"endpoint RTP local" : @"endpoint local de retour";
+        NSString *endpointAction = simulatorEndpoint.length ? [NSString stringWithFormat:@"Sélectionner l’endpoint %@ « %@ ».", rtpScenario ? @"RTP local" : @"local de retour", simulatorEndpoint] : @"Définir l’endpoint requis dans le profil avant de lancer le simulateur.";
+        [items addObject:CLItem(endpointMatches ? CLCheckLevelOK : CLCheckLevelError, @"Simulateur", [NSString stringWithFormat:@"%@ · %@", label, endpointTitle], simulatorEndpoint, endpoint, rtpScenario ? @"Le processus doit utiliser un endpoint RTP présent sur ce Mac, pas une valeur provenant du Mac serveur." : @"Le simulateur local doit envoyer son retour vers l’endpoint dédié CL MIDI Return Test.", endpointAction)];
         BOOL argumentsOK = [transport isEqualToString:simulatorProfile[@"transport"]] && [channel isEqualToString:expectedChannel] && [delay integerValue] == [simulatorProfile[@"delay_ms"] integerValue];
         [items addObject:CLItem(argumentsOK ? CLCheckLevelOK : CLCheckLevelError, @"Simulateur", [NSString stringWithFormat:@"%@ · paramètres", label], [NSString stringWithFormat:@"transport %@ · canal %@ · délai %@ ms", simulatorProfile[@"transport"], expectedChannel, simulatorProfile[@"delay_ms"]], [NSString stringWithFormat:@"transport %@ · canal %@ · délai %@ ms", transport, channel, delay], @"Canaux et délai restent configurables dans le profil.", @"Relancer le simulateur avec les paramètres du profil.")];
     }
     if (!foundSimulator) [items addObject:CLItem(CLCheckLevelInfo, @"Simulateur", @"Simulateurs CL5 / QL1", @"Selon le scénario", @"Aucun processus", @"L’absence est normale si le test distant n’est pas actif.", @"")];
     [counts enumerateKeysAndObjectsUsingBlock:^(NSString *name, NSNumber *count, BOOL *stop) { (void)stop; if (count.integerValue > 1 && ![name isEqualToString:@"CLYamahaConsoleSimulator"]) [items addObject:CLItem(CLCheckLevelWarning, @"Processus", @"Doublon suspect", @"Une instance", [NSString stringWithFormat:@"%@ instances de %@", count, name], @"Plusieurs instances peuvent se disputer les ports ou publier des états contradictoires.", @"Fermer manuellement l’ancienne instance après vérification.")]; }];
 
-    NSDictionary *ports = inspection[@"ports"] ?: @{}; BOOL server = [profile.machineRole isEqualToString:@"server"];
+    NSDictionary *ports = inspection[@"ports"] ?: @{};
     for (NSNumber *port in @[@5050, @11000, @11001, @63123]) { NSArray *owners = ports[port.stringValue] ?: @[]; BOOL required = server ? [@[@5050, @11001, @63123] containsObject:port] : [port isEqual:@11000]; [items addObject:CLItem(owners.count ? CLCheckLevelOK : (required ? CLCheckLevelError : CLCheckLevelInfo), @"Réseau", [NSString stringWithFormat:@"Port %@", port], required ? @"Occupé par CL Audio" : @"Selon le rôle", owners.count ? [owners componentsJoinedByString:@"\n"] : @"Libre", @"Contrôle en lecture seule du processus occupant le port.", @"Lancer le composant prévu par le profil ou fermer manuellement l’ancienne instance.")]; }
 
     if (!server) {
