@@ -97,7 +97,7 @@ static void CLInstallApplicationMenu(void) {
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
     CLInstallApplicationMenu();
-    CGFloat height = 850;
+    CGFloat height = 930;
     NSRect frame = NSMakeRect(0, 0, 820, height);
     self.window = [[NSWindow alloc] initWithContentRect:frame
                                               styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable
@@ -185,13 +185,15 @@ static void CLInstallApplicationMenu(void) {
         @[@"controller", @"Mac Télécommande — RTP émetteur-récepteur", @"Show Control, découverte Bonjour et liaison RTP-MIDI bidirectionnelle avec retours consoles.", @"Controller.png"],
         @[@"ableton-reader", @"Mac Ableton Lecteur — RTP émetteur-récepteur", @"AbletonOSC, LTC, X-Fader et agent RTP-MIDI bidirectionnel à démarrage automatique.", @"Controller.png"],
         @[@"builder", @"CL Arrangement Builder Live", @"Application Builder et Remote Script Ableton.", @"Builder.png"],
-        @[@"midi-console", @"CL MIDI Network Assistant + simulateur", @"Diagnostic MIDI, retours consoles et simulateur intégré IAC/RTP.", @"MIDIConsole.png"]
+        @[@"midi-console", @"CL MIDI Network Assistant + simulateur", @"Diagnostic MIDI, retours consoles et simulateur intégré IAC/RTP.", @"MIDIConsole.png"],
+        @[@"diagnostic-tools", @"Outils de diagnostic CL", @"Configuration Checker, MIDI Analyzer et Performance Monitor.", @"MIDIConsole.png"]
     ] : @[
         @[@"autoscene", @"Paradis Latin AutoScene", @"Périphérique Max for Live pour Ableton Live 11 et 12.", @"ParadisLatin.jpg"],
         @[@"controller", @"Mac Télécommande", @"Show Control, serveur web et télécommandes distantes.", @"Controller.png"],
         @[@"ableton-reader", @"Mac Ableton Lecteur", @"AbletonOSC, LTC, X-Fader et agent RTP léger.", @"Controller.png"],
         @[@"builder", @"CL Arrangement Builder Live", @"Application Builder et Remote Script Ableton.", @"Builder.png"],
-        @[@"midi-console", @"CL MIDI Network Assistant + simulateur", @"Diagnostic, retours consoles et tests IAC/RTP dans une seule application.", @"MIDIConsole.png"]
+        @[@"midi-console", @"CL MIDI Network Assistant + simulateur", @"Diagnostic, retours consoles et tests IAC/RTP dans une seule application.", @"MIDIConsole.png"],
+        @[@"diagnostic-tools", @"Outils de diagnostic CL", @"Configuration Checker, MIDI Analyzer et Performance Monitor.", @"MIDIConsole.png"]
     ];
     for (NSArray<NSString *> *item in components) {
         [componentStack addArrangedSubview:[self componentCard:item[0] title:item[1] subtitle:item[2] iconName:item[3]]];
@@ -264,7 +266,7 @@ static void CLInstallApplicationMenu(void) {
         return;
     }
     [self.checks enumerateKeysAndObjectsUsingBlock:^(NSString *key, NSButton *check, BOOL *stop) {
-        BOOL selected = (role == 0 && [key isEqualToString:@"controller"]) ||
+        BOOL selected = (role == 0 && ([key isEqualToString:@"controller"] || [key isEqualToString:@"diagnostic-tools"])) ||
                         (role == 1 && ([key isEqualToString:@"ableton-reader"] || [key isEqualToString:@"builder"] || [key isEqualToString:@"autoscene"])) ||
                         (role == 2 && [key isEqualToString:@"midi-console"]);
         check.state = selected ? NSControlStateValueOn : NSControlStateValueOff;

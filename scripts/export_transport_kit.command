@@ -142,6 +142,9 @@ echo "Assemblage des applications et composants…"
 ditto "$CONTROLLER_ROOT/CL Audio Controller.app" "$COMPONENTS_ROOT/Applications/CL Audio Controller.app"
 ditto "$CONTROLLER_ROOT/CL MIDI Network Assistant.app" "$COMPONENTS_ROOT/Applications/CL MIDI Network Assistant.app"
 ditto "$CONTROLLER_ROOT/CL MIDI RTP Agent.app" "$COMPONENTS_ROOT/Applications/CL MIDI RTP Agent.app"
+ditto "$CONTROLLER_ROOT/CL Audio Configuration Checker.app" "$COMPONENTS_ROOT/Applications/CL Audio Configuration Checker.app"
+ditto "$CONTROLLER_ROOT/CL MIDI Analyzer.app" "$COMPONENTS_ROOT/Applications/CL MIDI Analyzer.app"
+ditto "$CONTROLLER_ROOT/CL MIDI Performance Monitor.app" "$COMPONENTS_ROOT/Applications/CL MIDI Performance Monitor.app"
 ditto "$BUILDER_APP" "$COMPONENTS_ROOT/Applications/Arrangement Builder Live.app"
 
 ditto "$CONTROLLER_ROOT/AbletonOSC CL/AbletonOSC" "$COMPONENTS_ROOT/Ableton Live 11-12/Remote Scripts/AbletonOSC"
@@ -298,6 +301,9 @@ for expected in \
   "Installer la Suite CL.app/" \
   "Désinstaller la Suite CL.app/" \
   "Installer la Suite CL.app/Contents/Resources/Composants/Applications/CL Audio Controller.app/" \
+  "Installer la Suite CL.app/Contents/Resources/Composants/Applications/CL Audio Configuration Checker.app/" \
+  "Installer la Suite CL.app/Contents/Resources/Composants/Applications/CL MIDI Analyzer.app/" \
+  "Installer la Suite CL.app/Contents/Resources/Composants/Applications/CL MIDI Performance Monitor.app/" \
   "Installer la Suite CL.app/Contents/Resources/Composants/Applications/Arrangement Builder Live.app/" \
   "Installer la Suite CL.app/Contents/Resources/Composants/Ableton Live 11-12/Remote Scripts/AbletonOSC/" \
   "Installer la Suite CL.app/Contents/Resources/Composants/Ableton Live 11-12/Remote Scripts/CL_Arrangement_Builder_Live/" \

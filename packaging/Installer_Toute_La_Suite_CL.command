@@ -258,6 +258,7 @@ verify_selected_components() {
       "Composants/Applications/CL Audio Controller.app/"*) [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Ableton Live 11-12/Remote Scripts/AbletonOSC/"*|"Composants/Ableton Live 11-12/Max for Live/CL Audio Controller - Remote/"*) [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_ABLETON_READER" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Applications/CL MIDI RTP Agent.app/"*) [[ "$INSTALL_ABLETON_READER" == 1 ]] && echo "$line" >> "$selected" ;;
+      "Composants/Applications/CL Audio Configuration Checker.app/"*|"Composants/Applications/CL MIDI Analyzer.app/"*|"Composants/Applications/CL MIDI Performance Monitor.app/"*) [[ "$INSTALL_DIAGNOSTIC_TOOLS" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Applications/Arrangement Builder Live.app/"*|"Composants/Ableton Live 11-12/Remote Scripts/CL_Arrangement_Builder_Live/"*) [[ "$INSTALL_BUILDER" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Ableton Live 11-12/Max for Live/Paradis Latin AutoScene/"*) [[ "$INSTALL_AUTOSCENE" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Ableton Live 10/Max for Live/Paradis Latin AutoScene - Live 10/"*) [[ "$INSTALL_AUTOSCENE_LIVE10" == 1 ]] && echo "$line" >> "$selected" ;;
@@ -309,14 +310,14 @@ M4L_MIDI_CONSOLE_TARGET="$ABLETON_LIBRARY/Presets/MIDI Effects/Max MIDI Effect/C
 MIDI_TOOLS_TARGET="$INSTALL_HOME/Library/Application Support/CL MIDI Console/Network Tools"
 say ""; say "User Library retenue : $ABLETON_LIBRARY"
 
-INSTALL_REMOTE=0; INSTALL_CONTROLLER=0; INSTALL_ABLETON_READER=0; INSTALL_BUILDER=0; INSTALL_AUTOSCENE=0; INSTALL_AUTOSCENE_LIVE10=0; INSTALL_MIDI_CONSOLE=0; INSTALL_MIDI_RECEIVER=0
+INSTALL_REMOTE=0; INSTALL_CONTROLLER=0; INSTALL_ABLETON_READER=0; INSTALL_BUILDER=0; INSTALL_AUTOSCENE=0; INSTALL_AUTOSCENE_LIVE10=0; INSTALL_MIDI_CONSOLE=0; INSTALL_MIDI_RECEIVER=0; INSTALL_DIAGNOSTIC_TOOLS=0
 CHOICE="${CL_SUITE_COMPONENTS:-}"
 if [[ -z "$CHOICE" ]]; then
   echo; echo "Rôle ou composant à installer :"; echo "  1 — Suite complète"; echo "  2 — Télécommande CL Audio uniquement"; echo "  3 — Arrangement Builder uniquement"; echo "  4 — AutoScene uniquement"; echo "  5 — CL MIDI Console uniquement"; echo "  6 — Mac Ableton Lecteur — RTP émetteur-récepteur"; echo "  7 — Simulateur de console RTP"; echo "  8 — Annuler"
   read -r -p "Votre choix : " CHOICE
 fi
 case "$CHOICE" in
-  1|all|complete) INSTALL_CONTROLLER=1; INSTALL_ABLETON_READER=1; INSTALL_BUILDER=1; INSTALL_AUTOSCENE=1; INSTALL_MIDI_CONSOLE=1 ;;
+  1|all|complete) INSTALL_CONTROLLER=1; INSTALL_ABLETON_READER=1; INSTALL_BUILDER=1; INSTALL_AUTOSCENE=1; INSTALL_MIDI_CONSOLE=1; INSTALL_DIAGNOSTIC_TOOLS=1 ;;
   2|remote) INSTALL_REMOTE=1 ;;
   controller|show-control) INSTALL_CONTROLLER=1 ;;
   6|ableton-reader|reader) INSTALL_ABLETON_READER=1; INSTALL_BUILDER=1; INSTALL_AUTOSCENE=1 ;;
@@ -333,6 +334,7 @@ case "$CHOICE" in
     [[ "$normalized" == *,builder,* ]] && INSTALL_BUILDER=1
     [[ "$normalized" == *,autoscene,* ]] && INSTALL_AUTOSCENE=1
     [[ "$normalized" == *,midi-console,* ]] && INSTALL_MIDI_CONSOLE=1
+    [[ "$normalized" == *,diagnostic-tools,* ]] && INSTALL_DIAGNOSTIC_TOOLS=1
     [[ "$normalized" == *,midi-receiver,* || "$normalized" == *,simulator,* ]] && INSTALL_MIDI_CONSOLE=1
     ;;
 esac
@@ -351,6 +353,11 @@ mkdir -p "$USER_APPS" "$REMOTE_SCRIPTS" "$ABLETON_LIBRARY/Presets"
 
 [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 ]] && prepare_controller_replacement
 [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 ]] && install_item "$APPLICATIONS_SOURCE/CL Audio Controller.app" "$USER_APPS/CL Audio Controller.app" "Télécommande — CL Audio Controller" "controller"
+if [[ "$INSTALL_DIAGNOSTIC_TOOLS" == 1 ]]; then
+  install_item "$APPLICATIONS_SOURCE/CL Audio Configuration Checker.app" "$USER_APPS/CL Audio Configuration Checker.app" "Diagnostic — Configuration Checker" "diagnostic-tools"
+  install_item "$APPLICATIONS_SOURCE/CL MIDI Analyzer.app" "$USER_APPS/CL MIDI Analyzer.app" "Diagnostic — MIDI Analyzer" "diagnostic-tools"
+  install_item "$APPLICATIONS_SOURCE/CL MIDI Performance Monitor.app" "$USER_APPS/CL MIDI Performance Monitor.app" "Diagnostic — Performance Monitor" "diagnostic-tools"
+fi
 if [[ "$INSTALL_CONTROLLER" == 1 ]]; then
   install_item "$MIDI_TOOLS_SOURCE" "$MIDI_TOOLS_TARGET" "Télécommande — Outils diagnostic réseau MIDI" "controller"
   install_item "$APPLICATIONS_SOURCE/CL MIDI Network Assistant.app" "$USER_APPS/CL MIDI Network Assistant.app" "Télécommande — Assistant réseau MIDI" "controller"

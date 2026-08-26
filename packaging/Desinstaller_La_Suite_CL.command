@@ -25,6 +25,7 @@ UNINSTALL_AUTOSCENE=0
 UNINSTALL_LIVE10=0
 UNINSTALL_MIDI_CONSOLE=0
 UNINSTALL_MIDI_RECEIVER=0
+UNINSTALL_DIAGNOSTIC_TOOLS=0
 
 CHOICE="${CL_SUITE_UNINSTALL_COMPONENTS:-}"
 if [[ -z "$CHOICE" ]]; then
@@ -48,7 +49,7 @@ fi
 
 case "$CHOICE" in
   1|all|complete)
-    UNINSTALL_REMOTE=1; UNINSTALL_BUILDER=1; UNINSTALL_AUTOSCENE=1; UNINSTALL_LIVE10=1; UNINSTALL_MIDI_CONSOLE=1; UNINSTALL_MIDI_RECEIVER=1 ;;
+    UNINSTALL_REMOTE=1; UNINSTALL_BUILDER=1; UNINSTALL_AUTOSCENE=1; UNINSTALL_LIVE10=1; UNINSTALL_MIDI_CONSOLE=1; UNINSTALL_MIDI_RECEIVER=1; UNINSTALL_DIAGNOSTIC_TOOLS=1 ;;
   2|remote) UNINSTALL_REMOTE=1 ;;
   3|builder) UNINSTALL_BUILDER=1 ;;
   4|autoscene) UNINSTALL_AUTOSCENE=1 ;;
@@ -80,7 +81,8 @@ case "$CHOICE" in
     [[ "$normalized" == *,midi-console,* ]] && UNINSTALL_MIDI_CONSOLE=1
     [[ "$normalized" == *,midi-receiver,* ]] && UNINSTALL_MIDI_RECEIVER=1
     [[ "$normalized" == *,simulator,* ]] && UNINSTALL_MIDI_RECEIVER=1
-    if [[ "$UNINSTALL_REMOTE$UNINSTALL_CONTROLLER$UNINSTALL_ABLETON_READER$UNINSTALL_BUILDER$UNINSTALL_AUTOSCENE$UNINSTALL_LIVE10$UNINSTALL_MIDI_CONSOLE$UNINSTALL_MIDI_RECEIVER" == "00000000" ]]; then
+    [[ "$normalized" == *,diagnostic-tools,* ]] && UNINSTALL_DIAGNOSTIC_TOOLS=1
+    if [[ "$UNINSTALL_REMOTE$UNINSTALL_CONTROLLER$UNINSTALL_ABLETON_READER$UNINSTALL_BUILDER$UNINSTALL_AUTOSCENE$UNINSTALL_LIVE10$UNINSTALL_MIDI_CONSOLE$UNINSTALL_MIDI_RECEIVER$UNINSTALL_DIAGNOSTIC_TOOLS" == "000000000" ]]; then
       echo "Désinstallation annulée."
       exit 0
     fi
@@ -97,6 +99,7 @@ is_selected() {
     autoscene-live10) [[ "$UNINSTALL_LIVE10" == "1" ]] ;;
     midi-console) [[ "$UNINSTALL_MIDI_CONSOLE" == "1" ]] ;;
     midi-receiver) [[ "$UNINSTALL_MIDI_RECEIVER" == "1" ]] ;;
+    diagnostic-tools) [[ "$UNINSTALL_DIAGNOSTIC_TOOLS" == "1" ]] ;;
     *) return 1 ;;
   esac
 }
@@ -104,6 +107,9 @@ is_selected() {
 is_allowed_target() {
   case "$1" in
     "$INSTALL_HOME/Applications/CL Audio Controller.app"|\
+    "$INSTALL_HOME/Applications/CL Audio Configuration Checker.app"|\
+    "$INSTALL_HOME/Applications/CL MIDI Analyzer.app"|\
+    "$INSTALL_HOME/Applications/CL MIDI Performance Monitor.app"|\
     "$INSTALL_HOME/Applications/Arrangement Builder Live.app"|\
     "$INSTALL_HOME/Music/Ableton/User Library/Remote Scripts/AbletonOSC"|\
     "$INSTALL_HOME/Music/Ableton/User Library/Remote Scripts/CL_Arrangement_Builder_Live"|\
