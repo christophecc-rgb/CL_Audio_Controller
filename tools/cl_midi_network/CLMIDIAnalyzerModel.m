@@ -1,5 +1,145 @@
 #import "CLMIDIAnalyzerModel.h"
 
+static NSUInteger CLMIDIAnalyzerMessageLength(UInt8 status)
+{
+    if (status < 0x80) return 0;
+    if (status < 0xF0)
+        return (status & 0xE0) == 0xC0 ? 2 : 3;
+    switch (status)
+    {
+        case 0xF0: return NSNotFound;
+        case 0xF1: return 2;
+        case 0xF2: return 3;
+        case 0xF3: return 2;
+        case 0xF6:
+        case 0xF7:
+        case 0xF8:
+        case 0xF9:
+        case 0xFA:
+        case 0xFB:
+        case 0xFC:
+        case 0xFD:
+        case 0xFE:
+        case 0xFF: return 1;
+        default: return 1;
+    }
+}
+
+@interface CLMIDIAnalyzerPacketParser ()
+@property (nonatomic) UInt8 runningStatus;
+@property (nonatomic, strong) NSMutableData *pendingMessage;
+@property (nonatomic) NSUInteger pendingLength;
+@property (nonatomic) BOOL inSystemExclusive;
+@end
+
+@implementation CLMIDIAnalyzerPacketParser
+
+- (instancetype)init
+{
+    self = [super init];
+    if (self) _pendingMessage = [NSMutableData data];
+    return self;
+}
+
+- (void)reset
+{
+    self.runningStatus = 0;
+    self.pendingLength = 0;
+    self.inSystemExclusive = NO;
+    [self.pendingMessage setLength:0];
+}
+
+- (void)addEventWithData:(NSData *)data
+                  packet:(CLMIDIPacket *)packet
+                  events:(NSMutableArray<CLMIDIEvent *> *)events
+{
+    UInt8 messageBytes[data.length];
+    [data getBytes:messageBytes length:data.length];
+    CLMIDIPacket *messagePacket = [[CLMIDIPacket alloc]
+        initWithBytes:messageBytes
+               length:data.length
+            timestamp:packet.timestamp
+           sourceName:packet.sourceName];
+    [events addObject:[[CLMIDIEvent alloc] initWithPacket:messagePacket]];
+}
+
+- (void)finishPendingForPacket:(CLMIDIPacket *)packet
+                         events:(NSMutableArray<CLMIDIEvent *> *)events
+{
+    [self addEventWithData:self.pendingMessage.copy packet:packet events:events];
+    [self.pendingMessage setLength:0];
+    self.pendingLength = 0;
+}
+
+- (NSArray<CLMIDIEvent *> *)eventsForPacket:(CLMIDIPacket *)packet
+{
+    NSMutableArray<CLMIDIEvent *> *events = [NSMutableArray array];
+    UInt8 bytes[packet.data.length];
+    [packet.data getBytes:bytes length:packet.data.length];
+    for (NSUInteger index = 0; index < packet.data.length; index++)
+    {
+        UInt8 byte = bytes[index];
+
+        // Realtime messages may occur anywhere and do not disturb parser state.
+        if (byte >= 0xF8)
+        {
+            NSData *data = [NSData dataWithBytes:&byte length:1];
+            [self addEventWithData:data packet:packet events:events];
+            continue;
+        }
+
+        if (self.inSystemExclusive)
+        {
+            [self.pendingMessage appendBytes:&byte length:1];
+            if (byte == 0xF7)
+            {
+                self.inSystemExclusive = NO;
+                [self finishPendingForPacket:packet events:events];
+            }
+            continue;
+        }
+
+        if (byte >= 0x80)
+        {
+            [self.pendingMessage setLength:0];
+            self.pendingLength = CLMIDIAnalyzerMessageLength(byte);
+            [self.pendingMessage appendBytes:&byte length:1];
+            if (byte < 0xF0)
+                self.runningStatus = byte;
+            else
+                self.runningStatus = 0;
+
+            if (byte == 0xF0)
+            {
+                self.inSystemExclusive = YES;
+                continue;
+            }
+            if (self.pendingLength == 1)
+                [self finishPendingForPacket:packet events:events];
+            continue;
+        }
+
+        if (self.pendingMessage.length == 0)
+        {
+            if (self.runningStatus == 0)
+            {
+                NSData *data = [NSData dataWithBytes:&byte length:1];
+                [self addEventWithData:data packet:packet events:events];
+                continue;
+            }
+            UInt8 status = self.runningStatus;
+            self.pendingLength = CLMIDIAnalyzerMessageLength(status);
+            [self.pendingMessage appendBytes:&status length:1];
+        }
+        [self.pendingMessage appendBytes:&byte length:1];
+        if (self.pendingMessage.length == self.pendingLength)
+            [self finishPendingForPacket:packet events:events];
+    }
+    return events;
+}
+
+@end
+
 static NSDateFormatter *CLMIDIAnalyzerClock(void)
 {
     static NSDateFormatter *formatter;

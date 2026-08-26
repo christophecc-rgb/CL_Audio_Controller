@@ -71,6 +71,14 @@ class ContextResponse:
 
 
 class ServerIdentityTests(unittest.TestCase):
+    def test_midi_network_assistant_button_uses_existing_launcher_and_accessible_matte_red_style(self):
+        source = (PROJECT_ROOT / "launcher_control.py").read_text(encoding="utf-8")
+        self.assertIn(">MIDI Network Assistant</button>", source)
+        self.assertIn('aria-label="Ouvrir MIDI Network Assistant"', source)
+        self.assertIn(".midi-assistant-button:focus-visible", source)
+        self.assertIn("background:#8f3f3f", source)
+        self.assertIn('find_midi_network_assistant()', source)
+        self.assertNotIn(">Diagnostic</button>", source)
     def setUp(self):
         launcher.owned_server = None
 

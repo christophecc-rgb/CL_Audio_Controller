@@ -24,6 +24,15 @@ def load_app_module():
 
 
 class LiveSetGenerationTests(unittest.TestCase):
+    def test_ableton_connection_is_the_single_source_of_midi_roles(self):
+        self.assertEqual(self.app.ableton_midi_roles("local"), {
+            "mode": "Local", "expected_source": "Gestionnaire IAC Bus 1",
+            "returned_source": "Réseau Rtp MB Chris",
+        })
+        self.assertEqual(self.app.ableton_midi_roles("remote"), {
+            "mode": "Ableton distant", "expected_source": "Réseau Rtp MB Chris",
+            "returned_source": "local_simulator_tx",
+        })
     @classmethod
     def setUpClass(cls):
         cls.app = load_app_module()

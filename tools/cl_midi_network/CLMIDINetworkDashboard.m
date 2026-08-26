@@ -230,6 +230,8 @@ static BOOL CLPostDoubleClickFromConnectorReason(NSString *reason) {
 @property NSInteger expectedQL1Program;
 @property NSDate *expectedCL5ProgramAt;
 @property NSDate *expectedQL1ProgramAt;
+@property NSDictionary *lastCL5SimulatorTX;
+@property NSDictionary *lastQL1SimulatorTX;
 @property UInt8 expectedRunningStatus;
 @property NSUInteger sceneTitleTraceSequence;
 @property NSUInteger cl5SceneTitleLookupGeneration;
@@ -921,6 +923,7 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
                 : NSNull.null,
             @"fresh": @(self.lastCL5ProgramAt &&
                 MAX(0.0, -[self.lastCL5ProgramAt timeIntervalSinceNow]) <= 12.0),
+            @"local_simulator_tx": self.lastCL5SimulatorTX ?: @{},
         },
 
         @"ql1": @{
@@ -960,6 +963,7 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
                 : NSNull.null,
             @"fresh": @(self.lastQL1ProgramAt &&
                 MAX(0.0, -[self.lastQL1ProgramAt timeIntervalSinceNow]) <= 12.0),
+            @"local_simulator_tx": self.lastQL1SimulatorTX ?: @{},
         },
     };
 
@@ -2474,6 +2478,13 @@ static NSString * const CLSimulatorDevicesDefaultsKey = @"CLSimulatorDevicesV1";
     device[@"last_program"] = @(program);
     device[@"last_event_at"] = now;
     device[@"last_title"] = title;
+    NSDictionary *publication = @{ @"console": [device[@"channel"] integerValue] == 1 ? @"CL5" : @"QL1",
+        @"channel": device[@"channel"], @"midi_program": @(program), @"scene_memory": @(program + 1),
+        @"timestamp": @([now timeIntervalSince1970]), @"source": @"local_simulator_tx",
+        @"title": title ?: @"" };
+    if ([device[@"channel"] integerValue] == 1) self.lastCL5SimulatorTX = publication;
+    else if ([device[@"channel"] integerValue] == 2) self.lastQL1SimulatorTX = publication;
+    [self writeConsoleReturnState];
     if (self.simulatorDeviceRows) [self rebuildSimulatorDeviceRows];
 }
 

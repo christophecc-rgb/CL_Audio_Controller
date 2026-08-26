@@ -698,6 +698,11 @@ button:active{transform:scale(.985)}
 #events{font-family:Menlo,monospace;font-size:11px;color:#cbd5e1;line-height:1.30;min-height:28px;max-height:52px;overflow:hidden;padding:6px 7px;border-radius:10px;background:rgba(0,0,0,.16)}
 .footer{margin-top:12px;text-align:center;color:#5fa8ff;font-size:12px}
 </style>
+<style>
+.midi-assistant-button{height:28px;padding:0 10px;border-color:#a64f4f;background:#8f3f3f;color:#fff;font-family:inherit;font-weight:760}
+.midi-assistant-button:hover{background:#9d4949}.midi-assistant-button:active{background:#713232;transform:translateY(1px)}
+.midi-assistant-button:focus-visible{outline:2px solid #f0b0b0;outline-offset:2px}.midi-assistant-button:disabled{opacity:.48;cursor:not-allowed}
+</style>
 </head>
 <body>
 <div id="controlShell" class="control-shell">
@@ -1319,7 +1324,7 @@ body.show-mode .show-toggle{border-color:rgba(229,166,59,.72);background:rgba(22
   </div>
 
   <section class="card console-card">
-    <div class="console-head"><strong>MIDI &amp; CONSOLES</strong><div class="rtp-control"><span id="rtpBadge" class="rtp-badge">RTP · attente</span><button class="rtp-open" onclick="runAction('/midi-network-assistant','Ouverture du diagnostic RTP')">Diagnostic</button></div></div>
+    <div class="console-head"><strong>MIDI &amp; CONSOLES</strong><div class="rtp-control"><span id="rtpBadge" class="rtp-badge">RTP · attente</span><button class="rtp-open midi-assistant-button" aria-label="Ouvrir MIDI Network Assistant" onclick="runAction('/midi-network-assistant','Ouverture de MIDI Network Assistant')">MIDI Network Assistant</button></div></div>
     <div class="console-config"><span class="console-config-title">CONFIGURATION CONSOLES</span>
       <div class="offset-control">CL5 · Offset titre <button class="offset-button" onclick="changeTitleOffset('cl5',-1)">−</button><strong id="cl5TitleOffset" class="offset-value">0</strong><button class="offset-button" onclick="changeTitleOffset('cl5',1)">+</button><button class="offset-button" onclick="changeTitleOffset('cl5',0,true)">0</button></div>
       <div class="offset-control">QL1 · Offset titre <button class="offset-button" onclick="changeTitleOffset('ql1',-1)">−</button><strong id="ql1TitleOffset" class="offset-value">0</strong><button class="offset-button" onclick="changeTitleOffset('ql1',1)">+</button><button class="offset-button" onclick="changeTitleOffset('ql1',0,true)">0</button></div>
@@ -1849,6 +1854,16 @@ def remote_window():
     if not ok:
         return jsonify(error=message), 409
 
+    remote_app = find_remote_app()
+    if remote_app is not None:
+        subprocess.Popen(["/usr/bin/open", str(remote_app)])
+        event("Télécommande desktop ouverte sur Session")
+        return jsonify(
+            message="Télécommande desktop ouverte sur Session",
+            app=str(remote_app),
+            url=REMOTE_ROOT_URL,
+        )
+
     mode = open_remote_app_window(REMOTE_ROOT_URL, "Télécommande Ableton")
     event("Télécommande ouverte sur Session")
     return jsonify(message=f"Télécommande ouverte sur Session en {mode}", url=REMOTE_ROOT_URL)
@@ -1858,10 +1873,10 @@ def remote_window():
 def open_midi_network_assistant():
     assistant = find_midi_network_assistant()
     if assistant is None:
-        return jsonify(error="CL MIDI Network Assistant n’est pas installé"), 404
+        return jsonify(error="MIDI Network Assistant est introuvable. CL Audio Show Control reste disponible."), 404
     subprocess.Popen(["/usr/bin/open", str(assistant)])
-    event("Diagnostic RTP ouvert depuis Show Control")
-    return jsonify(message="Diagnostic RTP ouvert")
+    event("MIDI Network Assistant ouvert depuis Show Control")
+    return jsonify(message="MIDI Network Assistant ouvert")
 
 @app.route("/quit")
 def quit_launcher():

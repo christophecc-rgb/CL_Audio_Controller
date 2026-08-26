@@ -30,7 +30,8 @@ static NSString *CLArgument(NSString *command, NSString *name) {
     NSMutableSet *sourceNames = [NSMutableSet set], *destinationNames = [NSMutableSet set];
     for (NSDictionary *endpoint in endpoints) { NSString *name = endpoint[@"name"] ?: @""; if ([endpoint[@"direction"] isEqualToString:@"source"]) [sourceNames addObject:name]; else [destinationNames addObject:name]; }
     BOOL endpointOK = expectedEndpoint.length && [sourceNames containsObject:expectedEndpoint] && [destinationNames containsObject:expectedEndpoint];
-    [items addObject:CLItem(!expectedEndpoint.length ? CLCheckLevelInfo : (endpointOK ? CLCheckLevelOK : CLCheckLevelError), @"CoreMIDI", @"Endpoint RTP local", expectedEndpoint, !expectedEndpoint.length ? @"Non défini dans le profil" : (endpointOK ? expectedEndpoint : @"Absent comme paire entrée/sortie"), @"Une source et une destination CoreMIDI de même nom constituent la paire normale d’une session RTP-MIDI.", @"Sélectionner dans Configuration audio et MIDI l’endpoint RTP local défini par ce profil.")];
+    NSString *endpointActual = endpointOK ? expectedEndpoint : [NSString stringWithFormat:@"Attendu « %@ » · sources trouvées [%@] · destinations trouvées [%@] · direction manquante %@", expectedEndpoint, [[sourceNames allObjects] componentsJoinedByString:@", "], [[destinationNames allObjects] componentsJoinedByString:@", "], ![sourceNames containsObject:expectedEndpoint] ? @"source" : @"destination"];
+    [items addObject:CLItem(!expectedEndpoint.length ? CLCheckLevelInfo : (endpointOK ? CLCheckLevelOK : CLCheckLevelError), @"CoreMIDI", @"Endpoint RTP local", expectedEndpoint, !expectedEndpoint.length ? @"Non défini dans le profil" : endpointActual, @"Le nom de session RTP et le nom d’endpoint CoreMIDI peuvent différer. Les routages actifs Source/Destination sur Aucun sont normaux et sûrs.", @"Vérifier le nom réellement publié et la direction manquante, sans sélectionner Bus 1 dans les routages actifs RTP.")];
     for (NSString *name in @[@"Gestionnaire IAC Bus 1", @"CL MIDI Return Test"]) if ([sourceNames containsObject:name] || [destinationNames containsObject:name]) [items addObject:CLItem(CLCheckLevelOK, @"CoreMIDI", name, name, name, @"Endpoint local détecté.", @"")];
 
     NSString *sessionExpected = expectedRTP[@"local_session_name"] ?: @"", *sessionActual = actualRTP[@"local_session_name"] ?: @"";
@@ -74,6 +75,10 @@ static NSString *CLArgument(NSString *command, NSString *name) {
 
     NSDictionary *status = inspection[@"server_status"] ?: @{};
     if (server) {
+        NSString *abletonMode = status[@"ableton_mode"] ?: @"Local";
+        NSString *roleExpected = status[@"midi_expected_source"] ?: @"";
+        NSString *roleReturned = status[@"midi_returned_source"] ?: @"";
+        [items addObject:CLItem(CLCheckLevelOK, @"Moniteurs MIDI", @"Connexion Ableton OSC", abletonMode, [NSString stringWithFormat:@"%@ · expected %@ · returned %@", abletonMode, roleExpected, roleReturned], @"Cette commande est l’unique source de vérité des rôles MIDI.", @"")];
         NSString *mode = status[@"console_return_mode"] ?: @"", *source = status[@"console_return_source"] ?: @""; NSDictionary *expectedReturn = values[@"console_return"] ?: @{};
         BOOL returnOK = status.count && (![expectedReturn[@"mode"] length] || [mode isEqualToString:expectedReturn[@"mode"]]) && (![expectedReturn[@"source"] length] || [source isEqualToString:expectedReturn[@"source"]]);
         [items addObject:CLItem(returnOK ? CLCheckLevelOK : CLCheckLevelError, @"Retour console", @"État serveur /status", [NSString stringWithFormat:@"mode %@ · source %@", expectedReturn[@"mode"], expectedReturn[@"source"]], status.count ? [NSString stringWithFormat:@"mode %@ · source %@", mode, source] : @"Serveur indisponible", @"Lecture non destructive de l’état expected / returned publié par le serveur.", @"Vérifier le serveur et la source de retour configurée.")];

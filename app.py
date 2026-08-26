@@ -130,6 +130,7 @@ CONSOLE_TITLE_OFFSET_MIN = -5
 CONSOLE_TITLE_OFFSET_MAX = 5
 CONSOLE_TITLE_OFFSETS_PATH = DEFAULT_CONFIG_PATH.with_name("console-title-offsets.json")
 MIDI_RETURN_VISUAL_TIMEOUT_SECONDS = 2.0
+MIDI_REMOTE_RETURN_TIMESTAMP_TOLERANCE_SECONDS = 0.005
 
 
 def console_visual_state(validation_status: str, expected_activated_at: Any,
@@ -145,6 +146,15 @@ def console_visual_state(validation_status: str, expected_activated_at: Any,
     if status in ("confirmed", "mismatch"):
         return status
     return "idle"
+
+
+def ableton_midi_roles(target_mode: str) -> Dict[str, str]:
+    """Rôles MIDI dérivés exclusivement de Connexion Ableton OSC."""
+    if str(target_mode) == "remote":
+        return {"mode": "Ableton distant", "expected_source": "Réseau Rtp MB Chris",
+                "returned_source": "local_simulator_tx"}
+    return {"mode": "Local", "expected_source": "Gestionnaire IAC Bus 1",
+            "returned_source": "Réseau Rtp MB Chris"}
 
 
 def load_console_title_mode(path: Path = CONSOLE_TITLE_PREFERENCES_PATH) -> str:
@@ -960,6 +970,10 @@ def state_snapshot_locked() -> Dict[str, Any]:
     snapshot["started_at"] = SERVER_STARTED_AT
     snapshot["uptime_ms"] = int((time.monotonic() - SERVER_STARTED_MONOTONIC) * 1000)
     snapshot["ableton_target"] = ableton_target.to_dict()
+    midi_roles = ableton_midi_roles(ableton_target.mode)
+    snapshot["ableton_mode"] = midi_roles["mode"]
+    snapshot["midi_expected_source"] = midi_roles["expected_source"]
+    snapshot["midi_returned_source"] = midi_roles["returned_source"]
     snapshot["osc_transport"] = ableton_transport.diagnostics()
     snapshot["console_scene_map"] = state.get("console_scene_map") or {"cl5": {}, "ql1": {}}
     title_mode = str(state.get("console_title_mode") or "imported_library")
@@ -1039,11 +1053,33 @@ def state_snapshot_locked() -> Dict[str, Any]:
                 == "Gestionnaire IAC Bus 1"
                 and int(midi_console.get("expected_monitor_status", -1)) == 0
             )
+            remote_midi_mode = (
+                ableton_target.mode == "remote" and "local_simulator_tx" in console_state
+            )
+            if remote_midi_mode:
+                # Le redémarrage transactionnel provoqué par le changement de
+                # Connexion Ableton OSC constitue une frontière de génération.
+                expected_midi_program = (
+                    console_midi_program if received_at >= SERVER_STARTED_AT else None
+                )
+                expected_program_source = "ableton_remote_rtp_input" if console_midi_program is not None else "unavailable"
+                console_expected_activated_at = float(received_at or expected_activated_at)
+                simulator_tx = dict(console_state.get("local_simulator_tx") or {})
+                console_midi_program = simulator_tx.get("midi_program")
+                received_at = float(simulator_tx.get("timestamp") or 0)
+                if received_at < SERVER_STARTED_AT:
+                    console_midi_program = None
+                    received_at = 0
+                monitor_title = str(simulator_tx.get("title") or monitor_title).strip()
+            else:
+                expected_midi_program = None
+                expected_program_source = "unavailable"
+                console_expected_activated_at = expected_activated_at
             # Vérité canonique EXPECTED :
             # uniquement le Program Change réellement observé sur l'IAC.
             # Les intentions M4L et noms de clips Ableton ne doivent jamais
             # se faire passer pour un Program Change effectivement émis.
-            if (
+            if not remote_midi_mode and (
                 native_iac_monitor_ready
                 and native_iac_program is not None
                 and native_iac_source == "ableton_iac_output"
@@ -1054,9 +1090,10 @@ def state_snapshot_locked() -> Dict[str, Any]:
                     console_state.get("expected_activated_at") or expected_activated_at
                 )
             else:
-                expected_midi_program = None
-                expected_program_source = "unavailable"
-                console_expected_activated_at = expected_activated_at
+                if not remote_midi_mode:
+                    expected_midi_program = None
+                    expected_program_source = "unavailable"
+                    console_expected_activated_at = expected_activated_at
             expected_program = (
                 int(expected_midi_program) + 1
                 if expected_midi_program is not None else None
@@ -1081,8 +1118,12 @@ def state_snapshot_locked() -> Dict[str, Any]:
                 " · ".join(filter(None, [str(library_info.get("source_format") or "Bibliothèque importée"),
                                           str(library_info.get("source_name") or "")]))
             )
+            return_timestamp_floor = console_expected_activated_at
+            if remote_midi_mode:
+                return_timestamp_floor -= MIDI_REMOTE_RETURN_TIMESTAMP_TOLERANCE_SECONDS
+
             return_after_intent = bool(
-                return_recent and received_at >= console_expected_activated_at
+                return_recent and received_at >= return_timestamp_floor
             )
             confirmed = bool(
                 expected_midi_program is not None
@@ -1115,6 +1156,12 @@ def state_snapshot_locked() -> Dict[str, Any]:
             console_state["title_offset"] = expected_resolution["title_offset"]
             console_state["expected_scene_index"] = active_scene if active_scene >= 0 else None
             console_state["expected_generation"] = int(snapshot.get("set_generation", 0))
+            console_state["request_identity"] = "%s:%s:%s" % (
+                ableton_target.mode, console_name, console_expected_activated_at,
+            )
+            console_state["ableton_mode"] = midi_roles["mode"]
+            console_state["expected_source"] = midi_roles["expected_source"]
+            console_state["returned_source"] = midi_roles["returned_source"]
             console_state["expected_activated_at"] = console_expected_activated_at
             console_state["expected_midi_program"] = expected_midi_program
             console_state["expected_program"] = expected_program

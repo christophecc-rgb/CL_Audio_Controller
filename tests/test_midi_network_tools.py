@@ -7,6 +7,11 @@ TOOLS = ROOT / "tools" / "cl_midi_network"
 
 
 class MidiNetworkToolsTests(unittest.TestCase):
+    def test_simulator_tx_is_published_only_as_explicit_return_source(self):
+        source = (ROOT / "tools" / "cl_midi_network" / "CLMIDINetworkDashboard.m").read_text()
+        self.assertIn('@"source": @"local_simulator_tx"', source)
+        self.assertIn('@"local_simulator_tx": self.lastCL5SimulatorTX', source)
+        self.assertIn('@"local_simulator_tx": self.lastQL1SimulatorTX', source)
     def test_guardian_uses_bonjour_and_coremidi(self):
         source = (TOOLS / "CLMIDINetworkGuardian.m").read_text()
         self.assertIn("MIDINetworkSession", source)

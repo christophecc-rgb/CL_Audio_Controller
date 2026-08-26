@@ -49,6 +49,13 @@ class MidiAnalyzerAppTests(unittest.TestCase):
         self.assertLess(core.index("eventHandler(event)"), core.index("commandsForEvent:event"))
         self.assertIn("initWithCommand:nil", app)
         self.assertIn("recordForEvent:event", app)
+        self.assertIn("eventsForPacket:event.packet", app)
+
+    def test_packet_parser_supports_message_boundaries_and_realtime(self):
+        model = (TOOLS / "CLMIDIAnalyzerModel.m").read_text(encoding="utf-8")
+        self.assertIn("CLMIDIAnalyzerMessageLength", model)
+        self.assertIn("byte >= 0xF8", model)
+        self.assertIn("runningStatus", model)
 
 
 if __name__ == "__main__":

@@ -3,6 +3,13 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+@interface CLMIDIAnalyzerPacketParser : NSObject
+
+- (NSArray<CLMIDIEvent *> *)eventsForPacket:(CLMIDIPacket *)packet;
+- (void)reset;
+
+@end
+
 @interface CLMIDIAnalyzerRecord : NSObject
 
 @property (nonatomic, strong, readonly) NSDate *receivedAt;

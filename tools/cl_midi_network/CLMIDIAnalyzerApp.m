@@ -1,5 +1,6 @@
 #import <AppKit/AppKit.h>
 #import "CLMIDIAnalyzerModel.h"
+#import "CLMIDICommandInterpreter.h"
 
 @interface CLMIDIAnalyzerAppDelegate : NSObject
     <NSApplicationDelegate, NSTableViewDataSource, NSTableViewDelegate, CLCommandTraceReceiver>
@@ -12,6 +13,8 @@
 @property (nonatomic, strong) NSPopUpButton *retentionButton;
 @property (nonatomic, strong) CLMIDICore *core;
 @property (nonatomic, strong) CLMIDIAnalyzerSession *session;
+@property (nonatomic, strong) CLMIDIAnalyzerPacketParser *packetParser;
+@property (nonatomic, strong) CLMIDICommandInterpreter *commandInterpreter;
 @property (nonatomic, strong) NSMutableArray<CLMIDIEvent *> *pendingEvents;
 @property (nonatomic, strong) NSMutableArray<CLCommand *> *pendingCommands;
 @property (nonatomic, strong) NSMutableArray<CLMIDIEvent *> *pendingCommandEvents;
@@ -25,6 +28,8 @@
 {
     (void)notification;
     self.session = [CLMIDIAnalyzerSession new];
+    self.packetParser = [CLMIDIAnalyzerPacketParser new];
+    self.commandInterpreter = [CLMIDICommandInterpreter new];
     self.pendingEvents = [NSMutableArray array];
     self.pendingCommands = [NSMutableArray array];
     self.pendingCommandEvents = [NSMutableArray array];
@@ -179,12 +184,12 @@
 {
     (void)sender;
     if (self.core != nil) return;
+    self.commandInterpreter = [CLMIDICommandInterpreter new];
     self.core = [CLMIDICore new];
     __weak typeof(self) weakSelf = self;
     self.core.eventHandler = ^(CLMIDIEvent *event) {
         [weakSelf receiveEvent:event];
     };
-    self.core.commandReceiver = self;
     if (![self.core startMonitoring])
     {
         self.core = nil;
@@ -203,6 +208,7 @@
     self.core.eventHandler = nil;
     [self.core stopMonitoring];
     self.core = nil;
+    [self.packetParser reset];
     self.statusLabel.stringValue = @"Stopped";
     self.startButton.enabled = YES;
     self.stopButton.enabled = NO;
@@ -268,7 +274,15 @@
 {
     @synchronized (self)
     {
-        [self.pendingEvents addObject:event];
+        for (CLMIDIEvent *messageEvent in [self.packetParser eventsForPacket:event.packet])
+        {
+            [self.pendingEvents addObject:messageEvent];
+            for (CLCommand *command in [self.commandInterpreter commandsForEvent:messageEvent])
+            {
+                [self.pendingCommands addObject:command];
+                [self.pendingCommandEvents addObject:messageEvent];
+            }
+        }
         [self scheduleFlushLocked];
     }
 }
