@@ -23,6 +23,100 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# === CL COMPLETE DESKTOP KIT HELPERS ===
+
+sign_universal_binary() {
+  local binary="$1"
+  local temp_dir
+  temp_dir="$(mktemp -d "$BUILD_ROOT/sign-fat.XXXXXX")"
+
+  /usr/bin/lipo "$binary" -thin arm64 -output "$temp_dir/arm64"
+  /usr/bin/lipo "$binary" -thin x86_64 -output "$temp_dir/x86_64"
+
+  /usr/bin/codesign --force --sign - "$temp_dir/arm64"
+  /usr/bin/codesign --force --sign - "$temp_dir/x86_64"
+
+  /usr/bin/lipo -create \
+    "$temp_dir/arm64" \
+    "$temp_dir/x86_64" \
+    -output "$temp_dir/universal"
+
+  /usr/bin/codesign --force --sign - "$temp_dir/universal"
+  /usr/bin/ditto "$temp_dir/universal" "$binary"
+  chmod +x "$binary"
+
+  rm -rf "$temp_dir"
+  /usr/bin/codesign --verify --strict "$binary"
+}
+
+verify_universal() {
+  local binary="$1"
+  local archs
+  archs="$(/usr/bin/lipo -archs "$binary")"
+
+  [[ "$archs" == *arm64* && "$archs" == *x86_64* ]] || {
+    echo "Binaire non universel : $binary ($archs)" >&2
+    return 1
+  }
+}
+
+make_native_app() {
+  local source_binary="$1"
+  local app_path="$2"
+  local executable_name="$3"
+  local display_name="$4"
+  local bundle_id="$5"
+  local icon_path="${6:-}"
+
+  rm -rf "$app_path"
+  mkdir -p "$app_path/Contents/MacOS" "$app_path/Contents/Resources"
+
+  # Le fat binary doit être préparé/signé AVANT son entrée dans le bundle.
+  # Une resignature depuis Contents/MacOS fait considérer le binaire comme
+  # l'exécutable principal d'un bundle encore non scellé.
+  verify_universal "$source_binary"
+  sign_universal_binary "$source_binary"
+
+  /usr/bin/ditto "$source_binary" \
+    "$app_path/Contents/MacOS/$executable_name"
+  chmod +x "$app_path/Contents/MacOS/$executable_name"
+
+  if [[ -n "$icon_path" && -f "$icon_path" ]]; then
+    /usr/bin/ditto "$icon_path" \
+      "$app_path/Contents/Resources/CL_AUDIO.icns"
+  fi
+
+  cat > "$app_path/Contents/Info.plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+ "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleDisplayName</key><string>$display_name</string>
+<key>CFBundleExecutable</key><string>$executable_name</string>
+<key>CFBundleIdentifier</key><string>$bundle_id</string>
+<key>CFBundleName</key><string>$display_name</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>CFBundleShortVersionString</key><string>$VERSION</string>
+<key>CFBundleVersion</key><string>1</string>
+<key>LSMinimumSystemVersion</key><string>10.15</string>
+<key>NSHighResolutionCapable</key><true/>
+EOF
+
+  if [[ -n "$icon_path" && -f "$icon_path" ]]; then
+    echo '<key>CFBundleIconFile</key><string>CL_AUDIO.icns</string>' \
+      >> "$app_path/Contents/Info.plist"
+  fi
+
+  cat >> "$app_path/Contents/Info.plist" <<EOF
+</dict></plist>
+EOF
+
+  /usr/bin/plutil -lint "$app_path/Contents/Info.plist" >/dev/null
+  /usr/bin/xattr -cr "$app_path"
+  /usr/bin/codesign --force --sign - "$app_path"
+  /usr/bin/codesign --verify --deep --strict "$app_path"
+}
+
 if [[ -e "$RELEASE_DIR" ]]; then
   echo "Refus d'écraser une distribution existante : $RELEASE_DIR" >&2
   exit 1
@@ -82,6 +176,64 @@ ditto "$M4L_SOURCE" "$KIT_ROOT/Max for Live à installer"
 ditto "$MIDI_DEVICE_SOURCE" "$KIT_ROOT/Max for Live à installer/CL MIDI Console Monitor"
 
 "$MIDI_TOOLS_SOURCE/build.sh" "$BUILD_ROOT/midi-tools"
+
+# === CL COMPLETE DESKTOP KIT APPS ===
+echo
+echo "========== APPLICATIONS DESKTOP SUPPLÉMENTAIRES =========="
+
+REMOTE_BUILD_DIR="$BUILD_ROOT/remote-native"
+mkdir -p "$REMOTE_BUILD_DIR"
+
+clang \
+  -arch arm64 \
+  -arch x86_64 \
+  -mmacosx-version-min=10.15 \
+  -fobjc-arc \
+  -framework Cocoa \
+  -framework WebKit \
+  "$PACKAGING_SOURCE/RemoteAbleton.m" \
+  -o "$REMOTE_BUILD_DIR/RemoteAbleton"
+
+make_native_app \
+  "$REMOTE_BUILD_DIR/RemoteAbleton" \
+  "$KIT_ROOT/RemoteAbleton.app" \
+  "RemoteAbleton" \
+  "Télécommande Ableton" \
+  "com.claudio.ableton-remote" \
+  "$PROJECT_ROOT/CL_AUDIO.icns"
+
+make_native_app \
+  "$BUILD_ROOT/midi-tools/CLMIDIAnalyzer" \
+  "$KIT_ROOT/CL MIDI Analyzer.app" \
+  "CLMIDIAnalyzer" \
+  "CL MIDI Analyzer" \
+  "com.claudio.midi-analyzer" \
+  "$PROJECT_ROOT/CL_AUDIO.icns"
+
+make_native_app \
+  "$BUILD_ROOT/midi-tools/CLMIDIPerformanceMonitor" \
+  "$KIT_ROOT/CL MIDI Performance Monitor.app" \
+  "CLMIDIPerformanceMonitor" \
+  "CL MIDI Performance Monitor" \
+  "com.claudio.midi-performance-monitor" \
+  "$PROJECT_ROOT/CL_AUDIO.icns"
+
+make_native_app \
+  "$BUILD_ROOT/midi-tools/CLAudioConfigurationChecker" \
+  "$KIT_ROOT/CL Audio Configuration Checker.app" \
+  "CLAudioConfigurationChecker" \
+  "CL Audio Configuration Checker" \
+  "com.claudio.configurationchecker" \
+  "$PROJECT_ROOT/CL_AUDIO.icns"
+
+for binary in \
+  "$KIT_ROOT/RemoteAbleton.app/Contents/MacOS/RemoteAbleton" \
+  "$KIT_ROOT/CL MIDI Analyzer.app/Contents/MacOS/CLMIDIAnalyzer" \
+  "$KIT_ROOT/CL MIDI Performance Monitor.app/Contents/MacOS/CLMIDIPerformanceMonitor" \
+  "$KIT_ROOT/CL Audio Configuration Checker.app/Contents/MacOS/CLAudioConfigurationChecker"
+do
+  verify_universal "$binary"
+done
 mkdir -p \
   "$KIT_ROOT/CL MIDI Network Tools" \
   "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/MacOS" \

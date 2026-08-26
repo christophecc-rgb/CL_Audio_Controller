@@ -88,6 +88,7 @@ REMOTE_AB_URL = f"http://127.0.0.1:{WEB_PORT}/ab"
 REMOTE_ARRANGEMENT_URL = f"http://127.0.0.1:{WEB_PORT}/arrangement"
 REMOTE_ROOT_LAN_URL = lambda: f"http://{get_lan_ip()}:{WEB_PORT}/"
 REMOTE_APP_NAME = "Télécommande Ableton.app"
+REMOTE_APP_INTERNAL_NAME = "RemoteAbleton.app"
 server_ownership_lock = threading.RLock()
 server_lifecycle_lock = threading.RLock()
 owned_server = None
@@ -556,18 +557,21 @@ def find_remote_app():
     candidates = []
 
     # Mode développement : depuis le dossier projet
+    candidates.append(ROOT / "dist" / REMOTE_APP_INTERNAL_NAME)
     candidates.append(ROOT / "dist" / REMOTE_APP_NAME)
 
     # Mode app PyInstaller : app télécommande placée à côté du panneau dans dist/
     try:
         exe = Path(sys.executable).resolve()
         control_app = exe.parents[2]
+        candidates.append(control_app.parent / REMOTE_APP_INTERNAL_NAME)
         candidates.append(control_app.parent / REMOTE_APP_NAME)
     except Exception:
         pass
 
     # Mode pack zip : app télécommande placée à côté du panneau dans le même dossier
     try:
+        candidates.append(Path.cwd() / REMOTE_APP_INTERNAL_NAME)
         candidates.append(Path.cwd() / REMOTE_APP_NAME)
     except Exception:
         pass
@@ -1248,13 +1252,238 @@ details[open] summary::before{transform:rotate(90deg)}
 .local{height:30px;border:0;background:transparent;color:#91a9cb;font-size:11px;cursor:pointer}
 .stop{height:30px;padding:0 11px;border-radius:8px;border:1px solid rgba(217,88,88,.42);background:rgba(217,88,88,.10);color:#e68b8b;font-size:11px;cursor:pointer}
 .footer{font-size:9px;color:#707784;letter-spacing:.05em;text-align:center}
-body.show-mode .secondary-actions,body.show-mode details,body.show-mode .bottom,body.show-mode .network-card,body.show-mode .action-status{display:none}
-body.show-mode .app{justify-content:center;max-height:430px;max-width:600px}
-body.show-mode .topbar{grid-template-columns:190px 1fr}
-body.show-mode .brand{height:72px}
-body.show-mode .system{min-height:78px}
-body.show-mode .state-time,body.show-mode .system-ltc{font-size:22px}
-body.show-mode .show-toggle{border-color:rgba(229,166,59,.72);background:rgba(229,166,59,.18);color:#f3ce85}
+#cl5Return{--console-color:#c09af2;--console-accent:#9b6bd6}
+#ql1Return{--console-color:#70d386;--console-accent:#3f9b59}
+.console-return .console-name,
+.console-return .console-program{color:var(--console-color)}
+
+.console-return{
+  display:grid;
+  grid-template-columns:auto 1fr;
+  grid-template-rows:auto auto auto auto;
+  align-items:baseline;
+}
+
+.console-name{
+  grid-column:1;
+  grid-row:1;
+  font-size:18px;
+  line-height:20px;
+  font-weight:900;
+  letter-spacing:.04em;
+}
+
+.console-program{
+  grid-column:2;
+  grid-row:1;
+  justify-self:end;
+  margin:0;
+  font-size:18px;
+  line-height:20px;
+  font-weight:900;
+}
+
+.console-title{
+  grid-column:1 / -1;
+  grid-row:2;
+  margin-top:4px;
+  color:#b8cbe3;
+  font-size:12.5px;
+  line-height:16px;
+  font-weight:750;
+}
+
+.console-state{
+  grid-column:1 / -1;
+  grid-row:3;
+}
+
+.console-meta{
+  grid-column:1 / -1;
+  grid-row:4;
+}
+
+.save-network{
+  border-color:rgba(67,200,111,.72)!important;
+  background:linear-gradient(180deg,rgba(67,200,111,.34),rgba(38,139,75,.26))!important;
+  color:#a8f0bd!important;
+  box-shadow:0 5px 14px rgba(43,180,89,.18)!important;
+}
+
+.save-network:hover{
+  filter:brightness(1.16);
+}
+
+.network-card > .ltc-destination{
+  margin-top:6px;
+}
+
+body.show-mode .secondary-actions,
+body.show-mode details,
+body.show-mode .bottom,
+body.show-mode .content-grid,
+body.show-mode .action-status,
+body.show-mode .console-config,
+body.show-mode .console-head,
+body.show-mode .console-state,
+body.show-mode .console-meta{display:none!important}
+
+body.show-mode .app{
+  justify-content:flex-start;
+  width:100%;
+  max-width:600px;
+  max-height:none;
+  overflow:hidden;
+}
+
+body.show-mode .topbar{
+  display:grid!important;
+  grid-template-columns:160px 1fr!important;
+  gap:8px!important;
+  align-items:center;
+}
+
+body.show-mode .brand{
+  width:auto!important;
+  height:60px!important;
+}
+
+body.show-mode .product-row{
+  width:auto!important;
+  min-height:60px!important;
+}
+
+body.show-mode .product{
+  font-size:14px;
+}
+
+body.show-mode .show-toggle{
+  height:34px;
+  border-color:rgba(229,166,59,.72);
+  background:rgba(229,166,59,.18);
+  color:#f3ce85;
+}
+
+body.show-mode .system{
+  min-height:72px;
+}
+
+body.show-mode .state-time{
+  font-size:21px;
+}
+
+body.show-mode .system-ltc{
+  font-size:17px;
+}
+
+.show-current,
+.show-exit{
+  display:none;
+}
+
+body.show-mode .show-current{
+  display:block;
+  padding:12px 16px;
+  border-color:#b98439;
+  background:linear-gradient(145deg,rgba(185,132,57,.16),#15191f);
+  text-align:center;
+}
+
+.show-current-label{
+  color:#d5a954;
+  font-size:10px;
+  font-weight:850;
+  letter-spacing:.16em;
+}
+
+.show-current-title{
+  margin-top:5px;
+  color:#f2d17e;
+  font-size:22px;
+  line-height:1.15;
+  font-weight:900;
+}
+
+.show-current-remaining{
+  margin-top:6px;
+  color:#b9bec7;
+  font-size:13px;
+  line-height:16px;
+  font-weight:700;
+}
+
+body.show-mode #showMode{
+  display:none;
+}
+
+body.show-mode .show-exit{
+  display:block;
+  width:100%;
+  min-height:38px;
+  margin-top:auto;
+  border:1px solid rgba(229,166,59,.72);
+  border-radius:9px;
+  background:rgba(229,166,59,.18);
+  color:#f3ce85;
+  font-size:11px;
+  font-weight:800;
+  cursor:pointer;
+}
+
+body.show-mode .console-card{
+  padding:8px;
+  border-color:#38414e;
+  background:linear-gradient(145deg,#1b2028,#15191f);
+}
+
+body.show-mode .console-grid{
+  grid-template-columns:1fr 1fr;
+  gap:7px;
+}
+
+body.show-mode .console-return{
+  height:62px;
+  padding:7px 10px;
+  display:grid;
+  grid-template-columns:auto 1fr;
+  grid-template-rows:22px 18px;
+  align-items:baseline;
+  border-color:var(--console-accent);
+  background:#15181d;
+}
+
+body.show-mode .console-name{
+  grid-column:1;
+  grid-row:1;
+  font-size:18px;
+  line-height:20px;
+  font-weight:900;
+  letter-spacing:.04em;
+}
+
+body.show-mode .console-program{
+  grid-column:2;
+  grid-row:1;
+  justify-self:end;
+  margin:0;
+  font-size:18px;
+  line-height:20px;
+  font-weight:900;
+}
+
+body.show-mode .console-program-label{
+  display:none;
+}
+
+body.show-mode .console-title{
+  grid-column:1 / -1;
+  grid-row:2;
+  margin:2px 0 0;
+  color:#b8cbe3;
+  font-size:12.5px;
+  line-height:16px;
+  font-weight:750;
+}
 @media(max-width:520px){
   .app{width:100%;max-width:100%;gap:7px;padding:7px}
   .topbar{display:flex;flex-direction:column;gap:8px}
@@ -1277,6 +1506,12 @@ body.show-mode .show-toggle{border-color:rgba(229,166,59,.72);background:rgba(22
     <span class="dot"></span>
     <div><div id="stateTitle" class="state-title">VÉRIFICATION…</div><div id="stateDetail" class="state-detail">Contrôle des services en cours</div></div>
     <div class="system-side"><span id="stateTime" class="state-time">—</span><span id="systemLtc" class="system-ltc offline">--:--:--:--</span></div>
+  </section>
+
+  <section class="card show-current">
+    <div class="show-current-label">EN COURS · LECTURE SESSION</div>
+    <div id="showCurrentTitle" class="show-current-title">—</div>
+    <div id="showCurrentRemaining" class="show-current-remaining">Temps restant · --:--</div>
   </section>
 
   <div class="command-row">
@@ -1314,12 +1549,12 @@ body.show-mode .show-toggle{border-color:rgba(229,166,59,.72);background:rgba(22
         <label>Mode<select id="abletonMode" onchange="updateNetworkFields()"><option value="local">Local</option><option value="remote">Ableton distant</option></select></label>
         <label>Adresse Ableton<input id="abletonHost" value="127.0.0.1"></label>
         <div class="ports-readonly"><span>Ports AbletonOSC fixes</span><strong><span id="abletonSendPort">11000</span> → <span id="abletonReplyPort">11001</span></strong></div>
-        <div class="ltc-destination" role="button" tabindex="0" onclick="copyLtcDestination()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();copyLtcDestination();}"><span id="ltcDestinationLabel">Destination LTC Display v2 · cliquer pour copier</span><strong id="ltcDestination">127.0.0.1:63123</strong></div>
       </div>
       <div class="network-buttons">
-        <button class="action" onclick="saveNetworkConfig()">Appliquer</button>
+        <button class="action save-network" title="Appliquer et sauvegarder cette configuration" onclick="saveNetworkConfig()">Appliquer</button>
         <button class="action" onclick="testAbletonConnection()">Tester la connexion</button>
       </div>
+        <div class="ltc-destination" role="button" tabindex="0" onclick="copyLtcDestination()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();copyLtcDestination();}"><span id="ltcDestinationLabel">Destination LTC Display v2 · cliquer pour copier</span><strong id="ltcDestination">127.0.0.1:63123</strong></div>
     </section>
   </div>
 
@@ -1330,8 +1565,8 @@ body.show-mode .show-toggle{border-color:rgba(229,166,59,.72);background:rgba(22
       <div class="offset-control">QL1 · Offset titre <button class="offset-button" onclick="changeTitleOffset('ql1',-1)">−</button><strong id="ql1TitleOffset" class="offset-value">0</strong><button class="offset-button" onclick="changeTitleOffset('ql1',1)">+</button><button class="offset-button" onclick="changeTitleOffset('ql1',0,true)">0</button></div>
     </div>
     <div class="console-grid">
-      <div id="cl5Return" class="console-return waiting"><div class="console-name">CL5</div><div id="cl5Program" class="console-program">Mémoire —</div><div id="cl5Title" class="console-title">Titre console en attente</div><div id="cl5State" class="console-state">En attente du retour console</div><div id="cl5Meta" class="console-meta">Offset titre 0</div></div>
-      <div id="ql1Return" class="console-return waiting"><div class="console-name">QL1</div><div id="ql1Program" class="console-program">Mémoire —</div><div id="ql1Title" class="console-title">Titre console en attente</div><div id="ql1State" class="console-state">En attente du retour console</div><div id="ql1Meta" class="console-meta">Offset titre 0</div></div>
+      <div id="cl5Return" class="console-return waiting"><div class="console-name">CL5</div><div class="console-program"><span id="cl5Program">—</span></div><div id="cl5Title" class="console-title">Titre console en attente</div><div id="cl5State" class="console-state">En attente du retour console</div><div id="cl5Meta" class="console-meta">Offset titre 0</div></div>
+      <div id="ql1Return" class="console-return waiting"><div class="console-name">QL1</div><div class="console-program"><span id="ql1Program">—</span></div><div id="ql1Title" class="console-title">Titre console en attente</div><div id="ql1State" class="console-state">En attente du retour console</div><div id="ql1Meta" class="console-meta">Offset titre 0</div></div>
     </div>
   </section>
 
@@ -1351,6 +1586,7 @@ body.show-mode .show-toggle{border-color:rgba(229,166,59,.72);background:rgba(22
   </details>
 
   <div class="bottom"><button class="local" onclick="runAction('/local-page','Ouverture de la page locale')">↗ Page locale</button><button class="stop" onclick="confirmStop()">■ Arrêter…</button></div>
+  <button id="showModeExit" class="show-exit" onclick="toggleShowMode()">Quitter le mode spectacle</button>
   <div class="footer">CL AUDIO · SHOW CONTROL</div>
 </main>
 <script>
@@ -1363,6 +1599,28 @@ const consoleSignatures={cl5:null,ql1:null};
 const el=id=>document.getElementById(id);
 function setTech(id,on){el(id).className='tech-item '+(on?'on':'');}
 function setBusy(label){el('systemCard').className='card system busy';el('stateTitle').textContent=label.toUpperCase();el('stateDetail').textContent='Veuillez patienter…';}
+function cleanPlayingSceneName(value){
+  const raw=String(value||'').trim();
+  if(!raw||raw==='—')return 'Aucune scène en lecture';
+  return raw
+    .replace(/\s*;\s*BPM\s*;\s*KEY\s*;?.*$/i,'')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+
+function formatRemainingSeconds(value){
+  const seconds=Number(value);
+  if(!Number.isFinite(seconds)||seconds<0)return '--:--';
+  const rounded=Math.max(0,Math.ceil(seconds));
+  return Math.floor(rounded/60)+':'+String(rounded%60).padStart(2,'0');
+}
+
+function updateShowCurrent(state){
+  el('showCurrentTitle').textContent=cleanPlayingSceneName(state.playing_scene_name);
+  el('showCurrentRemaining').textContent=
+    'Temps restant · '+formatRemainingSeconds(state.remaining_seconds);
+}
+
 function render(s){
   latestState=s;const card=el('systemCard'),title=el('stateTitle'),detail=el('stateDetail');
   if(s.system_ready){card.className='card system ready';title.textContent='SYSTÈME PRÊT';detail.textContent='Serveur validé · Live Set prêt · OSC retour disponible';}
@@ -1372,6 +1630,7 @@ function render(s){
   else{card.className='card system error';title.textContent='SYSTÈME ARRÊTÉ';detail.textContent='Démarrez le serveur avant le spectacle';}
   const now=new Date();el('stateTime').textContent=now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
   el('remoteAddress').textContent=s.lan_url;el('localAddress').textContent=s.local_url.replace(/^https?:\/\//,'');
+  updateShowCurrent(s);
   setTech('techWeb',s.web);setTech('techOsc',s.osc);setTech('techReturn',s.ret);
   el('events').innerHTML=(s.events||[]).slice().reverse().join('<br>')||'Aucun événement récent.';
   el('orphanCard').className='card orphan '+(s.orphan_actions_available?'show':'');
@@ -1386,7 +1645,7 @@ function render(s){
   rtpBadge.className='rtp-badge '+(rtp.validated?'ok':(rtp.loop_detected?'error':''));
   const formatOffset=value=>Number(value||0).toLocaleString('fr-FR',{signDisplay:'exceptZero'});
   const offsets=s.console_title_offsets||{};el('cl5TitleOffset').textContent=formatOffset(offsets.cl5);el('ql1TitleOffset').textContent=formatOffset(offsets.ql1);
-  const renderConsole=(key,name,value)=>{value=value||{};const status=value.validation_status||'waiting',card=el(key+'Return');const signature=String(value.returned_scene_memory??'')+'|'+String(value.returned_title||'');if(consoleSignatures[key]!==null&&signature!==consoleSignatures[key]&&(value.returned_scene_memory!=null||value.returned_title)){card.classList.remove('recalled');void card.offsetWidth;card.classList.add('recalled');setTimeout(()=>card.classList.remove('recalled'),1900);}consoleSignatures[key]=signature;const visual=status==='confirmed'?'ok':status==='mismatch'?'mismatch':status==='stale'?'remembered':'waiting';card.className='console-return '+visual+(card.classList.contains('recalled')?' recalled':'');el(key+'Program').textContent='Mémoire '+(value.returned_scene_memory??'—');el(key+'Title').textContent=value.returned_title||'Titre console non résolu';el(key+'State').textContent=status==='confirmed'?'✓ Synchronisée':status==='mismatch'?'⚠ Divergence · attendu mémoire '+(value.expected_scene_memory??'—'):status==='stale'?'Retour MIDI ancien':status==='local_fallback'?'En attente du retour MIDI':'En attente du retour console';el(key+'Meta').textContent='Offset titre '+formatOffset(value.title_offset??offsets[key]??0)+(value.received_at?' · retour reçu':'');};
+  const renderConsole=(key,name,value)=>{value=value||{};const status=value.validation_status||'waiting',card=el(key+'Return');const signature=String(value.returned_scene_memory??'')+'|'+String(value.returned_title||'');if(consoleSignatures[key]!==null&&signature!==consoleSignatures[key]&&(value.returned_scene_memory!=null||value.returned_title)){card.classList.remove('recalled');void card.offsetWidth;card.classList.add('recalled');setTimeout(()=>card.classList.remove('recalled'),1900);}consoleSignatures[key]=signature;const visual=status==='confirmed'?'ok':status==='mismatch'?'mismatch':status==='stale'?'remembered':'waiting';card.className='console-return '+visual+(card.classList.contains('recalled')?' recalled':'');el(key+'Program').textContent=value.returned_scene_memory??'—';el(key+'Title').textContent=value.returned_title||'Titre console non résolu';el(key+'State').textContent=status==='confirmed'?'✓ Synchronisée':status==='mismatch'?'⚠ Divergence · attendu mémoire '+(value.expected_scene_memory??'—'):status==='stale'?'Retour MIDI ancien':status==='local_fallback'?'En attente du retour MIDI':'En attente du retour console';el(key+'Meta').textContent='Offset titre '+formatOffset(value.title_offset??offsets[key]??0)+(value.received_at?' · retour reçu':'');};
   renderConsole('cl5','CL5',cl5);renderConsole('ql1','QL1',ql1);
   const ltc=s.ltc_connected?s.ltc_timecode:'--:--:--:--';
   el('systemLtc').textContent=ltc;el('systemLtc').className='system-ltc'+(s.ltc_connected?'':' offline');
@@ -1462,7 +1721,7 @@ async function toggleShowMode(){
 }
 ['abletonHost'].forEach(id=>el(id).addEventListener('input',markNetworkDraftDirty));
 let telemetryBusy=false;
-async function refreshTelemetry(){if(telemetryBusy)return;telemetryBusy=true;try{const t=await(await fetch('/telemetry')).json();const ltc=t.ltc_connected?t.ltc_timecode:'--:--:--:--';el('systemLtc').textContent=ltc;el('systemLtc').className='system-ltc'+(t.ltc_connected?'':' offline');el('networkLtc').textContent=ltc;el('networkLtc').className='network-timecode'+(t.ltc_connected?'':' offline');}catch(e){}finally{telemetryBusy=false;}}
+async function refreshTelemetry(){if(telemetryBusy)return;telemetryBusy=true;try{const t=await(await fetch('/telemetry')).json();const ltc=t.ltc_connected?t.ltc_timecode:'--:--:--:--';el('systemLtc').textContent=ltc;el('systemLtc').className='system-ltc'+(t.ltc_connected?'':' offline');el('networkLtc').textContent=ltc;el('networkLtc').className='network-timecode'+(t.ltc_connected?'':' offline');updateShowCurrent(t);}catch(e){}finally{telemetryBusy=false;}}
 refresh();refreshTelemetry();setInterval(refresh,1500);setInterval(refreshTelemetry,100);
 </script>
 </body>
@@ -1562,7 +1821,9 @@ def state():
         ableton_server_target=remote_state.get("ableton_target"),
         network_config_error=network_config_error,
         osc_transport=remote_state.get("osc_transport"),
+        playing_scene=remote_state.get("playing_scene"),
         playing_scene_name=remote_state.get("playing_scene_name"),
+        remaining_seconds=remote_state.get("remaining_seconds"),
         ltc_connected=remote_state.get("ltc_connected", False),
         ltc_timecode=remote_state.get("ltc_timecode", "--:--:--:--"),
         ltc_destination=ltc_destination,
@@ -1642,6 +1903,9 @@ def telemetry():
     return jsonify(
         ltc_connected=bool(remote_state.get("ltc_connected")),
         ltc_timecode=remote_state.get("ltc_timecode", "--:--:--:--"),
+        playing_scene=remote_state.get("playing_scene"),
+        playing_scene_name=remote_state.get("playing_scene_name"),
+        remaining_seconds=remote_state.get("remaining_seconds"),
     )
 
 

@@ -168,6 +168,26 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('connectPeerThroughSystem:peer automatic:NO', connect_method)
         self.assertNotIn('pkill', source)
 
+    def test_dashboard_return_monitor_decodes_rtp_running_status_and_timestamps_each_event(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        callback = source.split("static void CLPassiveReturnRead", 1)[1].split(
+            "static NSString *CLMidiAgeDescription", 1
+        )[0]
+        recorder = source.rsplit(
+            "- (void)queueReturnedProgram:(UInt8)program channel:(UInt8)channel receivedAt:(NSDate *)receivedAt {", 1
+        )[1].split("- (void)queueExpectedProgram:", 1)[0]
+
+        self.assertIn("UInt8 runningStatus = delegate.returnRunningStatus", callback)
+        self.assertIn("if (byte >= 0xF8) continue", callback)
+        self.assertIn("runningStatus = byte < 0xF0 ? byte : 0", callback)
+        self.assertIn("(runningStatus & 0xF0) == 0xC0", callback)
+        self.assertIn("receivedAt:NSDate.date", callback)
+        self.assertIn("delegate.returnRunningStatus = runningStatus", callback)
+        self.assertIn("NSDate *eventAt = receivedAt ?: NSDate.date", recorder)
+        self.assertIn("self.lastCL5ProgramAt = eventAt", recorder)
+        self.assertIn("self.lastQL1ProgramAt = eventAt", recorder)
+        self.assertIn("[self writeConsoleReturnState]", recorder)
+
     def test_generic_round_trip_is_unreachable_and_hidden_in_local_mode(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
         run_test = source.split('- (void)runTest:', 1)[1].split('- (void)openMidiSetup:', 1)[0]

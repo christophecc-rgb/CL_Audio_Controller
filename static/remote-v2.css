@@ -736,10 +736,15 @@ body.is-arrangement-playing .card.current::after {
     text-overflow: ellipsis !important;
   }
 
-  .v2-app[data-module="session"] .scene-countdown,
-  .v2-app[data-module="session"] .selected-duration {
+  .v2-app[data-module="session"] .scene-countdown {
     margin-top: 4px !important;
     font-size: 13px !important;
+    line-height: 1 !important;
+  }
+
+  .v2-app[data-module="session"] .selected-duration {
+    margin-top: 4px !important;
+    font-size: 18px !important;
     line-height: 1 !important;
   }
 

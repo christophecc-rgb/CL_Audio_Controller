@@ -233,10 +233,11 @@ static BOOL CLPostDoubleClickFromConnectorReason(NSString *reason) {
 @property NSDictionary *lastCL5SimulatorTX;
 @property NSDictionary *lastQL1SimulatorTX;
 @property UInt8 expectedRunningStatus;
+@property UInt8 returnRunningStatus;
 @property NSUInteger sceneTitleTraceSequence;
 @property NSUInteger cl5SceneTitleLookupGeneration;
 @property NSUInteger ql1SceneTitleLookupGeneration;
-- (void)queueReturnedProgram:(UInt8)program channel:(UInt8)channel;
+- (void)queueReturnedProgram:(UInt8)program channel:(UInt8)channel receivedAt:(NSDate *)receivedAt;
 - (void)queueExpectedProgram:(UInt8)program channel:(UInt8)channel;
 - (void)resolveSceneTitleForMIDIProgram:(NSInteger)midiProgram channel:(UInt8)channel;
 - (void)updateConsoleReturnCards;
@@ -342,20 +343,27 @@ static void CLPassiveExpectedRead(const MIDIPacketList *packetList, void *readPr
 static void CLPassiveReturnRead(const MIDIPacketList *packetList, void *readProcRefCon, void *srcConnRefCon) {
     (void)srcConnRefCon;
     CLNetworkDelegate *delegate = (__bridge CLNetworkDelegate *)readProcRefCon;
+    UInt8 runningStatus = delegate.returnRunningStatus;
     const MIDIPacket *packet = &packetList->packet[0];
     for (UInt32 packetIndex = 0; packetIndex < packetList->numPackets; packetIndex++) {
         UInt16 index = 0;
         while (index < packet->length) {
-            UInt8 status = packet->data[index];
-            if ((status & 0xF0) == 0xC0 && index + 1 < packet->length) {
-                [delegate queueReturnedProgram:packet->data[index + 1] channel:(status & 0x0F) + 1];
-                index += 2;
-            } else {
-                index += 1;
+            UInt8 byte = packet->data[index++];
+            if (byte >= 0xF8) continue; // MIDI realtime n'annule jamais le running status.
+            if (byte & 0x80) {
+                runningStatus = byte < 0xF0 ? byte : 0;
+                continue;
+            }
+            if ((runningStatus & 0xF0) == 0xC0) {
+                UInt8 channel = (runningStatus & 0x0F) + 1;
+                if (channel == 1 || channel == 2) {
+                    [delegate queueReturnedProgram:byte channel:channel receivedAt:NSDate.date];
+                }
             }
         }
         packet = MIDIPacketNext(packet);
     }
+    delegate.returnRunningStatus = runningStatus;
 }
 
 static NSString *CLMidiAgeDescription(NSTimeInterval age) {
@@ -1267,7 +1275,7 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     [self writeConsoleReturnState];
 }
 
-- (void)queueReturnedProgram:(UInt8)program channel:(UInt8)channel {
+- (void)queueReturnedProgram:(UInt8)program channel:(UInt8)channel receivedAt:(NSDate *)receivedAt {
     if (channel < 1 || channel > 16) return;
     dispatch_async(dispatch_get_main_queue(), ^{ [self recordSimulatorProgram:program channel:channel]; });
     if (channel != 1 && channel != 2) {
@@ -1276,13 +1284,14 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     [self traceSceneTitleEvent:@"midi-callback" midiProgram:program channel:channel
                   lookupIndex:program receivedName:nil resolvedName:nil];
     dispatch_async(dispatch_get_main_queue(), ^{
+        NSDate *eventAt = receivedAt ?: NSDate.date;
         if (channel == 1) {
             self.lastCL5Program = program;
-            self.lastCL5ProgramAt = [NSDate date];
+            self.lastCL5ProgramAt = eventAt;
             self.lastCL5Title = @"";
         } else {
             self.lastQL1Program = program;
-            self.lastQL1ProgramAt = [NSDate date];
+            self.lastQL1ProgramAt = eventAt;
             self.lastQL1Title = @"";
         }
         NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;

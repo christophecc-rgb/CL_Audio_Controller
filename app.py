@@ -453,12 +453,12 @@ def decorate_remote_page_html(response):
 
     if "</head>" in html:
         assets = (
-            '<link rel="stylesheet" href="/static/remote-v2.css?v=2.0.6">\n'
-            '<script src="/static/remote-v2.js?v=2.0.6" defer></script>\n'
+            '<link rel="stylesheet" href="/static/remote-v2.css?v=2.0.7">\n'
+            '<script src="/static/remote-v2.js?v=2.0.7" defer></script>\n'
         )
         html = html.replace("</head>", assets + "</head>", 1)
     else:
-        html = '<link rel="stylesheet" href="/static/remote-v2.css?v=2.0.6">' + html
+        html = '<link rel="stylesheet" href="/static/remote-v2.css?v=2.0.7">' + html
 
     if "<body" in html:
         body_end = html.find(">", html.find("<body"))

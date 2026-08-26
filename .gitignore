@@ -65,3 +65,6 @@ pip-wheel-metadata/
 
 # Inventaire local contenant des chemins propres à la machine
 MANIFESTE_EXTRACTION.txt
+
+# Sauvegardes locales de travail
+*.before-*
