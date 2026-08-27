@@ -90,12 +90,11 @@ echo "Il ne réutilisera pas l'ancienne suite du 24 juillet."
 echo
 
 CONTROLLER_RELEASES="$BUILD_ROOT/controller-release"
-CL_RELEASE_OUTPUT_ROOT="$CONTROLLER_RELEASES" \
+CL_RELEASE_OUTPUT_ROOT="$CONTROLLER_RELEASES" CL_RELEASE_SKIP_DMG=1 \
   "$PROJECT_DIR/scripts/build_release.sh" "$VERSION"
 CONTROLLER_RELEASE="$(find "$CONTROLLER_RELEASES" -maxdepth 1 -type d -name "CL_Audio_Controller_${VERSION}_*" -print -quit)"
 [[ -n "$CONTROLLER_RELEASE" ]] || fail "la nouvelle distribution CL Audio Controller est introuvable"
 
-require_file "$CONTROLLER_RELEASE/CL_Audio_Controller_${VERSION}.dmg"
 require_file "$CONTROLLER_RELEASE/CL_Audio_Controller_${VERSION}_Kit_Complet_macOS.zip"
 require_file "$CONTROLLER_RELEASE/CL_Audio_Controller_${VERSION}_Max_for_Live.zip"
 
@@ -118,6 +117,10 @@ mkdir -p "$BUILDER_BUILD"
 )
 BUILDER_APP="$BUILDER_BUILD/dist/Arrangement Builder Live.app"
 [[ -d "$BUILDER_APP" ]] || fail "la nouvelle application Arrangement Builder Live est introuvable"
+ditto "$PROJECT_DIR/assets/app_icons/CL_Ableton.icns" "$BUILDER_APP/Contents/Resources/CL_Ableton.icns"
+/usr/libexec/PlistBuddy -c "Set :CFBundleIconFile CL_Ableton.icns" "$BUILDER_APP/Contents/Info.plist"
+xattr -cr "$BUILDER_APP"
+codesign --force --deep --sign - "$BUILDER_APP"
 
 INSTALLER_APP="$SUITE_ROOT/Installer la Suite CL.app"
 UNINSTALLER_APP="$SUITE_ROOT/Désinstaller la Suite CL.app"
@@ -139,10 +142,10 @@ mkdir -p \
 
 echo
 echo "Assemblage des applications et composants…"
-ditto "$CONTROLLER_ROOT/CL Audio Controller.app" "$COMPONENTS_ROOT/Applications/CL Audio Controller.app"
-ditto "$CONTROLLER_ROOT/CL MIDI Network Assistant.app" "$COMPONENTS_ROOT/Applications/CL MIDI Network Assistant.app"
+ditto "$CONTROLLER_ROOT/CL Audio Show Control.app" "$COMPONENTS_ROOT/Applications/CL Audio Show Control.app"
+ditto "$CONTROLLER_ROOT/CL MIDI Network Manager.app" "$COMPONENTS_ROOT/Applications/CL MIDI Network Manager.app"
 ditto "$CONTROLLER_ROOT/CL MIDI RTP Agent.app" "$COMPONENTS_ROOT/Applications/CL MIDI RTP Agent.app"
-ditto "$CONTROLLER_ROOT/CL Audio Configuration Checker.app" "$COMPONENTS_ROOT/Applications/CL Audio Configuration Checker.app"
+ditto "$CONTROLLER_ROOT/CL MIDI & RTP Diagnostic.app" "$COMPONENTS_ROOT/Applications/CL MIDI & RTP Diagnostic.app"
 ditto "$CONTROLLER_ROOT/CL MIDI Analyzer.app" "$COMPONENTS_ROOT/Applications/CL MIDI Analyzer.app"
 ditto "$CONTROLLER_ROOT/CL MIDI Performance Monitor.app" "$COMPONENTS_ROOT/Applications/CL MIDI Performance Monitor.app"
 ditto "$BUILDER_APP" "$COMPONENTS_ROOT/Applications/Arrangement Builder Live.app"
@@ -193,10 +196,11 @@ ditto "$NATIVE_BUILD/installer-universal" "$INSTALLER_APP/Contents/MacOS/Install
 ditto "$NATIVE_BUILD/installer-universal" "$UNINSTALLER_APP/Contents/MacOS/Désinstaller la Suite CL"
 
 for resources_dir in "$INSTALLER_RESOURCES" "$UNINSTALLER_APP/Contents/Resources"; do
-  ditto "$PROJECT_DIR/assets/cl_audio_show_control_icon_1024.png" "$resources_dir/Controller.png"
-  ditto "$BUILDER_DIR/assets/icon_1024.png" "$resources_dir/Builder.png"
+  ditto "$PROJECT_DIR/assets/app_icons/CL_Audio_Show_Control.png" "$resources_dir/Controller.png"
+  ditto "$PROJECT_DIR/assets/app_icons/CL_Ableton.png" "$resources_dir/Builder.png"
   ditto "$PROJECT_DIR/assets/paradis latin.jpg" "$resources_dir/ParadisLatin.jpg"
-  ditto "$PROJECT_DIR/assets/cl_midi_network_assistant_icon_1024.png" "$resources_dir/MIDIConsole.png"
+  ditto "$PROJECT_DIR/assets/app_icons/CL_MIDI_Network.png" "$resources_dir/MIDIConsole.png"
+  ditto "$PROJECT_DIR/assets/app_icons/CL_MIDI_RTP_Diagnostic.png" "$resources_dir/Diagnostic.png"
 done
 chmod +x \
   "$INSTALLER_RESOURCES/Installer_Toute_La_Suite_CL.command" \
@@ -300,8 +304,8 @@ unzip -Z1 "$DEST_ZIP" > "$ZIP_LIST"
 for expected in \
   "Installer la Suite CL.app/" \
   "Désinstaller la Suite CL.app/" \
-  "Installer la Suite CL.app/Contents/Resources/Composants/Applications/CL Audio Controller.app/" \
-  "Installer la Suite CL.app/Contents/Resources/Composants/Applications/CL Audio Configuration Checker.app/" \
+  "Installer la Suite CL.app/Contents/Resources/Composants/Applications/CL Audio Show Control.app/" \
+  "Installer la Suite CL.app/Contents/Resources/Composants/Applications/CL MIDI & RTP Diagnostic.app/" \
   "Installer la Suite CL.app/Contents/Resources/Composants/Applications/CL MIDI Analyzer.app/" \
   "Installer la Suite CL.app/Contents/Resources/Composants/Applications/CL MIDI Performance Monitor.app/" \
   "Installer la Suite CL.app/Contents/Resources/Composants/Applications/Arrangement Builder Live.app/" \
@@ -312,7 +316,7 @@ for expected in \
   "Paradis Latin AutoScene.amxd" \
   "Paradis Latin AutoScene - Live 10.amxd" \
   "CL MIDI Console Monitor.amxd" \
-  "CL MIDI Network Assistant.app/" \
+  "CL MIDI Network Manager.app/" \
   "CL MIDI RTP Agent.app/" \
   "CLMIDIRoundTripTester"; do
   LC_ALL=C grep -aFq "$expected" "$ZIP_LIST" || fail "contrôle final impossible, élément absent du ZIP : $expected"

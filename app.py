@@ -1220,7 +1220,7 @@ def state_snapshot_locked() -> Dict[str, Any]:
             if assistant_stale:
                 rtp_state["validated"] = False
                 rtp_state["status"] = "assistant_offline"
-                rtp_state["last_test"] = "CL MIDI Network Assistant hors ligne"
+                rtp_state["last_test"] = "CL MIDI Network Manager hors ligne"
             midi_console["rtp"] = rtp_state
 
             snapshot["midi_console"] = midi_console

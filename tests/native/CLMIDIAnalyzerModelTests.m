@@ -116,6 +116,12 @@ int main(void)
         session.typeFilter = @"program";
         NSCAssert(session.visibleRecords.count == 1, @"Type filter failed");
         session.typeFilter = nil;
+        session.channelFilter = @16;
+        NSCAssert(session.visibleRecords.firstObject == programRecord && session.visibleRecords.count == 1,
+                  @"Channel filter failed");
+        session.channelFilter = @2;
+        NSCAssert(session.visibleRecords.count == 0, @"Channel filter must hide other channels");
+        session.channelFilter = nil;
         session.sourceFilter = @"Ableton";
         NSCAssert(session.visibleRecords.firstObject == stopRecord, @"Source filter failed");
         session.sourceFilter = nil;
@@ -179,6 +185,18 @@ int main(void)
         NSCAssert(correlatedProgram.command != nil, @"Program command was not correlated");
         NSCAssert([correlatedProgram.commandTypeText isEqualToString:@"PROGRAM"],
                   @"Program row was not enriched");
+
+        [session clear];
+        session.typeFilter = @"program";
+        CLMIDIAnalyzerRecord *deferredProgram = [[CLMIDIAnalyzerRecord alloc]
+            initWithCommand:nil event:programEvent direction:@"RX" timestamp:[NSDate date]];
+        [session addRecord:deferredProgram];
+        NSCAssert(session.visibleRecords.count == 0,
+                  @"Raw event must not match the program filter yet");
+        [deferredProgram applyCommand:program];
+        [session refreshVisibleRecords];
+        NSCAssert(session.visibleRecords.firstObject == deferredProgram,
+                  @"Enriched Program Change must become visible immediately");
     }
     return 0;
 }

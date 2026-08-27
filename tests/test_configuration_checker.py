@@ -98,6 +98,12 @@ class ConfigurationCheckerTests(unittest.TestCase):
         ):
             self.assertIn(expected, source)
 
+    def test_simulator_argument_parser_preserves_unquoted_values_with_spaces(self):
+        source = (TOOLS / "CLConfigurationValidator.m").read_text()
+        self.assertIn('regularExpressionWithPattern:@"\\\\s--[[:alnum:]][[:alnum:]-]*', source)
+        self.assertIn("substringToIndex:boundary.location == NSNotFound ? tail.length : boundary.location", source)
+        self.assertNotIn("componentsSeparatedByCharactersInSet:NSCharacterSet.whitespaceCharacterSet].firstObject", source)
+
     def test_same_named_rtp_source_and_destination_form_a_valid_pair(self):
         source = (TOOLS / "CLConfigurationValidator.m").read_text()
         self.assertIn("[sourceNames containsObject:expectedEndpoint]", source)
@@ -165,16 +171,43 @@ class ConfigurationCheckerTests(unittest.TestCase):
     def test_ui_exposes_safe_check_and_profile_workflow(self):
         source = (TOOLS / "CLConfigurationCheckerApp.m").read_text()
         for expected in (
-            "CL AUDIO CONFIGURATION CHECKER",
+            "CL MIDI & RTP DIAGNOSTIC",
+            "ABLETON LOCAL",
+            "ABLETON DISTANT",
             "VÉRIFIER",
-            "SAUVEGARDER COMME PROFIL",
-            "CHARGER / IMPORTER",
-            "DUPLIQUER",
-            "EXPORTER JSON",
+            "ENREGISTRER LE PROFIL",
+            "OUVRIR UN PROFIL",
+            "COPIER TOUT",
+            "EXPORTER TEXTE",
             "Lecture seule",
             "--inspect-json",
         ):
             self.assertIn(expected, source)
+        self.assertNotIn('MAC SERVEUR', source)
+        self.assertNotIn('DUPLIQUER', source)
+        self.assertNotIn('EXPORTER JSON', source)
+
+    def test_text_report_can_be_copied_or_exported_without_changing_the_profile(self):
+        source = (TOOLS / "CLConfigurationCheckerApp.m").read_text()
+        for expected in (
+            "textReport",
+            "self.details.string",
+            "NSPasteboard.generalPasteboard",
+            "NSPasteboardTypeString",
+            "exportTextReport:",
+            "CL MIDI & RTP Diagnostic.txt",
+            "NSUTF8StringEncoding",
+        ):
+            self.assertIn(expected, source)
+        self.assertIn("[[self textReport] writeToURL:panel.URL", source)
+
+    def test_header_displays_the_bundled_paradis_latin_logo(self):
+        source = (TOOLS / "CLConfigurationCheckerApp.m").read_text()
+        release = (ROOT / "scripts" / "build_release.sh").read_text()
+        self.assertIn('pathForResource:@"paradis_latin_logo" ofType:@"jpg"', source)
+        self.assertIn("NSImageScaleProportionallyUpOrDown", source)
+        self.assertIn("NSImageAlignRight", source)
+        self.assertIn('paradis_latin_logo.jpg', release)
 
     def test_checker_is_built_and_packaged_with_network_tools(self):
         build = (TOOLS / "build.sh").read_text()

@@ -1,6 +1,6 @@
-# CL Audio Controller
+# CL Audio Show Control
 
-CL Audio Controller est une application macOS de pilotage d'Ableton Live. Elle réunit une interface native, une télécommande Web accessible sur le réseau local, des échanges OSC avec AbletonOSC, un suivi de l'arrangement et un pont Max for Live pour le crossfader.
+CL Audio Show Control est une application macOS de pilotage d'Ableton Live. Elle réunit une interface native, une télécommande Web accessible sur le réseau local, des échanges OSC avec AbletonOSC, un suivi de l'arrangement et un pont Max for Live pour le crossfader.
 
 La version de référence est **2.2.0** (build 6), identifiée par le bundle macOS `com.claudio.controller`.
 

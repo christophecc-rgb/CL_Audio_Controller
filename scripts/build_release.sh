@@ -7,7 +7,7 @@ STAMP="$(date +"%Y-%m-%d_%H-%M-%S")"
 RELEASE_ROOT="${CL_RELEASE_OUTPUT_ROOT:-$PROJECT_ROOT/Releases}"
 RELEASE_DIR="$RELEASE_ROOT/CL_Audio_Controller_${VERSION}_${STAMP}"
 BUILD_ROOT="$(mktemp -d "/private/tmp/CL_Audio_Controller_release_${VERSION}_XXXXXX")"
-APP_PATH="$BUILD_ROOT/dist/CL Audio Controller.app"
+APP_PATH="$BUILD_ROOT/dist/CL Audio Show Control.app"
 KIT_ROOT="$BUILD_ROOT/kit/CL Audio Controller $VERSION"
 M4L_SOURCE="$PROJECT_ROOT/M4L/Install"
 MIDI_DEVICE_SOURCE="$PROJECT_ROOT/M4L/Devices/CL MIDI Console Monitor"
@@ -17,6 +17,7 @@ PACKAGING_SOURCE="$PROJECT_ROOT/packaging"
 DMG_NAME="CL_Audio_Controller_${VERSION}.dmg"
 ZIP_NAME="CL_Audio_Controller_${VERSION}_Kit_Complet_macOS.zip"
 M4L_ZIP_NAME="CL_Audio_Controller_${VERSION}_Max_for_Live.zip"
+SKIP_DMG="${CL_RELEASE_SKIP_DMG:-0}"
 
 cleanup() {
   rm -rf "$BUILD_ROOT"
@@ -67,6 +68,7 @@ make_native_app() {
   local display_name="$4"
   local bundle_id="$5"
   local icon_path="${6:-}"
+  local bundled_resource="${7:-}"
 
   rm -rf "$app_path"
   mkdir -p "$app_path/Contents/MacOS" "$app_path/Contents/Resources"
@@ -84,6 +86,9 @@ make_native_app() {
   if [[ -n "$icon_path" && -f "$icon_path" ]]; then
     /usr/bin/ditto "$icon_path" \
       "$app_path/Contents/Resources/CL_AUDIO.icns"
+  fi
+  if [[ -n "$bundled_resource" && -f "$bundled_resource" ]]; then
+    /usr/bin/ditto "$bundled_resource" "$app_path/Contents/Resources/$(basename "$bundled_resource")"
   fi
 
   cat > "$app_path/Contents/Info.plist" <<EOF
@@ -145,6 +150,7 @@ mkdir -p "$RELEASE_DIR"
 cd "$PROJECT_ROOT"
 
 echo "========== BUILD $VERSION =========="
+python3 "$PROJECT_ROOT/scripts/generate_app_icon_variants.py"
 python3 -m PyInstaller \
   --noconfirm \
   --workpath "$BUILD_ROOT/build" \
@@ -171,7 +177,7 @@ mkdir -p \
   "$KIT_ROOT/AbletonOSC CL/AbletonOSC" \
   "$KIT_ROOT/Documentation"
 
-ditto "$APP_PATH" "$KIT_ROOT/CL Audio Controller.app"
+ditto "$APP_PATH" "$KIT_ROOT/CL Audio Show Control.app"
 ditto "$M4L_SOURCE" "$KIT_ROOT/Max for Live à installer"
 ditto "$MIDI_DEVICE_SOURCE" "$KIT_ROOT/Max for Live à installer/CL MIDI Console Monitor"
 
@@ -200,7 +206,7 @@ make_native_app \
   "RemoteAbleton" \
   "Télécommande Ableton" \
   "com.claudio.ableton-remote" \
-  "$PROJECT_ROOT/CL_AUDIO.icns"
+  "$PROJECT_ROOT/assets/app_icons/CL_Ableton.icns"
 
 make_native_app \
   "$BUILD_ROOT/midi-tools/CLMIDIAnalyzer" \
@@ -208,7 +214,8 @@ make_native_app \
   "CLMIDIAnalyzer" \
   "CL MIDI Analyzer" \
   "com.claudio.midi-analyzer" \
-  "$PROJECT_ROOT/CL_AUDIO.icns"
+  "$PROJECT_ROOT/assets/app_icons/CL_MIDI_Analyzer.icns" \
+  "$PROJECT_ROOT/M4L/Devices/CL MIDI Console Monitor/paradis_latin_logo.jpg"
 
 make_native_app \
   "$BUILD_ROOT/midi-tools/CLMIDIPerformanceMonitor" \
@@ -216,32 +223,35 @@ make_native_app \
   "CLMIDIPerformanceMonitor" \
   "CL MIDI Performance Monitor" \
   "com.claudio.midi-performance-monitor" \
-  "$PROJECT_ROOT/CL_AUDIO.icns"
+  "$PROJECT_ROOT/assets/app_icons/CL_MIDI_Performance.icns"
 
 make_native_app \
   "$BUILD_ROOT/midi-tools/CLAudioConfigurationChecker" \
-  "$KIT_ROOT/CL Audio Configuration Checker.app" \
+  "$KIT_ROOT/CL MIDI & RTP Diagnostic.app" \
   "CLAudioConfigurationChecker" \
-  "CL Audio Configuration Checker" \
+  "CL MIDI &amp; RTP Diagnostic" \
   "com.claudio.configurationchecker" \
-  "$PROJECT_ROOT/CL_AUDIO.icns"
+  "$PROJECT_ROOT/assets/app_icons/CL_MIDI_RTP_Diagnostic.icns" \
+  "$PROJECT_ROOT/M4L/Devices/CL MIDI Console Monitor/paradis_latin_logo.jpg"
 
 for binary in \
   "$KIT_ROOT/RemoteAbleton.app/Contents/MacOS/RemoteAbleton" \
   "$KIT_ROOT/CL MIDI Analyzer.app/Contents/MacOS/CLMIDIAnalyzer" \
   "$KIT_ROOT/CL MIDI Performance Monitor.app/Contents/MacOS/CLMIDIPerformanceMonitor" \
-  "$KIT_ROOT/CL Audio Configuration Checker.app/Contents/MacOS/CLAudioConfigurationChecker"
+  "$KIT_ROOT/CL MIDI & RTP Diagnostic.app/Contents/MacOS/CLAudioConfigurationChecker"
 do
   verify_universal "$binary"
 done
 mkdir -p \
   "$KIT_ROOT/CL MIDI Network Tools" \
-  "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/MacOS" \
-  "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Resources/Network Tools" \
-  "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/MacOS"
+  "$KIT_ROOT/CL MIDI Network Manager.app/Contents/MacOS" \
+  "$KIT_ROOT/CL MIDI Network Manager.app/Contents/Resources/Network Tools" \
+  "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/MacOS" \
+  "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/Resources"
+ditto "$PROJECT_ROOT/assets/app_icons/CL_MIDI_Network.icns" "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/Resources/CL_MIDI_Network.icns"
 for tool in CLMIDINetworkGuardian CLMIDIRTPAgent CLMIDIRoundTripTester CLMIDIRTPResponder CLYamahaConsoleSimulator CLMIDINetworkDashboard CLAudioConfigurationChecker; do
   ditto "$BUILD_ROOT/midi-tools/$tool" "$KIT_ROOT/CL MIDI Network Tools/$tool"
-  ditto "$BUILD_ROOT/midi-tools/$tool" "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Resources/Network Tools/$tool"
+  ditto "$BUILD_ROOT/midi-tools/$tool" "$KIT_ROOT/CL MIDI Network Manager.app/Contents/Resources/Network Tools/$tool"
 done
 ditto "$BUILD_ROOT/midi-tools/CLMIDIRTPAgent" "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/MacOS/CL MIDI RTP Agent"
 chmod +x "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/MacOS/CL MIDI RTP Agent"
@@ -253,6 +263,7 @@ cat > "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/Info.plist" <<EOF
 <key>CFBundleExecutable</key><string>CL MIDI RTP Agent</string>
 <key>CFBundleIdentifier</key><string>com.claudio.midi-rtp-agent</string>
 <key>CFBundleName</key><string>CL MIDI RTP Agent</string>
+<key>CFBundleIconFile</key><string>CL_MIDI_Network.icns</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>$VERSION</string>
 <key>LSBackgroundOnly</key><true/>
@@ -261,36 +272,36 @@ cat > "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/Info.plist" <<EOF
 EOF
 codesign --force --deep --sign - "$KIT_ROOT/CL MIDI RTP Agent.app"
 ditto "$MIDI_TOOLS_SOURCE/reconnect_legacy_rtp.applescript" "$KIT_ROOT/CL MIDI Network Tools/reconnect_legacy_rtp.applescript"
-ditto "$MIDI_TOOLS_SOURCE/reconnect_legacy_rtp.applescript" "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Resources/Network Tools/reconnect_legacy_rtp.applescript"
+ditto "$MIDI_TOOLS_SOURCE/reconnect_legacy_rtp.applescript" "$KIT_ROOT/CL MIDI Network Manager.app/Contents/Resources/Network Tools/reconnect_legacy_rtp.applescript"
 ditto "$MIDI_TOOLS_SOURCE/connect_rtp_peer.applescript" "$KIT_ROOT/CL MIDI Network Tools/connect_rtp_peer.applescript"
-ditto "$MIDI_TOOLS_SOURCE/connect_rtp_peer.applescript" "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Resources/Network Tools/connect_rtp_peer.applescript"
+ditto "$MIDI_TOOLS_SOURCE/connect_rtp_peer.applescript" "$KIT_ROOT/CL MIDI Network Manager.app/Contents/Resources/Network Tools/connect_rtp_peer.applescript"
 ditto "$MIDI_TOOLS_SOURCE/list_rtp_peers.applescript" "$KIT_ROOT/CL MIDI Network Tools/list_rtp_peers.applescript"
-ditto "$MIDI_TOOLS_SOURCE/list_rtp_peers.applescript" "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Resources/Network Tools/list_rtp_peers.applescript"
+ditto "$MIDI_TOOLS_SOURCE/list_rtp_peers.applescript" "$KIT_ROOT/CL MIDI Network Manager.app/Contents/Resources/Network Tools/list_rtp_peers.applescript"
 ditto "$MIDI_TOOLS_SOURCE/open_rtp_settings.applescript" "$KIT_ROOT/CL MIDI Network Tools/open_rtp_settings.applescript"
-ditto "$MIDI_TOOLS_SOURCE/open_rtp_settings.applescript" "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Resources/Network Tools/open_rtp_settings.applescript"
-ditto "$BUILD_ROOT/midi-tools/CLMIDINetworkDashboard" "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/MacOS/CL MIDI Network Assistant"
-ditto "$PACKAGING_SOURCE/CL_MIDI_Network_Assistant.sh" "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Resources/LegacyAssistant.sh"
-ditto "$PROJECT_ROOT/assets/CL_MIDI_Network_Assistant.icns" "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Resources/CL_MIDI_Network_Assistant.icns"
-ditto "$PROJECT_ROOT/M4L/Devices/CL MIDI Console Monitor/paradis_latin_logo.jpg" "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Resources/paradis_latin_logo.jpg"
-chmod +x "$KIT_ROOT/CL MIDI Network Tools"/CLMIDI* "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/MacOS/CL MIDI Network Assistant" "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Resources/LegacyAssistant.sh"
-cat > "$KIT_ROOT/CL MIDI Network Assistant.app/Contents/Info.plist" <<EOF
+ditto "$MIDI_TOOLS_SOURCE/open_rtp_settings.applescript" "$KIT_ROOT/CL MIDI Network Manager.app/Contents/Resources/Network Tools/open_rtp_settings.applescript"
+ditto "$BUILD_ROOT/midi-tools/CLMIDINetworkDashboard" "$KIT_ROOT/CL MIDI Network Manager.app/Contents/MacOS/CL MIDI Network Assistant"
+ditto "$PACKAGING_SOURCE/CL_MIDI_Network_Assistant.sh" "$KIT_ROOT/CL MIDI Network Manager.app/Contents/Resources/LegacyAssistant.sh"
+ditto "$PROJECT_ROOT/assets/app_icons/CL_MIDI_Network.icns" "$KIT_ROOT/CL MIDI Network Manager.app/Contents/Resources/CL_MIDI_Network_Assistant.icns"
+ditto "$PROJECT_ROOT/M4L/Devices/CL MIDI Console Monitor/paradis_latin_logo.jpg" "$KIT_ROOT/CL MIDI Network Manager.app/Contents/Resources/paradis_latin_logo.jpg"
+chmod +x "$KIT_ROOT/CL MIDI Network Tools"/CLMIDI* "$KIT_ROOT/CL MIDI Network Manager.app/Contents/MacOS/CL MIDI Network Assistant" "$KIT_ROOT/CL MIDI Network Manager.app/Contents/Resources/LegacyAssistant.sh"
+cat > "$KIT_ROOT/CL MIDI Network Manager.app/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-<key>CFBundleDisplayName</key><string>CL MIDI Network Assistant</string>
+<key>CFBundleDisplayName</key><string>CL MIDI Network Manager</string>
 <key>CFBundleExecutable</key><string>CL MIDI Network Assistant</string>
 <key>CFBundleIdentifier</key><string>com.claudio.midi-network-assistant</string>
 <key>CFBundleIconFile</key><string>CL_MIDI_Network_Assistant.icns</string>
-<key>CFBundleName</key><string>CL MIDI Network Assistant</string>
+<key>CFBundleName</key><string>CL MIDI Network Manager</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>$VERSION</string>
 <key>LSMinimumSystemVersion</key><string>10.15</string>
 <key>NSHighResolutionCapable</key><true/>
-<key>NSAppleEventsUsageDescription</key><string>CL MIDI Network Assistant utilise Configuration audio et MIDI et Événements système pour ouvrir et reconnecter la cible RTP sélectionnée.</string>
+<key>NSAppleEventsUsageDescription</key><string>CL MIDI Network Manager utilise Configuration audio et MIDI et Événements système pour ouvrir et reconnecter la cible RTP sélectionnée.</string>
 </dict></plist>
 EOF
-xattr -cr "$KIT_ROOT/CL MIDI Network Assistant.app"
-codesign --force --deep --sign - "$KIT_ROOT/CL MIDI Network Assistant.app"
+xattr -cr "$KIT_ROOT/CL MIDI Network Manager.app"
+codesign --force --deep --sign - "$KIT_ROOT/CL MIDI Network Manager.app"
 
 # git archive n'inclut ni .git, ni caches, ni journaux, ni fichiers locaux.
 git -C "$ABLETONOSC_ROOT" archive --format=tar HEAD |
@@ -324,7 +335,7 @@ EOF
 (
   cd "$KIT_ROOT"
   shasum -a 256 \
-    "CL Audio Controller.app/Contents/MacOS/CL Audio Controller" \
+    "CL Audio Show Control.app/Contents/MacOS/CL Audio Controller" \
     "AbletonOSC CL/AbletonOSC/abletonosc/song.py" \
     "Max for Live à installer/XFADER OSC BRIDGE v8.amxd" \
     "Max for Live à installer/LTC Display v2.0 Remote Config.amxd" \
@@ -336,13 +347,15 @@ EOF
     > CONTENU_SHA256.txt
 )
 
-echo
-echo "========== DMG =========="
-hdiutil create \
-  -volname "CL Audio Controller $VERSION" \
-  -srcfolder "$KIT_ROOT" \
-  -format UDZO \
-  "$RELEASE_DIR/$DMG_NAME"
+if [[ "$SKIP_DMG" != "1" ]]; then
+  echo
+  echo "========== DMG =========="
+  hdiutil create \
+    -volname "CL Audio Controller $VERSION" \
+    -srcfolder "$KIT_ROOT" \
+    -format UDZO \
+    "$RELEASE_DIR/$DMG_NAME"
+fi
 
 echo
 echo "========== ZIP COMPLET =========="
@@ -360,7 +373,9 @@ echo
 echo "========== SHA-256 =========="
 (
   cd "$RELEASE_DIR"
-  shasum -a 256 "$DMG_NAME" "$ZIP_NAME" "$M4L_ZIP_NAME" > SHA256SUMS.txt
+  checksum_files=("$ZIP_NAME" "$M4L_ZIP_NAME")
+  [[ "$SKIP_DMG" == "1" ]] || checksum_files=("$DMG_NAME" "${checksum_files[@]}")
+  shasum -a 256 "${checksum_files[@]}" > SHA256SUMS.txt
 )
 
 cat > "$RELEASE_DIR/BUILD_INFO.txt" <<EOF

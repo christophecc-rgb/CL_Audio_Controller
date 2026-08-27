@@ -8,7 +8,7 @@ LOG_FILE="/private/tmp/CL_Suite_Desinstallateur.log"
 [[ -x "$ENGINE" ]] || exit 1
 
 selected="$(/usr/bin/osascript <<'APPLESCRIPT'
-set picked to choose from list {"CL Audio Controller", "CL Arrangement Builder Live", "Paradis Latin AutoScene (Live 11/12)", "Paradis Latin AutoScene (Live 10)", "CL MIDI Console Monitor"} with title "Désinstaller la Suite CL" with prompt "Sélectionnez les composants à retirer :" with multiple selections allowed
+set picked to choose from list {"CL Audio Show Control", "CL Arrangement Builder Live", "Paradis Latin AutoScene (Live 11/12)", "Paradis Latin AutoScene (Live 10)", "CL MIDI Console Monitor"} with title "Désinstaller la Suite CL" with prompt "Sélectionnez les composants à retirer :" with multiple selections allowed
 if picked is false then return ""
 return picked as text
 APPLESCRIPT
@@ -16,7 +16,7 @@ APPLESCRIPT
 [[ -n "$selected" ]] || exit 0
 
 components=""
-[[ "$selected" == *"CL Audio Controller"* ]] && components="remote"
+[[ "$selected" == *"CL Audio Show Control"* ]] && components="remote"
 [[ "$selected" == *"CL Arrangement Builder Live"* ]] && components="${components:+$components,}builder"
 [[ "$selected" == *"Paradis Latin AutoScene (Live 11/12)"* ]] && components="${components:+$components,}autoscene"
 [[ "$selected" == *"Paradis Latin AutoScene (Live 10)"* ]] && components="${components:+$components,}autoscene-live10"

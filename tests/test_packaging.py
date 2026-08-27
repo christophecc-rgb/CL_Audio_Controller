@@ -31,6 +31,14 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("git -C \"$ABLETONOSC_ROOT\" archive", script)
         self.assertNotIn("github.com/ideoforms", script)
 
+    def test_native_remote_supports_arrangement_confirmation_dialog(self):
+        source = (PROJECT_ROOT / "packaging/RemoteAbleton.m").read_text(encoding="utf-8")
+        self.assertIn("WKUIDelegate", source)
+        self.assertIn("self.webView.UIDelegate = self", source)
+        self.assertIn("runJavaScriptConfirmPanelWithMessage", source)
+        self.assertIn('addButtonWithTitle:@"Continuer"', source)
+        self.assertIn("completionHandler(response == NSAlertFirstButtonReturn)", source)
+
     def test_user_installer_is_non_destructive_and_needs_no_administrator(self):
         script = (
             PROJECT_ROOT / "packaging/Installer_CL_Audio_Controller.command"
@@ -59,7 +67,7 @@ class PackagingTests(unittest.TestCase):
             PROJECT_ROOT / "packaging/Installer_Toute_La_Suite_CL.command"
         ).read_text(encoding="utf-8")
 
-        self.assertIn("CL Audio Controller.app", script)
+        self.assertIn("CL Audio Show Control.app", script)
         self.assertIn("Arrangement Builder Live.app", script)
         self.assertIn("CL_Arrangement_Builder_Live", script)
         self.assertIn("AbletonOSC", script)
@@ -75,7 +83,7 @@ class PackagingTests(unittest.TestCase):
         self.assertIn('local quit_requested=0', script)
         self.assertIn('if [[ "$quit_requested" != 1 ]]', script)
         self.assertIn("Serveur orphelin détecté", script)
-        self.assertIn('open -gj "$USER_APPS/CL Audio Controller.app"', script)
+        self.assertIn('open -gj "$controller_app"', script)
         self.assertIn("port_listening 5050", script)
         self.assertIn("port_listening 5055", script)
         self.assertIn("Live 10", script)
@@ -125,6 +133,8 @@ class PackagingTests(unittest.TestCase):
         self.assertNotIn('"CL MIDI RTP Simulator.app/"', script)
         self.assertIn("CFBundleIconFile", script)
         self.assertIn("CL_RELEASE_OUTPUT_ROOT", script)
+        self.assertIn("CL_RELEASE_SKIP_DMG=1", script)
+        self.assertNotIn('require_file "$CONTROLLER_RELEASE/CL_Audio_Controller_${VERSION}.dmg"', script)
         self.assertIn("CLSuiteInstallerApp.m", script)
         self.assertIn("installer-universal", script)
         self.assertIn("x86_64-apple-macosx10.15", script)
@@ -134,6 +144,12 @@ class PackagingTests(unittest.TestCase):
         self.assertIn('ditto "$BUILDER_APP"', script)
         self.assertIn('ditto "$BUILDER_DIR/RemoteScript"', script)
         self.assertNotIn('BUILDER_DIR/release/Arrangement Builder Live 1.2.2', script)
+
+    def test_transport_export_does_not_depend_on_dmg_creation(self):
+        release = (PROJECT_ROOT / "scripts/build_release.sh").read_text(encoding="utf-8")
+        self.assertIn('SKIP_DMG="${CL_RELEASE_SKIP_DMG:-0}"', release)
+        self.assertIn('if [[ "$SKIP_DMG" != "1" ]]', release)
+        self.assertIn('checksum_files=("$ZIP_NAME" "$M4L_ZIP_NAME")', release)
 
     def test_graphical_installer_wraps_the_noninteractive_engine(self):
         source = (
@@ -165,7 +181,7 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("Mac Télécommande", source)
         self.assertIn("CL Arrangement Builder Live", source)
         self.assertIn("Paradis Latin AutoScene", source)
-        self.assertIn("CL MIDI Network Assistant + simulateur", source)
+        self.assertIn("CL MIDI Network Manager + simulateur", source)
         self.assertIn("Mac Ableton Lecteur", source)
         self.assertIn("Simulateur console", source)
         self.assertIn("agent RTP léger", source)
@@ -184,7 +200,7 @@ class PackagingTests(unittest.TestCase):
         installer_section = source.split("] : @[", 1)[1]
         self.assertLess(installer_section.index("Paradis Latin AutoScene"), installer_section.index("Mac Télécommande"))
         self.assertLess(installer_section.index("Mac Télécommande"), installer_section.index("CL Arrangement Builder Live"))
-        self.assertLess(installer_section.index("CL Arrangement Builder Live"), installer_section.index("CL MIDI Network Assistant + simulateur"))
+        self.assertLess(installer_section.index("CL Arrangement Builder Live"), installer_section.index("CL MIDI Network Manager + simulateur"))
         self.assertIn('@selector(terminate:)', source)
         self.assertIn('keyEquivalent:@"q"', source)
 
@@ -233,9 +249,9 @@ class PackagingTests(unittest.TestCase):
 
             components = kit / "Composants"
             required_directories = (
-                "Applications/CL Audio Controller.app",
+                "Applications/CL Audio Show Control.app",
                 "Applications/Arrangement Builder Live.app",
-                "Applications/CL MIDI Network Assistant.app",
+                "Applications/CL MIDI Network Manager.app",
                 "Ableton Live 11-12/Remote Scripts/AbletonOSC",
                 "Ableton Live 11-12/Remote Scripts/CL_Arrangement_Builder_Live",
                 "Ableton Live 11-12/Max for Live/CL Audio Controller - Remote",
@@ -272,17 +288,17 @@ class PackagingTests(unittest.TestCase):
             )
             subprocess.run([str(engine)], check=True, env=environment, capture_output=True)
 
-            self.assertTrue((home / "Applications/CL Audio Controller.app").is_dir())
+            self.assertTrue((home / "Applications/CL Audio Show Control.app").is_dir())
             self.assertTrue((home / "Applications/Arrangement Builder Live.app").is_dir())
-            self.assertTrue((home / "Applications/CL MIDI Network Assistant.app").is_dir())
+            self.assertTrue((home / "Applications/CL MIDI Network Manager.app").is_dir())
 
-            legacy = home / "Applications/CL Audio Controller.app.sauvegarde_ancienne"
+            legacy = home / "Applications/CL Audio Show Control.app.sauvegarde_ancienne"
             legacy.mkdir()
             subprocess.run([str(engine)], check=True, env=environment, capture_output=True)
             trash_sessions = list((home / ".Trash").glob("CL Suite remplacée *"))
             self.assertTrue(trash_sessions)
             trashed_names = {item.name for session in trash_sessions for item in session.iterdir()}
-            self.assertTrue(any(name.endswith("CL Audio Controller.app") for name in trashed_names))
+            self.assertTrue(any(name.endswith("CL Audio Show Control.app") for name in trashed_names))
             self.assertTrue(any("sauvegarde_ancienne" in name for name in trashed_names))
             self.assertTrue(
                 (home / "Music/Ableton/User Library/Remote Scripts/AbletonOSC").is_dir()

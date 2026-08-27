@@ -53,11 +53,11 @@ coll = COLLECT(
 )
 app = BUNDLE(
     coll,
-    name='CL Audio Controller.app',
+    name='CL Audio Show Control.app',
     icon='CL_AUDIO.icns',
     bundle_identifier='com.claudio.controller',
     info_plist={
-        'CFBundleDisplayName': 'CL Audio Controller',
+        'CFBundleDisplayName': 'CL Audio Show Control',
         'CFBundleShortVersionString': '2.2.0',
         'CFBundleVersion': '6',
         'NSHighResolutionCapable': True,

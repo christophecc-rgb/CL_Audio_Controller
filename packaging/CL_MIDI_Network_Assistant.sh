@@ -8,10 +8,10 @@ LOG_FILE="/private/tmp/CL_MIDI_Network_Assistant.log"
 report_error() {
   local line="$1"
   local status="$2"
-  local message="Échec de CL MIDI Network Assistant (ligne $line, code $status). Consultez $LOG_FILE"
+  local message="Échec de CL MIDI Network Manager (ligne $line, code $status). Consultez $LOG_FILE"
   printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$message" >>"$LOG_FILE"
   osascript -e 'on run argv' \
-    -e 'display dialog (item 1 of argv) with title "CL MIDI Network Assistant" buttons {"OK"} default button "OK" with icon stop' \
+    -e 'display dialog (item 1 of argv) with title "CL MIDI Network Manager" buttons {"OK"} default button "OK" with icon stop' \
     -e 'end run' \
     "$message" >/dev/null 2>&1 || true
 }
@@ -29,7 +29,7 @@ open_terminal_command() {
 }
 
 choice="$(osascript \
-  -e 'set picked to choose from list {"Ouvrir les réglages MIDI réseau", "Tester un aller-retour", "Lancer le simulateur Yamaha", "Reconnecter une session RTP"} with title "CL MIDI Network Assistant" with prompt "Choisissez une opération"' \
+  -e 'set picked to choose from list {"Ouvrir les réglages MIDI réseau", "Tester un aller-retour", "Lancer le simulateur Yamaha", "Reconnecter une session RTP"} with title "CL MIDI Network Manager" with prompt "Choisissez une opération"' \
   -e 'if picked is false then return ""' \
   -e 'return item 1 of picked')"
 printf '%s CHOICE=%s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$choice" >>"$LOG_FILE"

@@ -185,15 +185,15 @@ static void CLInstallApplicationMenu(void) {
         @[@"controller", @"Mac Télécommande — RTP émetteur-récepteur", @"Show Control, découverte Bonjour et liaison RTP-MIDI bidirectionnelle avec retours consoles.", @"Controller.png"],
         @[@"ableton-reader", @"Mac Ableton Lecteur — RTP émetteur-récepteur", @"AbletonOSC, LTC, X-Fader et agent RTP-MIDI bidirectionnel à démarrage automatique.", @"Controller.png"],
         @[@"builder", @"CL Arrangement Builder Live", @"Application Builder et Remote Script Ableton.", @"Builder.png"],
-        @[@"midi-console", @"CL MIDI Network Assistant + simulateur", @"Diagnostic MIDI, retours consoles et simulateur intégré IAC/RTP.", @"MIDIConsole.png"],
-        @[@"diagnostic-tools", @"Outils de diagnostic CL", @"Configuration Checker, MIDI Analyzer et Performance Monitor.", @"MIDIConsole.png"]
+        @[@"midi-console", @"CL MIDI Network Manager + simulateur", @"Diagnostic MIDI, retours consoles et simulateur intégré IAC/RTP.", @"MIDIConsole.png"],
+        @[@"diagnostic-tools", @"Outils de diagnostic CL", @"MIDI & RTP Diagnostic, MIDI Analyzer et Performance Monitor.", @"Diagnostic.png"]
     ] : @[
         @[@"autoscene", @"Paradis Latin AutoScene", @"Périphérique Max for Live pour Ableton Live 11 et 12.", @"ParadisLatin.jpg"],
         @[@"controller", @"Mac Télécommande", @"Show Control, serveur web et télécommandes distantes.", @"Controller.png"],
         @[@"ableton-reader", @"Mac Ableton Lecteur", @"AbletonOSC, LTC, X-Fader et agent RTP léger.", @"Controller.png"],
         @[@"builder", @"CL Arrangement Builder Live", @"Application Builder et Remote Script Ableton.", @"Builder.png"],
-        @[@"midi-console", @"CL MIDI Network Assistant + simulateur", @"Diagnostic, retours consoles et tests IAC/RTP dans une seule application.", @"MIDIConsole.png"],
-        @[@"diagnostic-tools", @"Outils de diagnostic CL", @"Configuration Checker, MIDI Analyzer et Performance Monitor.", @"MIDIConsole.png"]
+        @[@"midi-console", @"CL MIDI Network Manager + simulateur", @"Diagnostic, retours consoles et tests IAC/RTP dans une seule application.", @"MIDIConsole.png"],
+        @[@"diagnostic-tools", @"Outils de diagnostic CL", @"MIDI & RTP Diagnostic, MIDI Analyzer et Performance Monitor.", @"Diagnostic.png"]
     ];
     for (NSArray<NSString *> *item in components) {
         [componentStack addArrangedSubview:[self componentCard:item[0] title:item[1] subtitle:item[2] iconName:item[3]]];
@@ -370,7 +370,7 @@ static void CLInstallApplicationMenu(void) {
                     : (installedAbletonReader
                        ? @"Le rôle Mac Ableton Lecteur est installé. Son agent RTP-MIDI émetteur-récepteur démarre automatiquement à l’ouverture de session. Fermez puis relancez Ableton Live s’il était ouvert."
                        : (installedNetworkAssistant
-                          ? @"CL MIDI Network Assistant et son simulateur IAC/RTP intégré ont été installés. Acceptez l’autorisation Accessibilité si macOS la demande."
+                          ? @"CL MIDI Network Manager et son simulateur IAC/RTP intégré ont été installés. Acceptez l’autorisation Accessibilité si macOS la demande."
                           : (selfRef.uninstaller ? @"Les éléments retirés restent récupérables dans la Corbeille." : @"Fermez complètement Ableton Live si celui-ci était ouvert, puis relancez-le.")));
                 [selfRef showAlert:(selfRef.uninstaller ? @"Désinstallation terminée" : @"Installation terminée")
                               message:successMessage

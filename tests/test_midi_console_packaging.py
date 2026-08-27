@@ -54,13 +54,13 @@ class MidiConsolePackagingTests(unittest.TestCase):
         self.assertIn("CL MIDI Console uniquement", source)
         self.assertIn("INSTALL_MIDI_CONSOLE", source)
         self.assertIn("Presets/MIDI Effects/Max MIDI Effect/CL MIDI Console Monitor", source)
-        self.assertIn("CL MIDI Network Assistant.app", source)
+        self.assertIn("CL MIDI Network Manager.app", source)
         self.assertIn('"midi-console"', source)
         self.assertIn("detect_live", source)
         self.assertIn("resolve_user_library", source)
         self.assertIn("verify_copy", source)
         self.assertIn("INSTALLATION TERMINÉE ET VÉRIFIÉE", source)
-        self.assertNotIn('login item "CL MIDI Network Assistant"', source)
+        self.assertNotIn('make new login item', source)
         self.assertIn("verify_selected_components", source)
         self.assertIn("composants sélectionnés", source)
         self.assertIn("CL MIDI RTP Agent.app", source)
@@ -72,7 +72,7 @@ class MidiConsolePackagingTests(unittest.TestCase):
         self.assertIn("UNINSTALL_MIDI_CONSOLE", source)
         self.assertIn("Presets/MIDI Effects/Max MIDI Effect/CL MIDI Console Monitor", source)
         self.assertIn("Application Support/CL MIDI Console/Network Tools", source)
-        self.assertIn("Applications/CL MIDI Network Assistant.app", source)
+        self.assertIn("Applications/CL MIDI Network Manager.app", source)
         self.assertIn('midi-console)', source)
         self.assertIn('delete login item "CL MIDI Network Assistant"', source)
         self.assertNotIn("pkill", source)
@@ -81,7 +81,7 @@ class MidiConsolePackagingTests(unittest.TestCase):
         source = (ROOT / "scripts" / "build_release.sh").read_text()
         for required in (
             "Max for Live à installer/CL MIDI Console Monitor",
-            "CL MIDI Network Assistant.app",
+            "CL MIDI Network Manager.app",
             "CL MIDI Network Tools",
             "CLMIDINetworkGuardian",
             "CLMIDIRoundTripTester",
@@ -96,14 +96,14 @@ class MidiConsolePackagingTests(unittest.TestCase):
         dashboard = (ROOT / "tools" / "cl_midi_network" / "CLMIDINetworkDashboard.m").read_text()
         engine = (ROOT / "tools" / "cl_midi_network" / "CLYamahaConsoleSimulator.m").read_text()
         self.assertIn("SIMULATEUR DE RETOUR CONSOLE", dashboard)
-        self.assertIn('@"Test local · retour dédié", @"Test distant · RTP"', dashboard)
+        self.assertIn('@"Ableton local", @"Ableton distant"', dashboard)
         self.assertIn('@"--transport", transport', dashboard)
         self.assertIn("Gestionnaire IAC Bus 1 est exclusivement la source expected", dashboard)
         self.assertIn('localCoreMIDI', engine)
 
         export_source = (ROOT / "scripts" / "export_transport_kit.command").read_text()
         self.assertIn("CL MIDI Console Monitor.amxd", export_source)
-        self.assertIn("CL MIDI Network Assistant.app/", export_source)
+        self.assertIn("CL MIDI Network Manager.app/", export_source)
         self.assertIn("CLMIDIRoundTripTester", export_source)
 
     def test_network_assistant_bundles_its_macos_icon(self):

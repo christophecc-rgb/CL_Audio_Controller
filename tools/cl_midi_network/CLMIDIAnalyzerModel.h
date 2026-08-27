@@ -42,6 +42,7 @@ NS_ASSUME_NONNULL_BEGIN
 @interface CLMIDIAnalyzerSession : NSObject
 
 @property (nonatomic, copy, nullable) NSString *typeFilter;
+@property (nonatomic, strong, nullable) NSNumber *channelFilter;
 @property (nonatomic, copy, nullable) NSString *sourceFilter;
 @property (nonatomic, copy, nullable) NSString *searchText;
 /// Zero retains the complete capture.
@@ -52,6 +53,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)addRecord:(CLMIDIAnalyzerRecord *)record;
 - (void)addRecords:(NSArray<CLMIDIAnalyzerRecord *> *)records;
 - (nullable CLMIDIAnalyzerRecord *)recordForEvent:(CLMIDIEvent *)event;
+- (void)refreshVisibleRecords;
 - (void)clear;
 - (NSString *)textLog;
 

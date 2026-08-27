@@ -33,13 +33,30 @@ class MidiAnalyzerAppTests(unittest.TestCase):
         model = (TOOLS / "CLMIDIAnalyzerModel.m").read_text(encoding="utf-8")
         self.assertIn("<AppKit/AppKit.h>", source)
         self.assertIn("CLCommandTraceReceiver", source)
-        for title in ("Start Monitoring", "Stop Monitoring", "Clear", "Save Log…"):
+        for title in ("Start Monitoring", "Stop Monitoring", "Clear", "Export CSV…", "Export JSON…", "Compare Capture…"):
             self.assertIn(title, source)
         for column in ("Heure", "Direction", "Source", "Type de commande", "Canal", "Description", "Octets hexadécimaux"):
             self.assertIn(column, source)
         for forbidden in ("MIDIGet", "MIDIPacketList", "MIDIPort", "MIDIClient", "packet->", ".bytes"):
             self.assertNotIn(forbidden, source)
             self.assertNotIn(forbidden, model)
+
+    def test_v2_interface_exposes_filters_exports_and_paradis_latin_branding(self):
+        source = (TOOLS / "CLMIDIAnalyzerApp.m").read_text(encoding="utf-8")
+        release = (ROOT / "scripts" / "build_release.sh").read_text(encoding="utf-8")
+        for control in ("NSSearchField", "typeFilterButton", "channelFilterButton", "sourceFilterField", "resetFilters:"):
+            self.assertIn(control, source)
+        for binding in ("session.typeFilter", "session.channelFilter", "session.sourceFilter", "session.searchText"):
+            self.assertIn(binding, source)
+        self.assertIn('@"Tous les canaux"', source)
+        self.assertIn("channel <= 16", source)
+        self.assertIn("boldSystemFontOfSize:17", source)
+        self.assertIn('pathForResource:@"paradis_latin_logo" ofType:@"jpg"', source)
+        self.assertIn("CL MIDI ANALYZER", source)
+        self.assertIn('paradis_latin_logo.jpg', release)
+        self.assertIn('local bundled_resource="${7:-}"', release)
+        self.assertIn("NSJSONSerialization", source)
+        self.assertIn('Capture JSON incompatible', source)
 
     def test_event_observation_precedes_command_interpretation(self):
         core = (TOOLS / "CLMIDICore.m").read_text(encoding="utf-8")
@@ -50,6 +67,8 @@ class MidiAnalyzerAppTests(unittest.TestCase):
         self.assertIn("initWithCommand:nil", app)
         self.assertIn("recordForEvent:event", app)
         self.assertIn("eventsForPacket:event.packet", app)
+        self.assertIn("[self.session refreshVisibleRecords]", app)
+        self.assertIn("sans attendre le", app)
 
     def test_packet_parser_supports_message_boundaries_and_realtime(self):
         model = (TOOLS / "CLMIDIAnalyzerModel.m").read_text(encoding="utf-8")

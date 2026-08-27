@@ -160,13 +160,14 @@ port_listening() {
 }
 
 prepare_controller_replacement() {
-  local quit_requested=0
+  local quit_requested=0 controller_app="$USER_APPS/CL Audio Show Control.app"
   [[ "$INSTALL_HOME" == "$HOME" ]] || return 0
-  [[ -e "$USER_APPS/CL Audio Controller.app" ]] || return 0
-  say ""; say "Préparation de CL Audio Controller"
+  [[ -e "$controller_app" ]] || controller_app="$USER_APPS/CL Audio Controller.app"
+  [[ -e "$controller_app" ]] || return 0
+  say ""; say "Préparation de CL Audio Show Control"
   if port_listening 5050 && ! port_listening 5055; then
     say "  Serveur orphelin détecté : réouverture temporaire du panneau pour reprise sécurisée"
-    /usr/bin/open -gj "$USER_APPS/CL Audio Controller.app" >/dev/null 2>&1 || true
+    /usr/bin/open -gj "$controller_app" >/dev/null 2>&1 || true
     for _ in 1 2 3 4 5 6 7 8 9 10; do
       port_listening 5055 && break
       sleep 0.5
@@ -189,7 +190,7 @@ prepare_controller_replacement() {
     fi
     sleep 0.5
   done
-  fail "CL Audio Controller fonctionne encore sur 5050 ou 5055 après la demande d’arrêt propre. Quittez-le complètement (ou redémarrez le Mac), puis relancez l’installation. Rien n’a été remplacé."
+  fail "CL Audio Show Control fonctionne encore sur 5050 ou 5055 après la demande d’arrêt propre. Quittez-le complètement (ou redémarrez le Mac), puis relancez l’installation. Rien n’a été remplacé."
 }
 
 prepare_rtp_agent_replacement() {
@@ -255,14 +256,14 @@ verify_selected_components() {
   while IFS= read -r line; do
     rel="${line#*  }"
     case "$rel" in
-      "Composants/Applications/CL Audio Controller.app/"*) [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 ]] && echo "$line" >> "$selected" ;;
+      "Composants/Applications/CL Audio Show Control.app/"*) [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Ableton Live 11-12/Remote Scripts/AbletonOSC/"*|"Composants/Ableton Live 11-12/Max for Live/CL Audio Controller - Remote/"*) [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_ABLETON_READER" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Applications/CL MIDI RTP Agent.app/"*) [[ "$INSTALL_ABLETON_READER" == 1 ]] && echo "$line" >> "$selected" ;;
-      "Composants/Applications/CL Audio Configuration Checker.app/"*|"Composants/Applications/CL MIDI Analyzer.app/"*|"Composants/Applications/CL MIDI Performance Monitor.app/"*) [[ "$INSTALL_DIAGNOSTIC_TOOLS" == 1 ]] && echo "$line" >> "$selected" ;;
+      "Composants/Applications/CL MIDI & RTP Diagnostic.app/"*|"Composants/Applications/CL MIDI Analyzer.app/"*|"Composants/Applications/CL MIDI Performance Monitor.app/"*) [[ "$INSTALL_DIAGNOSTIC_TOOLS" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Applications/Arrangement Builder Live.app/"*|"Composants/Ableton Live 11-12/Remote Scripts/CL_Arrangement_Builder_Live/"*) [[ "$INSTALL_BUILDER" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Ableton Live 11-12/Max for Live/Paradis Latin AutoScene/"*) [[ "$INSTALL_AUTOSCENE" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Ableton Live 10/Max for Live/Paradis Latin AutoScene - Live 10/"*) [[ "$INSTALL_AUTOSCENE_LIVE10" == 1 ]] && echo "$line" >> "$selected" ;;
-      "Composants/Applications/CL MIDI Network Assistant.app/"*|"Composants/Outils réseau MIDI/"*) [[ "$INSTALL_MIDI_CONSOLE" == 1 || "$INSTALL_CONTROLLER" == 1 ]] && echo "$line" >> "$selected" ;;
+      "Composants/Applications/CL MIDI Network Manager.app/"*|"Composants/Outils réseau MIDI/"*) [[ "$INSTALL_MIDI_CONSOLE" == 1 || "$INSTALL_CONTROLLER" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Ableton Live 11-12/Max for Live/CL MIDI Console Monitor/"*) [[ "$INSTALL_MIDI_CONSOLE" == 1 ]] && echo "$line" >> "$selected" ;;
     esac
   done < "$INTEGRITY_MANIFEST"
@@ -352,15 +353,15 @@ verify_selected_components
 mkdir -p "$USER_APPS" "$REMOTE_SCRIPTS" "$ABLETON_LIBRARY/Presets"
 
 [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 ]] && prepare_controller_replacement
-[[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 ]] && install_item "$APPLICATIONS_SOURCE/CL Audio Controller.app" "$USER_APPS/CL Audio Controller.app" "Télécommande — CL Audio Controller" "controller"
+[[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 ]] && install_item "$APPLICATIONS_SOURCE/CL Audio Show Control.app" "$USER_APPS/CL Audio Show Control.app" "Centre de contrôle — CL Audio Show Control" "controller"
 if [[ "$INSTALL_DIAGNOSTIC_TOOLS" == 1 ]]; then
-  install_item "$APPLICATIONS_SOURCE/CL Audio Configuration Checker.app" "$USER_APPS/CL Audio Configuration Checker.app" "Diagnostic — Configuration Checker" "diagnostic-tools"
+  install_item "$APPLICATIONS_SOURCE/CL MIDI & RTP Diagnostic.app" "$USER_APPS/CL MIDI & RTP Diagnostic.app" "Diagnostic — MIDI & RTP" "diagnostic-tools"
   install_item "$APPLICATIONS_SOURCE/CL MIDI Analyzer.app" "$USER_APPS/CL MIDI Analyzer.app" "Diagnostic — MIDI Analyzer" "diagnostic-tools"
   install_item "$APPLICATIONS_SOURCE/CL MIDI Performance Monitor.app" "$USER_APPS/CL MIDI Performance Monitor.app" "Diagnostic — Performance Monitor" "diagnostic-tools"
 fi
 if [[ "$INSTALL_CONTROLLER" == 1 ]]; then
   install_item "$MIDI_TOOLS_SOURCE" "$MIDI_TOOLS_TARGET" "Télécommande — Outils diagnostic réseau MIDI" "controller"
-  install_item "$APPLICATIONS_SOURCE/CL MIDI Network Assistant.app" "$USER_APPS/CL MIDI Network Assistant.app" "Télécommande — Assistant réseau MIDI" "controller"
+  install_item "$APPLICATIONS_SOURCE/CL MIDI Network Manager.app" "$USER_APPS/CL MIDI Network Manager.app" "Gestion réseau — CL MIDI Network Manager" "controller"
 fi
 if [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_ABLETON_READER" == 1 ]]; then
   install_item "$LIVE_CURRENT_SOURCE/Remote Scripts/AbletonOSC" "$REMOTE_SCRIPTS/AbletonOSC" "Ableton Lecteur — AbletonOSC CL" "ableton-reader"
@@ -395,11 +396,11 @@ fi
 if [[ "$INSTALL_MIDI_CONSOLE" == 1 ]]; then
   install_item "$LIVE_CURRENT_SOURCE/Max for Live/CL MIDI Console Monitor" "$M4L_MIDI_CONSOLE_TARGET" "MIDI Console — Périphérique Max for Live" "midi-console"
   [[ "$INSTALL_CONTROLLER" != 1 ]] && install_item "$MIDI_TOOLS_SOURCE" "$MIDI_TOOLS_TARGET" "MIDI Console — Outils réseau" "midi-console"
-  [[ "$INSTALL_CONTROLLER" != 1 ]] && install_item "$APPLICATIONS_SOURCE/CL MIDI Network Assistant.app" "$USER_APPS/CL MIDI Network Assistant.app" "MIDI Console — Assistant réseau" "midi-console"
+  [[ "$INSTALL_CONTROLLER" != 1 ]] && install_item "$APPLICATIONS_SOURCE/CL MIDI Network Manager.app" "$USER_APPS/CL MIDI Network Manager.app" "MIDI Console — Gestionnaire réseau" "midi-console"
 fi
 if [[ ( "$INSTALL_CONTROLLER" == 1 || "$INSTALL_MIDI_CONSOLE" == 1 ) && "$INSTALL_HOME" == "$HOME" && "${CL_SUITE_SKIP_POSTINSTALL:-0}" != "1" ]]; then
   say ""; say "Télécommande — Activation de la reconnexion RTP au démarrage"
-  /usr/bin/open -gj "$USER_APPS/CL MIDI Network Assistant.app" --args --background-monitor >/dev/null 2>&1 || true
+  /usr/bin/open -gj "$USER_APPS/CL MIDI Network Manager.app" --args --background-monitor >/dev/null 2>&1 || true
   for _ in 1 2 3 4 5; do
     [[ -f "$HOME/Library/LaunchAgents/com.claudio.midi-network-monitor.plist" ]] && break
     sleep 1

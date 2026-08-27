@@ -1,7 +1,7 @@
 #import <Cocoa/Cocoa.h>
 #import <WebKit/WebKit.h>
 
-@interface CLRemoteDelegate : NSObject <NSApplicationDelegate>
+@interface CLRemoteDelegate : NSObject <NSApplicationDelegate, WKUIDelegate>
 @property(nonatomic,strong) NSWindow *window;
 @property(nonatomic,strong) WKWebView *webView;
 @end
@@ -27,6 +27,7 @@
 
     WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];
     self.webView = [[WKWebView alloc] initWithFrame:frame configuration:config];
+    self.webView.UIDelegate = self;
     self.webView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
 
     self.window.contentView = self.webView;
@@ -37,6 +38,22 @@
     [self.webView loadRequest:[NSURLRequest requestWithURL:url]];
 
     [NSApp activateIgnoringOtherApps:YES];
+}
+
+- (void)webView:(WKWebView *)webView
+    runJavaScriptConfirmPanelWithMessage:(NSString *)message
+                        initiatedByFrame:(WKFrameInfo *)frame
+                       completionHandler:(void (^)(BOOL result))completionHandler {
+    (void)webView;
+    (void)frame;
+    NSAlert *alert = [[NSAlert alloc] init];
+    alert.messageText = @"Télécommande CL Audio";
+    alert.informativeText = message ?: @"Confirmer cette action ?";
+    [alert addButtonWithTitle:@"Continuer"];
+    [alert addButtonWithTitle:@"Annuler"];
+    [alert beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse response) {
+        completionHandler(response == NSAlertFirstButtonReturn);
+    }];
 }
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender {

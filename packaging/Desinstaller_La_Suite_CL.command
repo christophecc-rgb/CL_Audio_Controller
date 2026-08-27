@@ -106,8 +106,9 @@ is_selected() {
 
 is_allowed_target() {
   case "$1" in
+    "$INSTALL_HOME/Applications/CL Audio Show Control.app"|\
     "$INSTALL_HOME/Applications/CL Audio Controller.app"|\
-    "$INSTALL_HOME/Applications/CL Audio Configuration Checker.app"|\
+    "$INSTALL_HOME/Applications/CL MIDI & RTP Diagnostic.app"|\
     "$INSTALL_HOME/Applications/CL MIDI Analyzer.app"|\
     "$INSTALL_HOME/Applications/CL MIDI Performance Monitor.app"|\
     "$INSTALL_HOME/Applications/Arrangement Builder Live.app"|\
@@ -118,6 +119,7 @@ is_allowed_target() {
     "$INSTALL_HOME/Music/Ableton/User Library/Presets/Audio Effects/Max Audio Effect/CL Audio Controller - Live 10"|\
     "$INSTALL_HOME/Music/Ableton/User Library/Presets/MIDI Effects/Max MIDI Effect/CL MIDI Console Monitor"|\
     "$INSTALL_HOME/Library/Application Support/CL MIDI Console/Network Tools"|\
+    "$INSTALL_HOME/Applications/CL MIDI Network Manager.app"|\
     "$INSTALL_HOME/Applications/CL MIDI Network Assistant.app"|\
     "$INSTALL_HOME/Applications/CL MIDI RTP Agent.app"|\
     "$INSTALL_HOME/Applications/CL MIDI RTP Simulator.app"|\
@@ -163,12 +165,15 @@ if [[ "$UNINSTALL_MIDI_CONSOLE" == "1" && "$INSTALL_HOME" == "$HOME" && "${CL_SU
   rm -f "$HOME/Library/LaunchAgents/com.claudio.midi-network-monitor.plist"
   /usr/bin/osascript >/dev/null 2>&1 <<'APPLESCRIPT' || true
 tell application "System Events"
+  if exists login item "CL MIDI Network Manager" then
+    delete login item "CL MIDI Network Manager"
+  end if
   if exists login item "CL MIDI Network Assistant" then
     delete login item "CL MIDI Network Assistant"
   end if
 end tell
 APPLESCRIPT
-  echo "Démarrage automatique de CL MIDI Network Assistant retiré."
+  echo "Démarrage automatique de CL MIDI Network Manager retiré."
 fi
 if [[ "$UNINSTALL_ABLETON_READER" == "1" && "$INSTALL_HOME" == "$HOME" && "${CL_SUITE_SKIP_POSTINSTALL:-0}" != "1" ]]; then
   /usr/bin/osascript >/dev/null 2>&1 <<'APPLESCRIPT' || true

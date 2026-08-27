@@ -73,8 +73,8 @@ class ContextResponse:
 class ServerIdentityTests(unittest.TestCase):
     def test_midi_network_assistant_button_uses_existing_launcher_and_accessible_matte_red_style(self):
         source = (PROJECT_ROOT / "launcher_control.py").read_text(encoding="utf-8")
-        self.assertIn(">MIDI Network Assistant</button>", source)
-        self.assertIn('aria-label="Ouvrir MIDI Network Assistant"', source)
+        self.assertIn(">CL MIDI Network Manager</button>", source)
+        self.assertIn('aria-label="Ouvrir CL MIDI Network Manager"', source)
         self.assertIn(".midi-assistant-button:focus-visible", source)
         self.assertIn("background:#8f3f3f", source)
         self.assertIn('find_midi_network_assistant()', source)
@@ -536,7 +536,7 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
         self.assertIn("CONFIGURATION CONSOLES", page)
         self.assertIn("CL5 · Offset titre", page)
         self.assertIn("QL1 · Offset titre", page)
-        self.assertIn("Mémoire —", page)
+        self.assertIn('class="console-program"', page)
         self.assertIn("s.midi_console", page)
         self.assertIn("value.returned_scene_memory", page)
         self.assertIn("value.returned_title", page)
@@ -547,7 +547,7 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
         self.assertIn("⚠ Divergence", page)
         self.assertIn("s.ltc_connected", page)
         self.assertIn("setInterval(refreshTelemetry,100)", page)
-        self.assertIn("MODE LOCAL", page)
+        self.assertIn("ABLETON LOCAL", page)
         self.assertIn("ABLETON DISTANT", page)
         self.assertIn("Ports AbletonOSC fixes", page)
         self.assertNotIn('id="abletonName"', page)
@@ -588,7 +588,7 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
         sent = json.loads(urlopen.call_args.args[0].data.decode("utf-8"))
         self.assertEqual(sent, {"action": "console_title_offset", "console": "cl5", "offset": 1})
 
-    def test_telemetry_route_exposes_only_ltc_fields(self):
+    def test_telemetry_route_exposes_ltc_and_show_progress_fields(self):
         with mock.patch.object(
             launcher,
             "read_remote_state_diagnostic",
@@ -596,7 +596,13 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
         ):
             response = launcher.app.test_client().get("/telemetry")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.get_json(), {"ltc_connected": True, "ltc_timecode": "12:34:56:12"})
+        self.assertEqual(response.get_json(), {
+            "ltc_connected": True,
+            "ltc_timecode": "12:34:56:12",
+            "playing_scene": None,
+            "playing_scene_name": None,
+            "remaining_seconds": None,
+        })
 
     def test_control_panel_keeps_ltc_visible_in_system_card(self):
         self.assertIn('id="systemLtc"', launcher.PANEL_HTML_V2)
@@ -604,7 +610,8 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
         self.assertNotIn("body.show-mode .system-ltc{display:none", launcher.PANEL_HTML_V2)
         self.assertIn(".state-time{font:18px Menlo", launcher.PANEL_HTML_V2)
         self.assertIn(".system-ltc::before{content:'LTC  '", launcher.PANEL_HTML_V2)
-        self.assertIn("body.show-mode .state-time,body.show-mode .system-ltc{font-size:22px}", launcher.PANEL_HTML_V2)
+        self.assertIn("body.show-mode .state-time{", launcher.PANEL_HTML_V2)
+        self.assertIn("body.show-mode .system-ltc{", launcher.PANEL_HTML_V2)
         self.assertIn(".show-toggle{height:32px", launcher.PANEL_HTML_V2)
 
     def test_control_panel_publishes_the_ltc_device_destination(self):

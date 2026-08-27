@@ -186,13 +186,13 @@ def read_midi_console_state(expected_agent_host=None):
         if stale:
             rtp["validated"] = False
             rtp["status"] = "assistant_offline"
-            rtp["last_test"] = "CL MIDI Network Assistant hors ligne"
+            rtp["last_test"] = "CL MIDI Network Manager hors ligne"
         payload["rtp"] = rtp
     else:
         payload = {
             "schema_version": 2,
             "service": "cl-midi-console-monitor",
-            "source": "CL MIDI Network Assistant",
+            "source": "CL MIDI Network Manager",
             "updated_at": None,
             "age_seconds": None,
             "stale": True,
@@ -202,7 +202,7 @@ def read_midi_console_state(expected_agent_host=None):
                 "validated": False,
                 "loop_detected": False,
                 "status": "assistant_offline",
-                "last_test": "CL MIDI Network Assistant hors ligne",
+                "last_test": "CL MIDI Network Manager hors ligne",
             },
             "cl5": {
                 "program": None,
@@ -231,6 +231,8 @@ def read_midi_console_state(expected_agent_host=None):
 
 def find_midi_network_assistant():
     candidates = [
+        Path.home() / "Applications" / "CL MIDI Network Manager.app",
+        Path("/Applications/CL MIDI Network Manager.app"),
         Path.home() / "Applications" / "CL MIDI Network Assistant.app",
         Path("/Applications/CL MIDI Network Assistant.app"),
     ]
@@ -591,7 +593,7 @@ HTML = r'''
 <html>
 <head>
 <meta charset="utf-8">
-<title>CL Audio Controller</title>
+<title>CL Audio Show Control</title>
 <style>
 *{box-sizing:border-box}
 body{
@@ -1049,7 +1051,7 @@ body{
 }
 .hero img{width:100%;height:100%;object-fit:contain}
 .header{text-align:center;flex:0 0 auto}
-h1{font-size:13px;margin:0;font-weight:760;color:rgba(214,219,231,.76)}
+h1{font-size:13px;margin:0;font-weight:760;color:#d84a4a}
 .subtitle{font-size:8px;color:rgba(220,228,245,.50);margin:2px 0 0}
 .main{display:flex;flex-direction:column;gap:6px;min-height:0;flex:1}
 .card{
@@ -1183,7 +1185,7 @@ button{font:inherit}
 .brand img{width:100%;height:100%;object-fit:contain}
 .product-row{display:flex;align-items:center;justify-content:space-between;min-height:38px;padding:0 2px;gap:10px}
 .product-copy{display:flex;align-items:baseline;gap:8px;min-width:0;white-space:nowrap}
-.product{font-size:15px;font-weight:790;letter-spacing:.04em;color:#e6e9ef}
+.product{font-size:15px;font-weight:790;letter-spacing:.04em;color:#d84a4a}
 .product-subtitle{font-size:10px;color:#858d9b;letter-spacing:.025em}
 .show-toggle{height:32px;padding:0 14px;border:1px solid rgba(88,162,255,.68);border-radius:9px;background:linear-gradient(180deg,rgba(64,140,231,.28),rgba(40,104,184,.20));color:#dceaff;font-size:11px;font-weight:760;cursor:pointer;box-shadow:0 5px 14px rgba(32,101,190,.16)}
 .show-toggle:hover{filter:brightness(1.14)}
@@ -1546,7 +1548,7 @@ body.show-mode .console-title{
     <section id="networkCard" class="card network-card local">
       <div class="network-title-row"><div class="access-head">Connexion AbletonOSC</div><span id="modeBadge" class="mode-badge">MODE LOCAL</span><span id="networkLtc" class="network-timecode offline">--:--:--:--</span></div>
       <div class="network-grid">
-        <label>Mode<select id="abletonMode" onchange="updateNetworkFields()"><option value="local">Local</option><option value="remote">Ableton distant</option></select></label>
+        <label>MODE GÉNÉRAL<select id="abletonMode" onchange="updateNetworkFields()"><option value="local">Ableton local</option><option value="remote">Ableton distant</option></select></label>
         <label>Adresse Ableton<input id="abletonHost" value="127.0.0.1"></label>
         <div class="ports-readonly"><span>Ports AbletonOSC fixes</span><strong><span id="abletonSendPort">11000</span> → <span id="abletonReplyPort">11001</span></strong></div>
       </div>
@@ -1559,7 +1561,7 @@ body.show-mode .console-title{
   </div>
 
   <section class="card console-card">
-    <div class="console-head"><strong>MIDI &amp; CONSOLES</strong><div class="rtp-control"><span id="rtpBadge" class="rtp-badge">RTP · attente</span><button class="rtp-open midi-assistant-button" aria-label="Ouvrir MIDI Network Assistant" onclick="runAction('/midi-network-assistant','Ouverture de MIDI Network Assistant')">MIDI Network Assistant</button></div></div>
+    <div class="console-head"><strong>MIDI &amp; CONSOLES</strong><div class="rtp-control"><span id="rtpBadge" class="rtp-badge">RTP · attente</span><button class="rtp-open midi-assistant-button" aria-label="Ouvrir CL MIDI Network Manager" onclick="runAction('/midi-network-assistant','Ouverture de CL MIDI Network Manager')">CL MIDI Network Manager</button></div></div>
     <div class="console-config"><span class="console-config-title">CONFIGURATION CONSOLES</span>
       <div class="offset-control">CL5 · Offset titre <button class="offset-button" onclick="changeTitleOffset('cl5',-1)">−</button><strong id="cl5TitleOffset" class="offset-value">0</strong><button class="offset-button" onclick="changeTitleOffset('cl5',1)">+</button><button class="offset-button" onclick="changeTitleOffset('cl5',0,true)">0</button></div>
       <div class="offset-control">QL1 · Offset titre <button class="offset-button" onclick="changeTitleOffset('ql1',-1)">−</button><strong id="ql1TitleOffset" class="offset-value">0</strong><button class="offset-button" onclick="changeTitleOffset('ql1',1)">+</button><button class="offset-button" onclick="changeTitleOffset('ql1',0,true)">0</button></div>
@@ -1685,7 +1687,7 @@ function restoreNetworkDraft(mode){
   el('abletonReplyPort').textContent=draft.reply_port;
   applyNetworkCardMode(mode);
 }
-function applyNetworkCardMode(mode){const remote=mode==='remote';el('networkCard').className='card network-card '+(remote?'remote':'local');el('modeBadge').textContent=remote?'ABLETON DISTANT':'MODE LOCAL';}
+function applyNetworkCardMode(mode){const remote=mode==='remote';el('networkCard').className='card network-card '+(remote?'remote':'local');el('modeBadge').textContent=remote?'ABLETON DISTANT':'ABLETON LOCAL';}
 function updateNetworkFields(){
   captureVisibleNetworkDraft();
   networkVisibleMode=el('abletonMode').value;
@@ -2137,10 +2139,10 @@ def remote_window():
 def open_midi_network_assistant():
     assistant = find_midi_network_assistant()
     if assistant is None:
-        return jsonify(error="MIDI Network Assistant est introuvable. CL Audio Show Control reste disponible."), 404
+        return jsonify(error="CL MIDI Network Manager est introuvable. CL Audio Show Control reste disponible."), 404
     subprocess.Popen(["/usr/bin/open", str(assistant)])
-    event("MIDI Network Assistant ouvert depuis Show Control")
-    return jsonify(message="MIDI Network Assistant ouvert")
+    event("CL MIDI Network Manager ouvert depuis Show Control")
+    return jsonify(message="CL MIDI Network Manager ouvert")
 
 @app.route("/quit")
 def quit_launcher():

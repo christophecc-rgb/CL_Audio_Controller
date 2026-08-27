@@ -8,6 +8,32 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class AppIconTests(unittest.TestCase):
+    def test_generated_icon_family_has_one_accent_per_application_group(self):
+        generator = (ROOT / "scripts" / "generate_app_icon_variants.py").read_text()
+        for name, color in {
+            "CL_Audio_Show_Control": "#D84A4A",
+            "CL_Ableton": "#E58A3A",
+            "CL_MIDI_Network": "#32B89C",
+            "CL_MIDI_RTP_Diagnostic": "#3E9ED6",
+            "CL_MIDI_Analyzer": "#3974D8",
+            "CL_MIDI_Performance": "#6557C8",
+        }.items():
+            self.assertIn(name, generator)
+            self.assertIn(color, generator)
+
+    def test_release_assigns_the_group_icons_to_the_matching_apps(self):
+        release = (ROOT / "scripts" / "build_release.sh").read_text()
+        export = (ROOT / "scripts" / "export_transport_kit.command").read_text()
+        for icon in (
+            "CL_Ableton.icns",
+            "CL_MIDI_Network.icns",
+            "CL_MIDI_RTP_Diagnostic.icns",
+            "CL_MIDI_Analyzer.icns",
+            "CL_MIDI_Performance.icns",
+        ):
+            self.assertIn(icon, release + export)
+        self.assertIn("Diagnostic.png", export)
+
     def test_panel_logo_and_macos_icon_source_are_identical(self):
         panel = Image.open(ROOT / "cl_audio_logo.png").convert("RGB")
         source = Image.open(

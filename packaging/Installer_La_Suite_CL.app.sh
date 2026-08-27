@@ -25,14 +25,14 @@ if [[ "$live_choice" == "Ableton Live 10 — AutoScene uniquement" ]]; then
 else
   live_family="12"
   selected="$(/usr/bin/osascript <<'APPLESCRIPT'
-set picked to choose from list {"CL Audio Controller", "CL Arrangement Builder Live", "Paradis Latin AutoScene", "CL MIDI Console Monitor"} with title "Installer la Suite CL" with prompt "Sélectionnez les composants à installer :" default items {"CL Audio Controller", "CL Arrangement Builder Live", "Paradis Latin AutoScene", "CL MIDI Console Monitor"} with multiple selections allowed
+set picked to choose from list {"CL Audio Show Control", "CL Arrangement Builder Live", "Paradis Latin AutoScene", "CL MIDI Console Monitor"} with title "Installer la Suite CL" with prompt "Sélectionnez les composants à installer :" default items {"CL Audio Show Control", "CL Arrangement Builder Live", "Paradis Latin AutoScene", "CL MIDI Console Monitor"} with multiple selections allowed
 if picked is false then return ""
 return picked as text
 APPLESCRIPT
 )"
   [[ -n "$selected" ]] || exit 0
   components=""
-  [[ "$selected" == *"CL Audio Controller"* ]] && components="remote"
+  [[ "$selected" == *"CL Audio Show Control"* ]] && components="remote"
   [[ "$selected" == *"CL Arrangement Builder Live"* ]] && components="${components:+$components,}builder"
   [[ "$selected" == *"Paradis Latin AutoScene"* ]] && components="${components:+$components,}autoscene"
   [[ "$selected" == *"CL MIDI Console Monitor"* ]] && components="${components:+$components,}midi-console"

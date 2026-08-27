@@ -5,7 +5,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALL_HOME="${CL_SUITE_INSTALL_HOME:-$HOME}"
 ABLETON_TARGET="$INSTALL_HOME/Music/Ableton/User Library/Presets/MIDI Effects/Max MIDI Effect/CL MIDI Console Monitor"
 TOOLS_TARGET="$INSTALL_HOME/Library/Application Support/CL MIDI Console/Network Tools"
-APP_TARGET="$INSTALL_HOME/Applications/CL MIDI Network Assistant.app"
+APP_TARGET="$INSTALL_HOME/Applications/CL MIDI Network Manager.app"
 STAMP="$(date '+%Y-%m-%d_%H%M%S')"
 
 fail() {
@@ -25,7 +25,7 @@ backup_existing() {
 
 DEVICE_SOURCE="$SCRIPT_DIR/Max for Live/CL MIDI Console Monitor"
 TOOLS_SOURCE="$SCRIPT_DIR/Network Tools"
-APP_SOURCE="$SCRIPT_DIR/CL MIDI Network Assistant.app"
+APP_SOURCE="$SCRIPT_DIR/CL MIDI Network Manager.app"
 
 [[ -f "$DEVICE_SOURCE/CL MIDI Console Monitor.amxd" ]] || fail "périphérique Max for Live absent"
 [[ -x "$TOOLS_SOURCE/CLMIDIRoundTripTester" ]] || fail "outil de test MIDI absent"

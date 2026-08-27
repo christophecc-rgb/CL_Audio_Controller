@@ -11,6 +11,10 @@
 @property (nonatomic, strong) NSButton *startButton;
 @property (nonatomic, strong) NSButton *stopButton;
 @property (nonatomic, strong) NSPopUpButton *retentionButton;
+@property (nonatomic, strong) NSPopUpButton *typeFilterButton;
+@property (nonatomic, strong) NSPopUpButton *channelFilterButton;
+@property (nonatomic, strong) NSTextField *sourceFilterField;
+@property (nonatomic, strong) NSSearchField *searchField;
 @property (nonatomic, strong) CLMIDICore *core;
 @property (nonatomic, strong) CLMIDIAnalyzerSession *session;
 @property (nonatomic, strong) CLMIDIAnalyzerPacketParser *packetParser;
@@ -78,16 +82,37 @@
         [root.bottomAnchor constraintEqualToAnchor:content.bottomAnchor]
     ]];
 
+    [root addArrangedSubview:[self buildHeader]];
     [root addArrangedSubview:[self buildToolbar]];
+    [root addArrangedSubview:[self buildFilterBar]];
     NSSplitView *splitView = [self buildSplitView];
     [root addArrangedSubview:splitView];
     [splitView.heightAnchor constraintGreaterThanOrEqualToConstant:440].active = YES;
 
-    NSTextField *future = [NSTextField labelWithString:
-        @"Prepared: type/source filters · search · JSON/CSV · session capture · capture comparison"];
-    future.textColor = NSColor.secondaryLabelColor;
-    future.font = [NSFont systemFontOfSize:11];
-    [root addArrangedSubview:future];
+}
+
+- (NSView *)buildHeader
+{
+    NSStackView *header = [NSStackView new];
+    header.orientation = NSUserInterfaceLayoutOrientationHorizontal;
+    header.spacing = 12;
+    NSImageView *logo = [[NSImageView alloc] initWithFrame:NSMakeRect(0, 0, 128, 58)];
+    logo.image = [[NSImage alloc] initWithContentsOfFile:
+        [NSBundle.mainBundle pathForResource:@"paradis_latin_logo" ofType:@"jpg"]];
+    logo.imageScaling = NSImageScaleProportionallyUpOrDown;
+    [logo.widthAnchor constraintEqualToConstant:128].active = YES;
+    [logo.heightAnchor constraintEqualToConstant:58].active = YES;
+    NSTextField *title = [NSTextField labelWithString:@"CL MIDI ANALYZER"];
+    title.font = [NSFont boldSystemFontOfSize:17];
+    title.textColor = [NSColor colorWithRed:0.224 green:0.455 blue:0.847 alpha:1.0];
+    NSTextField *subtitle = [NSTextField labelWithString:@"Inspection CoreMIDI · captures · diagnostics"];
+    subtitle.textColor = NSColor.secondaryLabelColor;
+    NSStackView *titles = [NSStackView stackViewWithViews:@[title, subtitle]];
+    titles.orientation = NSUserInterfaceLayoutOrientationVertical;
+    titles.spacing = 2;
+    [header addArrangedSubview:logo];
+    [header addArrangedSubview:titles];
+    return header;
 }
 
 - (NSView *)buildToolbar
@@ -107,9 +132,11 @@
     NSButton *clear = [NSButton buttonWithTitle:@"Clear"
                                          target:self
                                          action:@selector(clearLog:)];
-    NSButton *save = [NSButton buttonWithTitle:@"Save Log…"
+    NSButton *save = [NSButton buttonWithTitle:@"Export CSV…"
                                         target:self
                                         action:@selector(saveLog:)];
+    NSButton *json = [NSButton buttonWithTitle:@"Export JSON…" target:self action:@selector(exportJSON:)];
+    NSButton *compare = [NSButton buttonWithTitle:@"Compare Capture…" target:self action:@selector(compareCapture:)];
 
     self.retentionButton = [[NSPopUpButton alloc] initWithFrame:NSZeroRect pullsDown:NO];
     [self.retentionButton addItemsWithTitles:@[@"10 000 events", @"50 000 events", @"Unlimited"]];
@@ -125,9 +152,68 @@
     [toolbar addArrangedSubview:self.stopButton];
     [toolbar addArrangedSubview:clear];
     [toolbar addArrangedSubview:save];
+    [toolbar addArrangedSubview:json];
+    [toolbar addArrangedSubview:compare];
     [toolbar addArrangedSubview:self.retentionButton];
     [toolbar addArrangedSubview:self.statusLabel];
     return toolbar;
+}
+
+- (NSView *)buildFilterBar
+{
+    NSStackView *filters = [NSStackView new];
+    filters.orientation = NSUserInterfaceLayoutOrientationHorizontal;
+    filters.spacing = 8;
+    self.typeFilterButton = [[NSPopUpButton alloc] initWithFrame:NSZeroRect pullsDown:NO];
+    [self.typeFilterButton addItemsWithTitles:@[@"Tous les types", @"Program", @"Control", @"Note", @"Transport", @"System"]];
+    self.typeFilterButton.target = self;
+    self.typeFilterButton.action = @selector(filtersChanged:);
+    self.channelFilterButton = [[NSPopUpButton alloc] initWithFrame:NSZeroRect pullsDown:NO];
+    [self.channelFilterButton addItemWithTitle:@"Tous les canaux"];
+    for (NSInteger channel = 1; channel <= 16; channel++) [self.channelFilterButton addItemWithTitle:[NSString stringWithFormat:@"Canal %ld", (long)channel]];
+    self.channelFilterButton.target = self;
+    self.channelFilterButton.action = @selector(filtersChanged:);
+    self.sourceFilterField = [NSTextField new];
+    self.sourceFilterField.placeholderString = @"Filtrer la source";
+    self.sourceFilterField.target = self;
+    self.sourceFilterField.action = @selector(filtersChanged:);
+    [self.sourceFilterField.widthAnchor constraintEqualToConstant:190].active = YES;
+    self.searchField = [NSSearchField new];
+    self.searchField.placeholderString = @"Rechercher commande, description ou hex";
+    self.searchField.target = self;
+    self.searchField.action = @selector(filtersChanged:);
+    [self.searchField.widthAnchor constraintGreaterThanOrEqualToConstant:280].active = YES;
+    NSButton *reset = [NSButton buttonWithTitle:@"Réinitialiser" target:self action:@selector(resetFilters:)];
+    [filters addArrangedSubview:[NSTextField labelWithString:@"Filtres"]];
+    [filters addArrangedSubview:self.typeFilterButton];
+    [filters addArrangedSubview:self.channelFilterButton];
+    [filters addArrangedSubview:self.sourceFilterField];
+    [filters addArrangedSubview:self.searchField];
+    [filters addArrangedSubview:reset];
+    return filters;
+}
+
+- (void)filtersChanged:(id)sender
+{
+    (void)sender;
+    self.session.typeFilter = self.typeFilterButton.indexOfSelectedItem == 0 ? nil : self.typeFilterButton.titleOfSelectedItem;
+    self.session.channelFilter = self.channelFilterButton.indexOfSelectedItem == 0 ? nil : @(self.channelFilterButton.indexOfSelectedItem);
+    self.session.sourceFilter = self.sourceFilterField.stringValue;
+    self.session.searchText = self.searchField.stringValue;
+    [self.tableView reloadData];
+    self.detailView.string = @"";
+    self.statusLabel.stringValue = [NSString stringWithFormat:@"%lu / %lu événements visibles",
+        (unsigned long)self.session.visibleRecords.count, (unsigned long)self.session.records.count];
+}
+
+- (void)resetFilters:(id)sender
+{
+    (void)sender;
+    [self.typeFilterButton selectItemAtIndex:0];
+    [self.channelFilterButton selectItemAtIndex:0];
+    self.sourceFilterField.stringValue = @"";
+    self.searchField.stringValue = @"";
+    [self filtersChanged:nil];
 }
 
 - (NSSplitView *)buildSplitView
@@ -240,16 +326,84 @@
 {
     (void)sender;
     NSSavePanel *panel = [NSSavePanel savePanel];
-    panel.nameFieldStringValue = @"CL_MIDI_Analyzer_Log.tsv";
+    panel.nameFieldStringValue = @"CL_MIDI_Analyzer_Capture.csv";
     [panel beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse response) {
         if (response != NSModalResponseOK) return;
-        NSString *header = @"Heure\tDirection\tSource\tCommande\tCanal\tDescription\tHex\n";
-        NSString *contents = [header stringByAppendingString:self.session.textLog];
+        NSMutableString *contents = [@"Heure,Direction,Source,Commande,Canal,Description,Hex\n" mutableCopy];
+        for (CLMIDIAnalyzerRecord *record in self.session.visibleRecords) {
+            NSMutableArray *fields = [NSMutableArray array];
+            for (NSString *value in @[record.timeText, record.direction, record.sourceText,
+                    record.commandTypeText, record.channelText, record.descriptionText, record.hexText]) {
+                NSString *escaped = [value stringByReplacingOccurrencesOfString:@"\"" withString:@"\"\""];
+                [fields addObject:[NSString stringWithFormat:@"\"%@\"", escaped]];
+            }
+            [contents appendFormat:@"%@\n", [fields componentsJoinedByString:@","]];
+        }
         NSError *error = nil;
         if (![contents writeToURL:panel.URL atomically:YES encoding:NSUTF8StringEncoding error:&error])
         {
             [self.window presentError:error];
         }
+    }];
+}
+
+- (NSArray<NSDictionary *> *)JSONRecords
+{
+    NSMutableArray *payload = [NSMutableArray array];
+    for (CLMIDIAnalyzerRecord *record in self.session.visibleRecords) {
+        [payload addObject:@{
+            @"time": record.timeText,
+            @"direction": record.direction,
+            @"source": record.sourceText,
+            @"command_type": record.commandTypeText,
+            @"channel": record.channelText,
+            @"description": record.descriptionText,
+            @"hex": record.hexText,
+        }];
+    }
+    return payload;
+}
+
+- (void)exportJSON:(id)sender
+{
+    (void)sender;
+    NSSavePanel *panel = [NSSavePanel savePanel];
+    panel.nameFieldStringValue = @"CL_MIDI_Analyzer_Capture.json";
+    [panel beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse response) {
+        if (response != NSModalResponseOK) return;
+        NSDictionary *capture = @{
+            @"format": @"cl-midi-analyzer-capture",
+            @"version": @2,
+            @"created_at": @([[NSDate date] timeIntervalSince1970]),
+            @"records": [self JSONRecords],
+        };
+        NSError *error = nil;
+        NSData *data = [NSJSONSerialization dataWithJSONObject:capture options:NSJSONWritingPrettyPrinted error:&error];
+        if (!data || ![data writeToURL:panel.URL options:NSDataWritingAtomic error:&error]) [self.window presentError:error];
+    }];
+}
+
+- (void)compareCapture:(id)sender
+{
+    (void)sender;
+    NSOpenPanel *panel = [NSOpenPanel openPanel];
+    panel.allowedFileTypes = @[@"json"];
+    [panel beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse response) {
+        if (response != NSModalResponseOK) return;
+        NSError *error = nil;
+        NSData *data = [NSData dataWithContentsOfURL:panel.URL options:0 error:&error];
+        NSDictionary *capture = data ? [NSJSONSerialization JSONObjectWithData:data options:0 error:&error] : nil;
+        NSArray *reference = [capture[@"records"] isKindOfClass:NSArray.class] ? capture[@"records"] : nil;
+        if (!reference) { [self.window presentError:error ?: [NSError errorWithDomain:@"CLMIDIAnalyzer" code:1 userInfo:@{NSLocalizedDescriptionKey: @"Capture JSON incompatible"}]]; return; }
+        NSInteger delta = (NSInteger)self.session.visibleRecords.count - (NSInteger)reference.count;
+        NSAlert *alert = [NSAlert new];
+        alert.messageText = @"Comparaison de captures";
+        alert.informativeText = [NSString stringWithFormat:
+            @"Capture actuelle : %lu événements\nCapture de référence : %lu événements\nÉcart : %@%ld",
+            (unsigned long)self.session.visibleRecords.count, (unsigned long)reference.count,
+            delta > 0 ? @"+" : @"", (long)delta];
+        [alert addButtonWithTitle:@"OK"];
+        [alert beginSheetModalForWindow:self.window completionHandler:nil];
     }];
 }
 
@@ -322,7 +476,12 @@
     [self.session addRecords:records];
     NSUInteger newCount = self.session.visibleRecords.count;
 
-    if (records.count > 0)
+    BOOL filtersActive = self.session.typeFilter.length || self.session.sourceFilter.length || self.session.searchText.length;
+    if (records.count > 0 && filtersActive)
+    {
+        [self.tableView reloadData];
+    }
+    else if (records.count > 0)
     {
         NSUInteger discardedCount = oldCount + records.count - newCount;
         NSUInteger removedCount = MIN(oldCount, discardedCount);
@@ -348,6 +507,16 @@
         [record applyCommand:commands[index]];
         NSUInteger row = [self.session.visibleRecords indexOfObjectIdenticalTo:record];
         if (row != NSNotFound) [changedRows addIndex:row];
+    }
+    if (filtersActive && commands.count > 0)
+    {
+        // Les enregistrements sont ajoutés avant leur enrichissement CLCommand.
+        // Un filtre PROGRAM peut donc les exclure à l'état brut `(none)` ; il
+        // faut recalculer immédiatement après applyCommand, sans attendre le
+        // prochain message MIDI (souvent PAUSE ou STOP).
+        [self.session refreshVisibleRecords];
+        newCount = self.session.visibleRecords.count;
+        [self.tableView reloadData];
     }
     if (changedRows.count > 0)
     {

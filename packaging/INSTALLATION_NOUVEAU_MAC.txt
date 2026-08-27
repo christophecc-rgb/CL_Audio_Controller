@@ -44,7 +44,7 @@ RÔLES RTP-MIDI
 - Mac Ableton Lecteur — RTP émetteur-récepteur : installe AbletonOSC, LTC,
   X-Fader et l'agent RTP-MIDI bidirectionnel. L'agent démarre automatiquement à
   l'ouverture de session.
-- Simulateur de consoles : intégré à CL MIDI Network Assistant. Le mode IAC
+- Simulateur de consoles : intégré à CL MIDI Network Manager. Le mode IAC
   teste uniquement le Mac local ; le mode RTP teste le trajet réseau. Les deux
   modes sont exclusifs et la simulation s'arrête avec l'Assistant.
 
@@ -55,7 +55,7 @@ Macs sont découverts sur le réseau par Bonjour.
 EMPLACEMENTS UTILISÉS
 
 Application :
-~/Applications/CL Audio Controller.app
+~/Applications/CL Audio Show Control.app
 
 AbletonOSC :
 ~/Music/Ableton/User Library/Remote Scripts/AbletonOSC

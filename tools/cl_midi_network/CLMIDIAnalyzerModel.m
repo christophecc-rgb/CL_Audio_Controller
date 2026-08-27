@@ -289,6 +289,8 @@ static NSDateFormatter *CLMIDIAnalyzerClock(void)
     if (self.typeFilter.length > 0 &&
         [record.commandTypeText rangeOfString:self.typeFilter options:NSCaseInsensitiveSearch].location == NSNotFound)
         return NO;
+    if (self.channelFilter != nil && ![record.event.channel isEqualToNumber:self.channelFilter])
+        return NO;
     if (self.sourceFilter.length > 0 &&
         [record.sourceText rangeOfString:self.sourceFilter options:NSCaseInsensitiveSearch].location == NSNotFound)
         return NO;
@@ -310,6 +312,11 @@ static NSDateFormatter *CLMIDIAnalyzerClock(void)
             return [self isRecordVisible:record];
         }];
     self.cachedVisibleRecords = [self.mutableRecords filteredArrayUsingPredicate:predicate];
+}
+
+- (void)refreshVisibleRecords
+{
+    [self rebuildVisibleRecords];
 }
 
 - (void)addRecord:(CLMIDIAnalyzerRecord *)record
@@ -343,6 +350,12 @@ static NSDateFormatter *CLMIDIAnalyzerClock(void)
 - (void)setTypeFilter:(NSString *)typeFilter
 {
     _typeFilter = [typeFilter copy];
+    [self rebuildVisibleRecords];
+}
+
+- (void)setChannelFilter:(NSNumber *)channelFilter
+{
+    _channelFilter = channelFilter;
     [self rebuildVisibleRecords];
 }
 

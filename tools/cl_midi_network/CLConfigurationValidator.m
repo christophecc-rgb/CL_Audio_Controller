@@ -8,8 +8,15 @@ static NSDictionary *CLItem(CLCheckLevel level, NSString *section, NSString *tit
 static NSString *CLArgument(NSString *command, NSString *name) {
     NSRange range = [command rangeOfString:[name stringByAppendingString:@" "]]; if (range.location == NSNotFound) return @"";
     NSString *tail = [command substringFromIndex:NSMaxRange(range)];
-    if ([tail hasPrefix:@"\""]) { NSRange end = [tail rangeOfString:@"\"" options:0 range:NSMakeRange(1, tail.length - 1)]; return end.location == NSNotFound ? @"" : [tail substringWithRange:NSMakeRange(1, end.location - 1)]; }
-    return [tail componentsSeparatedByCharactersInSet:NSCharacterSet.whitespaceCharacterSet].firstObject ?: @"";
+    NSRegularExpression *nextOption = [NSRegularExpression regularExpressionWithPattern:@"\\s--[[:alnum:]][[:alnum:]-]*(?:\\s|$)" options:0 error:nil];
+    NSRange boundary = [nextOption rangeOfFirstMatchInString:tail options:0 range:NSMakeRange(0, tail.length)];
+    NSString *value = [[tail substringToIndex:boundary.location == NSNotFound ? tail.length : boundary.location]
+        stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    if (value.length >= 2) {
+        unichar first = [value characterAtIndex:0], last = [value characterAtIndex:value.length - 1];
+        if ((first == '"' && last == '"') || (first == '\'' && last == '\'')) value = [value substringWithRange:NSMakeRange(1, value.length - 2)];
+    }
+    return value;
 }
 
 @interface CLConfigurationReport ()

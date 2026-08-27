@@ -125,7 +125,7 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('désactivez Entrée RTP > Piste', source)
         self.assertNotIn('Routages actifs : Aucun · une seule paire RTP', source)
         self.assertIn('SIMULATEUR DE RETOUR CONSOLE', source)
-        self.assertIn('@[@"Test local · retour dédié", @"Test distant · RTP"]', source)
+        self.assertIn('@[@"Ableton local", @"Ableton distant"]', source)
         self.assertIn('startIntegratedSimulator:', source)
         self.assertIn('cl-midi-rtp-control', source)
         self.assertIn('launchSimulatorDevice:', source)
@@ -139,7 +139,7 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('preferredRtpPeer', source)
         self.assertIn('paradis_latin_logo.jpg', source)
         self.assertIn('accentButton:', source)
-        self.assertIn('CL MIDI NETWORK ASSISTANT', source)
+        self.assertIn('CL MIDI NETWORK MANAGER', source)
         self.assertIn('CL AUDIO · MIDI NETWORK · 2026', source)
         self.assertIn('stylePopup:', source)
         self.assertIn('Connexion système vers', source)
@@ -152,8 +152,8 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('@"Vérifier RTP"', source)
         simulator_method = source.split('- (void)createIntegratedSimulatorPanelInView:', 1)[1].split('- (BOOL)applicationShouldTerminateAfterLastWindowClosed:', 1)[0]
         self.assertIn('SIMULATEUR DE RETOUR CONSOLE', simulator_method)
-        self.assertIn('Test local · retour dédié', simulator_method)
-        self.assertIn('Test distant · RTP', simulator_method)
+        self.assertIn('Ableton local', simulator_method)
+        self.assertIn('Ableton distant', simulator_method)
         self.assertIn('CLYamahaConsoleSimulator', simulator_method)
         self.assertIn('startIntegratedSimulator:', simulator_method)
         self.assertIn('stopIntegratedSimulator:', simulator_method)
@@ -211,7 +211,7 @@ class MidiNetworkToolsTests(unittest.TestCase):
         presentation = source.split('- (void)applyPresentationMode', 1)[1].split('- (void)updateRoundTripPanelForCurrentMode', 1)[0]
         mode_changed = source.split('- (void)simulatorModeChanged:', 1)[1].split('- (NSTask *)launchSimulatorDevice:', 1)[0]
 
-        self.assertIn('self.localReturnMode = self.returnModeMenu.indexOfSelectedItem == 1', setup)
+        self.assertIn('self.localReturnMode = self.returnModeMenu.indexOfSelectedItem == 0', setup)
         self.assertIn('[self updateRoundTripPanelForCurrentMode]', setup)
         self.assertIn('self.localReturnMode = mode == 0', mode_changed)
         self.assertIn('[self updateRoundTripPanelForCurrentMode]', mode_changed)
@@ -226,6 +226,35 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertNotIn('System Events', local_state)
         self.assertIn('DIAGNOSTIC DISTANT · VÉRIFIER RTP', updater)
         self.assertIn('Vérifier RTP', updater)
+
+    def test_local_assistant_layout_collapses_the_hidden_rtp_test_space(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        layout = source.split('- (void)layoutAssistantViewForRTPMode:(BOOL)rtpMode {', 1)[1].split('\n}', 1)[0]
+        self.assertIn('rtpMode ? 850 : 750', layout)
+        self.assertIn('rtpMode ? 0.0 : -100.0', layout)
+        self.assertIn('self.assistantReturnPanel.frame = NSMakeRect(16, 293, 468, 88)', layout)
+        self.assertIn('self.simulatorPanel.frame = NSMakeRect(16, 63, 468, 220)', layout)
+
+    def test_console_return_cards_keep_cl5_and_ql1_identity_colors(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        cards = source.split('- (void)updateConsoleReturnCards {', 1)[1].split('- (void)refreshAbletonSceneTitle', 1)[0]
+        self.assertIn('BOOL isCL5', cards)
+        self.assertIn('colorWithRed:0.608 green:0.420 blue:0.839', cards)
+        self.assertIn('colorWithRed:0.247 green:0.608 blue:0.349', cards)
+        self.assertIn('card.layer.borderColor = consoleAccent.CGColor', cards)
+        self.assertIn('programLabel.textColor = consoleAccent', cards)
+        self.assertIn('index == 1 ? compactComparison', cards)
+
+    def test_integrated_simulator_has_clear_console_rows_and_no_duplicate_details_button(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        panel = source.split('- (void)createIntegratedSimulatorPanelInView:', 1)[1].split('- (void)sendSimulatorMemory:', 1)[0]
+        self.assertIn('NSView *cl5Row', panel)
+        self.assertIn('NSView *ql1Row', panel)
+        self.assertIn('@"CL5 · Canal 1"', panel)
+        self.assertIn('@"QL1 · Canal 2"', panel)
+        self.assertIn('@"Délai"', panel)
+        self.assertNotIn('@"Afficher les détails"', panel)
+        self.assertIn('NSMakeRect(16, 153, 468, 220)', panel)
 
     def test_rtp_settings_script_finds_the_network_globe_by_accessibility_text(self):
         source = (TOOLS / "open_rtp_settings.applescript").read_text()
@@ -300,13 +329,14 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('Titre Ableton en attente', source)
         self.assertIn('http://127.0.0.1:5050/status', source)
         self.assertIn('playing_scene_name', source)
-        self.assertIn('colorWithRed:0.070 green:0.086 blue:0.110', source)
+        self.assertIn('colorWithRed:0.608 green:0.420 blue:0.839', source)
+        self.assertIn('colorWithRed:0.247 green:0.608 blue:0.349', source)
         self.assertIn('CL_MIDI_Console_State.json', source)
         self.assertIn('--background-monitor', source)
         self.assertNotIn('ltc_timecode', source)
         self.assertIn('@"Diagnostic détaillé"', source)
         self.assertIn('@"Vue Assistant"', source)
-        self.assertIn('setContentSize:NSMakeSize(500, 850)', source)
+        self.assertIn('setContentSize:NSMakeSize(500, rtpMode ? 850 : 750)', source)
         self.assertIn('setContentSize:NSMakeSize(500, 1100)', source)
         self.assertIn('self.technicalPanel.hidden = !detailed', source)
         self.assertIn('RÉSEAUX CONSOLES', source)
@@ -414,9 +444,11 @@ class MidiNetworkToolsTests(unittest.TestCase):
 
     def test_dashboard_separates_console_return_from_local_fallback(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text()
-        self.assertIn('@[@"RTP distant", @"Test local dédié"]', source)
+        self.assertIn('@[@"Ableton local", @"Ableton distant"]', source)
         self.assertIn('@"rtp_remote"', source)
         self.assertIn('@"local_dedicated"', source)
+        self.assertIn('@"http://127.0.0.1:5055/network-config"', source)
+        self.assertIn('[self synchronizeOperatingMode]', source)
 
     def test_remote_console_menu_excludes_internal_midi_endpoints(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
@@ -432,10 +464,13 @@ class MidiNetworkToolsTests(unittest.TestCase):
         changed = source.split('- (void)returnModeChanged:', 1)[1].split('- (void)targetChanged:', 1)[0]
         run_test = source.split('- (void)runTest:', 1)[1].split('- (void)openMidiSetup:', 1)[0]
         selector = source.split('- (void)selectPassiveReturnSourceNamed:', 1)[1].split('- (void)updateCompactSummary', 1)[0]
-        self.assertIn('self.localReturnMode = self.returnModeMenu.indexOfSelectedItem == 1', changed)
-        self.assertIn('self.returnMonitorStatus = self.localReturnDestination ? noErr', changed)
-        self.assertIn('CLPreferredConsoleReturnEndpoint(EndpointNames(YES))', changed)
-        self.assertIn('[self selectPassiveReturnSourceNamed:preferred]', changed)
+        simulator_changed = source.split('- (void)simulatorModeChanged:', 1)[1].split('- (NSTask *)launchSimulatorDevice:', 1)[0]
+        self.assertIn('[self requestOperatingMode:self.returnModeMenu.indexOfSelectedItem == 0 ? @"local" : @"remote"]', changed)
+        self.assertIn('self.localReturnMode = local', changed)
+        self.assertIn('[self simulatorModeChanged:nil]', changed)
+        self.assertIn('self.returnMonitorStatus = self.localReturnDestination ? noErr', simulator_changed)
+        self.assertIn('CLPreferredConsoleReturnEndpoint(EndpointNames(YES))', simulator_changed)
+        self.assertIn('[self selectPassiveReturnSourceNamed:preferred]', simulator_changed)
         self.assertIn('if (self.localReturnMode)', run_test)
         self.assertIn('[name isEqualToString:CLExpectedEndpointName]', selector)
         self.assertIn('[name isEqualToString:CLLocalReturnEndpointName]', selector)
@@ -600,8 +635,8 @@ class MidiNetworkToolsTests(unittest.TestCase):
         manual = dashboard.split('- (void)sendSimulatorMemory:', 1)[1].split(
             '- (void)simulatorModeChanged:', 1
         )[0]
-        self.assertIn('@"DESTINATION RTP"', dashboard)
-        self.assertIn('@"SOURCE AUTOMATIQUE"', dashboard)
+        self.assertIn('@"DESTINATION"', dashboard)
+        self.assertIn('@"SOURCE AUTO"', dashboard)
         self.assertIn('@"Aucune"', dashboard)
         self.assertIn('CLSimulatorInputEndpointNames()', dashboard)
         self.assertIn('if (input.length && ![input isEqualToString:@"Aucune"])', launch)
@@ -626,10 +661,10 @@ class MidiNetworkToolsTests(unittest.TestCase):
         setup = source.split('- (void)createIntegratedSimulatorPanelInView:', 1)[1].split(
             '- (void)sendSimulatorMemory:', 1
         )[0]
-        self.assertIn('NSMakeRect(14, 122, 140, 28)', setup)
-        self.assertIn('NSMakeRect(160, 122, 140, 28)', setup)
-        self.assertIn('NSMakeRect(306, 122, 148, 28)', setup)
-        self.assertIn('NSMakeRect(220, 90, 54, 26)', setup)
+        self.assertIn('NSMakeRect(14, 143, 170, 28)', setup)
+        self.assertIn('NSMakeRect(190, 143, 130, 28)', setup)
+        self.assertIn('NSMakeRect(326, 143, 128, 28)', setup)
+        self.assertIn('NSMakeRect(206, 6, 54, 26)', setup)
         self.assertNotIn('NSMakeRect(258, 86, 196, 28)', setup)
 
     def test_rtp_timeout_explains_missing_remote_return_without_blame_on_iac(self):

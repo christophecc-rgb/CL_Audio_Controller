@@ -8,9 +8,11 @@ ROOT = Path(__file__).resolve().parents[1]
 class ConfigurationCheckerPackagingTests(unittest.TestCase):
     def test_bundle_identity_and_version_are_canonical(self):
         script = (ROOT / "scripts" / "build_configuration_checker_app.sh").read_text()
-        self.assertIn('APP_NAME="CL Audio Configuration Checker"', script)
+        self.assertIn('APP_NAME="CL MIDI & RTP Diagnostic"', script)
+        self.assertIn('PLIST_APP_NAME="CL MIDI &amp; RTP Diagnostic"', script)
         self.assertIn('BUNDLE_ID="com.claudio.configurationchecker"', script)
         self.assertIn('VERSION="${1:-0.1.0}"', script)
+        self.assertIn('paradis_latin_logo.jpg', script)
         self.assertNotIn("Cel Audio", script)
 
     def test_packaging_does_not_install_or_change_functional_sources(self):

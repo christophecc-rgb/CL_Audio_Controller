@@ -1,4 +1,4 @@
-# CL Audio Configuration Checker — packaging macOS
+# CL MIDI & RTP Diagnostic — packaging macOS
 
 Le bundle est reconstruit sans installation avec :
 

@@ -17,20 +17,22 @@
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
     (void)notification; self.profile = [CLConfigurationProfile templateForRole:@"server"];
     self.window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 720, 650) styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable backing:NSBackingStoreBuffered defer:NO];
-    self.window.title = @"CL Audio Configuration Checker"; [self.window center]; NSView *content = self.window.contentView; content.wantsLayer = YES; content.layer.backgroundColor = [NSColor colorWithRed:0.055 green:0.065 blue:0.085 alpha:1].CGColor;
-    NSTextField *title = [self label:@"CL AUDIO CONFIGURATION CHECKER" frame:NSMakeRect(24, 602, 430, 28) size:19 bold:YES]; title.textColor = NSColor.whiteColor; [content addSubview:title];
+    self.window.title = @"CL MIDI & RTP Diagnostic"; [self.window center]; NSView *content = self.window.contentView; content.wantsLayer = YES; content.layer.backgroundColor = [NSColor colorWithRed:0.055 green:0.065 blue:0.085 alpha:1].CGColor;
+    NSTextField *title = [self label:@"CL MIDI & RTP DIAGNOSTIC" frame:NSMakeRect(24, 602, 430, 28) size:19 bold:YES]; title.textColor = [NSColor colorWithRed:0.243 green:0.620 blue:0.839 alpha:1.0]; [content addSubview:title];
+    NSImage *paradisLogo = [NSImage imageNamed:@"paradis_latin_logo"] ?: [[NSImage alloc] initWithContentsOfFile:[NSBundle.mainBundle pathForResource:@"paradis_latin_logo" ofType:@"jpg"]];
+    NSImageView *paradisLogoView = [[NSImageView alloc] initWithFrame:NSMakeRect(488, 596, 204, 40)]; paradisLogoView.image = paradisLogo; paradisLogoView.imageScaling = NSImageScaleProportionallyUpOrDown; paradisLogoView.imageAlignment = NSImageAlignRight; [content addSubview:paradisLogoView];
     self.profileLabel = [self label:self.profile.name frame:NSMakeRect(24, 560, 280, 26) size:13 bold:YES]; self.profileLabel.textColor = [NSColor colorWithWhite:0.88 alpha:1]; [content addSubview:self.profileLabel];
-    self.roleMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(318, 558, 190, 30)]; [self.roleMenu addItemsWithTitles:@[@"MAC SERVEUR", @"ABLETON DISTANT"]]; self.roleMenu.target = self; self.roleMenu.action = @selector(roleChanged:); [content addSubview:self.roleMenu];
+    self.roleMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(318, 558, 190, 30)]; [self.roleMenu addItemsWithTitles:@[@"ABLETON LOCAL", @"ABLETON DISTANT"]]; self.roleMenu.target = self; self.roleMenu.action = @selector(roleChanged:); [content addSubview:self.roleMenu];
     [content addSubview:[self button:@"VÉRIFIER" x:526 y:558 width:166 action:@selector(check:)]];
     self.stateLabel = [self label:@"● EN ATTENTE" frame:NSMakeRect(24, 518, 668, 30) size:18 bold:YES]; self.stateLabel.textColor = NSColor.systemOrangeColor; [content addSubview:self.stateLabel];
     NSScrollView *scroll = [[NSScrollView alloc] initWithFrame:NSMakeRect(24, 112, 668, 394)]; scroll.hasVerticalScroller = YES; scroll.borderType = NSBezelBorder;
     self.details = [[NSTextView alloc] initWithFrame:scroll.bounds]; self.details.editable = NO; self.details.selectable = YES; self.details.font = [NSFont monospacedSystemFontOfSize:11 weight:NSFontWeightRegular]; self.details.textColor = [NSColor colorWithWhite:0.88 alpha:1]; self.details.backgroundColor = [NSColor colorWithRed:0.035 green:0.042 blue:0.055 alpha:1]; self.details.string = @"Cliquez sur VÉRIFIER. Aucun réglage système ne sera modifié."; scroll.documentView = self.details; [content addSubview:scroll];
     self.progress = [[NSProgressIndicator alloc] initWithFrame:NSMakeRect(24, 88, 668, 12)]; self.progress.indeterminate = YES; self.progress.hidden = YES; [content addSubview:self.progress];
-    [content addSubview:[self button:@"SAUVEGARDER COMME PROFIL" x:24 y:52 width:220 action:@selector(saveProfile:)]];
-    [content addSubview:[self button:@"CHARGER / IMPORTER" x:252 y:52 width:180 action:@selector(loadProfile:)]];
-    [content addSubview:[self button:@"DUPLIQUER" x:440 y:52 width:116 action:@selector(duplicateProfile:)]];
-    [content addSubview:[self button:@"EXPORTER JSON" x:564 y:52 width:128 action:@selector(exportProfile:)]];
-    NSTextField *safety = [self label:@"Lecture seule · aucun processus, endpoint, Program Change ou réglage système n’est modifié." frame:NSMakeRect(24, 18, 668, 22) size:10 bold:NO]; safety.textColor = [NSColor colorWithWhite:0.58 alpha:1]; [content addSubview:safety];
+    [content addSubview:[self button:@"ENREGISTRER LE PROFIL" x:24 y:52 width:220 action:@selector(saveProfile:)]];
+    [content addSubview:[self button:@"OUVRIR UN PROFIL" x:252 y:52 width:180 action:@selector(loadProfile:)]];
+    [content addSubview:[self button:@"COPIER TOUT" x:24 y:14 width:124 action:@selector(copyAllText:)]];
+    [content addSubview:[self button:@"EXPORTER TEXTE…" x:156 y:14 width:170 action:@selector(exportTextReport:)]];
+    NSTextField *safety = [self label:@"Lecture seule · aucun réglage système n’est modifié." frame:NSMakeRect(338, 19, 354, 22) size:10 bold:NO]; safety.textColor = [NSColor colorWithWhite:0.58 alpha:1]; [content addSubview:safety];
     [self.window makeKeyAndOrderFront:nil]; [NSApp activateIgnoringOtherApps:YES];
 }
 - (void)roleChanged:(id)sender { (void)sender; self.profile = [CLConfigurationProfile templateForRole:self.roleMenu.indexOfSelectedItem == 0 ? @"server" : @"ableton_remote"]; self.profileLabel.stringValue = self.profile.name; self.stateLabel.stringValue = @"● EN ATTENTE"; self.details.string = @"Profil modèle chargé. Renseignez une référence par import JSON ou sauvegardez l’état courant après vérification."; }
@@ -69,12 +71,21 @@
 }
 - (void)showError:(NSError *)error { NSAlert *alert = [NSAlert new]; alert.messageText = @"Opération impossible"; alert.informativeText = error.localizedDescription ?: @"Erreur inconnue"; [alert runModal]; }
 - (void)saveProfile:(id)sender {
-    (void)sender; NSAlert *dialog = [NSAlert new]; dialog.messageText = @"Sauvegarder comme profil"; dialog.informativeText = @"Nom du profil de référence"; NSTextField *input = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 320, 24)]; input.stringValue = self.profile.name; dialog.accessoryView = input; [dialog addButtonWithTitle:@"Sauvegarder"]; [dialog addButtonWithTitle:@"Annuler"]; if ([dialog runModal] != NSAlertFirstButtonReturn) return;
+    (void)sender; NSAlert *dialog = [NSAlert new]; dialog.messageText = @"Enregistrer le profil"; dialog.informativeText = @"Nom du profil de référence"; NSTextField *input = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 320, 24)]; input.stringValue = self.profile.name; dialog.accessoryView = input; [dialog addButtonWithTitle:@"Enregistrer"]; [dialog addButtonWithTitle:@"Annuler"]; if ([dialog runModal] != NSAlertFirstButtonReturn) return;
     CLConfigurationProfile *profile = [self profileFromInspectionNamed:input.stringValue]; NSURL *url = [[CLConfigurationProfile profilesDirectory] URLByAppendingPathComponent:[[input.stringValue stringByReplacingOccurrencesOfString:@"/" withString:@"-"] stringByAppendingPathExtension:@"json"]]; NSError *error = nil; if (![profile writeToURL:url overwrite:NO error:&error]) { [self showError:error]; return; } self.profile = profile; self.profileLabel.stringValue = profile.name;
 }
 - (void)loadProfile:(id)sender { (void)sender; NSOpenPanel *panel = [NSOpenPanel openPanel]; panel.allowedFileTypes = @[@"json"]; panel.allowsMultipleSelection = NO; panel.directoryURL = [CLConfigurationProfile profilesDirectory]; if ([panel runModal] != NSModalResponseOK) return; NSError *error = nil; CLConfigurationProfile *profile = [CLConfigurationProfile loadFromURL:panel.URL error:&error]; if (!profile) { [self showError:error]; return; } self.profile = profile; self.profileLabel.stringValue = profile.name; [self.roleMenu selectItemAtIndex:[profile.machineRole isEqualToString:@"server"] ? 0 : 1]; self.stateLabel.stringValue = @"● PROFIL CHARGÉ"; }
-- (void)duplicateProfile:(id)sender { (void)sender; NSString *name = [self.profile.name stringByAppendingString:@" — copie"]; CLConfigurationProfile *copy = [CLConfigurationProfile profileWithValues:[self.profile.values mutableCopy] error:nil]; NSMutableDictionary *values = [copy.values mutableCopy]; values[@"profile_name"] = name; copy = [CLConfigurationProfile profileWithValues:values error:nil]; NSURL *url = [[CLConfigurationProfile profilesDirectory] URLByAppendingPathComponent:[[name stringByReplacingOccurrencesOfString:@"/" withString:@"-"] stringByAppendingPathExtension:@"json"]]; NSError *error = nil; if (![copy writeToURL:url overwrite:NO error:&error]) [self showError:error]; else { self.profile = copy; self.profileLabel.stringValue = copy.name; } }
-- (void)exportProfile:(id)sender { (void)sender; NSSavePanel *panel = [NSSavePanel savePanel]; panel.nameFieldStringValue = [[self.profile.name stringByReplacingOccurrencesOfString:@"/" withString:@"-"] stringByAppendingPathExtension:@"json"]; if ([panel runModal] != NSModalResponseOK) return; NSError *error = nil; if (![self.profile writeToURL:panel.URL overwrite:YES error:&error]) [self showError:error]; }
+- (NSString *)textReport {
+    NSString *role = [self.profile.machineRole isEqualToString:@"server"] ? @"ABLETON LOCAL" : @"ABLETON DISTANT";
+    return [NSString stringWithFormat:@"CL MIDI & RTP DIAGNOSTIC\nProfil : %@\nRôle : %@\nÉtat : %@\n\n%@\n", self.profile.name ?: @"", role, self.stateLabel.stringValue ?: @"", self.details.string ?: @""];
+}
+- (void)copyAllText:(id)sender {
+    (void)sender; NSPasteboard *pasteboard = NSPasteboard.generalPasteboard; [pasteboard clearContents]; [pasteboard setString:[self textReport] forType:NSPasteboardTypeString];
+}
+- (void)exportTextReport:(id)sender {
+    (void)sender; NSSavePanel *panel = [NSSavePanel savePanel]; panel.allowedFileTypes = @[@"txt"]; panel.nameFieldStringValue = @"CL MIDI & RTP Diagnostic.txt"; if ([panel runModal] != NSModalResponseOK) return;
+    NSError *error = nil; if (![[self textReport] writeToURL:panel.URL atomically:YES encoding:NSUTF8StringEncoding error:&error]) [self showError:error];
+}
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender { (void)sender; return YES; }
 @end
 

@@ -84,6 +84,7 @@ static void CLInstallApplicationMenu(void) {
     self.window.backgroundColor = [NSColor colorWithRed:.035 green:.045 blue:.06 alpha:1];
     [self.window center]; [self.window makeKeyAndOrderFront:nil]; [NSApp activateIgnoringOtherApps:YES];
     NSView *view = self.window.contentView;
+    NSTextField *appTitle = [self label:@"CL MIDI PERFORMANCE MONITOR" frame:NSMakeRect(24,362,470,20) size:13 bold:YES]; appTitle.textColor = [NSColor colorWithRed:0.396 green:0.341 blue:0.784 alpha:1.0]; [view addSubview:appTitle];
     self.headline = [self label:@"PRÊT À MESURER" frame:NSMakeRect(24,325,470,36) size:24 bold:YES];
     self.headline.textColor = [NSColor colorWithRed:.35 green:.85 blue:.55 alpha:1]; [view addSubview:self.headline];
     [view addSubview:[self label:@"Mesure passive · aucun périphérique ajouté dans Ableton" frame:NSMakeRect(25,302,470,20) size:11 bold:NO]];
