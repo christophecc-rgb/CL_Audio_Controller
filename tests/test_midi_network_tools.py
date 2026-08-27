@@ -577,6 +577,17 @@ class MidiNetworkToolsTests(unittest.TestCase):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
         self.assertIn('Gestionnaire IAC Bus 1 est exclusivement la source expected', source)
         self.assertIn('[CLSimulatorInputEndpointNames() containsObject:CLExpectedEndpointName]', source)
+        manual_send = source.split('- (void)sendSimulatorMemory:', 1)[1].split('- (void)simulatorModeChanged:', 1)[0]
+        self.assertIn('self.localReturnMode ? CLLocalReturnEndpointName', manual_send)
+        self.assertNotIn('self.localReturnMode ? CLExpectedEndpointName', manual_send)
+
+    def test_secondary_window_refreshes_canonical_expected_state_from_shared_monitor(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        loader = source.split('- (void)loadPublishedConsoleReturnState', 1)[1].split('- (void)writeConsoleReturnState', 1)[0]
+        cards = source.split('- (void)updateConsoleReturnCards {', 1)[1].split('- (void)refreshAbletonSceneTitle', 1)[0]
+        self.assertIn('self.expectedCL5State = cl5', loader)
+        self.assertIn('self.expectedQL1State = ql1', loader)
+        self.assertIn('BOOL showReturnedAsPrimary = confirmed || mismatch || !hasExpectedProgram', cards)
 
     def test_local_and_rtp_return_transports_keep_expected_monitor_independent(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")

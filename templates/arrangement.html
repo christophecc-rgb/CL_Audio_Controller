@@ -522,10 +522,10 @@ body.is-arrangement-paused .card.current {
     }
 
     .midi-return.state-waiting {
-      border-color:#ffd34f !important;
-      background:rgba(239,193,79,.08) !important;
-      box-shadow:0 0 0 1px rgba(239,193,79,.12) !important;
-      animation:midiWaitingPulse .3s ease-in-out infinite alternate !important;
+      border-color:var(--console-accent) !important;
+      background:#15181d !important;
+      box-shadow:0 0 0 1px color-mix(in srgb, var(--console-accent) 22%, transparent) !important;
+      animation:midiWaitingPulse .30s ease-in-out infinite alternate !important;
     }
 
     .midi-return.state-confirmed {
@@ -543,17 +543,26 @@ body.is-arrangement-paused .card.current {
     }
 
     .midi-return.state-timeout {
-      border-color:#e8913a !important;
-      background:rgba(130,75,24,.28) !important;
-      box-shadow:0 0 0 2px rgba(232,145,58,.18),0 0 12px rgba(232,145,58,.20) !important;
+      border-color:var(--console-accent) !important;
+      background:#15181d !important;
+      box-shadow:0 0 0 1px color-mix(in srgb, var(--console-accent) 20%, transparent) !important;
       animation:none !important;
     }
 
     @keyframes midiWaitingPulse {
       from {
-        background:rgba(239,193,79,.06);
-        box-shadow:0 0 0 0 rgba(239,193,79,.08);
+        border-color:color-mix(in srgb, var(--console-accent) 48%, #15181d);
+        box-shadow:
+          0 0 0 1px color-mix(in srgb, var(--console-accent) 12%, transparent);
       }
+      to {
+        border-color:var(--console-accent);
+        box-shadow:
+          0 0 0 2px color-mix(in srgb, var(--console-accent) 40%, transparent),
+          0 0 12px color-mix(in srgb, var(--console-accent) 34%, transparent);
+      }
+    }
+
       to {
         background:rgba(239,193,79,.38);
         box-shadow:0 0 0 3px rgba(239,193,79,.34),0 0 16px rgba(239,193,79,.44);
@@ -585,7 +594,29 @@ body.is-arrangement-paused .card.current {
       }
     }
 
+
+/* Arrangement — informations temporelles compactes */
+.card.current .meta,
+.card.next .meta {
+  min-height: 14px;
+  margin-top: 4px;
+  font-size: 10px;
+  line-height: 1.15;
+  font-weight: 650;
+  letter-spacing: .015em;
+  white-space: normal;
+}
+
+.card.current .meta {
+  color: #aebbc9;
+}
+
+.card.next .meta {
+  color: #8ea4bb;
+}
+
 </style>
+  <link rel="stylesheet" href="/static/cl-skins.css?v=20260827-142046">
 </head>
 <body>
   <main class="wrap">
@@ -700,6 +731,7 @@ body.is-arrangement-paused .card.current {
     let arrangementReturnActive = false;
     let pendingGotoIndex = null;
     let manualNextIndex = null;
+    let latestArrangementTime = 0;
     let lastAcceptedGeneration = -1;
 
     function resetArrangementUiForGeneration() {
@@ -775,6 +807,81 @@ body.is-arrangement-paused .card.current {
   return cleanTitle(marker.name || 'Repère');
 }
 
+    function formatConduiteDuration(seconds) {
+      const value = Math.max(0, Number(seconds) || 0);
+      const total = Math.floor(value);
+      const hours = Math.floor(total / 3600);
+      const minutes = Math.floor((total % 3600) / 60);
+      const secs = total % 60;
+
+      if (hours > 0) {
+        return String(hours).padStart(2, '0') + ':' +
+          String(minutes).padStart(2, '0') + ':' +
+          String(secs).padStart(2, '0');
+      }
+
+      return String(minutes).padStart(2, '0') + ':' +
+        String(secs).padStart(2, '0');
+    }
+
+    function markerDuration(index) {
+      if (
+        index < 0 ||
+        index >= markers.length ||
+        !markers[index]
+      ) return null;
+
+      const start = Number(markers[index].time || 0);
+
+      if (index + 1 >= markers.length || !markers[index + 1]) {
+        return null;
+      }
+
+      const end = Number(markers[index + 1].time || 0);
+      const duration = end - start;
+
+      return Number.isFinite(duration) && duration >= 0
+        ? duration
+        : null;
+    }
+
+    function renderConduiteTimes(current, currentIdx, next, nextIdx) {
+      const playhead = Math.max(0, Number(latestArrangementTime) || 0);
+
+      if (current && currentIdx >= 0) {
+        const start = Number(current.time || 0);
+        const elapsed = Math.max(0, playhead - start);
+
+        let remaining = null;
+
+        if (markers[currentIdx + 1]) {
+          const end = Number(markers[currentIdx + 1].time || 0);
+          remaining = Math.max(0, end - playhead);
+        }
+
+        currentMetaEl.textContent =
+          'Temps en cours ' + formatConduiteDuration(elapsed) +
+          (remaining !== null
+            ? '  ·  Restant ' + formatConduiteDuration(remaining)
+            : '');
+      } else {
+        currentMetaEl.textContent = '';
+      }
+
+      if (next && nextIdx >= 0) {
+        const start = Number(next.time || 0);
+        const duration = markerDuration(nextIdx);
+
+        nextMetaEl.textContent =
+          'Début ' + formatConduiteDuration(start) +
+          (duration !== null
+            ? '  ·  Durée ' + formatConduiteDuration(duration)
+            : '');
+      } else {
+        nextMetaEl.textContent = '';
+      }
+    }
+
     function clampIndexes() {
       if (!markers.length) { currentIndex = -1; nextIndex = -1; return; }
       if (currentIndex >= markers.length) currentIndex = markers.length - 1;
@@ -801,9 +908,13 @@ body.is-arrangement-paused .card.current {
     ? cleanTitle(next.name || 'Repère')
     : '—';
 
-  // Plus aucune info secondaire sous les titres
-  currentMetaEl.textContent = '';
-  nextMetaEl.textContent = '';
+  // Informations de conduite compactes
+  renderConduiteTimes(
+    current,
+    currentIndex,
+    next,
+    displayNextIndex
+  );
 
   if (!markerSelectIsOpen && markerSelectEl && markers[displayNextIndex] && pendingGotoIndex === null) {
     markerSelectEl.value = String(displayNextIndex);
@@ -1070,6 +1181,11 @@ body.is-arrangement-paused .card.current {
       }
 
       setStatus((connected ? '● ' : '○ ') + ((state && state.message) || (connected ? 'Connecté' : 'Interface non connectée')), connected);
+      latestArrangementTime = Math.max(
+        0,
+        Number(state && state.arrangement_time || 0)
+      );
+
       setMarkers(state && state.arrangement_markers, state);
       advanceNextWhenPlayheadPassed(state);
       // Debug block removed
@@ -1468,5 +1584,6 @@ markerSelectEl.addEventListener('change', () => {
       );
     }, { once: true });
   </script>
+  <script src="/static/cl-skins.js?v=20260827-142046" defer></script>
 </body>
 </html>

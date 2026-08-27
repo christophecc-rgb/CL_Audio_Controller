@@ -76,4 +76,30 @@ scenario('session');
 scenario('arrangement');
 scenario('session-mismatch', 'mismatch');
 scenario('arrangement-mismatch', 'mismatch');
-console.log('midi-return-visual: 4 scénarios réussis');
+
+// Le backend peut encore annoncer "waiting" à la fin des 600 ms, puis
+// publier le timeout au polling suivant. Ce timeout doit arrêter le flash.
+{
+  let now = 0;
+  const frames = [];
+  const timers = [];
+  const states = [];
+  const controller = createController({
+    now: () => now,
+    requestFrame: callback => frames.push(callback),
+    setTimer: (callback, delay) => { timers.push({at: now + delay, callback}); return timers.length; },
+    clearTimer: () => {},
+    applyState: state => states.push(state)
+  });
+  const payload = {expectedKey: 'late-timeout', hasExpected: true, backendState: 'waiting', finalKey: ''};
+  controller.update(payload);
+  frames.shift()();
+  now = 600;
+  timers.shift().callback();
+  assert.equal(states.at(-1), 'waiting', 'attente conservée tant que le backend attend');
+  now = 2100;
+  controller.update({...payload, backendState: 'timeout'});
+  assert.equal(states.at(-1), 'timeout', 'le timeout tardif arrête le flash');
+}
+
+console.log('midi-return-visual: 5 scénarios réussis');

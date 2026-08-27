@@ -779,6 +779,8 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     NSDictionary *payload = data.length ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
     if (![payload[@"service"] isEqualToString:@"cl-midi-console-monitor"]) return;
     NSDictionary *cl5 = payload[@"cl5"], *ql1 = payload[@"ql1"];
+    self.expectedCL5State = cl5;
+    self.expectedQL1State = ql1;
     if (cl5[@"expected_midi_program"] != nil && cl5[@"expected_midi_program"] != NSNull.null) {
         self.expectedCL5Program = [cl5[@"expected_midi_program"] integerValue];
         self.expectedCL5ProgramAt = [NSDate dateWithTimeIntervalSince1970:[cl5[@"expected_activated_at"] doubleValue]];
@@ -1055,8 +1057,9 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
         for (NSUInteger index = 0; index < cards.count; index++) {
             if (cards[index] == NSNull.null) continue;
             NSView *card = cards[index]; NSTextField *programLabel = programLabels[index]; NSTextField *titleLabel = titleLabels[index]; NSTextField *stateLabel = stateLabels[index];
-            NSInteger mainProgram = hasReturn ? receivedScene : expectedProgram;
-            NSString *mainTitle = hasReturn ? returnedTitle : expectedTitle;
+            BOOL showReturnedAsPrimary = confirmed || mismatch || !hasExpectedProgram;
+            NSInteger mainProgram = showReturnedAsPrimary && hasReturn ? receivedScene : expectedProgram;
+            NSString *mainTitle = showReturnedAsPrimary && hasReturn ? returnedTitle : expectedTitle;
             programLabel.stringValue = mainProgram >= 0
                 ? [NSString stringWithFormat:@"%@ · Mémoire %ld · %@", console[@"name"], (long)mainProgram, mainTitle]
                 : [NSString stringWithFormat:@"%@ · Mémoire — · Titre non résolu", console[@"name"]];
@@ -2341,7 +2344,7 @@ static NSString * const CLSimulatorDevicesDefaultsKey = @"CLSimulatorDevicesV1";
         self.simulatorStatusLabel.textColor = NSColor.systemRedColor;
         return;
     }
-    NSString *endpoint = self.localReturnMode ? CLExpectedEndpointName : self.simulatorEndpointMenu.titleOfSelectedItem;
+    NSString *endpoint = self.localReturnMode ? CLLocalReturnEndpointName : self.simulatorEndpointMenu.titleOfSelectedItem;
     if (!self.localReturnMode && ![CLLocalRTPEndpointNames() containsObject:endpoint]) {
         self.simulatorStatusLabel.stringValue = @"Endpoint RTP local introuvable";
         self.simulatorStatusLabel.textColor = NSColor.systemRedColor;

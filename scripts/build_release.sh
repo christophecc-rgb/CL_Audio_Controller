@@ -248,7 +248,7 @@ mkdir -p \
   "$KIT_ROOT/CL MIDI Network Manager.app/Contents/Resources/Network Tools" \
   "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/MacOS" \
   "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/Resources"
-ditto "$PROJECT_ROOT/assets/app_icons/CL_MIDI_Network.icns" "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/Resources/CL_MIDI_Network.icns"
+ditto "$PROJECT_ROOT/assets/app_icons/CL_MIDI_RTP.icns" "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/Resources/CL_MIDI_RTP.icns"
 for tool in CLMIDINetworkGuardian CLMIDIRTPAgent CLMIDIRoundTripTester CLMIDIRTPResponder CLYamahaConsoleSimulator CLMIDINetworkDashboard CLAudioConfigurationChecker; do
   ditto "$BUILD_ROOT/midi-tools/$tool" "$KIT_ROOT/CL MIDI Network Tools/$tool"
   ditto "$BUILD_ROOT/midi-tools/$tool" "$KIT_ROOT/CL MIDI Network Manager.app/Contents/Resources/Network Tools/$tool"
@@ -263,7 +263,7 @@ cat > "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/Info.plist" <<EOF
 <key>CFBundleExecutable</key><string>CL MIDI RTP Agent</string>
 <key>CFBundleIdentifier</key><string>com.claudio.midi-rtp-agent</string>
 <key>CFBundleName</key><string>CL MIDI RTP Agent</string>
-<key>CFBundleIconFile</key><string>CL_MIDI_Network.icns</string>
+<key>CFBundleIconFile</key><string>CL_MIDI_RTP.icns</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>$VERSION</string>
 <key>LSBackgroundOnly</key><true/>

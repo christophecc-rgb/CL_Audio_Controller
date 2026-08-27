@@ -1647,7 +1647,20 @@ function render(s){
   rtpBadge.className='rtp-badge '+(rtp.validated?'ok':(rtp.loop_detected?'error':''));
   const formatOffset=value=>Number(value||0).toLocaleString('fr-FR',{signDisplay:'exceptZero'});
   const offsets=s.console_title_offsets||{};el('cl5TitleOffset').textContent=formatOffset(offsets.cl5);el('ql1TitleOffset').textContent=formatOffset(offsets.ql1);
-  const renderConsole=(key,name,value)=>{value=value||{};const status=value.validation_status||'waiting',card=el(key+'Return');const signature=String(value.returned_scene_memory??'')+'|'+String(value.returned_title||'');if(consoleSignatures[key]!==null&&signature!==consoleSignatures[key]&&(value.returned_scene_memory!=null||value.returned_title)){card.classList.remove('recalled');void card.offsetWidth;card.classList.add('recalled');setTimeout(()=>card.classList.remove('recalled'),1900);}consoleSignatures[key]=signature;const visual=status==='confirmed'?'ok':status==='mismatch'?'mismatch':status==='stale'?'remembered':'waiting';card.className='console-return '+visual+(card.classList.contains('recalled')?' recalled':'');el(key+'Program').textContent=value.returned_scene_memory??'—';el(key+'Title').textContent=value.returned_title||'Titre console non résolu';el(key+'State').textContent=status==='confirmed'?'✓ Synchronisée':status==='mismatch'?'⚠ Divergence · attendu mémoire '+(value.expected_scene_memory??'—'):status==='stale'?'Retour MIDI ancien':status==='local_fallback'?'En attente du retour MIDI':'En attente du retour console';el(key+'Meta').textContent='Offset titre '+formatOffset(value.title_offset??offsets[key]??0)+(value.received_at?' · retour reçu':'');};
+  const renderConsole=(key,name,value)=>{
+    value=value||{};
+    const status=value.validation_status||'waiting',card=el(key+'Return');
+    const signature=String(value.returned_scene_memory??'')+'|'+String(value.returned_title||'');
+    if(consoleSignatures[key]!==null&&signature!==consoleSignatures[key]&&(value.returned_scene_memory!=null||value.returned_title)){card.classList.remove('recalled');void card.offsetWidth;card.classList.add('recalled');setTimeout(()=>card.classList.remove('recalled'),1900);}
+    consoleSignatures[key]=signature;
+    const visual=status==='confirmed'?'ok':status==='mismatch'?'mismatch':status==='stale'?'remembered':'waiting';
+    const showReturned=(status==='confirmed'||status==='mismatch'||value.expected_scene_memory==null)&&value.returned_scene_memory!=null;
+    card.className='console-return '+visual+(card.classList.contains('recalled')?' recalled':'');
+    el(key+'Program').textContent=showReturned?value.returned_scene_memory:(value.expected_scene_memory??'—');
+    el(key+'Title').textContent=(showReturned?value.returned_title:value.expected_title)||'Titre console non résolu';
+    el(key+'State').textContent=status==='confirmed'?'✓ Synchronisée':status==='mismatch'?'⚠ Divergence · attendu mémoire '+(value.expected_scene_memory??'—'):status==='stale'?'Retour MIDI ancien · reçu '+(value.returned_scene_memory??'—'):status==='local_fallback'?'En attente du retour MIDI':'En attente du retour console';
+    el(key+'Meta').textContent='Offset titre '+formatOffset(value.title_offset??offsets[key]??0)+(value.received_at?' · retour reçu':'');
+  };
   renderConsole('cl5','CL5',cl5);renderConsole('ql1','QL1',ql1);
   const ltc=s.ltc_connected?s.ltc_timecode:'--:--:--:--';
   el('systemLtc').textContent=ltc;el('systemLtc').className='system-ltc'+(s.ltc_connected?'':' offline');

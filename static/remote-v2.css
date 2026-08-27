@@ -243,7 +243,7 @@ button {
 }
 button:hover:not(:disabled) { border-color: #566276 !important; filter: brightness(1.08); }
 button:active:not(:disabled) { transform: translateY(1px); filter: brightness(.94); }
-button:disabled { opacity: .5; cursor: progress; }
+button:disabled { opacity: .5; cursor: default; }
 
 .go-button, .big-go, .knob-button {
   color: #061109 !important;

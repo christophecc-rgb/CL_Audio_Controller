@@ -1,0 +1,811 @@
+/* =========================================================
+   CL AUDIO — SKIN SYSTEM
+   Fond général sombre.
+   Preview + Next = même couleur.
+   GO / Pause / Stop = transports à fond plein/dégradé.
+   ========================================================= */
+
+:root {
+  --cl-skin-accent: #4da3ff;
+  --cl-skin-accent-2: #69b7ff;
+
+  --cl-skin-cl5: #b77cff;
+  --cl-skin-ql1: #65d68a;
+
+  --cl-skin-go-a: #59dc78;
+  --cl-skin-go-b: #29b957;
+
+  --cl-skin-pause-a: #ffb34d;
+  --cl-skin-pause-b: #dd7f23;
+
+  --cl-skin-stop-a: #ff6565;
+  --cl-skin-stop-b: #c93232;
+
+  --cl-skin-nav: #4da3ff;
+
+  --cl-skin-panel: #0b1016;
+  --cl-skin-panel-soft: #111821;
+  --cl-skin-border: #354353;
+  --cl-skin-text: #f1f5f9;
+}
+
+/* ---------- Structure commune ---------- */
+
+html[data-cl-skin] body {
+  background: #05080c !important;
+}
+
+html[data-cl-skin] .v2-workspace,
+html[data-cl-skin] .card,
+html[data-cl-skin] .goto-panel,
+html[data-cl-skin] .scene-select-panel,
+html[data-cl-skin] .transport-dock,
+html[data-cl-skin] .buttons-dock {
+  background:
+    linear-gradient(180deg, var(--cl-skin-panel-soft), var(--cl-skin-panel))
+    !important;
+}
+
+html[data-cl-skin] .v2-tabs a {
+  transition:
+    border-color .15s ease,
+    color .15s ease,
+    background .15s ease,
+    box-shadow .15s ease;
+}
+
+html[data-cl-skin] .v2-tabs a[aria-current="page"] {
+  border-color: var(--cl-skin-accent) !important;
+  color: #fff !important;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--cl-skin-accent) 30%, #111),
+      color-mix(in srgb, var(--cl-skin-accent) 12%, #090d12)
+    ) !important;
+}
+
+/* ---------- Program Change ---------- */
+
+html[data-cl-skin] .cl-skin-cl5 {
+  border-color: var(--cl-skin-cl5) !important;
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--cl-skin-cl5) 13%, #090b10),
+      #080b10 72%
+    ) !important;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--cl-skin-cl5) 24%, transparent),
+    0 0 10px color-mix(in srgb, var(--cl-skin-cl5) 10%, transparent)
+    !important;
+}
+
+html[data-cl-skin] .cl-skin-cl5 .midi-return-console,
+html[data-cl-skin] .cl-skin-cl5 .midi-return-memory {
+  color: var(--cl-skin-cl5) !important;
+}
+
+html[data-cl-skin] .cl-skin-ql1 {
+  border-color: var(--cl-skin-ql1) !important;
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--cl-skin-ql1) 13%, #090b10),
+      #080b10 72%
+    ) !important;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--cl-skin-ql1) 24%, transparent),
+    0 0 10px color-mix(in srgb, var(--cl-skin-ql1) 10%, transparent)
+    !important;
+}
+
+html[data-cl-skin] .cl-skin-ql1 .midi-return-console,
+html[data-cl-skin] .cl-skin-ql1 .midi-return-memory {
+  color: var(--cl-skin-ql1) !important;
+}
+
+/* ---------- GO ---------- */
+
+html[data-cl-skin] .cl-skin-go {
+  color: #06100a !important;
+  border-color: color-mix(in srgb, var(--cl-skin-go-a) 80%, white) !important;
+  background:
+    linear-gradient(
+      180deg,
+      var(--cl-skin-go-a),
+      var(--cl-skin-go-b)
+    ) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.35),
+    0 0 15px color-mix(in srgb, var(--cl-skin-go-a) 24%, transparent)
+    !important;
+}
+
+/* ---------- Preview + Next : TOUJOURS IDENTIQUES ---------- */
+
+html[data-cl-skin] .cl-skin-prevnext {
+  color: color-mix(in srgb, var(--cl-skin-nav) 85%, white) !important;
+  border-color: var(--cl-skin-nav) !important;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--cl-skin-nav) 18%, #10151d),
+      #0b1016
+    ) !important;
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--cl-skin-nav) 14%, transparent)
+    !important;
+}
+
+/* ---------- Pause ---------- */
+
+html[data-cl-skin] .cl-skin-pause {
+  color: #fff !important;
+  border-color: var(--cl-skin-pause-a) !important;
+  background:
+    linear-gradient(
+      180deg,
+      var(--cl-skin-pause-a),
+      var(--cl-skin-pause-b)
+    ) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.25),
+    0 0 13px color-mix(in srgb, var(--cl-skin-pause-a) 20%, transparent)
+    !important;
+}
+
+/* ---------- Stop ---------- */
+
+html[data-cl-skin] .cl-skin-stop {
+  color: #fff !important;
+  border-color: var(--cl-skin-stop-a) !important;
+  background:
+    linear-gradient(
+      180deg,
+      var(--cl-skin-stop-a),
+      var(--cl-skin-stop-b)
+    ) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.22),
+    0 0 14px color-mix(in srgb, var(--cl-skin-stop-a) 22%, transparent)
+    !important;
+}
+
+/* =========================================================
+   FAMILLE 1 — MULTICOLOR
+   ========================================================= */
+
+html[data-cl-skin="multicolor-classic"] {
+  --cl-skin-accent:#4da3ff;
+  --cl-skin-cl5:#b886ff;
+  --cl-skin-ql1:#64d98c;
+  --cl-skin-go-a:#62e083;
+  --cl-skin-go-b:#28b95a;
+  --cl-skin-pause-a:#ffb54d;
+  --cl-skin-pause-b:#dd7d22;
+  --cl-skin-stop-a:#ff6666;
+  --cl-skin-stop-b:#c83232;
+  --cl-skin-nav:#56a9ff;
+}
+
+html[data-cl-skin="multicolor-pastel"] {
+  --cl-skin-accent:#82bdf0;
+  --cl-skin-cl5:#c7a4e8;
+  --cl-skin-ql1:#91d3ae;
+  --cl-skin-go-a:#a8df9b;
+  --cl-skin-go-b:#72c477;
+  --cl-skin-pause-a:#f2c48e;
+  --cl-skin-pause-b:#d99e69;
+  --cl-skin-stop-a:#ee9898;
+  --cl-skin-stop-b:#cf7171;
+  --cl-skin-nav:#8abbe6;
+}
+
+html[data-cl-skin="multicolor-broadcast"] {
+  --cl-skin-accent:#3ca7ff;
+  --cl-skin-cl5:#bb72f4;
+  --cl-skin-ql1:#4bd07a;
+  --cl-skin-go-a:#4ee06f;
+  --cl-skin-go-b:#1daf46;
+  --cl-skin-pause-a:#ffac32;
+  --cl-skin-pause-b:#d57012;
+  --cl-skin-stop-a:#ff4d4d;
+  --cl-skin-stop-b:#b91f1f;
+  --cl-skin-nav:#36a1ff;
+}
+
+html[data-cl-skin="multicolor-vivid"] {
+  --cl-skin-accent:#00b8ff;
+  --cl-skin-cl5:#dc4fff;
+  --cl-skin-ql1:#80e45b;
+  --cl-skin-go-a:#c4f000;
+  --cl-skin-go-b:#66cf00;
+  --cl-skin-pause-a:#ff8a22;
+  --cl-skin-pause-b:#e44f11;
+  --cl-skin-stop-a:#ff394f;
+  --cl-skin-stop-b:#c70024;
+  --cl-skin-nav:#2f9cff;
+}
+
+/* =========================================================
+   FAMILLE 2 — BLACK / OUTLINE
+   Cartouches noires + contours simples.
+   Transports toujours PLEINS.
+   ========================================================= */
+
+html[data-cl-skin^="outline-"] {
+  --cl-skin-panel:#05070a;
+  --cl-skin-panel-soft:#090c10;
+}
+
+html[data-cl-skin^="outline-"] .card,
+html[data-cl-skin^="outline-"] .midi-return,
+html[data-cl-skin^="outline-"] .goto-panel,
+html[data-cl-skin^="outline-"] .scene-select-panel {
+  background:#05070a !important;
+}
+
+html[data-cl-skin="outline-blue"] {
+  --cl-skin-accent:#249cff;
+  --cl-skin-cl5:#65b9ff;
+  --cl-skin-ql1:#65b9ff;
+  --cl-skin-go-a:#339dff;
+  --cl-skin-go-b:#0868cd;
+  --cl-skin-pause-a:#287fda;
+  --cl-skin-pause-b:#145098;
+  --cl-skin-stop-a:#ff5959;
+  --cl-skin-stop-b:#bd2727;
+  --cl-skin-nav:#249cff;
+}
+
+html[data-cl-skin="outline-red"] {
+  --cl-skin-accent:#ff4545;
+  --cl-skin-cl5:#ff7777;
+  --cl-skin-ql1:#ff7777;
+  --cl-skin-go-a:#ef4848;
+  --cl-skin-go-b:#b61818;
+  --cl-skin-pause-a:#ef5b4d;
+  --cl-skin-pause-b:#ad3026;
+  --cl-skin-stop-a:#ff3333;
+  --cl-skin-stop-b:#980e0e;
+  --cl-skin-nav:#ff4c4c;
+}
+
+html[data-cl-skin="outline-green"] {
+  --cl-skin-accent:#63d84e;
+  --cl-skin-cl5:#8be47b;
+  --cl-skin-ql1:#8be47b;
+  --cl-skin-go-a:#65dc50;
+  --cl-skin-go-b:#29952a;
+  --cl-skin-pause-a:#76c65a;
+  --cl-skin-pause-b:#397e31;
+  --cl-skin-stop-a:#ff5b5b;
+  --cl-skin-stop-b:#b72626;
+  --cl-skin-nav:#63d84e;
+}
+
+html[data-cl-skin="outline-yellow"] {
+  --cl-skin-accent:#ffd52e;
+  --cl-skin-cl5:#ffe269;
+  --cl-skin-ql1:#ffe269;
+  --cl-skin-go-a:#ffd43c;
+  --cl-skin-go-b:#bc8b00;
+  --cl-skin-pause-a:#ffc33b;
+  --cl-skin-pause-b:#a56d00;
+  --cl-skin-stop-a:#ff5757;
+  --cl-skin-stop-b:#b62020;
+  --cl-skin-nav:#ffd52e;
+}
+
+html[data-cl-skin="outline-purple"] {
+  --cl-skin-accent:#bd56ea;
+  --cl-skin-cl5:#d88cf6;
+  --cl-skin-ql1:#d88cf6;
+  --cl-skin-go-a:#b84ee6;
+  --cl-skin-go-b:#722297;
+  --cl-skin-pause-a:#a856d0;
+  --cl-skin-pause-b:#62307e;
+  --cl-skin-stop-a:#ff5a6e;
+  --cl-skin-stop-b:#ad233a;
+  --cl-skin-nav:#bd56ea;
+}
+
+html[data-cl-skin="outline-orange"] {
+  --cl-skin-accent:#ff8d22;
+  --cl-skin-cl5:#ffad5f;
+  --cl-skin-ql1:#ffad5f;
+  --cl-skin-go-a:#ff922d;
+  --cl-skin-go-b:#ca5700;
+  --cl-skin-pause-a:#ff8427;
+  --cl-skin-pause-b:#b94c00;
+  --cl-skin-stop-a:#ff4e4e;
+  --cl-skin-stop-b:#ad1f1f;
+  --cl-skin-nav:#ff8d22;
+}
+
+/* ---------- Sélecteur dans Options avancées ---------- */
+
+.cl-skin-settings {
+  margin: 10px 0 4px;
+  padding: 10px;
+  border: 1px solid #303a47;
+  border-radius: 10px;
+  background: rgba(7,10,14,.9);
+}
+
+.cl-skin-settings-title {
+  margin-bottom: 7px;
+  color: #9ca9ba;
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: .12em;
+}
+
+.cl-skin-settings-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.cl-skin-settings label {
+  color: #c6cfda;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.cl-skin-settings select {
+  min-height: 34px;
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid #3a4655;
+  border-radius: 8px;
+  background: #0b1016;
+  color: #f1f5f9;
+  font-size: 11px;
+}
+
+
+/* =========================================================
+   OPTIONS AVANCÉES — APPARENCE + BIBLIOTHÈQUES COMPACTES
+   ========================================================= */
+
+.cl-skin-settings {
+  margin: 8px 0 12px !important;
+  padding: 10px 12px !important;
+  border: 1px solid #3a4655 !important;
+  border-radius: 11px !important;
+  background: linear-gradient(180deg,#111821,#0a0f15) !important;
+}
+
+.cl-skin-settings-title {
+  margin: 0 0 7px !important;
+  color: #aeb9c8 !important;
+  font-size: 10px !important;
+  font-weight: 850 !important;
+  letter-spacing: .14em !important;
+}
+
+.cl-skin-settings-row {
+  display: grid !important;
+  grid-template-columns: 70px minmax(0,1fr) !important;
+  gap: 9px !important;
+  align-items: center !important;
+}
+
+.cl-skin-settings select {
+  min-height: 31px !important;
+  padding: 3px 8px !important;
+  border-radius: 8px !important;
+}
+
+/* ---- Bibliothèques consoles ---- */
+
+.cl-console-libraries {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid #303b48;
+  border-radius: 11px;
+  background: #0b1016;
+}
+
+.cl-console-libraries-title {
+  margin-bottom: 8px;
+  color: #9ca8b8;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.cl-console-library-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0,1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid rgba(255,255,255,.055);
+}
+
+.cl-console-library-row:first-of-type {
+  border-top: 0;
+}
+
+.cl-console-library-name {
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: .08em;
+}
+
+.cl-console-library-name.cl5 {
+  color: #c08cff;
+}
+
+.cl-console-library-name.ql1 {
+  color: #71df92;
+}
+
+.cl-console-library-info {
+  min-width: 0;
+}
+
+.cl-console-library-file {
+  overflow: hidden;
+  color: #e5e9ef;
+  font-size: 10px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cl-console-library-meta {
+  margin-top: 2px;
+  overflow: hidden;
+  color: #788595;
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cl-console-library-action {
+  min-height: 30px !important;
+  padding: 0 10px !important;
+  border: 1px solid #465467 !important;
+  border-radius: 8px !important;
+  background: #161d26 !important;
+  color: #e7ebf0 !important;
+  font-size: 9px !important;
+  font-weight: 760 !important;
+  white-space: nowrap !important;
+}
+
+.cl-console-library-action:hover {
+  background: #202936 !important;
+}
+
+.cl-console-library-action.import {
+  border-color: #5272a3 !important;
+}
+
+.cl-console-library-action.finder {
+  color: #aeb8c5 !important;
+}
+
+.cl-console-source-row {
+  display: grid;
+  grid-template-columns: 150px minmax(0,1fr);
+  gap: 9px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.cl-console-source-row label {
+  color: #8995a5;
+  font-size: 10px;
+}
+
+.cl-console-source-row select {
+  min-height: 30px;
+  border: 1px solid #465467;
+  border-radius: 8px;
+  background: #0b1016;
+  color: #eef2f6;
+  padding: 2px 8px;
+  font-size: 10px;
+}
+
+@media (max-width: 620px) {
+  .cl-console-library-row {
+    grid-template-columns: 38px minmax(0,1fr) auto;
+  }
+
+  .cl-console-library-action.finder {
+    grid-column: 2 / -1;
+    justify-self: start;
+  }
+
+  .cl-console-source-row {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+
+
+/* =========================================================
+   OPTIONS AVANCÉES — VERSION COMPACTE
+   ========================================================= */
+
+/* APPARENCE sur une seule ligne */
+.cl-skin-settings {
+  display: grid !important;
+  grid-template-columns: auto auto minmax(180px, 1fr) !important;
+  align-items: center !important;
+  gap: 10px !important;
+
+  margin: 6px 0 10px !important;
+  padding: 8px 10px !important;
+
+  border: 1px solid #394657 !important;
+  border-radius: 9px !important;
+
+  background:
+    linear-gradient(180deg,#111821,#0b1016)
+    !important;
+}
+
+.cl-skin-settings-title {
+  margin: 0 !important;
+  color: #9da9b8 !important;
+
+  font-size: 9px !important;
+  font-weight: 850 !important;
+  letter-spacing: .12em !important;
+
+  white-space: nowrap !important;
+}
+
+.cl-skin-settings-row {
+  display: contents !important;
+}
+
+.cl-skin-settings label {
+  margin: 0 !important;
+
+  color: #d6dce4 !important;
+
+  font-size: 10px !important;
+  font-weight: 720 !important;
+
+  white-space: nowrap !important;
+}
+
+.cl-skin-settings select {
+  width: 100% !important;
+  min-height: 28px !important;
+
+  margin: 0 !important;
+  padding: 2px 8px !important;
+
+  border: 1px solid #4b596b !important;
+  border-radius: 7px !important;
+
+  background: #0a0f15 !important;
+  color: #eef2f6 !important;
+
+  font-size: 10px !important;
+  font-weight: 650 !important;
+}
+
+
+/* =========================================================
+   BOUTONS IMPORT / FINDER — PETITS
+   ========================================================= */
+
+.cl-console-library-action {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+
+  min-height: 26px !important;
+  height: 26px !important;
+
+  margin: 0 !important;
+  padding: 0 9px !important;
+
+  border: 1px solid #435064 !important;
+  border-radius: 7px !important;
+
+  background: #151b23 !important;
+  color: #dfe5ec !important;
+
+  font-size: 9px !important;
+  font-weight: 720 !important;
+  line-height: 1 !important;
+
+  white-space: nowrap !important;
+
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.035)
+    !important;
+}
+
+.cl-console-library-action:hover {
+  background: #1d2530 !important;
+  border-color: #596a80 !important;
+}
+
+.cl-console-library-action.import {
+  color: #dce9fb !important;
+  border-color: #4a6282 !important;
+}
+
+.cl-console-library-action.finder {
+  color: #aeb8c5 !important;
+  border-color: #3e4958 !important;
+}
+
+
+/* Réduit aussi les file inputs natifs */
+input[type="file"] {
+  font-size: 9px !important;
+}
+
+input[type="file"]::file-selector-button {
+  min-height: 24px !important;
+  height: 24px !important;
+
+  margin-right: 7px !important;
+  padding: 0 8px !important;
+
+  border: 1px solid #465365 !important;
+  border-radius: 6px !important;
+
+  background: #171d25 !important;
+  color: #d8dee7 !important;
+
+  font-size: 9px !important;
+  font-weight: 700 !important;
+}
+
+
+/* Si les actions sont dans les lignes CL5/QL1 */
+.cl-console-library-row {
+  grid-template-columns:
+    38px
+    minmax(0,1fr)
+    max-content
+    max-content
+    !important;
+
+  gap: 7px !important;
+  align-items: center !important;
+
+  padding: 6px 0 !important;
+}
+
+
+/* Mobile / fenêtre étroite */
+@media (max-width: 620px) {
+  .cl-skin-settings {
+    grid-template-columns: auto auto minmax(130px,1fr) !important;
+    gap: 7px !important;
+  }
+
+  .cl-skin-settings select {
+    min-width: 0 !important;
+  }
+
+  .cl-console-library-row {
+    grid-template-columns:
+      34px
+      minmax(0,1fr)
+      max-content
+      !important;
+  }
+
+  .cl-console-library-action.finder {
+    grid-column: 2 / -1 !important;
+    justify-self: start !important;
+  }
+}
+
+/* =========================================================
+   CL AUDIO — BIBLIOTHEQUES CONSOLES COMPACTES
+   ========================================================= */
+
+.cl-library-compact-zone {
+  margin-top: 6px !important;
+}
+
+.console-library-import {
+  display: grid !important;
+  grid-template-columns:
+    auto
+    minmax(0, 1fr)
+    auto
+    auto
+    minmax(0, 1fr) !important;
+  gap: 6px !important;
+  align-items: center !important;
+
+  margin: 3px 0 !important;
+  padding: 4px 6px !important;
+
+  min-height: 0 !important;
+}
+
+.console-library-import > strong {
+  min-width: 28px !important;
+  font-size: 10px !important;
+  line-height: 1 !important;
+}
+
+.console-library-import input[type="file"],
+.cl-library-file-input {
+  min-width: 0 !important;
+  width: 100% !important;
+  height: 26px !important;
+
+  margin: 0 !important;
+  padding: 2px 4px !important;
+
+  font-size: 9px !important;
+  line-height: 1 !important;
+}
+
+.console-library-import button,
+.cl-library-import,
+.cl-library-finder,
+.cl-console-library-action {
+  min-height: 26px !important;
+  height: 26px !important;
+
+  margin: 0 !important;
+  padding: 2px 8px !important;
+
+  border-radius: 6px !important;
+
+  font-size: 9px !important;
+  line-height: 1 !important;
+  font-weight: 750 !important;
+
+  white-space: nowrap !important;
+}
+
+.console-library-import span {
+  min-width: 0 !important;
+  margin: 0 !important;
+
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+
+  font-size: 9px !important;
+  line-height: 1.15 !important;
+}
+
+#libraryImportMessage {
+  margin-top: 4px !important;
+  font-size: 9px !important;
+  line-height: 1.15 !important;
+}
+
+@media (max-width: 600px) {
+  .console-library-import {
+    grid-template-columns:
+      auto
+      minmax(0, 1fr)
+      auto
+      auto !important;
+  }
+
+  .console-library-import > span {
+    grid-column: 2 / -1 !important;
+  }
+}
+

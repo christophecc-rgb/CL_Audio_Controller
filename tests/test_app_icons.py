@@ -13,10 +13,11 @@ class AppIconTests(unittest.TestCase):
         for name, color in {
             "CL_Audio_Show_Control": "#D84A4A",
             "CL_Ableton": "#E58A3A",
+            "CL_MIDI_RTP_Diagnostic": "#D5A735",
             "CL_MIDI_Network": "#32B89C",
-            "CL_MIDI_RTP_Diagnostic": "#3E9ED6",
-            "CL_MIDI_Analyzer": "#3974D8",
-            "CL_MIDI_Performance": "#6557C8",
+            "CL_MIDI_Analyzer": "#3E9ED6",
+            "CL_MIDI_Performance": "#3974D8",
+            "CL_MIDI_RTP": "#6557C8",
         }.items():
             self.assertIn(name, generator)
             self.assertIn(color, generator)
@@ -30,9 +31,19 @@ class AppIconTests(unittest.TestCase):
             "CL_MIDI_RTP_Diagnostic.icns",
             "CL_MIDI_Analyzer.icns",
             "CL_MIDI_Performance.icns",
+            "CL_MIDI_RTP.icns",
         ):
             self.assertIn(icon, release + export)
         self.assertIn("Diagnostic.png", export)
+        self.assertIn('CL_MIDI_RTP.icns" "$KIT_ROOT/CL MIDI RTP Agent.app', release)
+
+    def test_every_icon_uses_cl_and_its_function_without_generic_audio_label(self):
+        generator = (ROOT / "scripts" / "generate_app_icon_variants.py").read_text()
+        for label in ("SHOW CONTROL", "BUILDER", "MIDI RTP DIAG", "MIDI ANALYZER",
+                      "MIDI NETWORK", "MIDI PERFORMANCE", "MIDI RTP"):
+            self.assertIn(label, generator)
+        self.assertIn('draw.text((512, 430), "CL"', generator)
+        self.assertNotIn('"AUDIO"', generator)
 
     def test_panel_logo_and_macos_icon_source_are_identical(self):
         panel = Image.open(ROOT / "cl_audio_logo.png").convert("RGB")

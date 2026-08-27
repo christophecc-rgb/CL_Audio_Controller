@@ -706,10 +706,10 @@
     }
 
     .midi-return.state-waiting {
-      border-color:#ffd34f !important;
-      background:rgba(239,193,79,.08) !important;
-      box-shadow:0 0 0 1px rgba(239,193,79,.12) !important;
-      animation:midiWaitingPulse .3s ease-in-out infinite alternate !important;
+      border-color:var(--console-accent) !important;
+      background:#15181d !important;
+      box-shadow:0 0 0 1px color-mix(in srgb, var(--console-accent) 22%, transparent) !important;
+      animation:midiWaitingPulse .30s ease-in-out infinite alternate !important;
     }
 
     .midi-return.state-confirmed {
@@ -727,17 +727,26 @@
     }
 
     .midi-return.state-timeout {
-      border-color:#e8913a !important;
-      background:rgba(130,75,24,.28) !important;
-      box-shadow:0 0 0 2px rgba(232,145,58,.18),0 0 12px rgba(232,145,58,.20) !important;
+      border-color:var(--console-accent) !important;
+      background:#15181d !important;
+      box-shadow:0 0 0 1px color-mix(in srgb, var(--console-accent) 20%, transparent) !important;
       animation:none !important;
     }
 
     @keyframes midiWaitingPulse {
       from {
-        background:rgba(239,193,79,.06);
-        box-shadow:0 0 0 0 rgba(239,193,79,.08);
+        border-color:color-mix(in srgb, var(--console-accent) 48%, #15181d);
+        box-shadow:
+          0 0 0 1px color-mix(in srgb, var(--console-accent) 12%, transparent);
       }
+      to {
+        border-color:var(--console-accent);
+        box-shadow:
+          0 0 0 2px color-mix(in srgb, var(--console-accent) 40%, transparent),
+          0 0 12px color-mix(in srgb, var(--console-accent) 34%, transparent);
+      }
+    }
+
       to {
         background:rgba(239,193,79,.38);
         box-shadow:0 0 0 3px rgba(239,193,79,.34),0 0 16px rgba(239,193,79,.44);
@@ -771,6 +780,7 @@
     }
 
 </style>
+  <link rel="stylesheet" href="/static/cl-skins.css?v=20260827-142046">
 </head>
 
 <body>
@@ -837,13 +847,13 @@
         <div class="console-library-import" data-console="cl5">
           <strong>CL5</strong> <input id="cl5LibraryFile" type="file" accept=".clf,.csv,.tsv,.json,.txt">
           <button type="button" data-library-import="cl5">Choisir/importer…</button>
-          <button type="button" data-library-reveal="cl5">Révéler dans le Finder</button>
+          <button type="button" data-library-reveal="cl5" class="cl-console-library-action finder">Révéler dans le Finder</button>
           <span id="cl5LibraryStatus">Aucun fichier installé</span>
         </div>
         <div class="console-library-import" data-console="ql1">
           <strong>QL1</strong> <input id="ql1LibraryFile" type="file" accept=".clf,.csv,.tsv,.json,.txt">
           <button type="button" data-library-import="ql1">Choisir/importer…</button>
-          <button type="button" data-library-reveal="ql1">Révéler dans le Finder</button>
+          <button type="button" data-library-reveal="ql1" class="cl-console-library-action finder">Révéler dans le Finder</button>
           <span id="ql1LibraryStatus">Aucun fichier installé</span>
         </div>
         <div id="libraryImportMessage" aria-live="polite"></div>
@@ -1877,5 +1887,6 @@ gotoInput.addEventListener('blur', () => {
       );
     }, { once: true });
   </script>
+  <script src="/static/cl-skins.js?v=20260827-142046" defer></script>
 </body>
 </html>
