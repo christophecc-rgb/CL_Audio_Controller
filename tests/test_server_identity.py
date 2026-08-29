@@ -532,24 +532,27 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
 
     def test_panel_integrates_the_published_midi_console_state(self):
         page = launcher.app.test_client().get("/").get_data(as_text=True)
+
         self.assertIn("MIDI &amp; CONSOLES", page)
         self.assertIn("CONFIGURATION CONSOLES", page)
-        self.assertIn("CL5 · Offset titre", page)
-        self.assertIn("QL1 · Offset titre", page)
-        self.assertIn('class="console-program"', page)
+
+        # Passe 3 : la surface Show consomme désormais devices[] et construit
+        # les cartes par ID stable au lieu d'imposer CL5 / QL1 dans le DOM.
+        self.assertIn("showDevicesForState", page)
+        self.assertIn("syncShowDeviceDom", page)
+        self.assertIn("display_name", page)
+        self.assertIn("palette", page)
+
+        # La couche historique reste disponible en compatibilité.
         self.assertIn("s.midi_console", page)
-        self.assertIn("value.returned_scene_memory", page)
-        self.assertIn("value.returned_title", page)
-        self.assertIn("value.validation_status", page)
+
         self.assertIn("consoleSignatures", page)
-        self.assertIn("consoleRecall 1.8s", page)
-        self.assertIn("✓ Synchronisée", page)
-        self.assertIn("⚠ Divergence", page)
         self.assertIn("s.ltc_connected", page)
         self.assertIn("setInterval(refreshTelemetry,100)", page)
         self.assertIn("ABLETON LOCAL", page)
         self.assertIn("ABLETON DISTANT", page)
         self.assertIn("Ports AbletonOSC fixes", page)
+
         self.assertNotIn('id="abletonName"', page)
         self.assertNotIn('type="number" value="11000"', page)
 

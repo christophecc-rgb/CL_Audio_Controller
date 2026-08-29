@@ -1236,7 +1236,7 @@ button{font:inherit}
 .ltc-destination{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;min-height:30px;padding:0 8px;border-radius:7px;border:1px solid rgba(84,224,132,.42);background:rgba(46,154,84,.10);font-size:9px;color:#9aa2ae;cursor:pointer;user-select:none}.ltc-destination:hover{border-color:#72e49a;background:rgba(46,154,84,.18)}.ltc-destination strong{font:11px Menlo,monospace;color:#72e49a}.ltc-destination span:first-child{font-weight:760;letter-spacing:.035em}
 .network-buttons{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:6px}.network-buttons .action{height:31px;font-size:10px}
 .badge{padding:4px 8px;border-radius:999px;background:rgba(67,200,111,.12);color:#7ee39e;border:1px solid rgba(67,200,111,.28);font-size:10px}
-.console-card{padding:10px}.console-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}.console-head strong{font-size:10px;letter-spacing:.075em}.rtp-control{display:flex;align-items:center;gap:6px}.rtp-badge{font-size:9px;color:#d7a64c}.rtp-badge.ok{color:#70d89a}.rtp-badge.error{color:#ed7e7e}.rtp-open{height:24px;padding:0 8px;border:1px solid #3f4b5d;border-radius:7px;background:#242b35;color:#cfd6e1;font-size:9px;cursor:pointer}.console-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.console-return{border:2px solid #3b414b;border-radius:11px;background:#12161c;padding:10px;transition:border-color .2s,background .2s,box-shadow .2s}.console-name{font-size:10px;font-weight:850;letter-spacing:.09em;color:#aeb5c0}.console-program{font-size:20px;font-weight:850;color:#f0cb68;margin-top:3px}.console-title{font-size:13px;font-weight:720;color:#eef1f5;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.console-state{font-size:10px;color:#a1a8b3;margin-top:7px}.console-meta{font-size:9px;color:#777f8b;margin-top:4px}.console-return.ok{border-color:var(--console-color);background:color-mix(in srgb,var(--console-accent) 20%,#12161c);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--console-color) 30%,transparent),0 0 22px color-mix(in srgb,var(--console-accent) 34%,transparent);animation:consoleConfirmed .70s ease-out 1}.console-return.ok .console-state{color:var(--console-color)}.console-return.mismatch{border-color:var(--console-color);background:color-mix(in srgb,var(--console-accent) 18%,#12161c);box-shadow:0 0 24px color-mix(in srgb,var(--console-accent) 42%,transparent);animation:consoleMismatch .55s ease-in-out infinite alternate}.console-return.mismatch .console-state{color:var(--console-color)}.console-return.waiting{border-color:color-mix(in srgb,var(--console-accent) 52%,#3b414b);background:color-mix(in srgb,var(--console-accent) 7%,#12161c);animation:consoleWaiting 1.25s ease-in-out infinite alternate}.console-return.waiting .console-state{color:color-mix(in srgb,var(--console-color) 72%,#a1a8b3)}.console-return.remembered{border-color:color-mix(in srgb,var(--console-accent) 34%,#3b414b);background:color-mix(in srgb,var(--console-accent) 4%,#171b21);box-shadow:none;filter:saturate(.72) brightness(.82)}.console-return.remembered .console-state{color:color-mix(in srgb,var(--console-color) 45%,#9ca4af)}.console-config{display:grid;grid-template-columns:auto 1fr 1fr;gap:7px;align-items:center;margin-bottom:8px;padding:7px 8px;border:1px solid #303642;border-radius:9px;background:#11151b}.console-config-title{font-size:9px;font-weight:800;letter-spacing:.07em;color:#98a1ad}.offset-control{display:flex;align-items:center;justify-content:flex-end;gap:5px;font-size:9px;color:#aeb5c0}.offset-value{min-width:23px;text-align:center;font:11px Menlo,monospace;color:#f0cb68}.offset-button{width:25px;height:23px;padding:0;border:1px solid #424a56;border-radius:6px;background:#252b34;color:#e6eaf0;font-weight:800;cursor:pointer}.offset-button:hover{filter:brightness(1.18)}
+.console-card{padding:10px}.console-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:7px}.console-head strong{font-size:10px;letter-spacing:.075em}.rtp-control{display:flex;align-items:center;gap:6px}.rtp-badge{font-size:9px;color:#d7a64c}.rtp-badge.ok{color:#70d89a}.rtp-badge.error{color:#ed7e7e}.rtp-open{height:24px;padding:0 8px;border:1px solid #3f4b5d;border-radius:7px;background:#242b35;color:#cfd6e1;font-size:9px;cursor:pointer}.console-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(210px,100%),1fr));gap:7px;max-height:300px;overflow-y:auto}.console-return{min-width:0;border:2px solid #3b414b;border-radius:11px;background:#12161c;padding:10px;transition:border-color .2s,background .2s,box-shadow .2s}.console-name{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;font-weight:850;letter-spacing:.09em;color:#aeb5c0}.console-program{font-size:20px;font-weight:850;color:#f0cb68;margin-top:3px}.console-title{font-size:13px;font-weight:720;color:#eef1f5;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.console-state{font-size:10px;color:#a1a8b3;margin-top:7px}.console-meta{font-size:9px;color:#777f8b;margin-top:4px}.console-return.ok{border-color:var(--console-color);background:color-mix(in srgb,var(--console-accent) 20%,#12161c);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--console-color) 30%,transparent),0 0 22px color-mix(in srgb,var(--console-accent) 34%,transparent);animation:consoleConfirmed .70s ease-out 1}.console-return.ok .console-state{color:var(--console-color)}.console-return.mismatch{border-color:var(--console-color);background:color-mix(in srgb,var(--console-accent) 18%,#12161c);box-shadow:0 0 24px color-mix(in srgb,var(--console-accent) 42%,transparent);animation:consoleMismatch .55s ease-in-out infinite alternate}.console-return.mismatch .console-state{color:var(--console-color)}.console-return.waiting{border-color:color-mix(in srgb,var(--console-accent) 52%,#3b414b);background:color-mix(in srgb,var(--console-accent) 7%,#12161c);animation:consoleWaiting 1.25s ease-in-out infinite alternate}.console-return.waiting .console-state{color:color-mix(in srgb,var(--console-color) 72%,#a1a8b3)}.console-return.remembered{border-color:color-mix(in srgb,var(--console-accent) 34%,#3b414b);background:color-mix(in srgb,var(--console-accent) 4%,#171b21);box-shadow:none;filter:saturate(.72) brightness(.82)}.console-return.remembered .console-state{color:color-mix(in srgb,var(--console-color) 45%,#9ca4af)}.console-return.unavailable{opacity:.62;filter:saturate(.72);animation:none}.console-config{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-bottom:8px;padding:7px 8px;border:1px solid #303642;border-radius:9px;background:#11151b}.console-config-title{font-size:9px;font-weight:800;letter-spacing:.07em;color:#98a1ad}.offset-control{display:flex;align-items:center;justify-content:flex-end;gap:5px;font-size:9px;color:#aeb5c0}.offset-value{min-width:23px;text-align:center;font:11px Menlo,monospace;color:#f0cb68}.offset-button{width:25px;height:23px;padding:0;border:1px solid #424a56;border-radius:6px;background:#252b34;color:#e6eaf0;font-weight:800;cursor:pointer}.offset-button:hover{filter:brightness(1.18)}
 @keyframes consoleWaiting{from{filter:brightness(.88);background:color-mix(in srgb,var(--console-accent) 5%,#12161c);box-shadow:0 0 0 1px color-mix(in srgb,var(--console-accent) 10%,transparent)}to{filter:brightness(1.16);border-color:var(--console-accent);background:color-mix(in srgb,var(--console-accent) 30%,#12161c);box-shadow:0 0 16px color-mix(in srgb,var(--console-accent) 28%,transparent)}}@keyframes consoleConfirmed{0%{transform:scale(1);filter:brightness(.94);background:color-mix(in srgb,var(--console-accent) 12%,#12161c);box-shadow:none}35%{transform:scale(1.012);filter:brightness(1.22);background:color-mix(in srgb,var(--console-accent) 34%,#12161c);box-shadow:0 0 26px color-mix(in srgb,var(--console-accent) 55%,transparent)}100%{transform:scale(1);filter:brightness(1);background:color-mix(in srgb,var(--console-accent) 20%,#12161c);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--console-color) 30%,transparent),0 0 22px color-mix(in srgb,var(--console-accent) 34%,transparent)}}@keyframes consoleMismatch{from{filter:brightness(.82);background:color-mix(in srgb,var(--console-accent) 8%,#12161c);box-shadow:0 0 10px color-mix(in srgb,var(--console-accent) 18%,transparent)}to{filter:brightness(1.22);border-color:var(--console-color);background:color-mix(in srgb,var(--console-accent) 32%,#12161c);box-shadow:0 0 28px color-mix(in srgb,var(--console-accent) 52%,transparent)}}@keyframes consoleRecall{0%,100%{transform:scale(1);filter:brightness(1);border-color:var(--console-accent);background:#15181d;box-shadow:none}20%{transform:scale(1.018);filter:brightness(1.20);border-color:var(--console-color);background:color-mix(in srgb,var(--console-accent) 30%,#15181d);box-shadow:0 0 24px color-mix(in srgb,var(--console-accent) 48%,transparent)}45%{transform:scale(1);filter:brightness(1.08);border-color:var(--console-accent);background:color-mix(in srgb,var(--console-accent) 18%,#15181d);box-shadow:0 0 15px color-mix(in srgb,var(--console-accent) 28%,transparent)}70%{border-color:var(--console-color);background:color-mix(in srgb,var(--console-accent) 22%,#15181d)}}.console-return.recalled{animation:consoleRecall 1.8s ease-in-out}
 @media(prefers-reduced-motion:reduce){.console-return.recalled{animation:none;border-color:var(--console-accent)}}
 details{background:var(--card2);border:1px solid #292e37;border-radius:12px;overflow:hidden}
@@ -1254,8 +1254,7 @@ details[open] summary::before{transform:rotate(90deg)}
 .local{height:30px;border:0;background:transparent;color:#91a9cb;font-size:11px;cursor:pointer}
 .stop{height:30px;padding:0 11px;border-radius:8px;border:1px solid rgba(217,88,88,.42);background:rgba(217,88,88,.10);color:#e68b8b;font-size:11px;cursor:pointer}
 .footer{font-size:9px;color:#707784;letter-spacing:.05em;text-align:center}
-#cl5Return{--console-color:#c09af2;--console-accent:#9b6bd6}
-#ql1Return{--console-color:#63c7d4;--console-accent:#3e9eac}
+.console-return{--console-color:#aeb5c0;--console-accent:#66707d}
 .console-return .console-name,
 .console-return .console-program{color:var(--console-color)}
 
@@ -1439,8 +1438,10 @@ body.show-mode .console-card{
 }
 
 body.show-mode .console-grid{
-  grid-template-columns:1fr 1fr;
+  grid-template-columns:repeat(auto-fit,minmax(min(210px,100%),1fr));
   gap:7px;
+  max-height:300px;
+  overflow-y:auto;
 }
 
 body.show-mode .console-return{
@@ -1560,14 +1561,8 @@ body.show-mode .console-title{
 
   <section class="card console-card">
     <div class="console-head"><strong>MIDI &amp; CONSOLES</strong><div class="rtp-control"><span id="rtpBadge" class="rtp-badge">RTP · attente</span><button class="rtp-open midi-assistant-button" aria-label="Ouvrir CL MIDI Network Manager" onclick="runAction('/midi-network-assistant','Ouverture de CL MIDI Network Manager')">CL MIDI Network Manager</button></div></div>
-    <div class="console-config"><span class="console-config-title">CONFIGURATION CONSOLES</span>
-      <div class="offset-control">CL5 · Offset titre <button class="offset-button" onclick="changeTitleOffset('cl5',-1)">−</button><strong id="cl5TitleOffset" class="offset-value">0</strong><button class="offset-button" onclick="changeTitleOffset('cl5',1)">+</button><button class="offset-button" onclick="changeTitleOffset('cl5',0,true)">0</button></div>
-      <div class="offset-control">QL1 · Offset titre <button class="offset-button" onclick="changeTitleOffset('ql1',-1)">−</button><strong id="ql1TitleOffset" class="offset-value">0</strong><button class="offset-button" onclick="changeTitleOffset('ql1',1)">+</button><button class="offset-button" onclick="changeTitleOffset('ql1',0,true)">0</button></div>
-    </div>
-    <div class="console-grid">
-      <div id="cl5Return" class="console-return waiting"><div class="console-name">CL5</div><div class="console-program"><span id="cl5Program">—</span></div><div id="cl5Title" class="console-title">Titre console en attente</div><div id="cl5State" class="console-state">En attente du retour console</div><div id="cl5Meta" class="console-meta">Offset titre 0</div></div>
-      <div id="ql1Return" class="console-return waiting"><div class="console-name">QL1</div><div class="console-program"><span id="ql1Program">—</span></div><div id="ql1Title" class="console-title">Titre console en attente</div><div id="ql1State" class="console-state">En attente du retour console</div><div id="ql1Meta" class="console-meta">Offset titre 0</div></div>
-    </div>
+    <div class="console-config" id="consoleOffsets"><span class="console-config-title">CONFIGURATION CONSOLES</span></div>
+    <div class="console-grid" id="showDevices"></div>
   </section>
 
   <details>
@@ -1595,8 +1590,8 @@ let networkFormInitialized=false;
 let networkFormDirty=false;
 let networkVisibleMode=null;
 let networkDrafts={local:null,remote:null};
-const consoleSignatures={cl5:null,ql1:null};
-const consoleVisualRecalls={cl5:{expectedKey:null,startedAt:0,timer:null},ql1:{expectedKey:null,startedAt:0,timer:null}};
+const consoleSignatures={};
+const consoleVisualRecalls={};
 const CONSOLE_VISUAL_RECALL_MIN_MS=4000;
 const el=id=>document.getElementById(id);
 function setTech(id,on){el(id).className='tech-item '+(on?'on':'');}
@@ -1623,6 +1618,42 @@ function updateShowCurrent(state){
     'Temps restant · '+formatRemainingSeconds(state.remaining_seconds);
 }
 
+function showDevicesForState(state){
+  if(Array.isArray(state.devices))return state.devices.filter(device=>device.enabled!==false&&(device.visibility||{}).show_control!==false);
+  const midi=state.midi_console||{};
+  return [
+    {id:'console_a',legacy_key:'cl5',display_name:'CL5',enabled:true,library:'cl5',palette:{base:'#C09AF2',accent:'#9B6BD6'},production_supported:true,...(midi.cl5||{})},
+    {id:'console_b',legacy_key:'ql1',display_name:'QL1',enabled:true,library:'ql1',palette:{base:'#63C7D4',accent:'#3E9EAC'},production_supported:true,...(midi.ql1||{})}
+  ];
+}
+
+function syncShowDeviceDom(devices,offsets){
+  const grid=el('showDevices'),offsetPanel=el('consoleOffsets'),retained=new Set();
+  devices.forEach(device=>{
+    const key=String(device.id),legacy=device.legacy_key||'',palette=device.palette||{};
+    retained.add(key);
+    let card=Array.from(grid.children).find(item=>item.dataset.deviceId===key);
+    if(!card){
+      card=document.createElement('div');card.dataset.deviceId=key;
+      card.innerHTML='<div class="console-name"></div><div class="console-program"><span></span></div><div class="console-title"></div><div class="console-state"></div><div class="console-meta"></div>';
+      grid.appendChild(card);
+    }
+    card.id=legacy==='cl5'?'cl5Return':legacy==='ql1'?'ql1Return':'deviceReturn-'+key;
+    card.style.setProperty('--console-color',palette.base||'#AEB5C0');card.style.setProperty('--console-accent',palette.accent||'#66707D');
+    card.querySelector('.console-name').textContent=device.display_name||key;card.title=device.display_name||key;
+    if(legacy&&device.library){
+      let control=Array.from(offsetPanel.querySelectorAll('.offset-control')).find(item=>item.dataset.deviceId===key);
+      if(!control){control=document.createElement('div');control.className='offset-control';control.dataset.deviceId=key;offsetPanel.appendChild(control);}
+      const value=Number(offsets[legacy]||0).toLocaleString('fr-FR',{signDisplay:'exceptZero'});
+      control.innerHTML='<span></span><button class="offset-button">−</button><strong class="offset-value"></strong><button class="offset-button">+</button><button class="offset-button">0</button>';
+      control.querySelector('span').textContent=(device.display_name||key)+' · Offset titre';control.querySelector('strong').textContent=value;
+      const buttons=control.querySelectorAll('button');buttons[0].onclick=()=>changeTitleOffset(legacy,-1);buttons[1].onclick=()=>changeTitleOffset(legacy,1);buttons[2].onclick=()=>changeTitleOffset(legacy,0,true);
+    }
+  });
+  Array.from(grid.children).forEach(card=>{if(!retained.has(card.dataset.deviceId))card.remove();});
+  Array.from(offsetPanel.querySelectorAll('.offset-control')).forEach(control=>{if(!retained.has(control.dataset.deviceId))control.remove();});
+}
+
 function render(s){
   latestState=s;const card=el('systemCard'),title=el('stateTitle'),detail=el('stateDetail');
   if(s.system_ready){card.className='card system ready';title.textContent='SYSTÈME PRÊT';detail.textContent='Serveur validé · Live Set prêt · OSC retour disponible';}
@@ -1646,11 +1677,12 @@ function render(s){
   rtpBadge.textContent=rtp.validated?('RTP VALIDÉ · '+(rtp.peer||'cible')):(rtp.loop_detected?'RTP · BOUCLE':(rtp.available?('RTP DISPONIBLE · '+(rtp.peer||'cible')):'RTP HORS LIGNE'));
   rtpBadge.className='rtp-badge '+(rtp.validated?'ok':(rtp.loop_detected?'error':''));
   const formatOffset=value=>Number(value||0).toLocaleString('fr-FR',{signDisplay:'exceptZero'});
-  const offsets=s.console_title_offsets||{};el('cl5TitleOffset').textContent=formatOffset(offsets.cl5);el('ql1TitleOffset').textContent=formatOffset(offsets.ql1);
-  const renderConsole=(key,name,value)=>{
-    value=value||{};
-    const status=value.validation_status||'waiting',card=el(key+'Return');
-    const recall=consoleVisualRecalls[key];
+  const offsets=s.console_title_offsets||{},devices=showDevicesForState(s);syncShowDeviceDom(devices,offsets);
+  const renderConsole=(device)=>{
+    const key=String(device.id),value=device||{},legacy=device.legacy_key||'';
+    const supported=value.production_supported===true,status=supported?(value.validation_status||'waiting'):'unavailable';
+    const card=Array.from(el('showDevices').children).find(item=>item.dataset.deviceId===key);
+    const recall=consoleVisualRecalls[key]||(consoleVisualRecalls[key]={expectedKey:null,startedAt:0,timer:null});
     const expectedKey=String(value.request_identity??'')+'|'+String(value.expected_midi_program??'')+'|'+String(value.expected_activated_at??'');
     const hasExpected=value.expected_midi_program!=null||value.expected_scene_memory!=null;
     if(hasExpected&&expectedKey!==recall.expectedKey){recall.expectedKey=expectedKey;const reportedStart=Number(value.expected_activated_at)*1000;recall.startedAt=Number.isFinite(reportedStart)&&reportedStart>0?reportedStart:Date.now();if(recall.timer!==null)clearTimeout(recall.timer);const timerKey=expectedKey;recall.timer=setTimeout(()=>{recall.timer=null;if(recall.expectedKey===timerKey&&latestState)render(latestState);},Math.max(0,recall.startedAt+CONSOLE_VISUAL_RECALL_MIN_MS-Date.now())+10);}
@@ -1662,12 +1694,13 @@ function render(s){
     const visual=status==='mismatch'?'mismatch':visualRecallActive?'waiting':status==='confirmed'?'ok':status==='stale'?'remembered':'waiting';
     const showReturned=(status==='confirmed'||status==='mismatch'||value.expected_scene_memory==null)&&value.returned_scene_memory!=null;
     card.className='console-return '+visual+(status!=='mismatch'&&!visualRecallActive&&card.classList.contains('recalled')?' recalled':'');
-    el(key+'Program').textContent=showReturned?value.returned_scene_memory:(value.expected_scene_memory??'—');
-    el(key+'Title').textContent=(showReturned?value.returned_title:value.expected_title)||'Titre console non résolu';
-    el(key+'State').textContent=status==='confirmed'?'✓ Synchronisée':status==='mismatch'?'⚠ Divergence · attendu mémoire '+(value.expected_scene_memory??'—'):status==='stale'?'Retour MIDI ancien · reçu '+(value.returned_scene_memory??'—'):status==='local_fallback'?'En attente du retour MIDI':'En attente du retour console';
-    el(key+'Meta').textContent='Offset titre '+formatOffset(value.title_offset??offsets[key]??0)+(value.received_at?' · retour reçu':'');
+    card.classList.toggle('unavailable',!supported);
+    card.querySelector('.console-program span').textContent=showReturned?value.returned_scene_memory:(value.expected_scene_memory??'—');
+    const title=card.querySelector('.console-title');title.textContent=value.library?((showReturned?value.returned_title:value.expected_title)||'Titre console non résolu'):'';title.hidden=!value.library;
+    card.querySelector('.console-state').textContent=!supported?'Non actif en production':status==='confirmed'?'✓ Synchronisée':status==='mismatch'?'⚠ Divergence · attendu mémoire '+(value.expected_scene_memory??'—'):status==='stale'?'Retour MIDI ancien · reçu '+(value.returned_scene_memory??'—'):status==='local_fallback'?'En attente du retour MIDI':'En attente du retour console';
+    card.querySelector('.console-meta').textContent=supported&&legacy?'Offset titre '+formatOffset(value.title_offset??offsets[legacy]??0)+(value.received_at?' · retour reçu':''):('Canal MIDI '+(value.midi_channel||'—'));
   };
-  renderConsole('cl5','CL5',cl5);renderConsole('ql1','QL1',ql1);
+  devices.forEach(renderConsole);
   const ltc=s.ltc_connected?s.ltc_timecode:'--:--:--:--';
   el('systemLtc').textContent=ltc;el('systemLtc').className='system-ltc'+(s.ltc_connected?'':' offline');
   el('networkLtc').textContent=ltc;el('networkLtc').className='network-timecode'+(s.ltc_connected?'':' offline');
@@ -1850,6 +1883,7 @@ def state():
         ltc_destination=ltc_destination,
         ltc_port=LTC_PORT,
         midi_console=remote_state.get("midi_console") or read_midi_console_state((configured_target or {}).get("host")),
+        devices=remote_state.get("devices"),
         console_title_offsets=remote_state.get("console_title_offsets") or {"cl5": 0, "ql1": 0},
         console_title_offset_range=remote_state.get("console_title_offset_range") or {"min": -20, "max": 20},
         orphan_actions_available=identity["code"] == "orphan-claimable",

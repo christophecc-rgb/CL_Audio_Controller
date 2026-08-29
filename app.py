@@ -31,7 +31,7 @@ from build_identity import BUILD_ID, IDENTITY_PROTOCOL_VERSION, SERVICE_NAME
 from ableton_targets import DEFAULT_CONFIG_PATH, load_target
 from server_ownership import OwnershipRecordError, write_record
 from console_title_library import ConsoleLibraryStore, LibraryImportError, MAX_FILE_SIZE, parse_import
-from device_profiles import load_device_configuration_result
+from device_profiles import device_ui_snapshots, load_device_configuration_result
 
 multiprocessing.freeze_support()
 
@@ -1317,6 +1317,11 @@ def state_snapshot_locked() -> Dict[str, Any]:
         snapshot["midi_console"] = fallback_console
         snapshot["console_return_mode"] = "local_fallback"
         snapshot["console_return_source"] = ""
+    # Nouvelle couche UI additive. Les deux devices historiques héritent
+    # strictement de midi_console; les suivants restent explicitement indisponibles.
+    snapshot["devices"] = device_ui_snapshots(
+        DEVICE_CONFIGURATION, snapshot.get("midi_console") or {},
+    )
     if not snapshot.get("set_ready", False):
         snapshot.update({
             "scenes": {},

@@ -328,6 +328,51 @@ def new_disabled_device(configuration: DeviceConfiguration) -> DeviceProfile:
     )
 
 
+def device_ui_snapshots(configuration: DeviceConfiguration,
+                        midi_console: Optional[Mapping[str, Any]] = None) -> list[dict[str, Any]]:
+    """Assemble les profils et l'état historique sans recalculer le métier MIDI."""
+    historical = midi_console or {}
+    snapshots: list[dict[str, Any]] = []
+    for device in configuration.devices:
+        production_supported = (
+            device.id in {"console_a", "console_b"}
+            and device.legacy_key in {"cl5", "ql1"}
+        )
+        production_state = (
+            dict(historical.get(device.legacy_key) or {})
+            if production_supported else {}
+        )
+        validation_status = str(production_state.get("validation_status") or "unavailable")
+        visual_state = str(production_state.get("visual_state") or "idle")
+        payload = device.to_dict()
+        payload.update(production_state)
+        payload.update({
+            "id": device.id,
+            "legacy_key": device.legacy_key,
+            "display_name": device.display_name,
+            "enabled": device.enabled,
+            "palette": device.palette.to_dict(),
+            "visibility": device.visibility.to_dict(),
+            "device_type": device.device_type,
+            "protocol": device.protocol,
+            "signal_type": device.signal_type,
+            "midi_channel": device.midi_channel,
+            "production_supported": production_supported,
+            "expected": production_state.get("expected_scene_memory"),
+            "returned": production_state.get("returned_scene_memory"),
+            "status": validation_status,
+            "validation_status": validation_status,
+            "visual_state": visual_state,
+            "expected_activated_at": production_state.get("expected_activated_at"),
+            "expected_title": production_state.get("expected_title"),
+            "returned_title": production_state.get("returned_title"),
+            "fresh": bool(production_state) and validation_status != "stale",
+            "stale": validation_status == "stale",
+        })
+        snapshots.append(payload)
+    return snapshots
+
+
 class ProgramChangeSignalHandler:
     """Interface minimale du driver actuel, sans I/O et sans état global."""
 

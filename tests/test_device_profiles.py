@@ -23,6 +23,7 @@ from device_profiles import (
     FUTURE_SIGNAL_TYPES,
     ProgramChangeSignalHandler,
     default_device_configuration,
+    device_ui_snapshots,
     device_configuration_from_dict,
     load_device_configuration,
     load_device_configuration_result,
@@ -181,6 +182,28 @@ class DeviceProfileTests(unittest.TestCase):
         validate_device_configuration(extended)
         self.assertEqual(default_device_configuration(), self.configuration)
 
+    def test_ui_snapshots_map_legacy_state_without_inventing_nonproduction_state(self):
+        third = replace(new_disabled_device(self.configuration), enabled=True,
+                        display_name="RESOLUME VIDEO SERVER")
+        configuration = replace(self.configuration, devices=self.configuration.devices + (third,))
+        midi = {
+            "cl5": {"expected_scene_memory": 12, "returned_scene_memory": 12,
+                    "validation_status": "confirmed", "visual_state": "confirmed",
+                    "expected_activated_at": 123.5},
+            "ql1": {"expected_scene_memory": 43, "validation_status": "waiting"},
+        }
+        devices = device_ui_snapshots(configuration, midi)
+        self.assertEqual([device["id"] for device in devices], ["console_a", "console_b", "device_3"])
+        self.assertEqual(devices[0]["expected"], 12)
+        self.assertEqual(devices[0]["expected_activated_at"], 123.5)
+        self.assertTrue(devices[1]["production_supported"])
+        self.assertEqual(devices[1]["legacy_key"], "ql1")
+        self.assertEqual(devices[1]["midi_channel"], 2)
+        self.assertFalse(devices[2]["production_supported"])
+        self.assertEqual(devices[2]["status"], "unavailable")
+        self.assertIsNone(devices[2]["expected"])
+        self.assertIsNone(devices[2]["returned"])
+
 
 class DeviceProfileStatusCompatibilityTests(unittest.TestCase):
     @classmethod
@@ -200,6 +223,11 @@ class DeviceProfileStatusCompatibilityTests(unittest.TestCase):
         self.assertIn("ql1", snapshot["midi_console"])
         self.assertEqual(snapshot["devices"][0]["midi_channel"], 1)
         self.assertEqual(snapshot["devices"][1]["midi_channel"], 2)
+        self.assertTrue(snapshot["devices"][0]["production_supported"])
+        self.assertEqual(snapshot["devices"][1]["legacy_key"], "ql1")
+        self.assertIn(snapshot["devices"][0]["status"], {
+            "confirmed", "mismatch", "waiting", "stale", "local_fallback", "unavailable",
+        })
 
 
 if __name__ == "__main__":

@@ -205,6 +205,8 @@ static BOOL CLPostDoubleClickFromConnectorReason(NSString *reason) {
 @property NSTextField *cl5ReturnState;
 @property NSTextField *ql1ReturnState;
 @property NSView *assistantReturnPanel;
+@property NSScrollView *assistantDevicesScroll;
+@property NSMutableDictionary<NSString *, NSDictionary *> *assistantDeviceViews;
 @property NSView *assistantCL5ReturnCard;
 @property NSView *assistantQL1ReturnCard;
 @property NSTextField *assistantCL5ReturnProgram;
@@ -769,20 +771,9 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
 
     self.assistantReturnPanel = [[NSView alloc] initWithFrame:NSMakeRect(16, 66, 468, 64)];
     [content addSubview:self.assistantReturnPanel];
-    self.assistantCL5ReturnCard = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 228, 64)];
-    self.assistantQL1ReturnCard = [[NSView alloc] initWithFrame:NSMakeRect(240, 0, 228, 64)];
-    for (NSView *card in @[self.assistantCL5ReturnCard, self.assistantQL1ReturnCard]) {
-        card.wantsLayer = YES;
-        card.layer.cornerRadius = 9;
-        card.layer.borderWidth = 2;
-        [self.assistantReturnPanel addSubview:card];
-    }
-    self.assistantCL5ReturnProgram = [self label:@"CL5   PC — → —   …" frame:NSMakeRect(11, 34, 206, 20) size:13 bold:YES];
-    self.assistantQL1ReturnProgram = [self label:@"QL1   PC — → —   …" frame:NSMakeRect(11, 34, 206, 20) size:13 bold:YES];
-    self.assistantCL5ReturnState = [self label:@"Indéterminé" frame:NSMakeRect(11, 10, 206, 18) size:9 bold:NO];
-    self.assistantQL1ReturnState = [self label:@"Indéterminé" frame:NSMakeRect(11, 10, 206, 18) size:9 bold:NO];
-    [self.assistantCL5ReturnCard addSubview:self.assistantCL5ReturnProgram]; [self.assistantCL5ReturnCard addSubview:self.assistantCL5ReturnState];
-    [self.assistantQL1ReturnCard addSubview:self.assistantQL1ReturnProgram]; [self.assistantQL1ReturnCard addSubview:self.assistantQL1ReturnState];
+    NSString *monitorProfileError = nil;
+    self.deviceProfiles = [self loadDeviceProfilesForEditor:&monitorProfileError];
+    [self rebuildAssistantDeviceMonitoringCards];
 
     self.consoleLibrariesPanel = [[NSView alloc] initWithFrame:NSMakeRect(16, 293, 468, 110)];
     self.consoleLibrariesPanel.wantsLayer = YES;
@@ -1087,19 +1078,175 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     [self updateConsoleReturnCards];
 }
 
+
+- (NSColor *)deviceColorFromHex:(NSString *)hex fallback:(NSColor *)fallback {
+    if (![hex isKindOfClass:NSString.class]) return fallback;
+    NSString *value = [hex stringByTrimmingCharactersInSet:NSCharacterSet.whitespaceAndNewlineCharacterSet];
+    if ([value hasPrefix:@"#"]) value = [value substringFromIndex:1];
+    if (value.length != 6) return fallback;
+
+    unsigned int rgb = 0;
+    NSScanner *scanner = [NSScanner scannerWithString:value];
+    if (![scanner scanHexInt:&rgb]) return fallback;
+
+    return [NSColor colorWithRed:((rgb >> 16) & 0xFF) / 255.0
+                           green:((rgb >> 8) & 0xFF) / 255.0
+                            blue:(rgb & 0xFF) / 255.0
+                           alpha:1.0];
+}
+
+- (void)rebuildAssistantDeviceMonitoringCards {
+    if (!self.assistantReturnPanel) return;
+
+    for (NSView *view in self.assistantReturnPanel.subviews.copy) {
+        [view removeFromSuperview];
+    }
+
+    self.assistantDeviceViews = [NSMutableDictionary dictionary];
+
+    NSScrollView *scroll = [[NSScrollView alloc] initWithFrame:self.assistantReturnPanel.bounds];
+    scroll.hasVerticalScroller = YES;
+    scroll.hasHorizontalScroller = NO;
+    scroll.autohidesScrollers = YES;
+    scroll.drawsBackground = NO;
+    scroll.borderType = NSNoBorder;
+
+    NSMutableArray<NSDictionary *> *visibleDevices = [NSMutableArray array];
+    for (NSDictionary *device in self.deviceProfiles ?: @[]) {
+        if (![device[@"enabled"] boolValue]) continue;
+        NSDictionary *visibility = [device[@"visibility"] isKindOfClass:NSDictionary.class]
+            ? device[@"visibility"] : @{};
+        if (visibility[@"network_manager"] && ![visibility[@"network_manager"] boolValue]) continue;
+        [visibleDevices addObject:device];
+    }
+
+    NSUInteger rows = MAX((NSUInteger)1, (visibleDevices.count + 1) / 2);
+    CGFloat documentHeight = MAX(58.0, rows * 60.0);
+    NSView *document = [[NSView alloc] initWithFrame:NSMakeRect(0, 0, 450, documentHeight)];
+
+    for (NSUInteger index = 0; index < visibleDevices.count; index++) {
+        NSDictionary *profile = visibleDevices[index];
+        NSString *deviceID = [profile[@"id"] isKindOfClass:NSString.class] ? profile[@"id"] : @"";
+        if (!deviceID.length) continue;
+
+        NSUInteger row = index / 2;
+        NSUInteger column = index % 2;
+        CGFloat x = column == 0 ? 4.0 : 230.0;
+        CGFloat y = documentHeight - ((row + 1) * 60.0) + 4.0;
+
+        NSView *card = [[NSView alloc] initWithFrame:NSMakeRect(x, y, 216, 52)];
+        card.wantsLayer = YES;
+        card.layer.cornerRadius = 8.0;
+        card.layer.borderWidth = 1.0;
+        card.layer.backgroundColor =
+            [NSColor colorWithRed:0.045 green:0.055 blue:0.070 alpha:1.0].CGColor;
+
+        NSTextField *program =
+            [self label:@"PC — → —   …" frame:NSMakeRect(10, 27, 196, 18) size:11 bold:YES];
+        NSTextField *state =
+            [self label:@"Indéterminé" frame:NSMakeRect(10, 7, 196, 16) size:8 bold:NO];
+
+        [card addSubview:program];
+        [card addSubview:state];
+        [document addSubview:card];
+
+        self.assistantDeviceViews[deviceID] = @{
+            @"card": card,
+            @"programLabel": program,
+            @"stateLabel": state,
+            @"profile": profile
+        };
+    }
+
+    if (!visibleDevices.count) {
+        NSTextField *empty =
+            [self label:@"Aucun device actif pour Network Manager"
+                  frame:NSMakeRect(8, 20, 434, 20) size:10 bold:NO];
+        empty.alignment = NSTextAlignmentCenter;
+        [document addSubview:empty];
+    }
+
+    scroll.documentView = document;
+    self.assistantDevicesScroll = scroll;
+    [self.assistantReturnPanel addSubview:scroll];
+
+    NSDictionary *viewA = self.assistantDeviceViews[@"console_a"];
+    NSDictionary *viewB = self.assistantDeviceViews[@"console_b"];
+
+    self.assistantCL5ReturnCard = viewA[@"card"];
+    self.assistantCL5ReturnProgram = viewA[@"programLabel"];
+    self.assistantCL5ReturnState = viewA[@"stateLabel"];
+
+    self.assistantQL1ReturnCard = viewB[@"card"];
+    self.assistantQL1ReturnProgram = viewB[@"programLabel"];
+    self.assistantQL1ReturnState = viewB[@"stateLabel"];
+}
+
 - (void)updateConsoleReturnCards {
-    NSArray<NSDictionary *> *consoles = @[
-        @{@"name": @"CL5", @"program": @(self.lastCL5Program), @"date": self.lastCL5ProgramAt ?: NSNull.null, @"title": self.lastCL5Title ?: @"",
-          @"expected": self.expectedCL5State ?: @{},
-          @"cards": @[self.cl5ReturnCard ?: NSNull.null, self.assistantCL5ReturnCard ?: NSNull.null],
-          @"programLabels": @[self.cl5ReturnProgram ?: NSNull.null, self.assistantCL5ReturnProgram ?: NSNull.null],
-          @"stateLabels": @[self.cl5ReturnState ?: NSNull.null, self.assistantCL5ReturnState ?: NSNull.null]},
-        @{@"name": @"QL1", @"program": @(self.lastQL1Program), @"date": self.lastQL1ProgramAt ?: NSNull.null, @"title": self.lastQL1Title ?: @"",
-          @"expected": self.expectedQL1State ?: @{},
-          @"cards": @[self.ql1ReturnCard ?: NSNull.null, self.assistantQL1ReturnCard ?: NSNull.null],
-          @"programLabels": @[self.ql1ReturnProgram ?: NSNull.null, self.assistantQL1ReturnProgram ?: NSNull.null],
-          @"stateLabels": @[self.ql1ReturnState ?: NSNull.null, self.assistantQL1ReturnState ?: NSNull.null]}
-    ];
+    if (!self.deviceProfiles) {
+        NSString *profileError = nil;
+        self.deviceProfiles = [self loadDeviceProfilesForEditor:&profileError];
+    }
+    if (!self.assistantDeviceViews) {
+        [self rebuildAssistantDeviceMonitoringCards];
+    }
+
+    NSMutableArray<NSDictionary *> *consoles = [NSMutableArray array];
+
+    for (NSDictionary *profile in self.deviceProfiles ?: @[]) {
+        if (![profile[@"enabled"] boolValue]) continue;
+
+        NSDictionary *visibility = [profile[@"visibility"] isKindOfClass:NSDictionary.class]
+            ? profile[@"visibility"] : @{};
+        if (visibility[@"network_manager"] && ![visibility[@"network_manager"] boolValue]) continue;
+
+        NSString *deviceID = [profile[@"id"] isKindOfClass:NSString.class] ? profile[@"id"] : @"";
+        NSString *name = [profile[@"display_name"] isKindOfClass:NSString.class]
+            ? profile[@"display_name"] : deviceID;
+
+        BOOL isConsoleA = [deviceID isEqualToString:@"console_a"];
+        BOOL isConsoleB = [deviceID isEqualToString:@"console_b"];
+        BOOL productionSupported = isConsoleA || isConsoleB;
+
+        NSDictionary *expected = isConsoleA
+            ? (self.expectedCL5State ?: @{})
+            : isConsoleB
+            ? (self.expectedQL1State ?: @{})
+            : @{@"validation_status": @"unavailable"};
+
+        NSMutableArray *cards = [NSMutableArray array];
+        NSMutableArray *programLabels = [NSMutableArray array];
+        NSMutableArray *stateLabels = [NSMutableArray array];
+
+        if (isConsoleA && self.cl5ReturnCard) {
+            [cards addObject:self.cl5ReturnCard];
+            [programLabels addObject:self.cl5ReturnProgram];
+            [stateLabels addObject:self.cl5ReturnState];
+        } else if (isConsoleB && self.ql1ReturnCard) {
+            [cards addObject:self.ql1ReturnCard];
+            [programLabels addObject:self.ql1ReturnProgram];
+            [stateLabels addObject:self.ql1ReturnState];
+        }
+
+        NSDictionary *assistantView = self.assistantDeviceViews[deviceID];
+        if (assistantView[@"card"]) {
+            [cards addObject:assistantView[@"card"]];
+            [programLabels addObject:assistantView[@"programLabel"]];
+            [stateLabels addObject:assistantView[@"stateLabel"]];
+        }
+
+        [consoles addObject:@{
+            @"id": deviceID,
+            @"name": name.length ? name : deviceID,
+            @"expected": expected,
+            @"cards": cards,
+            @"programLabels": programLabels,
+            @"stateLabels": stateLabels,
+            @"palette": [profile[@"palette"] isKindOfClass:NSDictionary.class] ? profile[@"palette"] : @{},
+            @"productionSupported": @(productionSupported)
+        }];
+    }
+
     for (NSDictionary *console in consoles) {
         NSDictionary *expected = console[@"expected"];
         id expectedProgramValue = expected[@"expected_scene_memory"];
@@ -1142,13 +1289,17 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
         NSString *returnedProgramSource = [expected[@"returned_program_source"] isKindOfClass:NSString.class]
             ? expected[@"returned_program_source"] : @"unavailable";
         NSArray *cards = console[@"cards"], *programLabels = console[@"programLabels"], *stateLabels = console[@"stateLabels"];
-        BOOL isCL5 = [console[@"name"] isEqualToString:@"CL5"];
-        NSColor *consoleAccent = isCL5
-            ? [NSColor colorWithRed:0.608 green:0.420 blue:0.839 alpha:1.0]
-            : [NSColor colorWithRed:0.243 green:0.620 blue:0.675 alpha:1.0];
-        NSColor *consoleBackground = isCL5
-            ? [NSColor colorWithRed:0.105 green:0.080 blue:0.135 alpha:1.0]
-            : [NSColor colorWithRed:0.060 green:0.125 blue:0.145 alpha:1.0];
+        NSDictionary *palette = [console[@"palette"] isKindOfClass:NSDictionary.class]
+            ? console[@"palette"] : @{};
+        NSColor *identityBase =
+            [self deviceColorFromHex:palette[@"base"]
+                            fallback:[NSColor colorWithWhite:0.68 alpha:1.0]];
+        NSColor *consoleAccent =
+            [self deviceColorFromHex:palette[@"accent"]
+                            fallback:identityBase];
+        NSColor *consoleBackground =
+            [[NSColor colorWithRed:0.045 green:0.055 blue:0.070 alpha:1.0]
+                blendedColorWithFraction:0.18 ofColor:identityBase];
         NSColor *consolePulseBackground = [consoleBackground blendedColorWithFraction:0.38 ofColor:consoleAccent];
         NSColor *consoleWaitingBackground = [consoleBackground blendedColorWithFraction:0.32 ofColor:consoleAccent];
         for (NSUInteger index = 0; index < cards.count; index++) {
@@ -1198,7 +1349,8 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
             BOOL visualStateChanged = ![previousVisualState isEqualToString:visualState];
 
             if (visualRecallActive && expectedActivatedValue) {
-                NSString *recallKey = [NSString stringWithFormat:@"%ld|%.6f",
+                NSString *recallKey = [NSString stringWithFormat:@"%@|%ld|%.6f",
+                    console[@"id"] ?: @"device",
                     (long)expectedProgram, expectedActivatedValue.doubleValue];
                 NSString *scheduledRecallKey = [card.layer valueForKey:@"clVisualRecallTimerKey"];
                 if (![scheduledRecallKey isEqualToString:recallKey]) {

@@ -205,23 +205,33 @@ class LiveSetGenerationTests(unittest.TestCase):
                          (113, "Titre non résolu dans la bibliothèque CL5"))
 
     def test_program_change_cards_use_backend_visual_state_without_diagnostics(self):
-        visual_source = (PROJECT_ROOT / "static/midi-return-visual.js").read_text(encoding="utf-8")
+        visual_source = (PROJECT_ROOT / "static/midi-return-visual.js").read_text(
+            encoding="utf-8"
+        )
+
+        # Le moteur temporel commun reste canonique.
         self.assertIn("waitingMs = options.waitingMs || 4000", visual_source)
         self.assertIn("expectedStartedAtMs", visual_source)
         self.assertIn("backendState === 'mismatch'", visual_source)
         self.assertIn("confirmedMs = options.confirmedMs || 500", visual_source)
         self.assertIn("requestFrame", visual_source)
+
+        # Passe 3 : état + profil sont assemblés dans le renderer commun.
+        self.assertIn("deviceViewModel", visual_source)
+        self.assertIn("renderDeviceCards", visual_source)
+        self.assertIn("expected_activated_at", visual_source)
+        self.assertIn("production_supported", visual_source)
+
         for template in ("index.html", "arrangement.html"):
             source = (PROJECT_ROOT / "templates" / template).read_text(encoding="utf-8")
-            self.assertIn("value.visual_state || 'idle'", source)
-            self.assertIn("waitingMs: 4000", source)
-            self.assertIn("expectedStartedAtMs: Number(value.expected_activated_at || 0) * 1000", source)
-            self.assertIn("confirmedMs: 500", source)
-            self.assertIn("state-timeout", source)
-            self.assertIn("Retour absent", source)
+            self.assertIn("renderDeviceCards", source)
+            self.assertIn('/static/midi-return-visual.js', source)
             self.assertNotIn("Attendu — · Reçu —", source)
             self.assertNotIn("ableton_m4l_fallback", source)
-        launcher_source = (PROJECT_ROOT / "launcher_control.py").read_text(encoding="utf-8")
+
+        launcher_source = (PROJECT_ROOT / "launcher_control.py").read_text(
+            encoding="utf-8"
+        )
         self.assertIn("CONSOLE_VISUAL_RECALL_MIN_MS=4000", launcher_source)
         self.assertIn("value.request_identity", launcher_source)
         self.assertIn("value.expected_activated_at", launcher_source)
@@ -2305,28 +2315,33 @@ class LiveSetGenerationTests(unittest.TestCase):
     def test_arrangement_has_console_returns_and_local_keyboard_controls(self):
         source = (PROJECT_ROOT / "templates/arrangement.html").read_text(encoding="utf-8")
 
-        self.assertIn('id="arrCl5Return"', source)
-        self.assertIn('id="arrQl1Return"', source)
-        self.assertIn("state.midi_console || {}", source)
+        # Passe 3 : les cartes ne sont plus deux éléments CL5 / QL1 fixes.
+        self.assertIn("renderDeviceCards", source)
+        self.assertIn('/static/midi-return-visual.js', source)
+        self.assertNotIn('id="arrCl5Return"', source)
+        self.assertNotIn('id="arrQl1Return"', source)
+
         self.assertIn("if (event.key === 'ArrowLeft')", source)
         self.assertIn("previewBtn.click();", source)
         self.assertIn("if (event.key === 'ArrowRight')", source)
         self.assertIn("nextBtn.click();", source)
+
         self.assertNotIn('id="countLabel"', source)
         self.assertNotIn('id="timeLabel"', source)
         self.assertNotIn('class="arrangement-warning"', source)
         self.assertIn("Vérifier la position avant toute commande", source)
+
         self.assertIn("height:48px", source)
-        self.assertIn('class="midi-return-main-title"', source)
+        # Les sous-éléments des cartes sont désormais créés dynamiquement
+        # par le renderer commun ; on protège donc le style et le renderer.
+        self.assertIn(".midi-return-main-title", source)
         self.assertIn("white-space:nowrap", source)
         self.assertIn("text-overflow:ellipsis", source)
-        self.assertIn("grid-template-columns:repeat(2,minmax(0,1fr))", source)
-        self.assertIn('/static/midi-return-visual.js', source)
+        self.assertIn("renderDeviceCards", source)
 
         session_source = (PROJECT_ROOT / "templates/index.html").read_text(encoding="utf-8")
         self.assertIn('/static/midi-return-visual.js', session_source)
-        self.assertIn('window.CLMidiReturnVisual.createController', session_source)
-        self.assertIn('window.CLMidiReturnVisual.createController', source)
+        self.assertIn("renderDeviceCards", session_source)
 
     def test_scene_selection_publishes_cached_title_immediately(self):
         with self.app.lock:

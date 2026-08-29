@@ -239,13 +239,19 @@ class MidiNetworkToolsTests(unittest.TestCase):
 
     def test_console_return_cards_keep_cl5_and_ql1_identity_colors(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
-        cards = source.split('- (void)updateConsoleReturnCards {', 1)[1].split('- (void)refreshAbletonSceneTitle', 1)[0]
-        self.assertIn('BOOL isCL5', cards)
-        self.assertIn('colorWithRed:0.608 green:0.420 blue:0.839', cards)
-        self.assertIn('colorWithRed:0.243 green:0.620 blue:0.675', cards)
-        self.assertIn('card.layer.borderColor = consoleAccent.CGColor', cards)
-        self.assertIn('programLabel.textColor = consoleAccent', cards)
-        self.assertIn('@"%@   PC %@ → %@   %@"', cards)
+        cards = source.split('- (void)updateConsoleReturnCards {', 1)[1].split(
+            '- (void)refreshAbletonSceneTitle', 1
+        )[0]
+
+        # Passe 3 : l'identité visuelle vient désormais du profil du device,
+        # et non d'un branchement final codé en dur sur le nom CL5 / QL1.
+        self.assertIn('profile[@"palette"]', cards)
+        self.assertIn('profile[@"display_name"]', cards)
+        self.assertIn('deviceColorFromHex:palette[@"base"]', cards)
+        self.assertIn('deviceColorFromHex:palette[@"accent"]', cards)
+        self.assertIn('@"productionSupported": @(productionSupported)', cards)
+        self.assertIn('console[@"id"] ?: @"device"', cards)
+        self.assertNotIn('BOOL isCL5', cards)
 
     def test_network_manager_return_rows_are_compact_and_hide_memory_titles(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
@@ -284,8 +290,8 @@ class MidiNetworkToolsTests(unittest.TestCase):
             self.assertNotIn('data-library-reveal=', source)
             self.assertNotIn('/console-library/import/', source)
             self.assertNotIn("action:'console_title_mode'", source)
-            self.assertIn('state.midi_console || {}', source)
-            self.assertIn('renderConsoleReturn', source)
+            self.assertIn('CLMidiReturnVisual.devicesFromState(state)', source)
+            self.assertIn('CLMidiReturnVisual.renderDeviceCards', source)
 
     def test_integrated_simulator_has_clear_console_rows_and_no_duplicate_details_button(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
@@ -906,16 +912,26 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertEqual(set(ql1_skin_values), {"#63c7d4"})
 
         show = (ROOT / "launcher_control.py").read_text(encoding="utf-8").lower()
-        self.assertIn("#ql1return{--console-color:#63c7d4;--console-accent:#3e9eac}", show)
+        self.assertIn("palette:{base:'#63c7d4',accent:'#3e9eac'}", show)
+
+        visual = (ROOT / "static" / "midi-return-visual.js").read_text(encoding="utf-8").lower()
+        self.assertIn("console_b: {base: '#63c7d4', accent: '#3e9eac'}", visual)
 
         for template_name in ("index.html", "arrangement.html"):
             template = (ROOT / "templates" / template_name).read_text(encoding="utf-8").lower()
-            self.assertIn("--console-accent:#3e9eac", template)
-            self.assertIn("--console-text:#63c7d4", template)
+            self.assertIn("renderdevicecards", template)
 
         dashboard = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
-        self.assertGreaterEqual(dashboard.count("colorWithRed:0.243 green:0.620 blue:0.675"), 4)
-        self.assertIn("colorWithRed:0.388 green:0.780 blue:0.831", dashboard)
+
+        # La palette QL1 historique reste cyan dans le profil par défaut,
+        # mais le renderer natif consomme désormais la palette configurée.
+        self.assertIn('#63C7D4', dashboard)
+        self.assertIn('#3E9EAC', dashboard)
+        self.assertIn('profile[@"palette"]', dashboard)
+        self.assertIn('deviceColorFromHex:palette[@"base"]', dashboard)
+        self.assertIn('deviceColorFromHex:palette[@"accent"]', dashboard)
+
+        # Les anciennes identités vertes restent interdites.
         self.assertNotIn("colorWithRed:0.18 green:0.52 blue:0.29", dashboard)
         self.assertNotIn("colorWithRed:0.247 green:0.608 blue:0.349", dashboard)
 

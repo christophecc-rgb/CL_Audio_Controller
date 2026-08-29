@@ -10,6 +10,7 @@ const source = fs.readFileSync(
 const context = {globalThis: {}};
 vm.runInNewContext(source, context);
 const createController = context.globalThis.CLMidiReturnVisual.createController;
+const {visibleDevices, deviceViewModel, devicesFromState} = context.globalThis.CLMidiReturnVisual;
 
 function scenario(interfaceName) {
   let now = 0;
@@ -188,4 +189,52 @@ for (const [label, firstKey, secondKey] of [
   assert.equal(states.at(-1), 'confirmed', 'retour à 3 s : stable après 4 s');
 }
 
-console.log('midi-return-visual: 8 scénarios de rappel déterministe réussis');
+const makeDevice = (index, changes = {}) => ({
+  id: index === 1 ? 'console_a' : index === 2 ? 'console_b' : `device_${index}`,
+  legacy_key: index === 1 ? 'cl5' : index === 2 ? 'ql1' : null,
+  display_name: `DEVICE ${index}`,
+  enabled: true,
+  library: index <= 2 ? (index === 1 ? 'cl5' : 'ql1') : null,
+  midi_channel: index,
+  production_supported: index <= 2,
+  palette: {base:'#FFB067', accent:'#D7782D'},
+  visibility: {show_control:true, remote:true, network_manager:true},
+  ...changes
+});
+
+for (const count of [1, 2, 3, 4, 6, 8]) {
+  const devices = Array.from({length:count}, (_, index) => makeDevice(index + 1));
+  assert.equal(visibleDevices(devices, 'remote').length, count, `${count} devices rendus dans l'ordre`);
+  assert.deepEqual(
+    Array.from(visibleDevices(devices, 'remote'), device => device.id),
+    Array.from(devices, device => device.id),
+    `${count} devices: ordering stable`
+  );
+}
+
+{
+  const devices = [
+    makeDevice(1),
+    makeDevice(2, {display_name:'DM7', enabled:false}),
+    makeDevice(3, {visibility:{show_control:true,remote:false,network_manager:true}}),
+    makeDevice(4, {display_name:'LIGHTING GRANDMA BACKUP'})
+  ];
+  assert.deepEqual(Array.from(visibleDevices(devices, 'remote'), item => item.id), ['console_a','device_4']);
+  assert.deepEqual(Array.from(visibleDevices(devices, 'show_control'), item => item.id), ['console_a','device_3','device_4']);
+  const longName = deviceViewModel(devices[3]);
+  assert.equal(longName.displayName, 'LIGHTING GRANDMA BACKUP');
+  assert.equal(longName.label, 'Non actif en production');
+  assert.equal(longName.status, 'unavailable');
+  assert.equal(longName.memory, '—');
+  assert.equal(longName.title, '');
+  assert.equal(longName.base, '#FFB067');
+}
+
+{
+  const fallback = devicesFromState({midi_console:{cl5:{validation_status:'confirmed'},ql1:{validation_status:'waiting'}}});
+  assert.equal(fallback[0].display_name, 'CL5');
+  assert.equal(fallback[1].display_name, 'QL1');
+  assert.equal(fallback[1].midi_channel, 2);
+}
+
+console.log('midi-return-visual: 8 scénarios recall + renderer dynamique 1/2/3/4/6/8 réussis');

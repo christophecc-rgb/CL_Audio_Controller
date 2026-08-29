@@ -698,6 +698,10 @@
     .midi-return .midi-return-memory {
       color:var(--console-text) !important;
     }
+    .midi-returns{grid-template-columns:repeat(auto-fit,minmax(min(210px,100%),1fr));max-height:310px;overflow-y:auto}
+    .midi-return{min-width:0}
+    .midi-return-console{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .midi-return.device-unavailable{opacity:.62;filter:saturate(.72);animation:none!important}
 
     .midi-return.state-idle {
       border-color:var(--console-accent) !important;
@@ -823,10 +827,7 @@
       <a href="/arrangement" data-arrangement-link>Arrangement</a>
     </nav>
 
-    <section class="midi-returns" aria-label="Retours MIDI consoles">
-      <div class="midi-return state-idle" id="webCl5Return"><div class="midi-return-heading"><span class="midi-return-console">CL5</span><strong id="webCl5Program"><span class="midi-return-memory">—</span></strong></div><span class="midi-return-main-title">Titre en attente</span><span class="midi-return-state" id="webCl5State"></span></div>
-      <div class="midi-return state-idle" id="webQl1Return"><div class="midi-return-heading"><span class="midi-return-console">QL1</span><strong id="webQl1Program"><span class="midi-return-memory">—</span></strong></div><span class="midi-return-main-title">Titre en attente</span><span class="midi-return-state" id="webQl1State"></span></div>
-    </section>
+    <section class="midi-returns" id="sessionDevices" aria-label="Devices MIDI"></section>
 
     <div class="scene-cards">
       <section class="card current-card" id="currentCard" aria-live="polite">
@@ -881,8 +882,7 @@
     const gotoButton = document.getElementById('gotoButton');
     const pauseButton = document.getElementById('pauseButton');
     const ltcTimecodeEl = document.getElementById('ltcTimecode');
-    const webCl5Return = document.getElementById('webCl5Return');
-    const webQl1Return = document.getElementById('webQl1Return');
+    const sessionDevices = document.getElementById('sessionDevices');
 
     let actionBusy = false;
     let lastKnownState = null;
@@ -1256,90 +1256,9 @@
       const state = rawState && rawState.state ? rawState.state : rawState;
       if (!acceptStateGeneration(state)) return;
       if (window.CLRemoteLTC) window.CLRemoteLTC.render(ltcTimecodeEl, state);
-      const midi = state.midi_console || {};
-
-      const formatMidiAge = (seconds) => {
-        seconds = Math.max(0, Math.floor(seconds));
-        if (seconds < 60) return seconds < 2 ? 'à l’instant' : 'il y a ' + seconds + ' s';
-        const minutes = Math.floor(seconds / 60);
-        if (minutes < 60) return 'il y a ' + minutes + ' min';
-        const hours = Math.floor(minutes / 60);
-        const rest = minutes % 60;
-        return 'il y a ' + hours + ' h' + (rest ? ' ' + rest + ' min' : '');
-      };
-      const renderConsoleReturn = (name, value, card, programId, stateId) => {
-        value = value || {};
-        const status = value.validation_status || 'unavailable';
-        const expectedKey = [
-          value.expected_midi_program ?? '',
-          value.expected_activated_at ?? ''
-        ].join(':');
-        const hasExpected = value.expected_midi_program != null;
-        const finalKey = [
-          value.expected_midi_program ?? '',
-          value.returned_midi_program ?? '',
-          value.returned_at ?? ''
-        ].join(':');
-        if (!card._visualController) {
-          card._visualController = window.CLMidiReturnVisual.createController({
-            waitingMs: 4000,
-            confirmedMs: 500,
-            applyState: visualState => {
-              ['idle','waiting','confirmed','mismatch','timeout'].forEach(item => {
-                card.classList.toggle(`state-${item}`, visualState === item);
-              });
-            }
-          });
-        }
-        const visualState = card._visualController.update({
-          expectedKey,
-          expectedStartedAtMs: Number(value.expected_activated_at || 0) * 1000,
-          hasExpected,
-          backendState: value.visual_state || 'idle',
-          finalKey
-        });
-
-        const expectedTitle = value.expected_title || 'Titre non résolu';
-        const returnedTitle = value.returned_title || 'Titre non résolu';
-
-        const showReturned =
-          status === 'confirmed' ||
-          status === 'mismatch' ||
-          !value.expected_scene_memory;
-
-        const mainNumber =
-          (showReturned
-            ? value.returned_scene_memory
-            : value.expected_scene_memory) ?? '—';
-
-        const mainTitle =
-          showReturned && value.returned_scene_memory != null
-            ? returnedTitle
-            : expectedTitle;
-
-        const programEl = document.getElementById(programId);
-        programEl.textContent = '';
-
-        const memoryEl = document.createElement('span');
-        memoryEl.className = 'midi-return-memory';
-        memoryEl.textContent = mainNumber;
-
-        const mainTitleEl = card.querySelector('.midi-return-main-title');
-        mainTitleEl.textContent = mainTitle;
-
-        programEl.append(memoryEl);
-
-        const validationLabel =
-          visualState === 'confirmed' ? '✓ Boucle confirmée' :
-          visualState === 'mismatch'  ? '⚠ Retour différent' :
-          visualState === 'waiting'   ? 'Retour en attente…' :
-          visualState === 'timeout'   ? '⚠ Retour absent' :
-          '';
-
-        document.getElementById(stateId).textContent = validationLabel;
-      };
-      renderConsoleReturn('CL5', midi.cl5, webCl5Return, 'webCl5Program', 'webCl5State');
-      renderConsoleReturn('QL1', midi.ql1, webQl1Return, 'webQl1Program', 'webQl1State');
+      window.CLMidiReturnVisual.renderDeviceCards(sessionDevices, window.CLMidiReturnVisual.devicesFromState(state), {
+        surface: 'remote', idPrefix: 'webDevice'
+      });
       fillSceneSelect(state);
 
       const connected = Boolean(state && state.connected);
