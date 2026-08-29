@@ -7,6 +7,9 @@ production continue volontairement d'utiliser ses clés ``cl5`` / ``ql1``.
 from __future__ import annotations
 
 import json
+import os
+import re
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping, Optional
@@ -16,6 +19,7 @@ SUPPORTED_PROTOCOLS = frozenset({"midi"})
 FUTURE_PROTOCOLS = frozenset({"osc"})
 SUPPORTED_SIGNAL_TYPES = frozenset({"program_change"})
 FUTURE_SIGNAL_TYPES = frozenset({"control_change", "note", "sysex", "osc_message"})
+DEVICE_SCHEMA_VERSION = 1
 
 DEFAULT_DEVICE_CONFIG_PATH = (
     Path.home() / "Library" / "Application Support" / "CL Audio Controller" / "devices.json"
@@ -88,6 +92,7 @@ class DeviceProfile:
 
 @dataclass(frozen=True)
 class DeviceConfiguration:
+    schema_version: int = DEVICE_SCHEMA_VERSION
     profile_id: str = "default"
     profile_name: str = "Configuration par défaut"
     devices: tuple[DeviceProfile, ...] = field(default_factory=tuple)
@@ -100,6 +105,7 @@ class DeviceConfiguration:
 
     def to_dict(self) -> dict[str, Any]:
         return {
+            "schema_version": self.schema_version,
             "profile_id": self.profile_id,
             "profile_name": self.profile_name,
             "devices": [device.to_dict() for device in self.devices],
@@ -123,6 +129,18 @@ def default_device_configuration() -> DeviceConfiguration:
             library="ql1", visibility=DeviceVisibility(), legacy_key="ql1",
         ),
     ))
+
+
+DEVICE_PALETTE_PRESETS = {
+    "Violet": DevicePalette("#C09AF2", "#9B6BD6"),
+    "Cyan": DevicePalette("#63C7D4", "#3E9EAC"),
+    "Bleu": DevicePalette("#79B8FF", "#397FD1"),
+    "Orange": DevicePalette("#FFB067", "#D7782D"),
+    "Rose": DevicePalette("#F49BC4", "#C75B8D"),
+    "Jaune": DevicePalette("#F4D96B", "#C5A52E"),
+    "Rouge": DevicePalette("#F08A8A", "#C64D4D"),
+    "Vert": DevicePalette("#83D6A0", "#3E9B62"),
+}
 
 
 def _profile_from_dict(payload: Mapping[str, Any], fallback: Optional[DeviceProfile] = None) -> DeviceProfile:
@@ -168,6 +186,9 @@ def _profile_from_dict(payload: Mapping[str, Any], fallback: Optional[DeviceProf
 def device_configuration_from_dict(payload: Mapping[str, Any]) -> DeviceConfiguration:
     """Charge le format devices[] ou adapte doucement un ancien bloc cl5/ql1."""
     defaults = default_device_configuration()
+    schema_version = int(payload.get("schema_version", DEVICE_SCHEMA_VERSION))
+    if schema_version != DEVICE_SCHEMA_VERSION:
+        raise ValueError(f"schema_version {schema_version} non supportée")
     raw_devices = payload.get("devices")
     if isinstance(raw_devices, list):
         profiles = []
@@ -183,21 +204,128 @@ def device_configuration_from_dict(payload: Mapping[str, Any]) -> DeviceConfigur
             legacy = payload.get(legacy_key)
             profiles.append(_profile_from_dict(legacy, fallback) if isinstance(legacy, Mapping) else fallback)
     return DeviceConfiguration(
+        schema_version=schema_version,
         profile_id=str(payload.get("profile_id") or defaults.profile_id),
         profile_name=str(payload.get("profile_name") or defaults.profile_name),
         devices=tuple(profile for profile in profiles if profile is not None),
     )
 
 
-def load_device_configuration(path: Path = DEFAULT_DEVICE_CONFIG_PATH) -> DeviceConfiguration:
-    """Absence ou fichier invalide : configuration historique sûre, sans écriture disque."""
+@dataclass(frozen=True)
+class DeviceConfigurationLoadResult:
+    configuration: DeviceConfiguration
+    source: str
+    error: Optional[str] = None
+
+
+class DeviceConfigurationError(ValueError):
+    pass
+
+
+def validate_device_configuration(configuration: DeviceConfiguration) -> None:
+    if configuration.schema_version != DEVICE_SCHEMA_VERSION:
+        raise DeviceConfigurationError("Version de schéma non supportée")
+    ids = [device.id.strip() for device in configuration.devices]
+    if any(not device_id for device_id in ids) or len(ids) != len(set(ids)):
+        raise DeviceConfigurationError("Chaque ID interne doit être renseigné et unique")
+    for protected in ("console_a", "console_b"):
+        if protected not in ids:
+            raise DeviceConfigurationError(f"Le device historique {protected} doit être conservé")
+    color_pattern = re.compile(r"^#[0-9A-Fa-f]{6}$")
+    enabled_midi_channels: dict[int, str] = {}
+    for device in configuration.devices:
+        if not device.display_name.strip():
+            raise DeviceConfigurationError(f"{device.id} : nom affiché obligatoire")
+        if not color_pattern.fullmatch(device.palette.base) or not color_pattern.fullmatch(device.palette.accent):
+            raise DeviceConfigurationError(f"{device.id} : palette invalide")
+        if device.protocol == "midi" and not isinstance(device.midi_channel, int):
+            raise DeviceConfigurationError(f"{device.id} : canal MIDI obligatoire")
+        if device.protocol == "midi" and not 1 <= device.midi_channel <= 16:
+            raise DeviceConfigurationError(f"{device.id} : canal MIDI hors plage 1–16")
+        aliases = tuple(alias.strip() for alias in device.ableton_track_aliases if alias.strip())
+        if device.enabled and device.signal_type == "program_change" and not aliases:
+            raise DeviceConfigurationError(f"{device.id} : au moins un alias Ableton est requis")
+        if device.enabled and not device.supported:
+            raise DeviceConfigurationError(
+                f"{device.id} : {device.protocol}/{device.signal_type} n’est pas encore supporté"
+            )
+        if device.enabled and device.protocol == "midi":
+            previous = enabled_midi_channels.get(device.midi_channel)
+            if previous is not None:
+                raise DeviceConfigurationError(
+                    f"{device.id} : collision de canal MIDI avec {previous}"
+                )
+            enabled_midi_channels[device.midi_channel] = device.id
+
+
+def _device_configuration_path(path: Optional[Path]) -> Path:
+    return Path(path) if path is not None else Path(os.environ.get("CL_DEVICE_CONFIG_PATH", DEFAULT_DEVICE_CONFIG_PATH))
+
+
+def load_device_configuration_result(path: Optional[Path] = None) -> DeviceConfigurationLoadResult:
+    path = _device_configuration_path(path)
+    if not path.exists():
+        return DeviceConfigurationLoadResult(default_device_configuration(), "default")
     try:
-        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+        payload = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(payload, Mapping):
-            raise ValueError("la racine doit être un objet")
-        return device_configuration_from_dict(payload)
-    except (OSError, ValueError, TypeError, json.JSONDecodeError):
-        return default_device_configuration()
+            raise DeviceConfigurationError("la racine doit être un objet")
+        configuration = device_configuration_from_dict(payload)
+        validate_device_configuration(configuration)
+        return DeviceConfigurationLoadResult(configuration, "file")
+    except (OSError, ValueError, TypeError, json.JSONDecodeError) as error:
+        return DeviceConfigurationLoadResult(
+            default_device_configuration(), "default", f"Configuration devices invalide : {error}"
+        )
+
+
+def load_device_configuration(path: Optional[Path] = None) -> DeviceConfiguration:
+    """Absence ou fichier invalide : configuration historique sûre, sans écriture disque."""
+    return load_device_configuration_result(path).configuration
+
+
+def save_device_configuration(configuration: DeviceConfiguration,
+                              path: Optional[Path] = None) -> None:
+    """Valide puis remplace atomiquement devices.json."""
+    validate_device_configuration(configuration)
+    path = _device_configuration_path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = json.dumps(configuration.to_dict(), ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+    temporary_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", dir=path.parent,
+            prefix=f".{path.name}.", suffix=".tmp", delete=False,
+        ) as handle:
+            temporary_path = Path(handle.name)
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        reloaded = device_configuration_from_dict(json.loads(temporary_path.read_text(encoding="utf-8")))
+        validate_device_configuration(reloaded)
+        os.replace(temporary_path, path)
+        temporary_path = None
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+
+
+def next_device_id(configuration: DeviceConfiguration) -> str:
+    used = {device.id for device in configuration.devices}
+    index = 3
+    while f"device_{index}" in used:
+        index += 1
+    return f"device_{index}"
+
+
+def new_disabled_device(configuration: DeviceConfiguration) -> DeviceProfile:
+    return DeviceProfile(
+        id=next_device_id(configuration), display_name="Nouveau device", enabled=False,
+        device_type="console", protocol="midi", signal_type="program_change",
+        midi_channel=3, ableton_track_aliases=("NOUVEAU DEVICE PROGRAM",),
+        palette=DEVICE_PALETTE_PRESETS["Bleu"], library=None,
+        visibility=DeviceVisibility(), legacy_key=None,
+    )
 
 
 class ProgramChangeSignalHandler:

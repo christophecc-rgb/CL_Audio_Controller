@@ -919,6 +919,42 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertNotIn("colorWithRed:0.18 green:0.52 blue:0.29", dashboard)
         self.assertNotIn("colorWithRed:0.247 green:0.608 blue:0.349", dashboard)
 
+    def test_devices_editor_is_dynamic_persistent_and_protects_legacy_devices(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        editor = source.split("#pragma mark - Device Profiles editor", 1)[1].split(
+            "- (void)windowWillClose:", 1
+        )[0]
+        self.assertIn('CLDeviceConfigurationPath', source)
+        self.assertIn('@"schema_version": @(CLDeviceSchemaVersion)', editor)
+        self.assertIn('for (NSUInteger index = 0; index < self.deviceProfiles.count; index++)', editor)
+        self.assertIn('action:@selector(addDeviceProfile:)', editor)
+        self.assertIn('@"enabled": @NO', editor)
+        self.assertIn('console_a', editor)
+        self.assertIn('console_b', editor)
+        self.assertIn('NSDataWritingAtomic', editor)
+        self.assertIn('redémarrage requis', editor)
+        self.assertIn('Les devices historiques peuvent être désactivés, pas supprimés', editor)
+        self.assertIn('Restaurer CL5 / QL1 par défaut ?', editor)
+
+    def test_isolated_device_test_bench_never_calls_production_state_writers(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        bench = source.split('- (void)refreshIsolatedDeviceTestEndpoints:', 1)[1].split(
+            '- (void)windowWillClose:', 1
+        )[0]
+        self.assertIn('CLIsProtectedDeviceTestEndpoint', bench)
+        self.assertIn('MIDIOutputPortCreate', bench)
+        self.assertIn('MIDIInputPortCreate', bench)
+        self.assertIn('MIDIPortConnectSource', bench)
+        self.assertIn('MIDISend', bench)
+        self.assertIn('TEST TX', bench)
+        self.assertIn('TEST RX', bench)
+        self.assertIn('ROUND TRIP TEST', bench)
+        self.assertNotIn('queueExpectedProgram:', bench)
+        self.assertNotIn('queueReturnedProgram:', bench)
+        self.assertNotIn('writeConsoleReturnState', bench)
+        self.assertNotIn('expected_activated_at', bench)
+        self.assertNotIn('validation_status', bench)
+
 
 if __name__ == "__main__":
     unittest.main()

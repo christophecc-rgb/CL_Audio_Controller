@@ -31,7 +31,7 @@ from build_identity import BUILD_ID, IDENTITY_PROTOCOL_VERSION, SERVICE_NAME
 from ableton_targets import DEFAULT_CONFIG_PATH, load_target
 from server_ownership import OwnershipRecordError, write_record
 from console_title_library import ConsoleLibraryStore, LibraryImportError, MAX_FILE_SIZE, parse_import
-from device_profiles import load_device_configuration
+from device_profiles import load_device_configuration_result
 
 multiprocessing.freeze_support()
 
@@ -52,7 +52,8 @@ SERVER_INSTANCE_ID = str(uuid.uuid4())
 LAUNCH_ID = os.environ.get("CL_AUDIO_LAUNCH_ID")
 EXPECTED_BUILD_ID = os.environ.get("CL_AUDIO_EXPECTED_BUILD_ID")
 SHUTDOWN_TOKEN = os.environ.get("CL_AUDIO_SHUTDOWN_TOKEN")
-DEVICE_CONFIGURATION = load_device_configuration()
+DEVICE_CONFIGURATION_RESULT = load_device_configuration_result()
+DEVICE_CONFIGURATION = DEVICE_CONFIGURATION_RESULT.configuration
 
 
 def ensure_runtime_identity() -> bool:
@@ -982,6 +983,10 @@ def state_snapshot_locked() -> Dict[str, Any]:
     snapshot["device_profile"] = {
         "profile_id": DEVICE_CONFIGURATION.profile_id,
         "profile_name": DEVICE_CONFIGURATION.profile_name,
+        "schema_version": DEVICE_CONFIGURATION.schema_version,
+        "source": DEVICE_CONFIGURATION_RESULT.source,
+        "error": DEVICE_CONFIGURATION_RESULT.error,
+        "restart_required_after_save": True,
     }
     snapshot["devices"] = [device.to_dict() for device in DEVICE_CONFIGURATION.devices]
     snapshot["console_scene_map"] = state.get("console_scene_map") or {"cl5": {}, "ql1": {}}

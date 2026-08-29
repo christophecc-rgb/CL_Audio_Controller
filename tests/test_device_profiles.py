@@ -13,7 +13,10 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from device_profiles import (
+    DEVICE_PALETTE_PRESETS,
+    DEVICE_SCHEMA_VERSION,
     DeviceConfiguration,
+    DeviceConfigurationError,
     DeviceProfile,
     DeviceTestBench,
     FUTURE_PROTOCOLS,
@@ -22,6 +25,10 @@ from device_profiles import (
     default_device_configuration,
     device_configuration_from_dict,
     load_device_configuration,
+    load_device_configuration_result,
+    new_disabled_device,
+    save_device_configuration,
+    validate_device_configuration,
 )
 
 
@@ -102,6 +109,7 @@ class DeviceProfileTests(unittest.TestCase):
 
     def test_devices_list_round_trips_from_json_shape(self):
         payload = self.configuration.to_dict()
+        self.assertEqual(payload["schema_version"], DEVICE_SCHEMA_VERSION)
         restored = device_configuration_from_dict(json.loads(json.dumps(payload)))
         self.assertEqual(restored, self.configuration)
 
@@ -120,6 +128,58 @@ class DeviceProfileTests(unittest.TestCase):
         self.assertTrue(bench.test_round_trip("console_a"))
         self.assertEqual(production_state, before)
         self.assertNotIn("cl5", bench.snapshot())
+
+    def test_save_is_atomic_and_reload_preserves_rename_alias_palette_and_enabled(self):
+        renamed = replace(
+            self.ql1, display_name="DM7", enabled=False,
+            ableton_track_aliases=self.ql1.ableton_track_aliases + ("PGM CHANGE DM7", "DM7 PROGRAM"),
+            palette=DEVICE_PALETTE_PRESETS["Orange"],
+        )
+        changed = replace(self.configuration, devices=(self.cl5, renamed))
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "nested" / "devices.json"
+            with mock.patch("device_profiles.os.replace", wraps=__import__("os").replace) as atomic_replace:
+                save_device_configuration(changed, path)
+            atomic_replace.assert_called_once()
+            restored = load_device_configuration_result(path)
+        self.assertIsNone(restored.error)
+        dm7 = restored.configuration.by_id("console_b")
+        self.assertEqual((dm7.display_name, dm7.id, dm7.midi_channel), ("DM7", "console_b", 2))
+        self.assertIn("PGM CHANGE QL1", dm7.ableton_track_aliases)
+        self.assertIn("DM7 PROGRAM", dm7.ableton_track_aliases)
+        self.assertEqual(dm7.palette, DEVICE_PALETTE_PRESETS["Orange"])
+        self.assertFalse(dm7.enabled)
+
+    def test_invalid_json_reports_error_and_keeps_safe_defaults(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "devices.json"
+            path.write_text("{broken", encoding="utf-8")
+            result = load_device_configuration_result(path)
+        self.assertIsNotNone(result.error)
+        self.assertEqual(result.source, "default")
+        self.assertEqual(result.configuration, self.configuration)
+
+    def test_validation_rejects_duplicate_id_channel_palette_alias_collision_and_active_future_handler(self):
+        invalid = [
+            replace(self.configuration, devices=(self.cl5, replace(self.ql1, id="console_a"))),
+            replace(self.configuration, devices=(self.cl5, replace(self.ql1, midi_channel=17))),
+            replace(self.configuration, devices=(self.cl5, replace(self.ql1, palette=replace(self.ql1.palette, base="cyan")))),
+            replace(self.configuration, devices=(self.cl5, replace(self.ql1, ableton_track_aliases=()))),
+            replace(self.configuration, devices=(self.cl5, replace(self.ql1, midi_channel=1))),
+            replace(self.configuration, devices=(self.cl5, replace(self.ql1, protocol="osc", signal_type="osc_message"))),
+        ]
+        for configuration in invalid:
+            with self.subTest(configuration=configuration):
+                with self.assertRaises(DeviceConfigurationError):
+                    validate_device_configuration(configuration)
+
+    def test_restore_defaults_and_add_third_disabled_device(self):
+        third = new_disabled_device(self.configuration)
+        self.assertEqual(third.id, "device_3")
+        self.assertFalse(third.enabled)
+        extended = replace(self.configuration, devices=self.configuration.devices + (third,))
+        validate_device_configuration(extended)
+        self.assertEqual(default_device_configuration(), self.configuration)
 
 
 class DeviceProfileStatusCompatibilityTests(unittest.TestCase):
