@@ -213,7 +213,8 @@ class MidiNetworkToolsTests(unittest.TestCase):
 
         self.assertIn('self.localReturnMode = self.returnModeMenu.indexOfSelectedItem == 0', setup)
         self.assertIn('[self updateRoundTripPanelForCurrentMode]', setup)
-        self.assertIn('self.localReturnMode = mode == 0', mode_changed)
+        self.assertNotIn('simulatorModeMenu', source)
+        self.assertIn('self.simulatorModeLabel.stringValue = self.localReturnMode ?', mode_changed)
         self.assertIn('[self updateRoundTripPanelForCurrentMode]', mode_changed)
         self.assertIn('self.testPanel.hidden = !rtpMode', updater)
         self.assertIn('self.testButton.enabled = rtpMode', updater)
@@ -230,9 +231,10 @@ class MidiNetworkToolsTests(unittest.TestCase):
     def test_local_assistant_layout_collapses_the_hidden_rtp_test_space(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
         layout = source.split('- (void)layoutAssistantViewForRTPMode:(BOOL)rtpMode {', 1)[1].split('\n}', 1)[0]
-        self.assertIn('rtpMode ? 850 : 750', layout)
+        self.assertIn('rtpMode ? 970 : 870', layout)
         self.assertIn('rtpMode ? 0.0 : -100.0', layout)
-        self.assertIn('self.assistantReturnPanel.frame = NSMakeRect(16, 293, 468, 88)', layout)
+        self.assertIn('self.assistantReturnPanel.frame = NSMakeRect(16, 437, 468, 64)', layout)
+        self.assertIn('self.consoleLibrariesPanel.frame = NSMakeRect(16, 317, 468, 110)', layout)
         self.assertIn('self.simulatorPanel.frame = NSMakeRect(16, 63, 468, 220)', layout)
 
     def test_console_return_cards_keep_cl5_and_ql1_identity_colors(self):
@@ -240,18 +242,58 @@ class MidiNetworkToolsTests(unittest.TestCase):
         cards = source.split('- (void)updateConsoleReturnCards {', 1)[1].split('- (void)refreshAbletonSceneTitle', 1)[0]
         self.assertIn('BOOL isCL5', cards)
         self.assertIn('colorWithRed:0.608 green:0.420 blue:0.839', cards)
-        self.assertIn('colorWithRed:0.247 green:0.608 blue:0.349', cards)
+        self.assertIn('colorWithRed:0.243 green:0.620 blue:0.675', cards)
         self.assertIn('card.layer.borderColor = consoleAccent.CGColor', cards)
         self.assertIn('programLabel.textColor = consoleAccent', cards)
-        self.assertIn('index == 1 ? compactComparison', cards)
+        self.assertIn('@"%@   PC %@ → %@   %@"', cards)
+
+    def test_network_manager_return_rows_are_compact_and_hide_memory_titles(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        setup = source.split('self.cl5ReturnCard =', 1)[1].split('[self createIntegratedSimulatorPanelInView:content]', 1)[0]
+        cards = source.split('- (void)updateConsoleReturnCards {', 1)[1].split('- (void)refreshAbletonSceneTitle', 1)[0]
+        self.assertIn('@"CL5   PC — → —   …"', setup)
+        self.assertIn('@"QL1   PC — → —   …"', setup)
+        self.assertNotIn('ReturnTitle', setup)
+        self.assertNotIn('titleLabel.stringValue', cards)
+        self.assertIn('confirmed ? @"✓" : mismatch ? @"✕" : stale ? @"!" : @"…"', cards)
+        self.assertIn('@"Indéterminé · attendu indisponible"', cards)
+        self.assertIn('@"En attente du retour"', cards)
+        self.assertIn('@"Retour ancien · %@"', cards)
+        self.assertIn('expected[@"expected_title"]', cards)
+        self.assertIn('expected[@"returned_title"]', cards)
+
+    def test_console_libraries_are_configured_by_the_network_manager_via_backend(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        self.assertIn('@"BIBLIOTHÈQUES CONSOLES"', source)
+        self.assertIn('status[@"console_scene_library_status"]', source)
+        self.assertIn('info[@"entries"]', source)
+        self.assertIn('@"✓ %lu mémoires"', source)
+        self.assertIn('@"⚠ %@"', source)
+        self.assertIn('/console-library/import/%@', source)
+        self.assertIn('multipart/form-data; boundary=%@', source)
+        self.assertNotIn('parse_import', source)
+
+    def test_ableton_remotes_do_not_expose_console_library_management(self):
+        for template_name in ("index.html", "arrangement.html"):
+            source = (ROOT / "templates" / template_name).read_text(encoding="utf-8")
+            self.assertNotIn('Gérés par CL MIDI Network Manager', source)
+            self.assertNotIn('consoleLibrariesStatus', source)
+            self.assertNotIn('console_scene_library_status', source)
+            self.assertNotIn('id="consoleTitleMode"', source)
+            self.assertNotIn('data-library-import=', source)
+            self.assertNotIn('data-library-reveal=', source)
+            self.assertNotIn('/console-library/import/', source)
+            self.assertNotIn("action:'console_title_mode'", source)
+            self.assertIn('state.midi_console || {}', source)
+            self.assertIn('renderConsoleReturn', source)
 
     def test_integrated_simulator_has_clear_console_rows_and_no_duplicate_details_button(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
         panel = source.split('- (void)createIntegratedSimulatorPanelInView:', 1)[1].split('- (void)sendSimulatorMemory:', 1)[0]
         self.assertIn('NSView *cl5Row', panel)
         self.assertIn('NSView *ql1Row', panel)
-        self.assertIn('@"CL5 · Canal 1"', panel)
-        self.assertIn('@"QL1 · Canal 2"', panel)
+        self.assertIn('@"CL5 · Program Change · Canal 1"', panel)
+        self.assertIn('@"QL1 · Program Change · Canal 2"', panel)
         self.assertIn('@"Délai"', panel)
         self.assertNotIn('@"Afficher les détails"', panel)
         self.assertIn('NSMakeRect(16, 153, 468, 220)', panel)
@@ -305,7 +347,7 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('@"lastCL5Program"', source)
         self.assertIn('@"lastQL1Program"', source)
         self.assertIn('CLMidiAgeDescription', source)
-        self.assertIn('@"En attente du premier retour MIDI"', source)
+        self.assertIn('@"En attente du retour"', source)
         self.assertIn('@"✓ Confirmé par la console"', source)
         self.assertIn('Mismatch · reçu %ld · attendu %ld', source)
         self.assertIn('@"Retour ancien · %@"', source)
@@ -321,23 +363,25 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertNotIn('60 * NSEC_PER_MSEC', source)
         self.assertIn('@"title": self.lastCL5Title', source)
         self.assertIn('@"title": self.lastQL1Title', source)
-        self.assertNotIn('MIDISend(', source)
-        self.assertIn('CL5 · Scène attendue n°—', source)
-        self.assertIn('QL1 · Scène attendue n°—', source)
+        manual_send = source.split('- (void)sendSimulatorMemory:', 1)[1].split('- (void)simulatorModeChanged:', 1)[0]
+        self.assertIn('MIDISend(outputPort, destination, &packetList)', manual_send)
+        self.assertNotIn('[self toolPath:@"CLMIDIRoundTripTester"]', manual_send)
+        self.assertIn('CL5   PC — → —   …', source)
+        self.assertIn('QL1   PC — → —   …', source)
         self.assertIn('updateConsoleReturnCards', source)
         self.assertIn('assistantReturnPanel.hidden = detailed', source)
-        self.assertIn('Titre Ableton en attente', source)
+        self.assertNotIn('Titre Ableton en attente', source)
         self.assertIn('http://127.0.0.1:5050/status', source)
         self.assertIn('playing_scene_name', source)
         self.assertIn('colorWithRed:0.608 green:0.420 blue:0.839', source)
-        self.assertIn('colorWithRed:0.247 green:0.608 blue:0.349', source)
+        self.assertIn('colorWithRed:0.243 green:0.620 blue:0.675', source)
         self.assertIn('CL_MIDI_Console_State.json', source)
         self.assertIn('--background-monitor', source)
         self.assertNotIn('ltc_timecode', source)
         self.assertIn('@"Diagnostic détaillé"', source)
         self.assertIn('@"Vue Assistant"', source)
-        self.assertIn('setContentSize:NSMakeSize(500, rtpMode ? 850 : 750)', source)
-        self.assertIn('setContentSize:NSMakeSize(500, 1100)', source)
+        self.assertIn('setContentSize:NSMakeSize(500, rtpMode ? 970 : 870)', source)
+        self.assertIn('setContentSize:NSMakeSize(500, 1220)', source)
         self.assertIn('self.technicalPanel.hidden = !detailed', source)
         self.assertIn('RÉSEAUX CONSOLES', source)
         self.assertIn('self.lastCL5Test', source)
@@ -581,13 +625,31 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('self.localReturnMode ? CLLocalReturnEndpointName', manual_send)
         self.assertNotIn('self.localReturnMode ? CLExpectedEndpointName', manual_send)
 
+    def test_local_manual_simulator_sends_directly_to_destination_only_return_endpoint(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        manual_send = source.split('- (void)sendSimulatorMemory:', 1)[1].split(
+            '- (void)simulatorModeChanged:', 1
+        )[0]
+
+        self.assertIn('self.localReturnDestination', manual_send)
+        self.assertIn('MIDIOutputPortCreate(', manual_send)
+        self.assertIn('MIDISend(outputPort, destination, &packetList)', manual_send)
+        self.assertIn('UInt8 midiProgram = (UInt8)(sceneMemory - 1)', manual_send)
+        self.assertIn('0xC0 | ((channel - 1) & 0x0F)', manual_send)
+        self.assertIn('[self recordSimulatorProgram:midiProgram channel:channel]', manual_send)
+        self.assertIn('sendStatus != noErr', manual_send)
+        self.assertNotIn('[self toolPath:@"CLMIDIRoundTripTester"]', manual_send)
+        self.assertNotIn('MIDIGetSource', manual_send)
+        self.assertNotIn('MIDIPortConnectSource', manual_send)
+
     def test_secondary_window_refreshes_canonical_expected_state_from_shared_monitor(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
         loader = source.split('- (void)loadPublishedConsoleReturnState', 1)[1].split('- (void)writeConsoleReturnState', 1)[0]
         cards = source.split('- (void)updateConsoleReturnCards {', 1)[1].split('- (void)refreshAbletonSceneTitle', 1)[0]
         self.assertIn('self.expectedCL5State = cl5', loader)
         self.assertIn('self.expectedQL1State = ql1', loader)
-        self.assertIn('BOOL showReturnedAsPrimary = confirmed || mismatch || !hasExpectedProgram', cards)
+        self.assertIn('NSString *expectedDisplay = hasExpectedProgram', cards)
+        self.assertIn('NSString *returnedDisplay = hasReturn', cards)
 
     def test_local_and_rtp_return_transports_keep_expected_monitor_independent(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
@@ -599,8 +661,11 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertNotIn('expectedMonitorSource = 0', mode)
         self.assertNotIn('expectedCL5Program = -1', mode)
         self.assertNotIn('expectedQL1Program = -1', mode)
-        self.assertIn('mode == 0 ? CLLocalReturnEndpointName : selectedEndpoint', transport)
-        self.assertIn('mode == 0 ? @"iac" : @"rtp"', transport)
+        self.assertIn('BOOL local = self.localReturnMode', transport)
+        self.assertIn('local ? CLLocalReturnEndpointName : selectedEndpoint', transport)
+        self.assertIn('local ? @"iac" : @"rtp"', transport)
+        self.assertIn('EXPECTED absent : Gestionnaire IAC Bus 1 introuvable', transport)
+        self.assertIn('RETURNED absent : CL MIDI Return Test introuvable', transport)
 
     def test_return_monitor_handles_missing_source_and_has_single_publisher(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
@@ -737,13 +802,19 @@ class MidiNetworkToolsTests(unittest.TestCase):
             "expected_scene_memory", "expected_title", "expected_program_source",
             "returned_scene_memory", "returned_title", "returned_program_source",
             "title_offset", "expected_title_lookup_memory", "returned_title_lookup_memory",
-            "validation_status", "last_return_age_seconds", "confirmation_latency_ms",
+            "validation_status", "expected_activated_at", "last_return_age_seconds", "confirmation_latency_ms",
         ):
             self.assertIn(f'expected[@"{field}"]', method)
         for status in ("confirmed", "mismatch", "stale", "local_fallback", "unavailable"):
             self.assertIn(f'@"{status}"', method)
         self.assertIn('@"✓ Confirmé par la console"', method)
         self.assertIn('@"En attente du retour"', method)
+        self.assertIn('@"recall_waiting"', method)
+        self.assertIn('elapsedSinceExpected < 4.0', method)
+        self.assertIn('!mismatch', method)
+        self.assertIn('[visualState isEqualToString:@"recall_waiting"]', method)
+        self.assertIn('@"clVisualRecallTimerKey"', method)
+        self.assertIn('4.0 - elapsedSinceExpected', method)
         self.assertNotIn("date.timeIntervalSinceNow", method)
 
     def test_yamaha_simulator_dashboard_supports_independent_consoles(self):
@@ -823,6 +894,30 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('bundle identifier is "com.apple.audio.AudioMIDISetup"', source)
         self.assertIn('set visible to false', source)
         self.assertNotIn('click button "Se déconnecter"', source)
+
+    def test_ql1_visual_identity_stays_cyan_in_all_three_renderers(self):
+        skins = (ROOT / "static" / "cl-skins.css").read_text(encoding="utf-8").lower()
+        ql1_skin_values = [
+            line.split(":", 1)[1].strip().rstrip(";")
+            for line in skins.splitlines()
+            if "--cl-skin-ql1:" in line
+        ]
+        self.assertTrue(ql1_skin_values)
+        self.assertEqual(set(ql1_skin_values), {"#63c7d4"})
+
+        show = (ROOT / "launcher_control.py").read_text(encoding="utf-8").lower()
+        self.assertIn("#ql1return{--console-color:#63c7d4;--console-accent:#3e9eac}", show)
+
+        for template_name in ("index.html", "arrangement.html"):
+            template = (ROOT / "templates" / template_name).read_text(encoding="utf-8").lower()
+            self.assertIn("--console-accent:#3e9eac", template)
+            self.assertIn("--console-text:#63c7d4", template)
+
+        dashboard = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        self.assertGreaterEqual(dashboard.count("colorWithRed:0.243 green:0.620 blue:0.675"), 4)
+        self.assertIn("colorWithRed:0.388 green:0.780 blue:0.831", dashboard)
+        self.assertNotIn("colorWithRed:0.18 green:0.52 blue:0.29", dashboard)
+        self.assertNotIn("colorWithRed:0.247 green:0.608 blue:0.349", dashboard)
 
 
 if __name__ == "__main__":

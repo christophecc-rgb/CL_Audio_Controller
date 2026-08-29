@@ -9,7 +9,7 @@
     const requestFrame = options.requestFrame || root.requestAnimationFrame.bind(root);
     const setTimer = options.setTimer || root.setTimeout.bind(root);
     const clearTimer = options.clearTimer || root.clearTimeout.bind(root);
-    const waitingMs = options.waitingMs || 600;
+    const waitingMs = options.waitingMs || 4000;
     const confirmedMs = options.confirmedMs || 500;
 
     let lastExpectedKey = null;
@@ -39,8 +39,8 @@
 
       if (finalState === 'confirmed') {
         if (pendingFinalKey && completedConfirmationKey === pendingFinalKey) {
-          phase = 'idle';
-          applyState('idle');
+          phase = 'confirmed';
+          applyState('confirmed');
           return;
         }
         phase = 'confirmed';
@@ -50,8 +50,7 @@
         timer = setTimer(() => {
           if (generation !== confirmationGeneration || phase !== 'confirmed') return;
           completedConfirmationKey = pendingFinalKey;
-          phase = 'idle';
-          applyState('idle');
+          applyState('confirmed');
         }, Math.max(0, confirmedUntil - now()));
         return;
       }
@@ -69,16 +68,22 @@
       showFinalState();
     };
 
-    const startWaiting = (expectedKey, backendState, finalKey) => {
+    const startWaiting = (expectedKey, expectedStartedAtMs, backendState, finalKey) => {
       generation += 1;
       cancelTimer();
       lastExpectedKey = expectedKey;
       pendingFinalState = null;
       pendingFinalKey = '';
-      waitingUntil = now() + waitingMs;
+      const reportedStart = Number(expectedStartedAtMs);
+      waitingUntil = (Number.isFinite(reportedStart) && reportedStart > 0 ? reportedStart : now()) + waitingMs;
       confirmedUntil = 0;
-      phase = 'waiting-frame';
       rememberFinal(backendState, finalKey);
+
+      if (backendState === 'mismatch' || waitingUntil <= now()) {
+        showFinalState();
+        return;
+      }
+      phase = 'waiting-frame';
 
       // Cette affectation est synchrone : aucune réponse backend du même
       // cycle ne peut remplacer WAITING avant la première frame demandée.
@@ -96,14 +101,25 @@
     };
 
     return {
-      update({expectedKey, hasExpected, backendState, finalKey}) {
+      update({expectedKey, expectedStartedAtMs, hasExpected, backendState, finalKey}) {
         if (hasExpected && expectedKey !== lastExpectedKey) {
-          startWaiting(expectedKey, backendState, finalKey);
-          return 'waiting';
+          startWaiting(expectedKey, expectedStartedAtMs, backendState, finalKey);
+          return phase;
         }
 
         if (phase === 'waiting-frame' || phase === 'waiting') {
+          if (backendState === 'mismatch') {
+            generation += 1;
+            cancelTimer();
+            rememberFinal(backendState, finalKey);
+            showFinalState();
+            return phase;
+          }
           rememberFinal(backendState, finalKey);
+          if (now() >= waitingUntil) {
+            showFinalState();
+            return phase;
+          }
           applyState('waiting');
           return 'waiting';
         }

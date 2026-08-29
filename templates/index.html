@@ -690,8 +690,8 @@
 
     #webQl1Return,
     #arrQl1Return {
-      --console-accent:#3f9b59;
-      --console-text:#70d386;
+      --console-accent:#3e9eac;
+      --console-text:#63c7d4;
     }
 
     .midi-return .midi-return-console,
@@ -709,21 +709,25 @@
       border-color:var(--console-accent) !important;
       background:#15181d !important;
       box-shadow:0 0 0 1px color-mix(in srgb, var(--console-accent) 22%, transparent) !important;
-      animation:midiWaitingPulse .30s ease-in-out infinite alternate !important;
+      animation:midiWaitingPulse 1.15s ease-in-out infinite alternate !important;
     }
 
     .midi-return.state-confirmed {
-      border-color:#5fd478 !important;
-      background:rgba(58,139,77,.30) !important;
-      box-shadow:0 0 0 2px rgba(95,212,120,.18),0 0 14px rgba(95,212,120,.30) !important;
-      animation:none !important;
+      border-color:var(--console-accent) !important;
+      background:color-mix(in srgb, var(--console-accent) 18%, #15181d) !important;
+      box-shadow:
+        0 0 0 2px color-mix(in srgb, var(--console-accent) 24%, transparent),
+        0 0 14px color-mix(in srgb, var(--console-accent) 30%, transparent) !important;
+      animation:midiConfirmedPulse .65s ease-out 1 !important;
     }
 
     .midi-return.state-mismatch {
-      border-color:#ff5c5c !important;
-      background:rgba(151,39,39,.30) !important;
-      box-shadow:0 0 0 2px rgba(255,92,92,.16),0 0 12px rgba(255,92,92,.22) !important;
-      animation:none !important;
+      border-color:var(--console-text) !important;
+      background:color-mix(in srgb, var(--console-accent) 14%, #15181d) !important;
+      box-shadow:
+        0 0 0 2px color-mix(in srgb, var(--console-accent) 34%, transparent),
+        0 0 18px color-mix(in srgb, var(--console-accent) 38%, transparent) !important;
+      animation:midiMismatchPulse .48s ease-in-out infinite alternate !important;
     }
 
     .midi-return.state-timeout {
@@ -733,13 +737,44 @@
       animation:none !important;
     }
 
+    @keyframes midiConfirmedPulse {
+      0% { transform:scale(1); filter:brightness(.94); background:color-mix(in srgb, var(--console-accent) 12%, #15181d); box-shadow:none; }
+      38% {
+        transform:scale(1.012);
+        filter:brightness(1.22);
+        background:color-mix(in srgb, var(--console-accent) 34%, #15181d);
+        box-shadow:0 0 24px color-mix(in srgb, var(--console-accent) 55%, transparent);
+      }
+      100% { transform:scale(1); filter:brightness(1); background:color-mix(in srgb, var(--console-accent) 18%, #15181d); }
+    }
+
+    @keyframes midiMismatchPulse {
+      from {
+        filter:brightness(.82);
+        background:color-mix(in srgb, var(--console-accent) 8%, #15181d);
+        box-shadow:0 0 8px color-mix(in srgb, var(--console-accent) 18%, transparent);
+      }
+      to {
+        filter:brightness(1.22);
+        background:color-mix(in srgb, var(--console-accent) 32%, #15181d);
+        border-color:var(--console-text);
+        box-shadow:
+          0 0 0 2px color-mix(in srgb, var(--console-accent) 42%, transparent),
+          0 0 22px color-mix(in srgb, var(--console-accent) 52%, transparent);
+      }
+    }
+
     @keyframes midiWaitingPulse {
       from {
+        filter:brightness(.88);
+        background:color-mix(in srgb, var(--console-accent) 5%, #15181d);
         border-color:color-mix(in srgb, var(--console-accent) 48%, #15181d);
         box-shadow:
           0 0 0 1px color-mix(in srgb, var(--console-accent) 12%, transparent);
       }
       to {
+        filter:brightness(1.14);
+        background:color-mix(in srgb, var(--console-accent) 30%, #15181d);
         border-color:var(--console-accent);
         box-shadow:
           0 0 0 2px color-mix(in srgb, var(--console-accent) 40%, transparent),
@@ -747,11 +782,6 @@
       }
     }
 
-      to {
-        background:rgba(239,193,79,.38);
-        box-shadow:0 0 0 3px rgba(239,193,79,.34),0 0 16px rgba(239,193,79,.44);
-      }
-    }
 
     @media (prefers-reduced-motion:reduce) {
       .midi-return.state-waiting {
@@ -780,7 +810,7 @@
     }
 
 </style>
-  <link rel="stylesheet" href="/static/cl-skins.css?v=20260827-142046">
+  <link rel="stylesheet" href="/static/cl-skins.css?v=20260829-ql1-cyan-pulse">
 </head>
 
 <body>
@@ -832,38 +862,12 @@
       <button class="goto-button" id="gotoButton" type="button">ALLER À LA SCÈNE</button>
     </section>
 
-    <details class="advanced-options">
-      <summary>Options avancées</summary>
-      <div class="advanced-options__content">
-        <label>Source des titres consoles
-          <select id="consoleTitleMode">
-            <option value="ableton">Titres Ableton</option>
-            <option value="imported_library">Bibliothèque de titres importée</option>
-          </select>
-        </label>
-        <div id="consoleTitleSource">Source active : —</div>
-        <h3>Bibliothèques de titres consoles</h3>
-        <p>Formats acceptés : Yamaha CLF, CSV, TSV, JSON et TXT structuré. Import réservé au Mac serveur.</p>
-        <div class="console-library-import" data-console="cl5">
-          <strong>CL5</strong> <input id="cl5LibraryFile" type="file" accept=".clf,.csv,.tsv,.json,.txt">
-          <button type="button" data-library-import="cl5">Choisir/importer…</button>
-          <button type="button" data-library-reveal="cl5" class="cl-console-library-action finder">Révéler dans le Finder</button>
-          <span id="cl5LibraryStatus">Aucun fichier installé</span>
-        </div>
-        <div class="console-library-import" data-console="ql1">
-          <strong>QL1</strong> <input id="ql1LibraryFile" type="file" accept=".clf,.csv,.tsv,.json,.txt">
-          <button type="button" data-library-import="ql1">Choisir/importer…</button>
-          <button type="button" data-library-reveal="ql1" class="cl-console-library-action finder">Révéler dans le Finder</button>
-          <span id="ql1LibraryStatus">Aucun fichier installé</span>
-        </div>
-        <div id="libraryImportMessage" aria-live="polite"></div>
-      </div>
-    </details>
+
 
 <!-- Removed temporary test banner -->
   </main>
 
-  <script src="/static/midi-return-visual.js"></script>
+  <script src="/static/midi-return-visual.js?v=20260829-visual-recall-4s"></script>
   <script>
     const statusEl = document.getElementById('status');
     const currentEl = document.getElementById('current');
@@ -879,52 +883,6 @@
     const ltcTimecodeEl = document.getElementById('ltcTimecode');
     const webCl5Return = document.getElementById('webCl5Return');
     const webQl1Return = document.getElementById('webQl1Return');
-    const consoleTitleMode = document.getElementById('consoleTitleMode');
-    const consoleTitleSource = document.getElementById('consoleTitleSource');
-    const libraryImportMessage = document.getElementById('libraryImportMessage');
-
-    consoleTitleMode.addEventListener('change', async () => {
-      const response = await fetch('/action', {method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({action:'console_title_mode', mode:consoleTitleMode.value})});
-      const result = await response.json();
-      libraryImportMessage.textContent = result.message || '';
-    });
-    async function importConsoleFile(consoleName, file) {
-      const previewBody = new FormData(); previewBody.append('file', file); previewBody.append('preview', '1');
-      const previewResponse = await fetch('/console-library/import/' + consoleName, {method:'POST', body:previewBody});
-      const previewResult = await previewResponse.json();
-      if (!previewResult.ok) { libraryImportMessage.textContent = previewResult.message || ''; return; }
-      const preview = previewResult.preview || {}, sample = (preview.entries || [])
-        .map(entry => entry.memory + ' — ' + entry.title).join('\n');
-      if (!window.confirm(consoleName.toUpperCase() + ' · ' + (preview.entry_count || 0)
-        + ' titre(s) valide(s)\nFormat ' + preview.source_format + '\n' + sample
-        + '\n\nActiver cette bibliothèque ?')) return;
-      const body = new FormData(); body.append('file', file);
-      const response = await fetch('/console-library/import/' + consoleName, {method:'POST', body});
-      const result = await response.json(); libraryImportMessage.textContent = result.message || '';
-    }
-    document.querySelectorAll('[data-library-import]').forEach(button => button.addEventListener('click', async () => {
-      const consoleName = button.dataset.libraryImport;
-      const input = document.getElementById(consoleName + 'LibraryFile');
-      if (!input.files.length) { input.click(); return; }
-      await importConsoleFile(consoleName, input.files[0]);
-    }));
-    document.querySelectorAll('input[type=file]').forEach(input => input.addEventListener('change', () => {
-      if (input.files.length) input.parentElement.querySelector('[data-library-import]').click();
-    }));
-    document.querySelectorAll('.console-library-import').forEach(zone => {
-      zone.addEventListener('dragover', event => { event.preventDefault(); zone.classList.add('drag-over'); });
-      zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
-      zone.addEventListener('drop', async event => {
-        event.preventDefault(); zone.classList.remove('drag-over');
-        const file = event.dataTransfer.files[0]; if (!file) return;
-        await importConsoleFile(zone.dataset.console, file);
-      });
-    });
-    document.querySelectorAll('[data-library-reveal]').forEach(button => button.addEventListener('click', async () => {
-      const response = await fetch('/console-library/reveal/' + button.dataset.libraryReveal, {method:'POST'});
-      const result = await response.json(); libraryImportMessage.textContent = result.message || '';
-    }));
 
     let actionBusy = false;
     let lastKnownState = null;
@@ -1299,17 +1257,7 @@
       if (!acceptStateGeneration(state)) return;
       if (window.CLRemoteLTC) window.CLRemoteLTC.render(ltcTimecodeEl, state);
       const midi = state.midi_console || {};
-      consoleTitleMode.value = state.console_title_mode || 'imported_library';
-      consoleTitleSource.textContent = 'Source active : ' + (state.console_title_source || '—');
-      for (const name of ['cl5', 'ql1']) {
-        const info = (state.console_scene_library_status || {})[name] || {};
-        document.getElementById(name + 'LibraryStatus').textContent =
-          (info.status || 'Aucun fichier installé') + ' · ' + (info.scene_count || 0) + ' titre(s)'
-          + (info.source_format ? ' · ' + info.source_format : '')
-          + (info.source_name ? ' · ' + info.source_name : '')
-          + (info.imported_at ? ' · ' + new Date(info.imported_at).toLocaleString('fr-FR') : '')
-          + (info.migrated_from ? ' · migrée depuis ' + info.migrated_from : '');
-      }
+
       const formatMidiAge = (seconds) => {
         seconds = Math.max(0, Math.floor(seconds));
         if (seconds < 60) return seconds < 2 ? 'à l’instant' : 'il y a ' + seconds + ' s';
@@ -1334,7 +1282,7 @@
         ].join(':');
         if (!card._visualController) {
           card._visualController = window.CLMidiReturnVisual.createController({
-            waitingMs: 600,
+            waitingMs: 4000,
             confirmedMs: 500,
             applyState: visualState => {
               ['idle','waiting','confirmed','mismatch','timeout'].forEach(item => {
@@ -1345,6 +1293,7 @@
         }
         const visualState = card._visualController.update({
           expectedKey,
+          expectedStartedAtMs: Number(value.expected_activated_at || 0) * 1000,
           hasExpected,
           backendState: value.visual_state || 'idle',
           finalKey
@@ -1887,6 +1836,6 @@ gotoInput.addEventListener('blur', () => {
       );
     }, { once: true });
   </script>
-  <script src="/static/cl-skins.js?v=20260827-142046" defer></script>
+  <script src="/static/cl-skins.js?v=20260829-animation-audit" defer></script>
 </body>
 </html>

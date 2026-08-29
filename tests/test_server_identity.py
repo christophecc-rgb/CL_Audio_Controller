@@ -568,8 +568,8 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
         self.assertIn("grid-template-columns:1fr auto 1fr", page)
         self.assertIn(".network-timecode{justify-self:end;min-width:116px", page)
         self.assertIn("font:14px Menlo", page)
-        self.assertIn(".console-return.remembered{border-color:#59616d", page)
-        self.assertIn(".console-return.mismatch{border-color:#e05252", page)
+        self.assertIn(".console-return.remembered{border-color:color-mix(in srgb,var(--console-accent) 34%,#3b414b)", page)
+        self.assertIn(".console-return.mismatch{border-color:var(--console-color)", page)
         self.assertIn("background:#89dfa6", page)
         self.assertIn("background:#e5a63b", page)
 

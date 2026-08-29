@@ -206,17 +206,27 @@ class LiveSetGenerationTests(unittest.TestCase):
 
     def test_program_change_cards_use_backend_visual_state_without_diagnostics(self):
         visual_source = (PROJECT_ROOT / "static/midi-return-visual.js").read_text(encoding="utf-8")
-        self.assertIn("waitingMs = options.waitingMs || 600", visual_source)
+        self.assertIn("waitingMs = options.waitingMs || 4000", visual_source)
+        self.assertIn("expectedStartedAtMs", visual_source)
+        self.assertIn("backendState === 'mismatch'", visual_source)
         self.assertIn("confirmedMs = options.confirmedMs || 500", visual_source)
         self.assertIn("requestFrame", visual_source)
         for template in ("index.html", "arrangement.html"):
             source = (PROJECT_ROOT / "templates" / template).read_text(encoding="utf-8")
             self.assertIn("value.visual_state || 'idle'", source)
+            self.assertIn("waitingMs: 4000", source)
+            self.assertIn("expectedStartedAtMs: Number(value.expected_activated_at || 0) * 1000", source)
             self.assertIn("confirmedMs: 500", source)
             self.assertIn("state-timeout", source)
             self.assertIn("Retour absent", source)
             self.assertNotIn("Attendu — · Reçu —", source)
             self.assertNotIn("ableton_m4l_fallback", source)
+        launcher_source = (PROJECT_ROOT / "launcher_control.py").read_text(encoding="utf-8")
+        self.assertIn("CONSOLE_VISUAL_RECALL_MIN_MS=4000", launcher_source)
+        self.assertIn("value.request_identity", launcher_source)
+        self.assertIn("value.expected_activated_at", launcher_source)
+        self.assertIn("recall.expectedKey===timerKey", launcher_source)
+        self.assertIn("status!=='mismatch'", launcher_source)
 
     def test_late_return_cannot_confirm_a_rapid_second_program_change(self):
         now = time.time()
