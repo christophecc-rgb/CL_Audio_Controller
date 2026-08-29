@@ -231,8 +231,19 @@ def validate_device_configuration(configuration: DeviceConfiguration) -> None:
     for protected in ("console_a", "console_b"):
         if protected not in ids:
             raise DeviceConfigurationError(f"Le device historique {protected} doit être conservé")
+    historical = {
+        "console_a": ("cl5", 1),
+        "console_b": ("ql1", 2),
+    }
+    for device_id, (legacy_key, midi_channel) in historical.items():
+        device = configuration.by_id(device_id)
+        if device.legacy_key != legacy_key or device.midi_channel != midi_channel:
+            raise DeviceConfigurationError(
+                f"{device_id} doit conserver legacy_key={legacy_key} et le canal MIDI {midi_channel}"
+            )
     color_pattern = re.compile(r"^#[0-9A-Fa-f]{6}$")
     enabled_midi_channels: dict[int, str] = {}
+    enabled_ableton_aliases: dict[str, str] = {}
     for device in configuration.devices:
         if not device.display_name.strip():
             raise DeviceConfigurationError(f"{device.id} : nom affiché obligatoire")
@@ -256,6 +267,17 @@ def validate_device_configuration(configuration: DeviceConfiguration) -> None:
                     f"{device.id} : collision de canal MIDI avec {previous}"
                 )
             enabled_midi_channels[device.midi_channel] = device.id
+        if device.enabled and device.supported:
+            for alias in (device.id, device.legacy_key, *aliases):
+                normalized_alias = " ".join(str(alias or "").casefold().split())
+                if not normalized_alias:
+                    continue
+                previous = enabled_ableton_aliases.get(normalized_alias)
+                if previous is not None and previous != device.id:
+                    raise DeviceConfigurationError(
+                        f"{device.id} : collision d’alias Ableton avec {previous}"
+                    )
+                enabled_ableton_aliases[normalized_alias] = device.id
 
 
 def _device_configuration_path(path: Optional[Path]) -> Path:

@@ -248,6 +248,8 @@ static BOOL CLPostDoubleClickFromConnectorReason(NSString *reason) {
 @property NSUInteger ql1SceneTitleLookupGeneration;
 @property NSWindow *devicesWindow;
 @property NSMutableArray<NSMutableDictionary *> *deviceProfiles;
+@property NSDictionary<NSNumber *, NSString *> *returnDeviceIDByChannel;
+@property NSMutableDictionary<NSString *, NSDictionary *> *returnedDeviceStates;
 @property NSPopUpButton *deviceProfileMenu;
 @property NSTextField *deviceNameField;
 @property NSTextField *deviceIDField;
@@ -283,6 +285,7 @@ static BOOL CLPostDoubleClickFromConnectorReason(NSString *reason) {
 - (void)recordSimulatorProgram:(NSInteger)program deviceID:(NSString *)deviceID;
 - (void)updateConsoleLibrariesFromStatus:(NSDictionary *)status;
 - (void)recordIsolatedDeviceTestProgram:(UInt8)program channel:(UInt8)channel source:(NSString *)source;
+- (void)rebuildReturnDeviceRouting;
 @end
 
 static NSString *const CLExpectedEndpointName = @"Gestionnaire IAC Bus 1";
@@ -408,9 +411,7 @@ static void CLPassiveReturnRead(const MIDIPacketList *packetList, void *readProc
             }
             if ((runningStatus & 0xF0) == 0xC0) {
                 UInt8 channel = (runningStatus & 0x0F) + 1;
-                if (channel == 1 || channel == 2) {
-                    [delegate queueReturnedProgram:byte channel:channel receivedAt:NSDate.date];
-                }
+                [delegate queueReturnedProgram:byte channel:channel receivedAt:NSDate.date];
             }
         }
         packet = MIDIPacketNext(packet);
@@ -773,6 +774,8 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     [content addSubview:self.assistantReturnPanel];
     NSString *monitorProfileError = nil;
     self.deviceProfiles = [self loadDeviceProfilesForEditor:&monitorProfileError];
+    self.returnedDeviceStates = [NSMutableDictionary dictionary];
+    [self rebuildReturnDeviceRouting];
     [self rebuildAssistantDeviceMonitoringCards];
 
     self.consoleLibrariesPanel = [[NSView alloc] initWithFrame:NSMakeRect(16, 293, 468, 110)];
@@ -859,6 +862,10 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     NSDictionary *payload = data.length ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
     if (![payload[@"service"] isEqualToString:@"cl-midi-console-monitor"]) return;
     NSDictionary *cl5 = payload[@"cl5"], *ql1 = payload[@"ql1"];
+    NSDictionary *returnedDevices = payload[@"returned_devices"];
+    if ([returnedDevices isKindOfClass:NSDictionary.class]) {
+        self.returnedDeviceStates = [returnedDevices mutableCopy];
+    }
     self.expectedCL5State = cl5;
     self.expectedQL1State = ql1;
     if (cl5[@"expected_midi_program"] != nil && cl5[@"expected_midi_program"] != NSNull.null) {
@@ -950,6 +957,7 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
         @"return_monitor_source": self.localReturnMode ? CLLocalReturnEndpointName :
             (self.returnMonitorSource ? EndpointName(self.returnMonitorSource) : @""),
         @"return_monitor_status": @(self.returnMonitorStatus),
+        @"returned_devices": self.returnedDeviceStates ?: @{},
 
         @"rtp": @{
             @"peer": peer,
@@ -1620,6 +1628,23 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     [self updateRoundTripPanelForCurrentMode];
 }
 
+- (void)rebuildReturnDeviceRouting {
+    NSMutableDictionary<NSNumber *, NSString *> *routing = [NSMutableDictionary dictionary];
+    for (NSDictionary *device in self.deviceProfiles ?: @[]) {
+        if (![device[@"enabled"] boolValue]) continue;
+        if (![[device[@"protocol"] lowercaseString] isEqualToString:@"midi"]) continue;
+        if (![[device[@"signal_type"] lowercaseString] isEqualToString:@"program_change"]) continue;
+        NSDictionary *rx = [device[@"rx"] isKindOfClass:NSDictionary.class] ? device[@"rx"] : @{};
+        if (rx[@"enabled"] && ![rx[@"enabled"] boolValue]) continue;
+        NSNumber *channel = [device[@"midi_channel"] isKindOfClass:NSNumber.class]
+            ? device[@"midi_channel"] : nil;
+        NSString *deviceID = [device[@"id"] isKindOfClass:NSString.class] ? device[@"id"] : @"";
+        if (!channel || channel.integerValue < 1 || channel.integerValue > 16 || !deviceID.length) continue;
+        if (!routing[channel]) routing[channel] = deviceID;
+    }
+    self.returnDeviceIDByChannel = routing.copy;
+}
+
 - (void)selectPassiveExpectedSourceNamed:(NSString *)name {
     MIDIEndpointRef selectedSource = 0;
     for (ItemCount index = 0; index < MIDIGetNumberOfSources(); index++) {
@@ -1695,14 +1720,27 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
 
 - (void)queueReturnedProgram:(UInt8)program channel:(UInt8)channel receivedAt:(NSDate *)receivedAt {
     if (channel < 1 || channel > 16) return;
+    NSString *deviceID = self.returnDeviceIDByChannel[@(channel)];
+    if (!deviceID.length) return;
     dispatch_async(dispatch_get_main_queue(), ^{ [self recordSimulatorProgram:program channel:channel]; });
-    if (channel != 1 && channel != 2) {
-        return;
-    }
-    [self traceSceneTitleEvent:@"midi-callback" midiProgram:program channel:channel
-                  lookupIndex:program receivedName:nil resolvedName:nil];
     dispatch_async(dispatch_get_main_queue(), ^{
         NSDate *eventAt = receivedAt ?: NSDate.date;
+        self.returnedDeviceStates[deviceID] = @{
+            @"midi_program": @(program),
+            @"returned_midi_program": @(program),
+            @"scene_memory": @(program + 1),
+            @"returned_scene_memory": @(program + 1),
+            @"received_at": @([eventAt timeIntervalSince1970]),
+            @"returned_received_at": @([eventAt timeIntervalSince1970]),
+            @"source": @"physical_midi",
+            @"returned_program_source": @"physical_midi",
+        };
+        if (channel != 1 && channel != 2) {
+            [self writeConsoleReturnState];
+            return;
+        }
+        [self traceSceneTitleEvent:@"midi-callback" midiProgram:program channel:channel
+                      lookupIndex:program receivedName:nil resolvedName:nil];
         if (channel == 1) {
             self.lastCL5Program = program;
             self.lastCL5ProgramAt = eventAt;

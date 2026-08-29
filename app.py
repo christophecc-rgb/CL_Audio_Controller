@@ -31,7 +31,7 @@ from build_identity import BUILD_ID, IDENTITY_PROTOCOL_VERSION, SERVICE_NAME
 from ableton_targets import DEFAULT_CONFIG_PATH, load_target
 from server_ownership import OwnershipRecordError, write_record
 from console_title_library import ConsoleLibraryStore, LibraryImportError, MAX_FILE_SIZE, parse_import
-from device_profiles import device_ui_snapshots, load_device_configuration_result
+from device_profiles import DeviceProfile, load_device_configuration_result
 
 multiprocessing.freeze_support()
 
@@ -502,6 +502,108 @@ PGM_CHANGE_CLIP_RE = re.compile(
 CONSOLE_TRACK_NAMES = {"cl5": "PGM CHANGE CL5", "ql1": "PGM CHANGE QL1"}
 
 
+def normalize_ableton_alias(value: Any) -> str:
+    return " ".join(str(value or "").strip().casefold().split())
+
+
+def production_device_profiles():
+    """Devices réellement supportés par le moteur Python, dans l'ordre du profil."""
+    return tuple(
+        device for device in DEVICE_CONFIGURATION.devices
+        if device.enabled and device.protocol == "midi"
+        and device.signal_type == "program_change" and device.supported
+    )
+
+
+def ableton_alias_device_map() -> Dict[str, str]:
+    aliases: Dict[str, str] = {}
+    for device in production_device_profiles():
+        selectors = (device.id, device.legacy_key, *device.ableton_track_aliases)
+        for selector in selectors:
+            normalized = normalize_ableton_alias(selector)
+            if not normalized:
+                continue
+            previous = aliases.get(normalized)
+            if previous is not None and previous != device.id:
+                raise ValueError(f"Alias Ableton ambigu : {selector}")
+            aliases[normalized] = device.id
+    return aliases
+
+
+def resolve_device_profile(selector: Any) -> Optional[DeviceProfile]:
+    device_id = ableton_alias_device_map().get(normalize_ableton_alias(selector))
+    return DEVICE_CONFIGURATION.by_id(device_id) if device_id else None
+
+
+def build_device_state(
+    device: DeviceProfile,
+    expected: Optional[Dict[str, Any]],
+    returned: Optional[Dict[str, Any]] = None,
+    *,
+    now: Optional[float] = None,
+    return_mode: str = "console_return",
+    remote_return_tolerance: float = 0.0,
+) -> Dict[str, Any]:
+    """Valide un Program Change sans dépendre de CL5, QL1 ou d'un device précis."""
+    expected = dict(expected or {})
+    returned = dict(returned or {})
+    current_time = float(time.time() if now is None else now)
+    expected_program = expected.get("expected_midi_program")
+    expected_at = float(expected.get("expected_activated_at") or current_time)
+    returned_program = returned.get("returned_midi_program")
+    returned_at = float(returned.get("returned_received_at") or returned.get("returned_at") or 0)
+    return_recent = bool(returned_at and current_time - returned_at <= 12.0)
+    return_after_intent = bool(
+        return_recent and returned_at >= expected_at - max(0.0, float(remote_return_tolerance))
+    )
+    confirmed = bool(
+        expected_program is not None and returned_program is not None
+        and return_after_intent and int(returned_program) == int(expected_program)
+    )
+    mismatched = bool(
+        expected_program is not None and returned_program is not None
+        and return_after_intent and not confirmed
+    )
+    validation_status = (
+        "unavailable" if expected_program is None
+        else "stale" if returned_at and not return_after_intent
+        else "confirmed" if confirmed
+        else "mismatch" if mismatched
+        else "local_fallback" if return_mode == "local_fallback"
+        else "waiting"
+    )
+    expected_memory = int(expected_program) + 1 if expected_program is not None else None
+    returned_memory = int(returned_program) + 1 if returned_program is not None else None
+    snapshot = device.to_dict()
+    snapshot.update(expected)
+    snapshot.update(returned)
+    snapshot.update({
+        "id": device.id,
+        "production_supported": True,
+        "expected_midi_program": expected_program,
+        "expected_program": expected_memory,
+        "expected_scene_memory": expected_memory,
+        "expected_activated_at": expected_at,
+        "returned_midi_program": returned_program,
+        "returned_program": returned_memory,
+        "returned_scene_memory": returned_memory,
+        "returned_received_at": returned_at or None,
+        "returned_at": returned_at or None,
+        "return_recent": return_recent,
+        "confirmed": confirmed,
+        "mismatch": mismatched,
+        "matched": confirmed,
+        "validation_status": validation_status,
+        "status": validation_status,
+        "visual_state": console_visual_state(validation_status, expected_at, current_time),
+        "fresh": return_recent,
+        "stale": validation_status == "stale",
+        "expected": expected_memory,
+        "returned": returned_memory,
+    })
+    return snapshot
+
+
 def parse_program_change_clip_name(name: Any) -> Optional[int]:
     """Retourne le numéro écrit dans un clip PGM CHANGE ou CC CHANGE (1..128)."""
     match = PGM_CHANGE_CLIP_RE.match(str(name or ""))
@@ -602,17 +704,26 @@ def build_console_scene_map(
     scene_count: int,
     scene_titles: Any = None,
 ) -> Dict[str, Dict[int, list]]:
-    """Associe chaque retour console aux clips alignés de Main, CL5 et QL1."""
+    """Associe les devices aux pistes Ableton via leurs aliases configurés."""
     names = [str(name or "").strip() for name in (track_names or ())]
-    indexes = {name.casefold(): index for index, name in enumerate(names)}
+    indexes = {normalize_ableton_alias(name): index for index, name in enumerate(names)}
     main_index = indexes.get("main")
-    result: Dict[str, Dict[int, list]] = {"cl5": {}, "ql1": {}}
+    devices = production_device_profiles()
+    result: Dict[str, Dict[int, list]] = {device.id: {} for device in devices}
+    for device in devices:
+        if device.legacy_key:
+            result[device.legacy_key] = result[device.id]
     supplied_titles = list(scene_titles or ())
     if main_index is None and not supplied_titles:
         return result
     main_clips = supplied_titles or list(clip_names_by_track.get(main_index) or ())
-    for console, track_name in CONSOLE_TRACK_NAMES.items():
-        track_index = indexes.get(track_name.casefold())
+    for device in devices:
+        track_index = next(
+            (indexes.get(normalize_ableton_alias(alias))
+             for alias in device.ableton_track_aliases
+             if indexes.get(normalize_ableton_alias(alias)) is not None),
+            None,
+        )
         if track_index is None:
             continue
         program_clips = list(clip_names_by_track.get(track_index) or ())
@@ -623,7 +734,7 @@ def build_console_scene_map(
             if program is None or not title:
                 continue
             midi_program = program - 1
-            result[console].setdefault(midi_program, []).append({
+            result[device.id].setdefault(midi_program, []).append({
                 "scene_index": scene_index,
                 "program": program,
                 "midi_program": midi_program,
@@ -691,25 +802,144 @@ def expected_console_scene_for_index(
     return None
 
 
+def build_production_device_states(
+    midi_console: Dict[str, Any], *, active_scene: int, active_title: str,
+    title_mode: str, now: float,
+) -> Dict[str, Dict[str, Any]]:
+    """Construit la vue de production générique sans inventer de retour MIDI."""
+    device_states: Dict[str, Dict[str, Any]] = {}
+    scene_map = state.get("console_scene_map") or {}
+    outgoing = state.get("ableton_midi_output") or {}
+    libraries = state.get("console_scene_libraries") or {}
+    offsets = state.get("console_title_offsets") or {}
+    return_mode = str(midi_console.get("return_mode") or "console_return")
+    returned_devices = (
+        midi_console.get("returned_devices")
+        if isinstance(midi_console.get("returned_devices"), dict) else {}
+    )
+    for device in production_device_profiles():
+        generic_return = dict(returned_devices.get(device.id) or {})
+        if device.legacy_key in ("cl5", "ql1"):
+            historical = dict(midi_console.get(device.legacy_key) or {})
+            snapshot = device.to_dict()
+            snapshot.update(historical)
+            if generic_return:
+                generic_program = generic_return.get(
+                    "returned_midi_program", generic_return.get("midi_program")
+                )
+                generic_received_at = generic_return.get(
+                    "returned_received_at", generic_return.get("received_at")
+                )
+                validated = build_device_state(
+                    device,
+                    {
+                        "expected_midi_program": historical.get("expected_midi_program"),
+                        "expected_activated_at": historical.get("expected_activated_at"),
+                        "expected_title": historical.get("expected_title"),
+                    },
+                    {
+                        **generic_return,
+                        "returned_midi_program": generic_program,
+                        "returned_received_at": generic_received_at,
+                    },
+                    now=now,
+                    return_mode=return_mode,
+                )
+                snapshot.update(validated)
+                snapshot["returned_title"] = historical.get("returned_title", "Titre non résolu")
+                snapshot["returned_title_source"] = historical.get(
+                    "returned_title_source", "unresolved"
+                )
+            snapshot.update({
+                "id": device.id,
+                "production_supported": True,
+                "expected": snapshot.get("expected_scene_memory"),
+                "returned": snapshot.get("returned_scene_memory"),
+                "status": snapshot.get("validation_status", "unavailable"),
+                "fresh": bool(snapshot.get("fresh", snapshot.get("return_recent", False))),
+                "stale": snapshot.get("validation_status") == "stale",
+            })
+            device_states[device.id] = snapshot
+            continue
+
+        intent = dict(outgoing.get(device.id) or {})
+        expected_program = intent.get("expected_midi_program", intent.get("midi_program"))
+        activated_at = intent.get("expected_activated_at", intent.get("activated_at"))
+        candidate = expected_console_scene_for_index(scene_map, device.id, active_scene)
+        library_key = str(device.library or "").strip().lower()
+        resolution = resolve_console_scene_title(
+            libraries, library_key, expected_program, offsets.get(library_key, 0),
+        )
+        resolution = resolve_display_title(
+            title_mode, resolution, (candidate or {}).get("title") or active_title,
+            library_key or device.display_name,
+        )
+        returned_program = generic_return.get(
+            "returned_midi_program", generic_return.get("midi_program")
+        )
+        returned_at = generic_return.get(
+            "returned_received_at", generic_return.get("received_at")
+        )
+        generic = build_device_state(
+            device,
+            {
+                "expected_midi_program": expected_program,
+                "expected_activated_at": activated_at or now,
+                "expected_program_source": (
+                    "ableton_midi_output" if expected_program is not None else "unavailable"
+                ),
+                "expected_title": resolution["title"],
+                "expected_title_source": resolution["title_source"],
+                "expected_title_lookup_memory": resolution["title_lookup_memory"],
+                "expected_scene_index": active_scene if active_scene >= 0 else None,
+            },
+            {
+                **generic_return,
+                "returned_midi_program": returned_program,
+                "returned_received_at": returned_at,
+            } if generic_return else None,
+            now=now,
+            return_mode=return_mode,
+        )
+        generic.update({
+            "returned_title": "Titre non résolu",
+            "returned_title_source": "unresolved",
+            "returned_program_source": (
+                str(generic_return.get("returned_program_source") or "physical_midi")
+                if returned_program is not None else "unavailable"
+            ),
+            "returned_scene_memory_source": (
+                "program_number_identity" if returned_program is not None else "unavailable"
+            ),
+        })
+        device_states[device.id] = generic
+    return device_states
+
+
 def record_ableton_midi_output(
     console: str, midi_program: Any, activated_at: Optional[float] = None,
 ) -> bool:
     """Mémorise le dernier Program Change réellement passé dans la piste Live."""
-    console_name = str(console or "").strip().lower()
+    device = resolve_device_profile(console)
     try:
         raw_program = int(midi_program)
     except (TypeError, ValueError):
         return False
-    if console_name not in ("cl5", "ql1") or not 0 <= raw_program <= 127:
+    if device is None or not 0 <= raw_program <= 127:
         return False
     timestamp = float(activated_at) if activated_at is not None else time.time()
     with lock:
         outgoing = dict(state.get("ableton_midi_output") or {})
-        outgoing[console_name] = {
+        intent = {
             "midi_program": raw_program,
+            "expected_midi_program": raw_program,
             "activated_at": timestamp,
+            "expected_activated_at": timestamp,
             "source": "ableton_midi_output",
         }
+        outgoing[device.id] = intent
+        if device.legacy_key:
+            outgoing[device.legacy_key] = intent
         state["ableton_midi_output"] = outgoing
     return True
 
@@ -730,6 +960,7 @@ state: Dict[str, Any] = {
     "scenes": {},
     "console_scene_map": {"cl5": {}, "ql1": {}},
     "ableton_midi_output": {"cl5": None, "ql1": None},
+    "device_states": {},
     "expected_scene_signature": None,
     "expected_activated_at": None,
     "console_title_mode": load_console_title_mode(),
@@ -1132,25 +1363,29 @@ def state_snapshot_locked() -> Dict[str, Any]:
                 " · ".join(filter(None, [str(library_info.get("source_format") or "Bibliothèque importée"),
                                           str(library_info.get("source_name") or "")]))
             )
-            return_timestamp_floor = console_expected_activated_at
-            if remote_midi_mode:
-                return_timestamp_floor -= MIDI_REMOTE_RETURN_TIMESTAMP_TOLERANCE_SECONDS
-
+            profile = DEVICE_CONFIGURATION.by_legacy_key(console_name)
+            generic_validation = build_device_state(
+                profile,
+                {
+                    "expected_midi_program": expected_midi_program,
+                    "expected_activated_at": console_expected_activated_at,
+                },
+                {
+                    "returned_midi_program": console_midi_program,
+                    "returned_received_at": received_at or None,
+                },
+                now=now,
+                return_mode=console_return_mode,
+                remote_return_tolerance=(
+                    MIDI_REMOTE_RETURN_TIMESTAMP_TOLERANCE_SECONDS if remote_midi_mode else 0.0
+                ),
+            )
             return_after_intent = bool(
-                return_recent and received_at >= return_timestamp_floor
+                generic_validation["return_recent"]
+                and generic_validation["validation_status"] != "stale"
             )
-            confirmed = bool(
-                expected_midi_program is not None
-                and return_after_intent
-                and console_midi_program is not None
-                and int(console_midi_program) == int(expected_midi_program)
-            )
-            mismatched = bool(
-                expected_midi_program is not None
-                and return_after_intent
-                and console_midi_program is not None
-                and not confirmed
-            )
+            confirmed = generic_validation["confirmed"]
+            mismatched = generic_validation["mismatch"]
             console_state["returned_midi_program"] = console_midi_program
             console_state["returned_program"] = return_program
             console_state["midi_program"] = expected_midi_program
@@ -1206,17 +1441,8 @@ def state_snapshot_locked() -> Dict[str, Any]:
                 max(0, int(round((received_at - console_expected_activated_at) * 1000)))
                 if confirmed else None
             )
-            console_state["validation_status"] = (
-                "unavailable" if expected_midi_program is None
-                else "stale" if received_at and not return_after_intent
-                else "confirmed" if confirmed
-                else "mismatch" if mismatched
-                else "local_fallback" if console_return_mode == "local_fallback"
-                else "waiting"
-            )
-            console_state["visual_state"] = console_visual_state(
-                console_state["validation_status"], console_expected_activated_at, now,
-            )
+            console_state["validation_status"] = generic_validation["validation_status"]
+            console_state["visual_state"] = generic_validation["visual_state"]
             console_state["title_source"] = returned_resolution["title_source"]
             console_state["ableton_title"] = active_title
             midi_console[console_name] = console_state
@@ -1317,11 +1543,16 @@ def state_snapshot_locked() -> Dict[str, Any]:
         snapshot["midi_console"] = fallback_console
         snapshot["console_return_mode"] = "local_fallback"
         snapshot["console_return_source"] = ""
-    # Nouvelle couche UI additive. Les deux devices historiques héritent
-    # strictement de midi_console; les suivants restent explicitement indisponibles.
-    snapshot["devices"] = device_ui_snapshots(
-        DEVICE_CONFIGURATION, snapshot.get("midi_console") or {},
+    device_states = build_production_device_states(
+        snapshot.get("midi_console") or {},
+        active_scene=active_scene,
+        active_title=active_title,
+        title_mode=title_mode,
+        now=time.time(),
     )
+    state["device_states"] = device_states
+    snapshot["device_states"] = device_states
+    snapshot["devices"] = list(device_states.values())
     if not snapshot.get("set_ready", False):
         snapshot.update({
             "scenes": {},
@@ -1374,6 +1605,7 @@ def reset_live_set_state_locked(set_id: Optional[str], reason: str) -> int:
         "scenes": {},
         "console_scene_map": {"cl5": {}, "ql1": {}},
         "ableton_midi_output": {"cl5": None, "ql1": None},
+        "device_states": {},
         "play_mode": "stopped",
         "playing_scene": -1,
         "playing_scene_name": "—",
@@ -2343,20 +2575,27 @@ def refresh_console_scene_map(generation: int, attempt: int = 1) -> None:
         return
     track_names = [str(name or "") for name in track_names_response]
     mapping_track_names = list(track_names)
-    for console, expected_name in CONSOLE_TRACK_NAMES.items():
-        if any(name.strip().casefold() == expected_name.casefold() for name in mapping_track_names):
+    for device in production_device_profiles():
+        aliases = tuple(device.ableton_track_aliases)
+        if any(
+            normalize_ableton_alias(name) in {normalize_ableton_alias(alias) for alias in aliases}
+            for name in mapping_track_names
+        ):
             continue
+        if not device.legacy_key:
+            continue
+        expected_name = aliases[0]
         candidates = [
             index for index, name in enumerate(mapping_track_names)
-            if console.upper() in name.upper() and "CHANGE" in name.upper()
+            if device.legacy_key.upper() in name.upper() and "CHANGE" in name.upper()
         ]
         if len(candidates) == 1:
             mapping_track_names[candidates[0]] = expected_name
-    normalized = {name.strip().casefold(): index for index, name in enumerate(mapping_track_names)}
-    missing_tracks = [
-        name for name in ("Main", *CONSOLE_TRACK_NAMES.values())
-        if name.casefold() not in normalized
-    ]
+    normalized = {normalize_ableton_alias(name): index for index, name in enumerate(mapping_track_names)}
+    missing_tracks = ["Main"] if "main" not in normalized else []
+    for device in production_device_profiles():
+        if not any(normalize_ableton_alias(alias) in normalized for alias in device.ableton_track_aliases):
+            missing_tracks.append(device.display_name)
     with lock:
         if int(state.get("set_generation", 0)) == int(generation):
             state["console_scene_map_diagnostic"] = {
@@ -2366,9 +2605,10 @@ def refresh_console_scene_map(generation: int, attempt: int = 1) -> None:
                 "missing_tracks": missing_tracks,
             }
     required_indexes = {
-        normalized[name.casefold()]
-        for name in CONSOLE_TRACK_NAMES.values()
-        if name.casefold() in normalized
+        normalized[normalize_ableton_alias(alias)]
+        for device in production_device_profiles()
+        for alias in device.ableton_track_aliases
+        if normalize_ableton_alias(alias) in normalized
     }
     with lock:
         scene_count = len(state.get("scenes") or {})
@@ -2415,14 +2655,16 @@ def refresh_console_scene_map(generation: int, attempt: int = 1) -> None:
         scene_count,
         scene_titles=scene_titles,
     )
-    if not any(console_scene_map.get(name) for name in ("cl5", "ql1")):
+    if not any(console_scene_map.get(device.id) for device in production_device_profiles()):
         schedule_console_scene_map_refresh(generation, attempt + 1)
     with lock:
         if int(state.get("set_generation", 0)) != int(generation):
             return
         state["console_scene_map"] = console_scene_map
         state["console_scene_map_diagnostic"].update({
-            "status": "ready" if any(console_scene_map.get(name) for name in ("cl5", "ql1")) else "empty",
+            "status": "ready" if any(
+                console_scene_map.get(device.id) for device in production_device_profiles()
+            ) else "empty",
             "cl5_program_count": len(console_scene_map.get("cl5") or {}),
             "ql1_program_count": len(console_scene_map.get("ql1") or {}),
         })

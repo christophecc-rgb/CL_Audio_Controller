@@ -167,6 +167,10 @@ class DeviceProfileTests(unittest.TestCase):
             replace(self.configuration, devices=(self.cl5, replace(self.ql1, palette=replace(self.ql1.palette, base="cyan")))),
             replace(self.configuration, devices=(self.cl5, replace(self.ql1, ableton_track_aliases=()))),
             replace(self.configuration, devices=(self.cl5, replace(self.ql1, midi_channel=1))),
+            replace(self.configuration, devices=(self.cl5, replace(self.ql1, legacy_key="dm7"))),
+            replace(self.configuration, devices=(self.cl5, replace(
+                self.ql1, ableton_track_aliases=self.cl5.ableton_track_aliases,
+            ))),
             replace(self.configuration, devices=(self.cl5, replace(self.ql1, protocol="osc", signal_type="osc_message"))),
         ]
         for configuration in invalid:

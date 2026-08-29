@@ -593,6 +593,47 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('selectPassiveExpectedSourceNamed:CLExpectedEndpointName', refresh)
         self.assertIn('selectPassiveReturnSourceNamed:preferred', refresh)
 
+    def test_return_callback_routes_real_program_changes_through_device_profiles(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        parser = source.split('static void CLPassiveReturnRead', 1)[1].split(
+            'static void CLIsolatedDeviceTestRead', 1
+        )[0]
+        routing = source.split('- (void)rebuildReturnDeviceRouting', 1)[1].split(
+            '- (void)selectPassiveExpectedSourceNamed:', 1
+        )[0]
+        returned = source.rsplit('- (void)queueReturnedProgram:', 1)[1].split(
+            '- (void)queueExpectedProgram:', 1
+        )[0]
+        writer = source.split('- (void)writeConsoleReturnState', 1)[1].split(
+            '- (NSColor *)deviceColorFromHex:', 1
+        )[0]
+        self.assertNotIn('channel == 1 || channel == 2', parser)
+        self.assertIn('[delegate queueReturnedProgram:byte channel:channel receivedAt:NSDate.date]', parser)
+        self.assertIn('device[@"enabled"]', routing)
+        self.assertIn('device[@"protocol"]', routing)
+        self.assertIn('device[@"signal_type"]', routing)
+        self.assertIn('device[@"rx"]', routing)
+        self.assertIn('self.returnDeviceIDByChannel[@(channel)]', returned)
+        self.assertIn('self.returnedDeviceStates[deviceID]', returned)
+        self.assertIn('@"source": @"physical_midi"', returned)
+        self.assertIn('if (channel != 1 && channel != 2)', returned)
+        self.assertIn('self.lastCL5Program = program', returned)
+        self.assertIn('self.lastQL1Program = program', returned)
+        self.assertIn('@"returned_devices": self.returnedDeviceStates', writer)
+
+    def test_generic_return_path_does_not_use_test_bench_or_simulator_as_return_truth(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        returned = source.rsplit('- (void)queueReturnedProgram:', 1)[1].split(
+            '- (void)queueExpectedProgram:', 1
+        )[0]
+        bench = source.split('- (void)startIsolatedDeviceTestRX:', 1)[1].split(
+            '- (void)windowWillClose:', 1
+        )[0]
+        self.assertNotIn('deviceTestReceived', returned)
+        self.assertNotIn('last_event_at', returned)
+        self.assertNotIn('local_simulator_tx', returned)
+        self.assertNotIn('returnedDeviceStates', bench)
+
     def test_expected_parser_handles_running_status_and_packet_boundaries(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
         parser = source.split('static void CLPassiveExpectedRead', 1)[1].split(
