@@ -248,6 +248,8 @@ static BOOL CLPostDoubleClickFromConnectorReason(NSString *reason) {
 @property NSUInteger ql1SceneTitleLookupGeneration;
 @property NSWindow *devicesWindow;
 @property NSMutableArray<NSMutableDictionary *> *deviceProfiles;
+@property NSDictionary<NSNumber *, NSString *> *expectedDeviceIDByChannel;
+@property NSMutableDictionary<NSString *, NSDictionary *> *expectedDeviceStates;
 @property NSDictionary<NSNumber *, NSString *> *returnDeviceIDByChannel;
 @property NSMutableDictionary<NSString *, NSDictionary *> *returnedDeviceStates;
 @property NSPopUpButton *deviceProfileMenu;
@@ -382,12 +384,9 @@ static void CLPassiveExpectedRead(const MIDIPacketList *packetList, void *readPr
             }
             if ((runningStatus & 0xF0) == 0xC0) {
                 UInt8 channel = (runningStatus & 0x0F) + 1;
-                if (channel == 1 || channel == 2) {
-                    CLExpectedDiagnostic(@"EXPECTED_PROGRAM_DECODED", [NSString stringWithFormat:
-                        @"channel=%u raw_program=%u console=%@", channel, byte,
-                        channel == 1 ? @"CL5" : @"QL1"]);
-                    [delegate queueExpectedProgram:byte channel:channel];
-                }
+                CLExpectedDiagnostic(@"EXPECTED_PROGRAM_DECODED", [NSString stringWithFormat:
+                    @"channel=%u raw_program=%u", channel, byte]);
+                [delegate queueExpectedProgram:byte channel:channel];
             }
         }
         packet = MIDIPacketNext(packet);
@@ -774,6 +773,7 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     [content addSubview:self.assistantReturnPanel];
     NSString *monitorProfileError = nil;
     self.deviceProfiles = [self loadDeviceProfilesForEditor:&monitorProfileError];
+    self.expectedDeviceStates = [NSMutableDictionary dictionary];
     self.returnedDeviceStates = [NSMutableDictionary dictionary];
     [self rebuildReturnDeviceRouting];
     [self rebuildAssistantDeviceMonitoringCards];
@@ -862,6 +862,10 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     NSDictionary *payload = data.length ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
     if (![payload[@"service"] isEqualToString:@"cl-midi-console-monitor"]) return;
     NSDictionary *cl5 = payload[@"cl5"], *ql1 = payload[@"ql1"];
+    NSDictionary *expectedDevices = payload[@"expected_devices"];
+    if ([expectedDevices isKindOfClass:NSDictionary.class]) {
+        self.expectedDeviceStates = [expectedDevices mutableCopy];
+    }
     NSDictionary *returnedDevices = payload[@"returned_devices"];
     if ([returnedDevices isKindOfClass:NSDictionary.class]) {
         self.returnedDeviceStates = [returnedDevices mutableCopy];
@@ -957,6 +961,7 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
         @"return_monitor_source": self.localReturnMode ? CLLocalReturnEndpointName :
             (self.returnMonitorSource ? EndpointName(self.returnMonitorSource) : @""),
         @"return_monitor_status": @(self.returnMonitorStatus),
+        @"expected_devices": self.expectedDeviceStates ?: @{},
         @"returned_devices": self.returnedDeviceStates ?: @{},
 
         @"rtp": @{
@@ -1629,19 +1634,26 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
 }
 
 - (void)rebuildReturnDeviceRouting {
+    NSMutableDictionary<NSNumber *, NSString *> *expectedRouting = [NSMutableDictionary dictionary];
     NSMutableDictionary<NSNumber *, NSString *> *routing = [NSMutableDictionary dictionary];
     for (NSDictionary *device in self.deviceProfiles ?: @[]) {
         if (![device[@"enabled"] boolValue]) continue;
         if (![[device[@"protocol"] lowercaseString] isEqualToString:@"midi"]) continue;
         if (![[device[@"signal_type"] lowercaseString] isEqualToString:@"program_change"]) continue;
-        NSDictionary *rx = [device[@"rx"] isKindOfClass:NSDictionary.class] ? device[@"rx"] : @{};
-        if (rx[@"enabled"] && ![rx[@"enabled"] boolValue]) continue;
         NSNumber *channel = [device[@"midi_channel"] isKindOfClass:NSNumber.class]
             ? device[@"midi_channel"] : nil;
         NSString *deviceID = [device[@"id"] isKindOfClass:NSString.class] ? device[@"id"] : @"";
         if (!channel || channel.integerValue < 1 || channel.integerValue > 16 || !deviceID.length) continue;
-        if (!routing[channel]) routing[channel] = deviceID;
+        NSDictionary *tx = [device[@"tx"] isKindOfClass:NSDictionary.class] ? device[@"tx"] : @{};
+        if (!tx[@"enabled"] || [tx[@"enabled"] boolValue]) {
+            if (!expectedRouting[channel]) expectedRouting[channel] = deviceID;
+        }
+        NSDictionary *rx = [device[@"rx"] isKindOfClass:NSDictionary.class] ? device[@"rx"] : @{};
+        if ((!rx[@"enabled"] || [rx[@"enabled"] boolValue]) && !routing[channel]) {
+            routing[channel] = deviceID;
+        }
     }
+    self.expectedDeviceIDByChannel = expectedRouting.copy;
     self.returnDeviceIDByChannel = routing.copy;
 }
 
@@ -1768,9 +1780,28 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
 }
 
 - (void)queueExpectedProgram:(UInt8)program channel:(UInt8)channel {
-    if (channel != 1 && channel != 2) return;
+    if (channel < 1 || channel > 16) return;
+    NSString *deviceID = self.expectedDeviceIDByChannel[@(channel)];
+    if (!deviceID.length) return;
     dispatch_async(dispatch_get_main_queue(), ^{
         NSDate *receivedAt = [NSDate date];
+        self.expectedDeviceStates[deviceID] = @{
+            @"midi_program": @(program),
+            @"expected_midi_program": @(program),
+            @"scene_memory": @(program + 1),
+            @"expected_scene_memory": @(program + 1),
+            @"received_at": @([receivedAt timeIntervalSince1970]),
+            @"expected_received_at": @([receivedAt timeIntervalSince1970]),
+            @"expected_activated_at": @([receivedAt timeIntervalSince1970]),
+            @"source": @"ableton_iac_output",
+            @"expected_program_source": @"ableton_iac_output",
+        };
+        if (channel != 1 && channel != 2) {
+            CLExpectedDiagnostic(@"EXPECTED_STATE_UPDATED", [NSString stringWithFormat:
+                @"device_id=%@ expected_midi_program=%u", deviceID, program]);
+            [self writeConsoleReturnState];
+            return;
+        }
         if (channel == 1) {
             self.expectedCL5Program = program;
             self.expectedCL5ProgramAt = receivedAt;

@@ -136,9 +136,6 @@ class GenericDeviceProductionStateTests(unittest.TestCase):
         for expected_program, expected_status in ((42, "confirmed"), (41, "mismatch")):
             with self.subTest(expected_status=expected_status):
                 now = time.time()
-                self.assertTrue(self.app.record_ableton_midi_output(
-                    "DM7 PROGRAM", expected_program, now - 0.1,
-                ))
                 with self.app.lock:
                     self.app.state["set_ready"] = True
                     self.app.state["set_generation"] = 8
@@ -155,6 +152,17 @@ class GenericDeviceProductionStateTests(unittest.TestCase):
                     "expected_monitor_status": 0,
                     "cl5": {"received": False},
                     "ql1": {"received": False},
+                    "expected_devices": {
+                        "device_3": {
+                            "midi_program": expected_program,
+                            "expected_midi_program": expected_program,
+                            "scene_memory": expected_program + 1,
+                            "expected_scene_memory": expected_program + 1,
+                            "received_at": now - 0.1,
+                            "expected_activated_at": now - 0.1,
+                            "source": "ableton_iac_output",
+                        },
+                    },
                     "returned_devices": {
                         "device_3": {
                             "midi_program": returned_program,
@@ -176,6 +184,39 @@ class GenericDeviceProductionStateTests(unittest.TestCase):
                 self.assertEqual(device["returned_program_source"], "physical_midi")
                 self.assertEqual(device["validation_status"], expected_status)
                 self.assertEqual(device["confirmed"], expected_status == "confirmed")
+
+    def test_native_expected_device_3_is_numeric_without_any_return(self):
+        now = time.time()
+        payload = {
+            "service": "cl-midi-console-monitor",
+            "updated_at": now,
+            "return_mode": "console_return",
+            "expected_monitor_source": "Gestionnaire IAC Bus 1",
+            "expected_monitor_status": 0,
+            "cl5": {"received": False},
+            "ql1": {"received": False},
+            "expected_devices": {
+                "device_3": {
+                    "midi_program": 49,
+                    "scene_memory": 50,
+                    "received_at": now,
+                    "expected_activated_at": now,
+                    "source": "ableton_iac_output",
+                },
+            },
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "midi-state.json"
+            path.write_text(json.dumps(payload), encoding="utf-8")
+            with self.app.lock, mock.patch.object(self.app, "MIDI_CONSOLE_STATE_PATH", path):
+                snapshot = self.app.state_snapshot_locked()
+        device = snapshot["device_states"]["device_3"]
+        self.assertEqual(device["expected_midi_program"], 49)
+        self.assertEqual(device["expected_scene_memory"], 50)
+        self.assertEqual(device["expected_activated_at"], now)
+        self.assertIsNone(device["returned_midi_program"])
+        self.assertEqual(device["validation_status"], "waiting")
+        self.assertFalse(device["confirmed"])
 
     def test_real_return_without_expected_is_unavailable_not_confirmed(self):
         device = self.app.build_device_state(

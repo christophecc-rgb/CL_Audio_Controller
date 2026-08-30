@@ -813,11 +813,16 @@ def build_production_device_states(
     libraries = state.get("console_scene_libraries") or {}
     offsets = state.get("console_title_offsets") or {}
     return_mode = str(midi_console.get("return_mode") or "console_return")
+    expected_devices = (
+        midi_console.get("expected_devices")
+        if isinstance(midi_console.get("expected_devices"), dict) else {}
+    )
     returned_devices = (
         midi_console.get("returned_devices")
         if isinstance(midi_console.get("returned_devices"), dict) else {}
     )
     for device in production_device_profiles():
+        generic_expected = dict(expected_devices.get(device.id) or {})
         generic_return = dict(returned_devices.get(device.id) or {})
         if device.legacy_key in ("cl5", "ql1"):
             historical = dict(midi_console.get(device.legacy_key) or {})
@@ -833,8 +838,13 @@ def build_production_device_states(
                 validated = build_device_state(
                     device,
                     {
-                        "expected_midi_program": historical.get("expected_midi_program"),
-                        "expected_activated_at": historical.get("expected_activated_at"),
+                        **generic_expected,
+                        "expected_midi_program": generic_expected.get(
+                            "expected_midi_program", historical.get("expected_midi_program")
+                        ),
+                        "expected_activated_at": generic_expected.get(
+                            "expected_activated_at", historical.get("expected_activated_at")
+                        ),
                         "expected_title": historical.get("expected_title"),
                     },
                     {
@@ -863,8 +873,16 @@ def build_production_device_states(
             continue
 
         intent = dict(outgoing.get(device.id) or {})
-        expected_program = intent.get("expected_midi_program", intent.get("midi_program"))
-        activated_at = intent.get("expected_activated_at", intent.get("activated_at"))
+        expected_program = generic_expected.get(
+            "expected_midi_program", generic_expected.get(
+                "midi_program", intent.get("expected_midi_program", intent.get("midi_program"))
+            )
+        )
+        activated_at = generic_expected.get(
+            "expected_activated_at", generic_expected.get(
+                "received_at", intent.get("expected_activated_at", intent.get("activated_at"))
+            )
+        )
         candidate = expected_console_scene_for_index(scene_map, device.id, active_scene)
         library_key = str(device.library or "").strip().lower()
         resolution = resolve_console_scene_title(
@@ -883,10 +901,12 @@ def build_production_device_states(
         generic = build_device_state(
             device,
             {
+                **generic_expected,
                 "expected_midi_program": expected_program,
                 "expected_activated_at": activated_at or now,
                 "expected_program_source": (
-                    "ableton_midi_output" if expected_program is not None else "unavailable"
+                    str(generic_expected.get("expected_program_source") or "ableton_iac_output")
+                    if expected_program is not None else "unavailable"
                 ),
                 "expected_title": resolution["title"],
                 "expected_title_source": resolution["title_source"],

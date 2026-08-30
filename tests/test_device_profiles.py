@@ -222,7 +222,10 @@ class DeviceProfileStatusCompatibilityTests(unittest.TestCase):
     def test_status_exposes_devices_and_preserves_historical_console_keys(self):
         with self.module.lock:
             snapshot = self.module.state_snapshot_locked()
-        self.assertEqual([device["id"] for device in snapshot["devices"]], ["console_a", "console_b"])
+        self.assertEqual(
+            [device["id"] for device in snapshot["devices"][:2]],
+            ["console_a", "console_b"],
+        )
         self.assertIn("cl5", snapshot["midi_console"])
         self.assertIn("ql1", snapshot["midi_console"])
         self.assertEqual(snapshot["devices"][0]["midi_channel"], 1)

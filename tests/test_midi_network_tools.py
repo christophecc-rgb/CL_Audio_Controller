@@ -643,10 +643,49 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('if (byte >= 0xF8) continue;', parser)
         self.assertIn('runningStatus = byte < 0xF0 ? byte : 0;', parser)
         self.assertIn('(runningStatus & 0xF0) == 0xC0', parser)
-        self.assertIn('channel == 1 || channel == 2', parser)
+        self.assertNotIn('channel == 1 || channel == 2', parser)
         self.assertIn('[delegate queueExpectedProgram:byte channel:channel]', parser)
         self.assertIn('delegate.expectedRunningStatus = runningStatus', parser)
         self.assertNotIn('queueReturnedProgram:', parser)
+
+    def test_expected_callback_routes_configured_channels_to_generic_device_state(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        routing = source.split('- (void)rebuildReturnDeviceRouting {', 1)[1].split(
+            '- (void)selectPassiveExpectedSourceNamed:', 1
+        )[0]
+        expected = source.rsplit('- (void)queueExpectedProgram:', 1)[1].split(
+            '- (void)updateCompactSummary', 1
+        )[0]
+        writer = source.split('- (void)writeConsoleReturnState', 1)[1].split(
+            '- (NSColor *)deviceColorFromHex:', 1
+        )[0]
+        self.assertIn('self.expectedDeviceIDByChannel = expectedRouting.copy', routing)
+        self.assertIn('device[@"enabled"]', routing)
+        self.assertIn('device[@"protocol"]', routing)
+        self.assertIn('device[@"signal_type"]', routing)
+        self.assertIn('device[@"tx"]', routing)
+        self.assertIn('self.expectedDeviceIDByChannel[@(channel)]', expected)
+        self.assertIn('if (!deviceID.length) return;', expected)
+        self.assertIn('self.expectedDeviceStates[deviceID]', expected)
+        self.assertIn('@"expected_midi_program": @(program)', expected)
+        self.assertIn('@"expected_scene_memory": @(program + 1)', expected)
+        self.assertIn('@"expected_activated_at": @([receivedAt timeIntervalSince1970])', expected)
+        self.assertIn('@"source": @"ableton_iac_output"', expected)
+        self.assertIn('if (channel != 1 && channel != 2)', expected)
+        self.assertIn('self.expectedCL5Program = program', expected)
+        self.assertIn('self.expectedQL1Program = program', expected)
+        self.assertIn('@"expected_devices": self.expectedDeviceStates', writer)
+
+    def test_generic_expected_is_only_written_by_passive_expected_callback_path(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        bench = source.split('- (void)startIsolatedDeviceTestRX:', 1)[1].split(
+            '- (void)windowWillClose:', 1
+        )[0]
+        simulator = source.split('- (void)sendSimulatorMemory:', 1)[1].split(
+            '#pragma mark - Device Profiles editor', 1
+        )[0]
+        self.assertNotIn('expectedDeviceStates', bench)
+        self.assertNotIn('expectedDeviceStates', simulator)
 
     def test_expected_diagnostic_instruments_connection_callback_and_state_only(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
