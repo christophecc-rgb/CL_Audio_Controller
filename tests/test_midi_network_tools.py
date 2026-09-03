@@ -231,11 +231,11 @@ class MidiNetworkToolsTests(unittest.TestCase):
     def test_local_assistant_layout_collapses_the_hidden_rtp_test_space(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
         layout = source.split('- (void)layoutAssistantViewForRTPMode:(BOOL)rtpMode {', 1)[1].split('\n}', 1)[0]
-        self.assertIn('rtpMode ? 970 : 870', layout)
-        self.assertIn('rtpMode ? 0.0 : -100.0', layout)
-        self.assertIn('self.assistantReturnPanel.frame = NSMakeRect(16, 437, 468, 64)', layout)
-        self.assertIn('self.consoleLibrariesPanel.frame = NSMakeRect(16, 317, 468, 110)', layout)
-        self.assertIn('self.simulatorPanel.frame = NSMakeRect(16, 63, 468, 220)', layout)
+        self.assertIn('700 + offset', layout)
+        self.assertIn('rtpMode ? 104.0 : 0.0', layout)
+        self.assertIn('self.assistantReturnPanel.frame = NSMakeRect(16, 181, 468, 124)', layout)
+        self.assertIn('self.testPanel.frame = NSMakeRect(16, 343, 468, 96)', layout)
+        self.assertIn('self.assistantTestBanner.frame = NSMakeRect(16, 125, 468, 44)', layout)
 
     def test_console_return_cards_keep_cl5_and_ql1_identity_colors(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
@@ -270,7 +270,7 @@ class MidiNetworkToolsTests(unittest.TestCase):
 
     def test_console_libraries_are_configured_by_the_network_manager_via_backend(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
-        self.assertIn('@"BIBLIOTHÈQUES CONSOLES"', source)
+        self.assertIn('@"BACKEND ET BIBLIOTHÈQUES"', source)
         self.assertIn('status[@"console_scene_library_status"]', source)
         self.assertIn('info[@"entries"]', source)
         self.assertIn('@"✓ %lu mémoires"', source)
@@ -313,7 +313,7 @@ class MidiNetworkToolsTests(unittest.TestCase):
 
     def test_dashboard_is_a_network_only_technical_panel(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text()
-        self.assertIn('@"DIAGNOSTIC RÉSEAU MIDI"', source)
+        self.assertIn('@"INFORMATIONS TECHNIQUES"', source)
         self.assertIn('@"SESSION RTP OBSERVÉE"', source)
         self.assertIn('@"PORTS COREMIDI"', source)
         self.assertIn('@"CORRESPONDANTS BONJOUR"', source)
@@ -386,8 +386,8 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertNotIn('ltc_timecode', source)
         self.assertIn('@"Diagnostic détaillé"', source)
         self.assertIn('@"Vue Assistant"', source)
-        self.assertIn('setContentSize:NSMakeSize(500, rtpMode ? 970 : 870)', source)
-        self.assertIn('setContentSize:NSMakeSize(500, 1220)', source)
+        self.assertIn('setContentSize:NSMakeSize(500, 700 + offset)', source)
+        self.assertIn('setContentSize:NSMakeSize(500, 1000 + offset)', source)
         self.assertIn('self.technicalPanel.hidden = !detailed', source)
         self.assertIn('RÉSEAUX CONSOLES', source)
         self.assertIn('self.lastCL5Test', source)
@@ -1050,6 +1050,29 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertNotIn('writeConsoleReturnState', bench)
         self.assertNotIn('expected_activated_at', bench)
         self.assertNotIn('validation_status', bench)
+
+    def test_dashboard_clarifies_mode_devices_connection_and_simulator_actions(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        self.assertIn('@"Mode appliqué par CL Audio Show Control"', source)
+        self.assertIn('@"CL Audio Show Control indisponible · mode affiché conservé localement"', source)
+        self.assertIn('@"CIBLE ABLETON DISTANTE (RTP)"', source)
+        self.assertIn('self.connectButton.title = local ? @"Non requis" : @"Connecter"', source)
+        self.assertIn('self.connectButton.title = self.localReturnMode ? @"Non requis" : @"Connecter"', source)
+        self.assertIn('scroll.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable', source)
+        self.assertIn('self.assistantReturnPanel.frame = NSMakeRect(16, 181, 468, 124)', source)
+        self.assertIn('self.assistantDevicesScroll.frame = self.assistantReturnPanel.bounds', source)
+        self.assertIn('CGFloat y = ((rows - 1 - row) * 60.0) + 4.0', source)
+        self.assertIn('self.assistantDevicesButton.frame = NSMakeRect(338, 307, 146, 30)', source)
+        self.assertIn('[scroll.contentView scrollToPoint:NSMakePoint(0, 0)]', source)
+        self.assertIn('self.consoleLibrariesPanel.hidden = !detailed', source)
+        self.assertIn('self.simulatorPanel.hidden = !detailed', source)
+        self.assertIn('@"APPAREILS SUIVIS"', source)
+        self.assertIn('@"Mode test actif · %lu appareil%@ simulé%@"', source)
+        self.assertIn('@"%@ · %@", verdict, mode', source)
+        self.assertIn('nativeDevice ? @"Natif" : @"Configurable"', source)
+        self.assertIn('self.simulatorStartButton.title = @"REDÉMARRER"', source)
+        self.assertIn('self.simulatorStartButton.title = @"DÉMARRER"', source)
+        self.assertIn('self.simulatorStopAllButton.enabled = NO', source)
 
 
 if __name__ == "__main__":

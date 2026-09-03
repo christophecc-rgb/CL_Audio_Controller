@@ -74,13 +74,31 @@
   window.CLRemoteLTC = {
     enableSmoothing(element, fps = 25) {
       if (!element || ltcClocks.has(element)) return;
-      const clock = { baseFrames: null, fps, syncedAt: 0 };
+      const clock = { baseFrames: null, fps, syncedAt: 0, playing: false };
       ltcClocks.set(element, clock);
       window.setInterval(() => {
-        if (clock.baseFrames === null || document.hidden) return;
+        if (clock.baseFrames === null || !clock.playing || document.hidden) return;
         const elapsedFrames = Math.floor((performance.now() - clock.syncedAt) * clock.fps / 1000);
         element.textContent = formatLtcFrames(clock.baseFrames + elapsedFrames, clock.fps);
       }, Math.round(1000 / fps));
+    },
+    setPlaying(element, playing) {
+      const clock = ltcClocks.get(element);
+      if (!clock) return;
+      if (clock.playing === Boolean(playing)) return;
+      if (clock.playing && !playing && clock.baseFrames !== null) {
+        const elapsedFrames = Math.floor((performance.now() - clock.syncedAt) * clock.fps / 1000);
+        clock.baseFrames += elapsedFrames;
+        clock.syncedAt = performance.now();
+        element.textContent = formatLtcFrames(clock.baseFrames, clock.fps);
+      } else if (!clock.playing && playing) {
+        const current = (element.textContent || '').trim();
+        if (LTC_PATTERN.test(current)) {
+          clock.baseFrames = parseLtcFrames(current, clock.fps);
+          clock.syncedAt = performance.now();
+        }
+      }
+      clock.playing = Boolean(playing);
     },
     render(element, state) {
       if (!element) return;
@@ -154,6 +172,7 @@
       currentCard.classList.contains('live')
     );
     document.body.classList.toggle('v2-playing', Boolean(playing));
+    if (sharedLtcTimecode) window.CLRemoteLTC.setPlaying(sharedLtcTimecode, Boolean(playing));
   };
 
   if (status) new MutationObserver(syncState).observe(status, {attributes: true, childList: true, subtree: true});

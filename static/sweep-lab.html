@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CL Audio — Sweep Lab V2</title>
+
+<style>
+:root {
+  color-scheme: dark;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: #090b0e;
+  color: #eef2f5;
+  padding: 28px;
+}
+
+.lab {
+  max-width: 1100px;
+  margin: auto;
+}
+
+h1 {
+  margin: 0 0 6px;
+  font-size: 24px;
+}
+
+.subtitle {
+  color: #8f9aa6;
+  margin-bottom: 24px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.card {
+  --accent: #8956e8;
+  position: relative;
+  overflow: hidden;
+  min-height: 100px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: #15181d;
+  padding: 14px 16px;
+  isolation: isolate;
+}
+
+.card.ql1 {
+  --accent: #3e9eac;
+}
+
+.loaded-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--accent);
+  opacity: .30;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.fx {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.content {
+  position: relative;
+  z-index: 5;
+}
+
+.heading {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.console {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.memory {
+  font-size: 32px;
+  font-weight: 850;
+}
+
+.title {
+  font-size: 17px;
+  margin-top: 3px;
+}
+
+.state {
+  color: #aab3bc;
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.controls {
+  background: #111419;
+  border: 1px solid #242b33;
+  border-radius: 12px;
+  padding: 18px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+button, select {
+  appearance: none;
+  border: 1px solid #3b4652;
+  border-radius: 8px;
+  background: #20262d;
+  color: #f4f6f8;
+  padding: 9px 13px;
+  font-weight: 650;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:hover {
+  background: #29313a;
+}
+
+button.primary {
+  background: #2c824a;
+  border-color: #42a663;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 14px 24px;
+}
+
+.control label {
+  display: flex;
+  justify-content: space-between;
+  color: #b9c1c9;
+  font-size: 13px;
+  margin-bottom: 5px;
+}
+
+.control output {
+  color: white;
+  font-variant-numeric: tabular-nums;
+}
+
+input[type=range] {
+  width: 100%;
+}
+
+.code {
+  margin-top: 18px;
+  border-radius: 8px;
+  padding: 14px;
+  background: #080a0d;
+  color: #b9d7c0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 700px) {
+  .cards, .grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+
+<body>
+<div class="lab">
+
+<h1>Program Change — Sweep Lab V2</h1>
+
+<div class="subtitle">
+Compare plusieurs familles visuelles sans toucher au vrai contrôleur MIDI.
+</div>
+
+<div class="cards">
+
+  <div class="card cl5">
+    <div class="loaded-overlay"></div>
+    <div class="fx"></div>
+
+    <div class="content">
+      <div class="heading">
+        <span class="console">CL5</span>
+        <span class="memory">52</span>
+      </div>
+      <div class="title">DANCING QUEEN</div>
+      <div class="state">Mémoire chargée</div>
+    </div>
+  </div>
+
+  <div class="card ql1">
+    <div class="loaded-overlay"></div>
+    <div class="fx"></div>
+
+    <div class="content">
+      <div class="heading">
+        <span class="console">QL1</span>
+        <span class="memory">51</span>
+      </div>
+      <div class="title">DANCING QUEEN</div>
+      <div class="state">Mémoire chargée</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="controls">
+
+<div class="actions">
+  <button class="primary" id="trigger">▶ Déclencher recall</button>
+
+  <select id="type">
+    <option value="line">1 — Trait lumineux</option>
+    <option value="comet">2 — Comète</option>
+    <option value="softband">3 — Nappe douce</option>
+    <option value="scanner">4 — Scanner vertical</option>
+    <option value="double">5 — Double sweep</option>
+    <option value="center">6 — Centre → bords</option>
+    <option value="edge">7 — Edge sweep</option>
+    <option value="glass">8 — Glass sheen</option>
+  </select>
+</div>
+
+<div class="grid">
+
+<div class="control">
+<label>Durée <output id="durationOut"></output></label>
+<input id="duration" type="range" min="350" max="2500" step="50" value="1100">
+</div>
+
+<div class="control">
+<label>Longueur / largeur <output id="widthOut"></output></label>
+<input id="width" type="range" min="8" max="80" step="1" value="30">
+</div>
+
+<div class="control">
+<label>Épaisseur <output id="heightOut"></output></label>
+<input id="height" type="range" min="1" max="20" step="1" value="3">
+</div>
+
+<div class="control">
+<label>Intensité <output id="opacityOut"></output></label>
+<input id="opacity" type="range" min="20" max="100" step="5" value="95">
+</div>
+
+<div class="control">
+<label>Halo <output id="glowOut"></output></label>
+<input id="glow" type="range" min="0" max="35" step="1" value="14">
+</div>
+
+<div class="control">
+<label>Position verticale <output id="bottomOut"></output></label>
+<input id="bottom" type="range" min="0" max="45" step="1" value="6">
+</div>
+
+</div>
+
+<div class="code" id="code"></div>
+
+</div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+const controls = {
+  duration: $('duration'),
+  width: $('width'),
+  height: $('height'),
+  opacity: $('opacity'),
+  glow: $('glow'),
+  bottom: $('bottom')
+};
+
+function values() {
+  return Object.fromEntries(
+    Object.entries(controls).map(([k,v]) => [k, Number(v.value)])
+  );
+}
+
+function clearFx(card) {
+  const fx = card.querySelector('.fx');
+  fx.getAnimations().forEach(a => a.cancel());
+  fx.innerHTML = '';
+}
+
+function makeEl(fx) {
+  const el = document.createElement('span');
+  el.style.position = 'absolute';
+  el.style.pointerEvents = 'none';
+  fx.appendChild(el);
+  return el;
+}
+
+function accentOf(card) {
+  return getComputedStyle(card).getPropertyValue('--accent').trim();
+}
+
+function animateRecallBackground(card) {
+  const overlay = card.querySelector('.loaded-overlay');
+
+  overlay.getAnimations().forEach(a => a.cancel());
+
+  overlay.animate([
+    { opacity: .30 },
+    { offset: .22, opacity: .70 },
+    { opacity: .30 }
+  ], {
+    duration: 3800,
+    easing: 'ease-in-out'
+  });
+}
+
+function runLine(card, v, accent) {
+  const fx = card.querySelector('.fx');
+  const el = makeEl(fx);
+
+  Object.assign(el.style, {
+    left: '0',
+    bottom: v.bottom + 'px',
+    width: v.width + '%',
+    height: v.height + 'px',
+    borderRadius: '999px',
+    background:
+      `linear-gradient(90deg, transparent, ${accent}, white, ${accent}, transparent)`,
+    boxShadow:
+      `0 0 ${Math.max(3,v.glow/2)}px ${accent},
+       0 0 ${v.glow}px ${accent}`
+  });
+
+  el.animate([
+    { transform:'translateX(-120%)', opacity:0 },
+    { offset:.15, opacity:v.opacity/100 },
+    { offset:.75, opacity:v.opacity/100 },
+    { transform:'translateX(430%)', opacity:0 }
+  ], {
+    duration:v.duration,
+    easing:'ease-out'
+  });
+}
+
+function runComet(card, v, accent) {
+  const fx = card.querySelector('.fx');
+  const el = makeEl(fx);
+
+  Object.assign(el.style, {
+    left:'0',
+    bottom:v.bottom + 'px',
+    width:Math.max(14,v.width) + '%',
+    height:Math.max(3,v.height) + 'px',
+    borderRadius:'999px',
+    background:
+      `linear-gradient(90deg,
+        transparent 0%,
+        color-mix(in srgb, ${accent} 25%, transparent) 35%,
+        ${accent} 75%,
+        white 100%)`,
+    filter:`drop-shadow(0 0 ${v.glow}px ${accent})`
+  });
+
+  el.animate([
+    { transform:'translateX(-130%) scaleX(.7)', opacity:0 },
+    { offset:.18, opacity:v.opacity/100 },
+    { offset:.72, opacity:v.opacity/100 },
+    { transform:'translateX(430%) scaleX(1.15)', opacity:0 }
+  ], {
+    duration:v.duration,
+    easing:'cubic-bezier(.2,.75,.25,1)'
+  });
+}
+
+function runSoftBand(card, v, accent) {
+  const fx = card.querySelector('.fx');
+  const el = makeEl(fx);
+
+  Object.assign(el.style, {
+    top:'0',
+    bottom:'0',
+    left:'0',
+    width:v.width + '%',
+    background:
+      `linear-gradient(90deg,
+        transparent,
+        color-mix(in srgb, ${accent} 12%, transparent),
+        color-mix(in srgb, ${accent} 38%, transparent),
+        color-mix(in srgb, ${accent} 12%, transparent),
+        transparent)`,
+    filter:`blur(${Math.max(2,v.glow/5)}px)`
+  });
+
+  el.animate([
+    { transform:'translateX(-130%)', opacity:0 },
+    { offset:.2, opacity:v.opacity/100 },
+    { offset:.75, opacity:v.opacity/100 },
+    { transform:'translateX(430%)', opacity:0 }
+  ], {
+    duration:v.duration,
+    easing:'ease-in-out'
+  });
+}
+
+function runScanner(card, v, accent) {
+  const fx = card.querySelector('.fx');
+  const el = makeEl(fx);
+
+  Object.assign(el.style, {
+    top:'5%',
+    bottom:'5%',
+    left:'0',
+    width:Math.max(2,v.height) + 'px',
+    background:
+      `linear-gradient(180deg,
+        transparent,
+        white,
+        ${accent},
+        white,
+        transparent)`,
+    boxShadow:`0 0 ${v.glow}px ${accent}`
+  });
+
+  el.animate([
+    { transform:'translateX(-20px)', opacity:0 },
+    { offset:.12, opacity:v.opacity/100 },
+    { offset:.82, opacity:v.opacity/100 },
+    { transform:`translateX(${card.clientWidth + 20}px)`, opacity:0 }
+  ], {
+    duration:v.duration,
+    easing:'linear'
+  });
+}
+
+function runDouble(card, v, accent) {
+  runLine(card, v, accent);
+
+  setTimeout(() => {
+    runLine(card, {
+      ...v,
+      width:Math.max(10,v.width*.7),
+      height:Math.max(1,v.height-1),
+      opacity:v.opacity*.82
+    }, accent);
+  }, Math.round(v.duration*.28));
+}
+
+function runCenter(card, v, accent) {
+  const fx = card.querySelector('.fx');
+  const el = makeEl(fx);
+
+  Object.assign(el.style, {
+    left:'50%',
+    top:'50%',
+    width:'6%',
+    height:'70%',
+    transform:'translate(-50%,-50%)',
+    borderRadius:'999px',
+    background:
+      `radial-gradient(ellipse,
+        white 0%,
+        ${accent} 28%,
+        color-mix(in srgb, ${accent} 28%, transparent) 58%,
+        transparent 80%)`,
+    filter:`blur(${Math.max(1,v.glow/8)}px)`
+  });
+
+  el.animate([
+    {
+      transform:'translate(-50%,-50%) scaleX(.2)',
+      opacity:0
+    },
+    {
+      offset:.28,
+      opacity:v.opacity/100
+    },
+    {
+      transform:`translate(-50%,-50%) scaleX(${Math.max(4,v.width/6)})`,
+      opacity:0
+    }
+  ], {
+    duration:v.duration,
+    easing:'ease-out'
+  });
+}
+
+function runEdge(card, v, accent) {
+  const fx = card.querySelector('.fx');
+  const el = makeEl(fx);
+
+  Object.assign(el.style, {
+    left:'0',
+    bottom:'0',
+    width:v.width + '%',
+    height:Math.max(2,v.height) + 'px',
+    borderRadius:'999px',
+    background:
+      `linear-gradient(90deg, transparent, ${accent}, white, transparent)`,
+    boxShadow:`0 -2px ${v.glow}px ${accent}`
+  });
+
+  el.animate([
+    { transform:'translateX(-120%)', opacity:0 },
+    { offset:.12, opacity:v.opacity/100 },
+    { offset:.8, opacity:v.opacity/100 },
+    { transform:'translateX(430%)', opacity:0 }
+  ], {
+    duration:v.duration,
+    easing:'cubic-bezier(.2,.75,.2,1)'
+  });
+}
+
+function runGlass(card, v, accent) {
+  const fx = card.querySelector('.fx');
+  const el = makeEl(fx);
+
+  Object.assign(el.style, {
+    top:'-35%',
+    left:'0',
+    width:Math.max(18,v.width) + '%',
+    height:'170%',
+    transform:'skewX(-18deg)',
+    background:
+      `linear-gradient(90deg,
+        transparent,
+        rgba(255,255,255,.03),
+        color-mix(in srgb, ${accent} 28%, white),
+        rgba(255,255,255,.12),
+        transparent)`,
+    filter:`blur(${Math.max(1,v.glow/7)}px)`
+  });
+
+  el.animate([
+    { transform:'translateX(-160%) skewX(-18deg)', opacity:0 },
+    { offset:.18, opacity:(v.opacity/100)*.75 },
+    { offset:.72, opacity:(v.opacity/100)*.75 },
+    { transform:'translateX(500%) skewX(-18deg)', opacity:0 }
+  ], {
+    duration:v.duration,
+    easing:'ease-in-out'
+  });
+}
+
+function trigger() {
+  const v = values();
+  const type = $('type').value;
+
+  document.querySelectorAll('.card').forEach(card => {
+    clearFx(card);
+    animateRecallBackground(card);
+
+    const accent = accentOf(card);
+
+    ({
+      line:runLine,
+      comet:runComet,
+      softband:runSoftBand,
+      scanner:runScanner,
+      double:runDouble,
+      center:runCenter,
+      edge:runEdge,
+      glass:runGlass
+    })[type](card, v, accent);
+  });
+}
+
+function updateUI() {
+  const v = values();
+
+  $('durationOut').textContent = v.duration + ' ms';
+  $('widthOut').textContent = v.width + ' %';
+  $('heightOut').textContent = v.height + ' px';
+  $('opacityOut').textContent = v.opacity + ' %';
+  $('glowOut').textContent = v.glow + ' px';
+  $('bottomOut').textContent = v.bottom + ' px';
+
+  $('code').textContent =
+`Type : ${$('type').selectedOptions[0].text}
+duration: ${v.duration} ms
+width: ${v.width} %
+height: ${v.height} px
+peak opacity: ${v.opacity / 100}
+glow: ${v.glow} px
+bottom: ${v.bottom} px`;
+}
+
+Object.values(controls).forEach(input =>
+  input.addEventListener('input', updateUI)
+);
+
+$('type').addEventListener('change', () => {
+  updateUI();
+  trigger();
+});
+
+$('trigger').addEventListener('click', trigger);
+
+updateUI();
+</script>
+</body>
+</html>

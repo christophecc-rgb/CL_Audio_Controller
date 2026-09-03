@@ -60,7 +60,7 @@ body.v2-energy-saver *::after {
  * les pseudo-éléments au renfort visuel du recall.
  */
 .midi-return.state-waiting {
-  animation: midiWaitingPulse 1.6s ease-in-out infinite alternate !important;
+  animation: none !important;
 }
 
 .midi-return::before {
@@ -104,29 +104,52 @@ body.v2-energy-saver *::after {
 
 @keyframes v2-midi-waiting-layer {
   from {
-    opacity: .16;
-    box-shadow: inset 0 0 10px color-mix(in srgb, var(--console-accent) 32%, transparent);
+    opacity: .14;
+    box-shadow: inset 0 0 8px color-mix(in srgb, var(--console-accent) 28%, transparent);
   }
   to {
-    opacity: .48;
-    box-shadow: inset 0 0 26px color-mix(in srgb, var(--console-accent) 68%, transparent);
+    opacity: .52;
+    box-shadow: inset 0 0 24px color-mix(in srgb, var(--console-accent) 72%, transparent);
   }
 }
 
 @keyframes v2-midi-waiting-sweep {
-  0%, 8% { opacity: 0; transform: translateX(-50%) skewX(-14deg); }
-  25% { opacity: .62; }
-  52% { opacity: .82; }
-  78% { opacity: .58; }
-  100% { opacity: 0; transform: translateX(145%) skewX(-14deg); }
+  0% {
+    left: -45%;
+    opacity: 0;
+    transform: skewX(-14deg);
+  }
+  15% {
+    opacity: .95;
+  }
+  80% {
+    opacity: .85;
+  }
+  100% {
+    left: 103%;
+    opacity: 0;
+    transform: skewX(-14deg);
+  }
 }
 
 .midi-return.state-waiting.recall-pulse::before {
-  animation: v2-midi-waiting-layer 2.8s ease-in-out infinite alternate !important;
+  animation: none !important;
+  opacity: 0 !important;
 }
 
 .midi-return.state-waiting.recall-pulse::after {
-  animation: v2-midi-waiting-sweep 2.0s ease-in-out infinite !important;
+  width: 42% !important;
+  opacity: 0;
+  filter: blur(2px) brightness(1.45);
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--console-accent) 35%, transparent) 22%,
+    color-mix(in srgb, var(--console-text) 95%, white 5%) 50%,
+    color-mix(in srgb, var(--console-accent) 40%, transparent) 78%,
+    transparent 100%
+  ) !important;
+  animation: v2-midi-waiting-sweep .72s ease-out 1 !important;
 }
 
 .ltc-display {
@@ -502,8 +525,14 @@ select {
 }
 
 @keyframes v2-live-ambient {
-  0%, 100% { opacity: .26; }
-  50% { opacity: .50; }
+  0%, 100% {
+    opacity: .22;
+    box-shadow: inset 0 0 14px rgba(255,184,77,.10);
+  }
+  50% {
+    opacity: .62;
+    box-shadow: inset 0 0 34px rgba(255,184,77,.34);
+  }
 }
 
 @keyframes v2-live-console-sweep {
@@ -683,13 +712,12 @@ body.is-arrangement-playing .card.current::after {
   }
 
   .midi-return.state-waiting.recall-pulse::before {
-    animation-duration: 2.8s !important;
-    animation-iteration-count: infinite !important;
+    animation: none !important;
   }
 
   .midi-return.state-waiting.recall-pulse::after {
-    animation-duration: 2.0s !important;
-    animation-iteration-count: infinite !important;
+    animation-duration: .72s !important;
+    animation-iteration-count: 1 !important;
   }
 }
 
@@ -1185,10 +1213,395 @@ body.is-arrangement-playing .card.current::after {
   }
 }
 
-/* Session "En cours" : fond LIVE stable.
-   La vague ::after reste animée ; pas de respiration d'encadrement. */
-.current-card.session-playing::before,
-.current-card.is-playing::before {
-  animation: none !important;
-  opacity: .30 !important;
+/* Session "En cours" :
+   PLAY = 5 flashes décroissants puis état ON AIR + heartbeat doux.
+   PAUSE / STOP = fixes. */
+
+@keyframes v2-session-play-start {
+  0% {
+    filter:brightness(.96);
+    transform:scale(1);
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--cl-skin-current) 65%, transparent),
+      0 0 30px color-mix(in srgb, var(--cl-skin-current) 42%, transparent),
+      inset 0 0 18px color-mix(in srgb, var(--cl-skin-current) 18%, transparent);
+  }
+
+  7% {
+    filter:brightness(1.10);
+    transform:scale(1.010);
+    box-shadow:
+      0 0 0 5px color-mix(in srgb, var(--cl-skin-current) 96%, transparent),
+      0 0 72px color-mix(in srgb, var(--cl-skin-current) 88%, transparent),
+      0 0 34px color-mix(in srgb, var(--cl-skin-current) 72%, transparent),
+      inset 0 0 30px color-mix(in srgb, var(--cl-skin-current) 34%, transparent);
+  }
+
+  15% {
+    filter:brightness(1);
+    transform:scale(1);
+  }
+
+  25% {
+    filter:brightness(1.08);
+    transform:scale(1.008);
+    box-shadow:
+      0 0 0 4px color-mix(in srgb, var(--cl-skin-current) 88%, transparent),
+      0 0 60px color-mix(in srgb, var(--cl-skin-current) 76%, transparent),
+      0 0 28px color-mix(in srgb, var(--cl-skin-current) 60%, transparent),
+      inset 0 0 26px color-mix(in srgb, var(--cl-skin-current) 28%, transparent);
+  }
+
+  35% {
+    filter:brightness(1);
+    transform:scale(1);
+  }
+
+  46% {
+    filter:brightness(1.06);
+    transform:scale(1.006);
+    box-shadow:
+      0 0 0 4px color-mix(in srgb, var(--cl-skin-current) 78%, transparent),
+      0 0 50px color-mix(in srgb, var(--cl-skin-current) 64%, transparent),
+      0 0 24px color-mix(in srgb, var(--cl-skin-current) 50%, transparent),
+      inset 0 0 22px color-mix(in srgb, var(--cl-skin-current) 24%, transparent);
+  }
+
+  57% {
+    filter:brightness(1);
+    transform:scale(1);
+  }
+
+  68% {
+    filter:brightness(1.045);
+    transform:scale(1.004);
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--cl-skin-current) 70%, transparent),
+      0 0 42px color-mix(in srgb, var(--cl-skin-current) 54%, transparent),
+      0 0 20px color-mix(in srgb, var(--cl-skin-current) 42%, transparent),
+      inset 0 0 18px color-mix(in srgb, var(--cl-skin-current) 20%, transparent);
+  }
+
+  79% {
+    filter:brightness(1);
+    transform:scale(1);
+  }
+
+  88% {
+    filter:brightness(1.025);
+    transform:scale(1.002);
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--cl-skin-current) 62%, transparent),
+      0 0 34px color-mix(in srgb, var(--cl-skin-current) 44%, transparent),
+      inset 0 0 15px color-mix(in srgb, var(--cl-skin-current) 16%, transparent);
+  }
+
+  100% {
+    filter:brightness(1);
+    transform:scale(1);
+  }
 }
+
+@keyframes v2-session-live-heartbeat {
+  0%, 66%, 100% {
+    filter:brightness(1);
+    transform:scale(1);
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--cl-skin-current) 62%, transparent),
+      0 0 32px color-mix(in srgb, var(--cl-skin-current) 42%, transparent),
+      inset 0 0 20px color-mix(in srgb, var(--cl-skin-current) 18%, transparent);
+  }
+
+  73% {
+    filter:brightness(1.055);
+    transform:scale(1.002);
+    box-shadow:
+      0 0 0 4px color-mix(in srgb, var(--cl-skin-current) 86%, transparent),
+      0 0 55px color-mix(in srgb, var(--cl-skin-current) 70%, transparent),
+      inset 0 0 27px color-mix(in srgb, var(--cl-skin-current) 28%, transparent);
+  }
+
+  80% {
+    filter:brightness(1);
+    transform:scale(1);
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--cl-skin-current) 62%, transparent),
+      0 0 32px color-mix(in srgb, var(--cl-skin-current) 42%, transparent),
+      inset 0 0 20px color-mix(in srgb, var(--cl-skin-current) 18%, transparent);
+  }
+
+  89% {
+    filter:brightness(1.035);
+    transform:scale(1.001);
+    box-shadow:
+      0 0 0 3px color-mix(in srgb, var(--cl-skin-current) 76%, transparent),
+      0 0 45px color-mix(in srgb, var(--cl-skin-current) 58%, transparent),
+      inset 0 0 24px color-mix(in srgb, var(--cl-skin-current) 23%, transparent);
+  }
+
+  97% {
+    filter:brightness(1);
+    transform:scale(1);
+  }
+}
+
+
+/* === SESSION VISUAL CONSOLIDATED ===
+   PLAY  : contour net + halo heartbeat
+   GO    : fond éclairci + halo extérieur
+   PAUSE : pulse lent, lisible
+   NEXT  : double contour discret
+*/
+
+html[data-cl-skin] .current-card.session-playing {
+  background:
+    radial-gradient(
+      circle at 50% 32%,
+      color-mix(in srgb, var(--cl-skin-current) 52%, transparent),
+      transparent 70%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--cl-skin-current) 62%, #15181d) 0%,
+      color-mix(in srgb, var(--cl-skin-current) 42%, #11151b) 55%,
+      color-mix(in srgb, var(--cl-skin-current) 30%, #0b0f14) 100%
+    ) !important;
+
+  border-color:
+    color-mix(in srgb, var(--cl-skin-current) 84%, white) !important;
+
+  color:#f8fbff !important;
+
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--cl-skin-current) 28%, white),
+    0 0 0 1px color-mix(in srgb, var(--cl-skin-current) 56%, transparent),
+    0 0 28px color-mix(in srgb, var(--cl-skin-current) 44%, transparent),
+    inset 0 0 24px color-mix(in srgb, var(--cl-skin-current) 22%, transparent)
+    !important;
+
+  animation:
+    v2-session-live-heartbeat 3.5s ease-in-out infinite !important;
+}
+
+@keyframes v2-session-go-halo {
+  0%, 20%, 46%, 72%, 100% {
+    outline:
+      1px solid color-mix(in srgb, var(--cl-skin-current) 30%, transparent);
+    outline-offset: 1px;
+  }
+
+  10% {
+    outline:
+      2px solid color-mix(in srgb, var(--cl-skin-current) 88%, transparent);
+    outline-offset: 3px;
+    filter:brightness(1.08);
+  }
+
+  34% {
+    outline:
+      2px solid color-mix(in srgb, var(--cl-skin-current) 74%, transparent);
+    outline-offset: 3px;
+    filter:brightness(1.06);
+  }
+
+  61% {
+    outline:
+      1.5px solid color-mix(in srgb, var(--cl-skin-current) 60%, transparent);
+    outline-offset: 2px;
+    filter:brightness(1.04);
+  }
+
+  84% {
+    outline:
+      1px solid color-mix(in srgb, var(--cl-skin-current) 44%, transparent);
+    outline-offset: 2px;
+    filter:brightness(1.02);
+  }
+}
+
+html[data-cl-skin] .current-card.session-playing.session-recall-pulse {
+  animation-name:
+    v2-session-go-halo,
+    v2-session-live-heartbeat !important;
+
+  animation-duration:
+    2s,
+    3.5s !important;
+
+  animation-timing-function:
+    ease-out,
+    ease-in-out !important;
+
+  animation-iteration-count:
+    1,
+    infinite !important;
+}
+
+@keyframes v2-session-pause-pulse {
+  0%, 100% {
+    filter:brightness(.94);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--cl-skin-current) 24%, white),
+      0 0 0 1px color-mix(in srgb, var(--cl-skin-current) 30%, transparent),
+      0 0 14px color-mix(in srgb, var(--cl-skin-current) 18%, transparent),
+      inset 0 0 16px color-mix(in srgb, var(--cl-skin-current) 14%, transparent);
+  }
+
+  50% {
+    filter:brightness(1.08);
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--cl-skin-current) 34%, white),
+      0 0 0 2px color-mix(in srgb, var(--cl-skin-current) 44%, transparent),
+      0 0 24px color-mix(in srgb, var(--cl-skin-current) 28%, transparent),
+      inset 0 0 20px color-mix(in srgb, var(--cl-skin-current) 18%, transparent);
+  }
+}
+
+html[data-cl-skin] .current-card.session-paused {
+  background:
+    radial-gradient(
+      circle at 50% 35%,
+      color-mix(in srgb, var(--cl-skin-current) 16%, transparent),
+      transparent 72%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--cl-skin-current) 32%, #171b20),
+      color-mix(in srgb, var(--cl-skin-current) 20%, #0c1117)
+    ) !important;
+
+  border-color:
+    color-mix(in srgb, var(--cl-skin-current) 52%, white) !important;
+
+  animation:
+    v2-session-pause-pulse 1.7s ease-in-out infinite !important;
+}
+
+/* Prochaine scène : structure nette, sans halo */
+html[data-cl-skin] .selected-card {
+  border-color:
+    color-mix(in srgb, var(--cl-skin-nav) 74%, white) !important;
+
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--cl-skin-nav) 18%, white),
+    0 0 0 1px color-mix(in srgb, var(--cl-skin-nav) 20%, transparent)
+    !important;
+}
+
+/* Aucun sweep sur la carte Session */
+.current-card.session-playing::before,
+.current-card.session-playing::after,
+.current-card.is-playing::before,
+.current-card.is-playing::after {
+  animation:none !important;
+  opacity:0 !important;
+}
+
+/* === MIDI SOFT SWEEP FINAL ===
+   Recall Program Change :
+   petite traînée lumineuse colorée,
+   pas de bande blanche plein écran.
+*/
+
+@keyframes v2-midi-soft-sweep {
+  0% {
+    transform: translateX(-15%);
+    opacity: 0;
+  }
+
+  18% {
+    opacity: .28;
+  }
+
+  48% {
+    opacity: .92;
+  }
+
+  78% {
+    opacity: .30;
+  }
+
+  100% {
+    transform: translateX(410%);
+    opacity: 0;
+  }
+}
+
+.midi-return.state-waiting.recall-pulse {
+  position: relative !important;
+  overflow: hidden !important;
+  isolation: isolate !important;
+}
+
+/* On laisse l'ancienne couche blanche définitivement inactive. */
+.midi-return.state-waiting.recall-pulse::before {
+  animation: none !important;
+  opacity: 0 !important;
+}
+
+/* Nouveau sweep : trait court, bas de cartouche, couleur de la console. */
+.midi-return.state-waiting.recall-pulse::after {
+  content: "" !important;
+
+  position: absolute !important;
+  left: -30% !important;
+  bottom: 6px !important;
+
+  width: 32% !important;
+  height: 2px !important;
+
+  border-radius: 999px !important;
+  pointer-events: none !important;
+  z-index: 2 !important;
+
+  background:
+    linear-gradient(
+      90deg,
+      transparent 0%,
+      color-mix(in srgb, var(--console-accent) 18%, transparent) 18%,
+      color-mix(in srgb, var(--console-accent) 72%, transparent) 42%,
+      var(--console-accent) 58%,
+      color-mix(in srgb, var(--console-accent) 65%, transparent) 72%,
+      transparent 100%
+    ) !important;
+
+  box-shadow:
+    0 0 5px color-mix(in srgb, var(--console-accent) 68%, transparent),
+    0 0 11px color-mix(in srgb, var(--console-accent) 34%, transparent)
+    !important;
+
+  opacity: 0;
+
+  animation:
+    v2-midi-soft-sweep 1.05s cubic-bezier(.18,.70,.25,1) 1 !important;
+}
+
+/* === END MIDI SOFT SWEEP FINAL === */
+
+
+/* === MIDI SWEEP LAYER FIX ===
+   Ordre visuel :
+   fond carte
+   < overlay global
+   < sweep
+   < contenu texte
+*/
+
+.midi-return {
+  position: relative !important;
+}
+
+.midi-return .global-recall-overlay {
+  z-index: 3 !important;
+}
+
+.midi-return.state-waiting.recall-pulse::after {
+  z-index: 4 !important;
+}
+
+.midi-return > *:not(.global-recall-overlay) {
+  position: relative;
+  z-index: 5;
+}
+
+/* === END MIDI SWEEP LAYER FIX === */

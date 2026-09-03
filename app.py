@@ -1104,10 +1104,11 @@ def start_ltc_udp_listener():
     def publish(timecode: str, source_ip: str, received_at: float) -> None:
         nonlocal last_print
         with lock:
-            state["ltc_timecode"] = timecode
-            state["timecode"] = timecode
-            state["ltc"] = timecode
-            state["smpte"] = timecode
+            if bool(state.get("is_playing", False)):
+                state["ltc_timecode"] = timecode
+                state["timecode"] = timecode
+                state["ltc"] = timecode
+                state["smpte"] = timecode
         now = time.time()
         if not last_print or now - last_print > 0.5:
             print(f"LTC -> {timecode} source={source_ip}", flush=True)

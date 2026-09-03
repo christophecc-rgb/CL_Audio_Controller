@@ -137,8 +137,8 @@
 
       if (finalState === 'confirmed') {
         if (pendingFinalKey && completedConfirmationKey === pendingFinalKey) {
-          phase = 'idle';
-          applyState('idle');
+          phase = 'loaded';
+          applyState('loaded');
           return;
         }
         phase = 'confirmed';
@@ -148,8 +148,8 @@
         timer = setTimer(() => {
           if (generation !== confirmationGeneration || phase !== 'confirmed') return;
           completedConfirmationKey = pendingFinalKey;
-          phase = 'idle';
-          applyState('idle');
+          phase = 'loaded';
+          applyState('loaded');
         }, Math.max(0, confirmedUntil - now()));
         return;
       }
@@ -358,9 +358,106 @@
               addEvent:'PROGRAM_ADD',
               details
             });
+
+            if (typeof card.animate === 'function') {
+              if (!card._globalRecallOverlay) {
+                const overlay = root.document.createElement('span');
+                overlay.className = 'global-recall-overlay';
+                Object.assign(overlay.style, {
+                  position: 'absolute',
+                  inset: '0',
+                  borderRadius: 'inherit',
+                  pointerEvents: 'none',
+                  opacity: '0',
+                  zIndex: '3'
+                });
+                card.appendChild(overlay);
+                card._globalRecallOverlay = overlay;
+              }
+
+              if (card._globalRecallAnimation) {
+                card._globalRecallAnimation.cancel();
+              }
+
+              const style = root.getComputedStyle(card);
+              const accent = style.getPropertyValue('--console-accent').trim() || '#7c4dff';
+              const overlay = card._globalRecallOverlay;
+
+              overlay.style.background = accent;
+
+              card._globalRecallAnimation = overlay.animate([
+                { offset: 0, opacity: 0.30 },
+                { offset: 0.22, opacity: 0.70 },
+                { offset: 1, opacity: 0.30 }
+              ], {
+                duration: 3800,
+                easing: 'ease-in-out',
+                iterations: 1
+              });
+
+              card._globalRecallAnimation.onfinish = () => {
+                overlay.style.opacity = '0.30';
+              };
+
+              /* Sweep CENTRE -> BORDS */
+              if (!card._recallSweepOverlay) {
+                const sweep = root.document.createElement('span');
+                sweep.className = 'recall-sweep-overlay';
+                Object.assign(sweep.style, {
+                  position: 'absolute',
+                  left: '50%',
+                  top: '50%',
+                  width: '6%',
+                  height: '70%',
+                  borderRadius: '999px',
+                  pointerEvents: 'none',
+                  opacity: '0',
+                  zIndex: '4',
+                  transform: 'translate(-50%, -50%)'
+                });
+                card.appendChild(sweep);
+                card._recallSweepOverlay = sweep;
+              }
+
+              const sweep = card._recallSweepOverlay;
+
+              sweep.style.background =
+                `radial-gradient(
+                  ellipse,
+                  white 0%,
+                  ${accent} 28%,
+                  color-mix(in srgb, ${accent} 28%, transparent) 58%,
+                  transparent 80%
+                )`;
+
+              sweep.style.filter = 'blur(3.6px)';
+
+              if (card._recallSweepAnimation) {
+                card._recallSweepAnimation.cancel();
+              }
+
+              card._recallSweepAnimation = sweep.animate([
+                {
+                  transform: 'translate(-50%, -50%) scaleX(.2)',
+                  opacity: 0
+                },
+                {
+                  offset: 0.28,
+                  opacity: 0.75
+                },
+                {
+                  transform: 'translate(-50%, -50%) scaleX(11.33)',
+                  opacity: 0
+                }
+              ], {
+                duration: 1750,
+                easing: 'ease-out',
+                iterations: 1
+              });
+            }
           },
           applyState: state => {
-            ['idle','waiting','confirmed','mismatch','timeout'].forEach(item => card.classList.toggle('state-' + item, state === item));
+            ['idle','waiting','confirmed','loaded','mismatch','timeout'].forEach(item => card.classList.toggle('state-' + item, state === item));
 
             if (state === 'waiting') {
               card.classList.add('recall-pulse');
@@ -375,13 +472,40 @@
           }
         });
       }
-      const visual = card._visualController.update({
+      let visual = card._visualController.update({
         expectedKey: view.expectedKey,
         expectedStartedAtMs: view.expectedStartedAtMs,
         hasExpected: view.hasExpected,
         backendState: view.visualState,
         finalKey: view.finalKey
       });
+
+      /*
+       * STOP est uniquement un reset VISUEL.
+       * On ne modifie ni EXPECTED, ni RETURNED, ni l'état métier MIDI.
+       */
+      if (options.forceIdle) {
+        ['idle','waiting','confirmed','loaded','mismatch','timeout'].forEach(item => {
+          card.classList.toggle('state-' + item, item === 'idle');
+        });
+        card.classList.remove('recall-pulse');
+
+        if (card._globalRecallAnimation) {
+          card._globalRecallAnimation.cancel();
+        }
+        if (card._globalRecallOverlay) {
+          card._globalRecallOverlay.style.opacity = '0';
+        }
+
+        if (card._recallSweepAnimation) {
+          card._recallSweepAnimation.cancel();
+        }
+        if (card._recallSweepOverlay) {
+          card._recallSweepOverlay.style.opacity = '0';
+        }
+
+        visual = 'idle';
+      }
       card.classList.toggle('device-unavailable', !view.productionSupported);
       card.querySelector('.midi-return-state').textContent = view.label || (
         visual === 'confirmed' ? '✓ Boucle confirmée' :
