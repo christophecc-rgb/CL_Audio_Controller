@@ -4,22 +4,17 @@
   const STORAGE_KEY = 'cl-audio-remote-skin';
 
   const skins = [
-    ['multicolor-classic',   'Multicolor Classic'],
-    ['multicolor-pastel',    'Multicolor Pastel'],
-    ['multicolor-broadcast', 'Multicolor Broadcast'],
-    ['multicolor-vivid',     'Multicolor Vivid'],
-
-    ['outline-blue',   'Outline Blue'],
-    ['outline-red',    'Outline Red'],
-    ['outline-green',  'Outline Green'],
-    ['outline-yellow', 'Outline Yellow'],
-    ['outline-purple', 'Outline Purple'],
-    ['outline-orange', 'Outline Orange']
+    ['skin-broadcast', 'Broadcast'],
+    ['skin-regie',     'Régie propre'],
+    ['skin-vivid',     'Vivid'],
+    ['skin-pastel',    'Pastel'],
+    ['skin-outline',   'Outline'],
+    ['skin-dark',      'Sombre']
   ];
 
   function applySkin(name) {
     const valid = skins.some(([id]) => id === name);
-    const selected = valid ? name : 'multicolor-classic';
+    const selected = valid ? name : 'skin-broadcast';
 
     document.documentElement.dataset.clSkin = selected;
 
@@ -58,6 +53,14 @@
         action.includes('next')
       ) {
         button.classList.add('cl-skin-prevnext');
+      }
+
+      if (
+        action === 'play' ||
+        action.includes('play') ||
+        id.includes('play')
+      ) {
+        button.classList.add('cl-skin-play');
       }
 
       if (
@@ -147,13 +150,13 @@
 
     const current =
       document.documentElement.dataset.clSkin ||
-      'multicolor-classic';
+      'skin-broadcast';
 
     select.value = current;
   }
 
   function boot() {
-    let saved = 'multicolor-classic';
+    let saved = 'skin-broadcast';
 
     try {
       saved = localStorage.getItem(STORAGE_KEY) || saved;

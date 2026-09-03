@@ -1243,7 +1243,7 @@ body.is-arrangement-playing .card.current::after {
   }
 
   25% {
-    filter:brightness(1.08);
+    filter:brightness(1.12);
     transform:scale(1.008);
     box-shadow:
       0 0 0 4px color-mix(in srgb, var(--cl-skin-current) 88%, transparent),
@@ -1439,21 +1439,21 @@ html[data-cl-skin] .current-card.session-playing.session-recall-pulse {
 
 @keyframes v2-session-pause-pulse {
   0%, 100% {
-    filter:brightness(.94);
+    filter:brightness(.72);
     box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, var(--cl-skin-current) 24%, white),
-      0 0 0 1px color-mix(in srgb, var(--cl-skin-current) 30%, transparent),
-      0 0 14px color-mix(in srgb, var(--cl-skin-current) 18%, transparent),
-      inset 0 0 16px color-mix(in srgb, var(--cl-skin-current) 14%, transparent);
+      inset 0 0 0 1px color-mix(in srgb, var(--cl-skin-current) 18%, white),
+      0 0 0 1px color-mix(in srgb, var(--cl-skin-current) 22%, transparent),
+      0 0 10px color-mix(in srgb, var(--cl-skin-current) 14%, transparent),
+      inset 0 0 14px color-mix(in srgb, var(--cl-skin-current) 10%, transparent);
   }
 
   50% {
     filter:brightness(1.08);
     box-shadow:
-      inset 0 0 0 1px color-mix(in srgb, var(--cl-skin-current) 34%, white),
-      0 0 0 2px color-mix(in srgb, var(--cl-skin-current) 44%, transparent),
-      0 0 24px color-mix(in srgb, var(--cl-skin-current) 28%, transparent),
-      inset 0 0 20px color-mix(in srgb, var(--cl-skin-current) 18%, transparent);
+      inset 0 0 0 1px color-mix(in srgb, var(--cl-skin-current) 38%, white),
+      0 0 0 2px color-mix(in srgb, var(--cl-skin-current) 48%, transparent),
+      0 0 28px color-mix(in srgb, var(--cl-skin-current) 32%, transparent),
+      inset 0 0 22px color-mix(in srgb, var(--cl-skin-current) 20%, transparent);
   }
 }
 
@@ -1474,7 +1474,7 @@ html[data-cl-skin] .current-card.session-paused {
     color-mix(in srgb, var(--cl-skin-current) 52%, white) !important;
 
   animation:
-    v2-session-pause-pulse 1.7s ease-in-out infinite !important;
+    v2-session-pause-pulse 2.3s ease-in-out infinite !important;
 }
 
 /* Prochaine scène : structure nette, sans halo */
@@ -1605,3 +1605,275 @@ html[data-cl-skin] .selected-card {
 }
 
 /* === END MIDI SWEEP LAYER FIX === */
+
+/* === ARRANGEMENT CURRENT = SESSION CURRENT === */
+
+html[data-cl-skin] body.is-arrangement-playing .card.current,
+html[data-cl-skin] .v2-app[data-module="arrangement"] .card.current.is-playing {
+  background:
+    radial-gradient(
+      circle at 50% 35%,
+      color-mix(in srgb, var(--cl-skin-current) 18%, transparent),
+      transparent 72%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--cl-skin-current) 34%, #171b20),
+      color-mix(in srgb, var(--cl-skin-current) 21%, #0c1117)
+    ) !important;
+
+  border-color:
+    color-mix(in srgb, var(--cl-skin-current) 58%, white) !important;
+
+  color:
+    color-mix(in srgb, var(--cl-skin-current) 28%, white) !important;
+
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--cl-skin-current) 24%, white),
+    0 0 0 1px color-mix(in srgb, var(--cl-skin-current) 28%, transparent),
+    0 0 18px color-mix(in srgb, var(--cl-skin-current) 20%, transparent),
+    inset 0 0 16px color-mix(in srgb, var(--cl-skin-current) 12%, transparent)
+    !important;
+}
+
+html[data-cl-skin] body.is-arrangement-playing .card.current .label,
+html[data-cl-skin] body.is-arrangement-playing .card.current .scene-name,
+html[data-cl-skin] body.is-arrangement-playing .card.current .meta,
+html[data-cl-skin] .v2-app[data-module="arrangement"] .card.current.is-playing .label,
+html[data-cl-skin] .v2-app[data-module="arrangement"] .card.current.is-playing .scene-name,
+html[data-cl-skin] .v2-app[data-module="arrangement"] .card.current.is-playing .meta {
+  color:
+    color-mix(in srgb, var(--cl-skin-current) 32%, white) !important;
+}
+
+html[data-cl-skin] body.is-arrangement-paused .card.current,
+html[data-cl-skin] .v2-app[data-module="arrangement"] .card.current.is-paused {
+  background:
+    radial-gradient(
+      circle at 50% 35%,
+      color-mix(in srgb, var(--cl-skin-current) 16%, transparent),
+      transparent 72%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--cl-skin-current) 32%, #171b20),
+      color-mix(in srgb, var(--cl-skin-current) 20%, #0c1117)
+    ) !important;
+
+  border-color:
+    color-mix(in srgb, var(--cl-skin-current) 52%, white) !important;
+
+  animation:
+    v2-session-pause-pulse 2.3s ease-in-out infinite !important;
+}
+
+html[data-cl-skin] body.is-arrangement-paused .card.current .label,
+html[data-cl-skin] body.is-arrangement-paused .card.current .scene-name,
+html[data-cl-skin] body.is-arrangement-paused .card.current .meta,
+html[data-cl-skin] .v2-app[data-module="arrangement"] .card.current.is-paused .label,
+html[data-cl-skin] .v2-app[data-module="arrangement"] .card.current.is-paused .scene-name,
+html[data-cl-skin] .v2-app[data-module="arrangement"] .card.current.is-paused .meta {
+  color:
+    color-mix(in srgb, var(--cl-skin-current) 32%, white) !important;
+}
+
+/* === END ARRANGEMENT CURRENT = SESSION CURRENT === */
+
+/* === A/B VISUAL = SESSION VISUAL === */
+
+/* ----------------------------------------------------------
+   A/B — TITRE EN COURS
+   Même langage visuel que la carte Session "En cours"
+   ---------------------------------------------------------- */
+
+html[data-cl-skin] .v2-app[data-module="ab"] .title-box-current {
+  background:
+    radial-gradient(
+      circle at 50% 35%,
+      color-mix(in srgb, var(--cl-skin-current) 12%, transparent),
+      transparent 72%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--cl-skin-current) 22%, #171b20),
+      color-mix(in srgb, var(--cl-skin-current) 13%, #0c1117)
+    ) !important;
+
+  border-color:
+    color-mix(
+      in srgb,
+      var(--cl-skin-current) var(--cl-skin-border-strength),
+      transparent
+    ) !important;
+
+  box-shadow:
+    inset 0 0 0 1px
+      color-mix(in srgb, var(--cl-skin-current) 18%, white),
+    0 0 var(--cl-skin-glow-size)
+      color-mix(in srgb, var(--cl-skin-current) 18%, transparent)
+    !important;
+}
+
+html[data-cl-skin] .v2-app[data-module="ab"] .title-box-current .now-label {
+  color:
+    color-mix(in srgb, var(--cl-skin-current) 54%, white) !important;
+
+  font-weight: 800 !important;
+  letter-spacing: .07em !important;
+  text-transform: uppercase !important;
+}
+
+html[data-cl-skin] .v2-app[data-module="ab"] .title-box-current .now-title {
+  color:
+    color-mix(in srgb, var(--cl-skin-current) 30%, white) !important;
+
+  font-weight: 900 !important;
+  line-height: 1.02 !important;
+
+  text-shadow:
+    0 0 12px
+      color-mix(in srgb, var(--cl-skin-current) 22%, transparent)
+    !important;
+}
+
+
+/* Lecture A/B */
+html[data-cl-skin] .v2-app[data-module="ab"] .title-box-current.is-playing {
+  background:
+    radial-gradient(
+      circle at 50% 35%,
+      color-mix(in srgb, var(--cl-skin-current) 18%, transparent),
+      transparent 72%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--cl-skin-current) 34%, #171b20),
+      color-mix(in srgb, var(--cl-skin-current) 21%, #0c1117)
+    ) !important;
+
+  border-color:
+    color-mix(in srgb, var(--cl-skin-current) 58%, white) !important;
+
+  box-shadow:
+    inset 0 0 0 1px
+      color-mix(in srgb, var(--cl-skin-current) 24%, white),
+    0 0 0 1px
+      color-mix(in srgb, var(--cl-skin-current) 28%, transparent),
+    0 0 18px
+      color-mix(in srgb, var(--cl-skin-current) 20%, transparent),
+    inset 0 0 16px
+      color-mix(in srgb, var(--cl-skin-current) 12%, transparent)
+    !important;
+}
+
+
+/* Pause A/B = même respiration que Session */
+html[data-cl-skin] .v2-app[data-module="ab"] .title-box-current.is-paused {
+  background:
+    radial-gradient(
+      circle at 50% 35%,
+      color-mix(in srgb, var(--cl-skin-current) 16%, transparent),
+      transparent 72%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--cl-skin-current) 32%, #171b20),
+      color-mix(in srgb, var(--cl-skin-current) 20%, #0c1117)
+    ) !important;
+
+  border-color:
+    color-mix(in srgb, var(--cl-skin-current) 52%, white) !important;
+
+  animation:
+    v2-session-pause-pulse 2.3s ease-in-out infinite !important;
+}
+
+
+/* ----------------------------------------------------------
+   A/B — PROCHAIN
+   Même langage visuel que "Prochaine scène"
+   ---------------------------------------------------------- */
+
+html[data-cl-skin] .v2-app[data-module="ab"] .title-box-next {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--cl-skin-next) 10%, #15191f),
+      color-mix(in srgb, var(--cl-skin-next) 3%, #101318)
+    ) !important;
+
+  border-color:
+    color-mix(
+      in srgb,
+      var(--cl-skin-next) var(--cl-skin-border-strength),
+      transparent
+    ) !important;
+
+  box-shadow:
+    inset 0 0 0 1px
+      color-mix(in srgb, var(--cl-skin-next) 14%, white),
+    0 0 var(--cl-skin-glow-size)
+      color-mix(in srgb, var(--cl-skin-next) 12%, transparent)
+    !important;
+}
+
+html[data-cl-skin] .v2-app[data-module="ab"] .title-box-next .now-label {
+  color:
+    color-mix(in srgb, var(--cl-skin-next) 52%, white) !important;
+
+  font-weight: 800 !important;
+  letter-spacing: .07em !important;
+  text-transform: uppercase !important;
+}
+
+html[data-cl-skin] .v2-app[data-module="ab"] .title-box-next .next-title {
+  color:
+    color-mix(in srgb, var(--cl-skin-next) 30%, white) !important;
+
+  font-weight: 800 !important;
+  line-height: 1.02 !important;
+
+  text-shadow:
+    0 0 12px
+      color-mix(in srgb, var(--cl-skin-next) 20%, transparent)
+    !important;
+}
+
+
+/* PRÊT : on garde l'animation A/B existante,
+   mais elle prend désormais la couleur NEXT du skin. */
+
+html[data-cl-skin] .v2-app[data-module="ab"]
+.title-box-next.is-prepared::before,
+html[data-cl-skin] .v2-app[data-module="ab"]
+.title-box-next.is-imminent::before {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--cl-skin-next) 24%, transparent),
+      color-mix(in srgb, var(--cl-skin-next) 6%, transparent)
+    ) !important;
+}
+
+html[data-cl-skin] .v2-app[data-module="ab"]
+.title-box-next.is-prepared::after,
+html[data-cl-skin] .v2-app[data-module="ab"]
+.title-box-next.is-imminent::after {
+  border-color:
+    color-mix(in srgb, var(--cl-skin-next) 62%, white) !important;
+}
+
+
+/* Typographie cohérente Session / A-B,
+   tout en conservant la place disponible dans A/B. */
+
+html[data-cl-skin] .v2-app[data-module="ab"] .now-title {
+  font-size: clamp(30px, 5vw, 52px) !important;
+}
+
+html[data-cl-skin] .v2-app[data-module="ab"] .next-title {
+  font-size: clamp(28px, 4.6vw, 48px) !important;
+}
+
+
+/* === END A/B VISUAL = SESSION VISUAL === */

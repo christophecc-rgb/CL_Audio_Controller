@@ -833,3 +833,321 @@ input[type="file"]::file-selector-button {
     grid-column: 2 / -1 !important;
   }
 }
+
+/* === CL SKIN PALETTE V2 ===
+   6 palettes issues du Skin Lab.
+   Un seul moteur visuel, uniquement des variables de rôle.
+   ========================================================== */
+
+html[data-cl-skin] {
+  --cl-skin-next: var(--cl-skin-nav);
+  --cl-skin-play: #ff9c35;
+
+  --cl-skin-border-strength: 80%;
+  --cl-skin-glow-size: 17px;
+  --cl-skin-panel-strength: 95%;
+}
+
+
+/* ----------------------------------------------------------
+   1 — BROADCAST
+   Lab :
+   saturation 100 / brightness 100
+   bordures 80 / halo 17 / fond 95
+   ---------------------------------------------------------- */
+
+html[data-cl-skin="skin-broadcast"] {
+  --cl-skin-accent:#249cff;
+  --cl-skin-nav:#249cff;
+  --cl-skin-next:#249cff;
+
+  --cl-skin-current:#ff812b;
+
+  --cl-skin-go-a:#65d972;
+  --cl-skin-go-b:#65d972;
+
+  --cl-skin-play:#ff9c35;
+
+  --cl-skin-pause-a:#d9ad3f;
+  --cl-skin-pause-b:#a97822;
+
+  --cl-skin-stop-a:#dc4545;
+  --cl-skin-stop-b:#a92f2f;
+
+  --cl-skin-cl5:#8956e8;
+  --cl-skin-ql1:#3e9eac;
+
+  --cl-skin-border-strength:80%;
+  --cl-skin-glow-size:17px;
+  --cl-skin-panel-strength:95%;
+}
+
+
+/* ----------------------------------------------------------
+   2 — RÉGIE PROPRE
+   Lab :
+   saturation 80 / brightness 95
+   bordures 50 / halo 8 / fond 90
+
+   Couleurs précompensées pour éviter un filtre global.
+   ---------------------------------------------------------- */
+
+html[data-cl-skin="skin-regie"] {
+  --cl-skin-accent:#4c7ba3;
+  --cl-skin-nav:#4c7ba3;
+  --cl-skin-next:#516c83;
+
+  --cl-skin-current:#c1854f;
+
+  --cl-skin-go-a:#6dab7a;
+  --cl-skin-go-b:#6dab7a;
+
+  --cl-skin-play:#be854e;
+
+  --cl-skin-pause-a:#a68f4f;
+  --cl-skin-pause-b:#76642f;
+
+  --cl-skin-stop-a:#9e5050;
+  --cl-skin-stop-b:#773838;
+
+  --cl-skin-cl5:#6f5e94;
+  --cl-skin-ql1:#548388;
+
+  --cl-skin-border-strength:50%;
+  --cl-skin-glow-size:8px;
+  --cl-skin-panel-strength:90%;
+}
+
+
+/* ----------------------------------------------------------
+   3 — VIVID
+   Lab :
+   saturation 135 / brightness 105
+   bordures 90 / halo 26 / fond 95
+   ---------------------------------------------------------- */
+
+html[data-cl-skin="skin-vivid"] {
+  --cl-skin-accent:#0099ff;
+  --cl-skin-nav:#0099ff;
+  --cl-skin-next:#00abff;
+
+  --cl-skin-current:#ff6f00;
+
+  --cl-skin-go-a:#37fa54;
+  --cl-skin-go-b:#37fa54;
+
+  --cl-skin-play:#ff8e00;
+
+  --cl-skin-pause-a:#d6b900;
+  --cl-skin-pause-b:#977d00;
+
+  --cl-skin-stop-a:#dc3535;
+  --cl-skin-stop-b:#a52222;
+
+  --cl-skin-cl5:#b845ff;
+  --cl-skin-ql1:#10d1e6;
+
+  --cl-skin-border-strength:90%;
+  --cl-skin-glow-size:26px;
+  --cl-skin-panel-strength:95%;
+}
+
+
+/* ----------------------------------------------------------
+   4 — PASTEL
+   Lab :
+   saturation 70 / brightness 105
+   bordures 60 / halo 10 / fond 95
+   ---------------------------------------------------------- */
+
+html[data-cl-skin="skin-pastel"] {
+  --cl-skin-accent:#96b6ce;
+  --cl-skin-nav:#96b6ce;
+  --cl-skin-next:#a0b7c8;
+
+  --cl-skin-current:#d8b08c;
+
+  --cl-skin-go-a:#a3ccab;
+  --cl-skin-go-b:#a3ccab;
+
+  --cl-skin-play:#d8b08c;
+
+  --cl-skin-pause-a:#c4b47f;
+  --cl-skin-pause-b:#8f8056;
+
+  --cl-skin-stop-a:#b77f7f;
+  --cl-skin-stop-b:#865858;
+
+  --cl-skin-cl5:#aa9fc3;
+  --cl-skin-ql1:#91b5b8;
+
+  --cl-skin-border-strength:60%;
+  --cl-skin-glow-size:10px;
+  --cl-skin-panel-strength:95%;
+}
+
+
+/* ----------------------------------------------------------
+   5 — OUTLINE
+   Lab :
+   saturation 100 / brightness 95
+   bordures 100 / halo 4 / fond 90
+   ---------------------------------------------------------- */
+
+html[data-cl-skin="skin-outline"] {
+  --cl-skin-accent:#2294f2;
+  --cl-skin-nav:#2294f2;
+  --cl-skin-next:#2294f2;
+
+  --cl-skin-current:#f27b29;
+
+  --cl-skin-go-a:#5ecd4a;
+  --cl-skin-go-b:#5ecd4a;
+
+  --cl-skin-play:#f28620;
+
+  --cl-skin-pause-a:#c9a524;
+  --cl-skin-pause-b:#856c13;
+
+  --cl-skin-stop-a:#d23d3d;
+  --cl-skin-stop-b:#982929;
+
+  --cl-skin-cl5:#b452de;
+  --cl-skin-ql1:#3b96a3;
+
+  --cl-skin-border-strength:100%;
+  --cl-skin-glow-size:4px;
+  --cl-skin-panel-strength:90%;
+}
+
+
+/* ----------------------------------------------------------
+   6 — SOMBRE
+   Lab :
+   saturation 70 / brightness 85
+   bordures 40 / halo 3 / fond 85
+   ---------------------------------------------------------- */
+
+html[data-cl-skin="skin-dark"] {
+  --cl-skin-accent:#496379;
+  --cl-skin-nav:#496379;
+  --cl-skin-next:#415462;
+
+  --cl-skin-current:#7e5a3d;
+
+  --cl-skin-go-a:#4e6953;
+  --cl-skin-go-b:#4e6953;
+
+  --cl-skin-play:#74583c;
+
+  --cl-skin-pause-a:#6f6647;
+  --cl-skin-pause-b:#4f482f;
+
+  --cl-skin-stop-a:#623d3d;
+  --cl-skin-stop-b:#482b2b;
+
+  --cl-skin-cl5:#544865;
+  --cl-skin-ql1:#435b5e;
+
+  --cl-skin-border-strength:40%;
+  --cl-skin-glow-size:3px;
+  --cl-skin-panel-strength:85%;
+}
+
+
+/* ==========================================================
+   MOTEUR COMMUN DES RÔLES
+   ========================================================== */
+
+
+/* PLAY, s'il existe comme contrôle autonome. */
+html[data-cl-skin] .cl-skin-play {
+  color:#08100b !important;
+
+  border-color:
+    color-mix(
+      in srgb,
+      var(--cl-skin-play) var(--cl-skin-border-strength),
+      black
+    ) !important;
+
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--cl-skin-play) 82%, white),
+      var(--cl-skin-play) 52%,
+      color-mix(in srgb, var(--cl-skin-play) 72%, black)
+    ) !important;
+
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.16),
+    inset 0 -3px 5px rgba(0,0,0,.25),
+    0 0 var(--cl-skin-glow-size)
+      color-mix(in srgb, var(--cl-skin-play) 18%, transparent)
+    !important;
+}
+
+
+/* NEXT / scène préparée : rôle indépendant de NAV. */
+html[data-cl-skin] .selected-card {
+  border-color:
+    color-mix(
+      in srgb,
+      var(--cl-skin-next) var(--cl-skin-border-strength),
+      transparent
+    ) !important;
+
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--cl-skin-next) 10%, #15191f),
+      color-mix(in srgb, var(--cl-skin-next) 3%, #101318)
+    ) !important;
+
+  box-shadow:
+    0 0 var(--cl-skin-glow-size)
+      color-mix(in srgb, var(--cl-skin-next) 16%, transparent)
+    !important;
+}
+
+
+/* CURRENT : même rôle pour toutes les palettes. */
+html[data-cl-skin] .current-card.session-playing,
+html[data-cl-skin] .current-card.session-paused {
+  border-color:
+    color-mix(
+      in srgb,
+      var(--cl-skin-current) var(--cl-skin-border-strength),
+      transparent
+    ) !important;
+}
+
+
+/* Intensité des contours PREV / NEXT. */
+html[data-cl-skin] .cl-skin-prevnext {
+  border-color:
+    color-mix(
+      in srgb,
+      var(--cl-skin-nav) var(--cl-skin-border-strength),
+      transparent
+    ) !important;
+}
+
+
+/*
+ * Les Program Change gardent leur moteur/animations actuels.
+ * On fournit simplement les couleurs de palette.
+ */
+html[data-cl-skin] .cl-skin-cl5 {
+  --console-accent:var(--cl-skin-cl5);
+  --console-text:var(--cl-skin-cl5);
+}
+
+html[data-cl-skin] .cl-skin-ql1 {
+  --console-accent:var(--cl-skin-ql1);
+  --console-text:var(--cl-skin-ql1);
+}
+
+
+/* === END CL SKIN PALETTE V2 === */
+

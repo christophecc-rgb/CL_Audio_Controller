@@ -1,0 +1,611 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CL Audio — Skin Lab</title>
+
+<style>
+:root {
+  color-scheme: dark;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+
+  --bg: #0b0e12;
+  --panel: #131820;
+  --panel2: #181e27;
+
+  --nav: #249cff;
+  --current: #ff812b;
+  --next: #249cff;
+  --go: #65d972;
+  --play: #ff9c35;
+  --pause: #ffd35a;
+  --stop: #ff4a4a;
+  --cl5: #8956e8;
+  --ql1: #3e9eac;
+
+  --sat: 1;
+  --brightness: 1;
+  --border-alpha: .85;
+  --glow: 18px;
+  --panel-alpha: .94;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  padding: 28px;
+  background: var(--bg);
+  color: #eef2f5;
+}
+
+.lab {
+  max-width: 1150px;
+  margin: auto;
+}
+
+h1 {
+  margin: 0 0 6px;
+  font-size: 24px;
+}
+
+.subtitle {
+  color: #8f9aa6;
+  margin-bottom: 24px;
+}
+
+.preview {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--panel) calc(var(--panel-alpha) * 100%), transparent),
+      color-mix(in srgb, var(--panel2) calc(var(--panel-alpha) * 100%), transparent)
+    );
+  border: 1px solid #252d37;
+  border-radius: 14px;
+  padding: 20px;
+  margin-bottom: 22px;
+
+  filter:
+    saturate(var(--sat))
+    brightness(var(--brightness));
+}
+
+.transport {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0,1fr));
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.btn {
+  min-height: 54px;
+  border-radius: 9px;
+  border: 1px solid;
+  font-weight: 800;
+  font-size: 15px;
+  color: #08100b;
+  box-shadow:
+    inset 0 1px rgba(255,255,255,.18),
+    inset 0 -3px rgba(0,0,0,.25),
+    0 0 var(--glow) color-mix(in srgb, currentColor 12%, transparent);
+}
+
+.btn.prev,
+.btn.next-nav {
+  color: white;
+  background: color-mix(in srgb, var(--nav) 16%, #121820);
+  border-color:
+    color-mix(in srgb, var(--nav) calc(var(--border-alpha) * 100%), transparent);
+}
+
+.btn.go {
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--go) 78%, white),
+      var(--go) 45%,
+      color-mix(in srgb, var(--go) 72%, black)
+    );
+  border-color:
+    color-mix(in srgb, var(--go) calc(var(--border-alpha) * 100%), black);
+}
+
+.btn.play {
+  background: var(--play);
+  border-color:
+    color-mix(in srgb, var(--play) calc(var(--border-alpha) * 100%), black);
+}
+
+.btn.pause {
+  background: var(--pause);
+  border-color:
+    color-mix(in srgb, var(--pause) calc(var(--border-alpha) * 100%), black);
+}
+
+.btn.stop {
+  background: var(--stop);
+  border-color:
+    color-mix(in srgb, var(--stop) calc(var(--border-alpha) * 100%), black);
+  color: white;
+}
+
+.scene-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.scene-card {
+  min-height: 95px;
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: #15191f;
+  border: 1px solid;
+}
+
+.scene-card.current {
+  border-color:
+    color-mix(in srgb, var(--current) calc(var(--border-alpha) * 100%), transparent);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--current) 19%, #17191d),
+      color-mix(in srgb, var(--current) 8%, #111419)
+    );
+  box-shadow:
+    0 0 var(--glow)
+    color-mix(in srgb, var(--current) 24%, transparent);
+}
+
+.scene-card.next {
+  border-color:
+    color-mix(in srgb, var(--next) calc(var(--border-alpha) * 100%), transparent);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--next) 10%, #17191d),
+      #111419
+    );
+  box-shadow:
+    0 0 calc(var(--glow) * .6)
+    color-mix(in srgb, var(--next) 18%, transparent);
+}
+
+.label {
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: .12em;
+  color: #aeb6bf;
+  margin-bottom: 8px;
+}
+
+.scene-title {
+  font-size: 22px;
+  font-weight: 820;
+}
+
+.pc-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0,1fr));
+  gap: 12px;
+}
+
+.pc {
+  position: relative;
+  min-height: 82px;
+  border-radius: 10px;
+  padding: 12px 14px;
+  overflow: hidden;
+  background: #15181d;
+  border: 1px solid;
+}
+
+.pc.cl5 {
+  --accent: var(--cl5);
+}
+
+.pc.ql1 {
+  --accent: var(--ql1);
+}
+
+.pc {
+  border-color:
+    color-mix(in srgb, var(--accent) calc(var(--border-alpha) * 100%), transparent);
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--accent) 30%, #15181d),
+      color-mix(in srgb, var(--accent) 15%, #111419)
+    );
+  box-shadow:
+    0 0 calc(var(--glow) * .7)
+    color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+.pc-head {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.pc-console {
+  color: var(--accent);
+  font-weight: 750;
+}
+
+.pc-memory {
+  font-size: 29px;
+  font-weight: 850;
+}
+
+.pc-title {
+  margin-top: 2px;
+  font-size: 16px;
+}
+
+.controls {
+  background: #111419;
+  border: 1px solid #242b33;
+  border-radius: 12px;
+  padding: 18px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+button {
+  appearance: none;
+  border: 1px solid #3b4652;
+  border-radius: 8px;
+  background: #20262d;
+  color: #f4f6f8;
+  padding: 9px 13px;
+  cursor: pointer;
+  font-weight: 650;
+}
+
+button:hover {
+  background: #29313a;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2,minmax(0,1fr));
+  gap: 14px 24px;
+}
+
+.control label {
+  display: flex;
+  justify-content: space-between;
+  color: #b9c1c9;
+  font-size: 13px;
+  margin-bottom: 5px;
+}
+
+.control output {
+  color: white;
+  font-variant-numeric: tabular-nums;
+}
+
+input[type=range] {
+  width: 100%;
+}
+
+.code {
+  margin-top: 18px;
+  border-radius: 8px;
+  padding: 14px;
+  background: #080a0d;
+  color: #b9d7c0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 780px) {
+  .transport {
+    grid-template-columns: repeat(2,1fr);
+  }
+
+  .scene-grid,
+  .pc-grid,
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+</head>
+
+<body>
+<div class="lab">
+
+<h1>CL Audio — Skin Lab V1</h1>
+
+<div class="subtitle">
+Comparaison de palettes et simplification des rôles visuels.
+</div>
+
+<div class="preview">
+
+  <div class="transport">
+    <button class="btn prev">PREV</button>
+    <button class="btn next-nav">NEXT</button>
+    <button class="btn go">GO</button>
+    <button class="btn play">PLAY</button>
+    <button class="btn pause">PAUSE</button>
+    <button class="btn stop">STOP</button>
+  </div>
+
+  <div class="scene-grid">
+    <div class="scene-card current">
+      <div class="label">En cours · Lecture</div>
+      <div class="scene-title">DANCING QUEEN</div>
+    </div>
+
+    <div class="scene-card next">
+      <div class="label">Prochaine scène sélectionnée</div>
+      <div class="scene-title">10 — L'OBJET DU DÉSIR</div>
+    </div>
+  </div>
+
+  <div class="pc-grid">
+    <div class="pc cl5">
+      <div class="pc-head">
+        <span class="pc-console">CL5</span>
+        <span class="pc-memory">52</span>
+      </div>
+      <div class="pc-title">DANCING QUEEN</div>
+    </div>
+
+    <div class="pc ql1">
+      <div class="pc-head">
+        <span class="pc-console">QL1</span>
+        <span class="pc-memory">51</span>
+      </div>
+      <div class="pc-title">DANCING QUEEN</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="controls">
+
+<div class="actions">
+  <button data-preset="broadcast">Broadcast</button>
+  <button data-preset="minimal">Régie propre</button>
+  <button data-preset="vivid">Vivid</button>
+  <button data-preset="pastel">Pastel</button>
+  <button data-preset="outline">Outline</button>
+  <button data-preset="dark">Sombre</button>
+</div>
+
+<div class="grid">
+
+<div class="control">
+<label>Saturation <output id="satOut"></output></label>
+<input id="sat" type="range" min="50" max="160" step="5" value="100">
+</div>
+
+<div class="control">
+<label>Luminosité <output id="brightnessOut"></output></label>
+<input id="brightness" type="range" min="70" max="130" step="5" value="100">
+</div>
+
+<div class="control">
+<label>Force bordures <output id="borderOut"></output></label>
+<input id="border" type="range" min="15" max="100" step="5" value="85">
+</div>
+
+<div class="control">
+<label>Halo <output id="glowOut"></output></label>
+<input id="glow" type="range" min="0" max="36" step="1" value="18">
+</div>
+
+<div class="control">
+<label>Fond panneau <output id="panelOut"></output></label>
+<input id="panel" type="range" min="60" max="100" step="5" value="95">
+</div>
+
+</div>
+
+<div class="code" id="code"></div>
+
+</div>
+
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+const presets = {
+  broadcast: {
+    nav:'#249cff',
+    current:'#ff812b',
+    next:'#249cff',
+    go:'#65d972',
+    play:'#ff9c35',
+    pause:'#ffd35a',
+    stop:'#ff4a4a',
+    cl5:'#8956e8',
+    ql1:'#3e9eac',
+    sat:100,
+    brightness:100,
+    border:80,
+    glow:17,
+    panel:95
+  },
+
+  minimal: {
+    nav:'#4583b8',
+    current:'#d98a42',
+    next:'#4f7391',
+    go:'#67b878',
+    play:'#d58a42',
+    pause:'#c8a84f',
+    stop:'#c85757',
+    cl5:'#7761a8',
+    ql1:'#4f8c93',
+    sat:78,
+    brightness:94,
+    border:48,
+    glow:8,
+    panel:92
+  },
+
+  vivid: {
+    nav:'#168cff',
+    current:'#ff7218',
+    next:'#1b9cff',
+    go:'#57e16c',
+    play:'#ff8d22',
+    pause:'#ffdb2f',
+    stop:'#ff3434',
+    cl5:'#9d4cff',
+    ql1:'#35bdcc',
+    sat:135,
+    brightness:106,
+    border:92,
+    glow:26,
+    panel:96
+  },
+
+  pastel: {
+    nav:'#84afd0',
+    current:'#dca574',
+    next:'#91b0c7',
+    go:'#8fc79a',
+    play:'#dca574',
+    pause:'#d8c47c',
+    stop:'#d18282',
+    cl5:'#a595c7',
+    ql1:'#7fafb4',
+    sat:72,
+    brightness:103,
+    border:58,
+    glow:10,
+    panel:94
+  },
+
+  outline: {
+    nav:'#249cff',
+    current:'#ff812b',
+    next:'#249cff',
+    go:'#63d84e',
+    play:'#ff8d22',
+    pause:'#ffd52e',
+    stop:'#ff4545',
+    cl5:'#bd56ea',
+    ql1:'#3e9eac',
+    sat:100,
+    brightness:94,
+    border:100,
+    glow:4,
+    panel:88
+  },
+
+  dark: {
+    nav:'#4b779b',
+    current:'#a46736',
+    next:'#45647c',
+    go:'#527f5a',
+    play:'#956536',
+    pause:'#958446',
+    stop:'#8f4b4b',
+    cl5:'#665383',
+    ql1:'#456d72',
+    sat:68,
+    brightness:84,
+    border:38,
+    glow:3,
+    panel:84
+  }
+};
+
+function setColor(name, value) {
+  document.documentElement.style.setProperty('--' + name, value);
+}
+
+function applyPreset(name) {
+  const p = presets[name];
+
+  [
+    'nav','current','next','go',
+    'play','pause','stop','cl5','ql1'
+  ].forEach(key => setColor(key,p[key]));
+
+  $('sat').value = p.sat;
+  $('brightness').value = p.brightness;
+  $('border').value = p.border;
+  $('glow').value = p.glow;
+  $('panel').value = p.panel;
+
+  update();
+}
+
+function update() {
+  const sat = Number($('sat').value);
+  const brightness = Number($('brightness').value);
+  const border = Number($('border').value);
+  const glow = Number($('glow').value);
+  const panel = Number($('panel').value);
+
+  const root = document.documentElement;
+
+  root.style.setProperty('--sat', sat / 100);
+  root.style.setProperty('--brightness', brightness / 100);
+  root.style.setProperty('--border-alpha', border / 100);
+  root.style.setProperty('--glow', glow + 'px');
+  root.style.setProperty('--panel-alpha', panel / 100);
+
+  $('satOut').textContent = sat + ' %';
+  $('brightnessOut').textContent = brightness + ' %';
+  $('borderOut').textContent = border + ' %';
+  $('glowOut').textContent = glow + ' px';
+  $('panelOut').textContent = panel + ' %';
+
+  const cs = getComputedStyle(root);
+
+  $('code').textContent =
+`Palette actuelle
+
+NAV     ${cs.getPropertyValue('--nav').trim()}
+CURRENT ${cs.getPropertyValue('--current').trim()}
+NEXT    ${cs.getPropertyValue('--next').trim()}
+GO      ${cs.getPropertyValue('--go').trim()}
+PLAY    ${cs.getPropertyValue('--play').trim()}
+PAUSE   ${cs.getPropertyValue('--pause').trim()}
+STOP    ${cs.getPropertyValue('--stop').trim()}
+CL5     ${cs.getPropertyValue('--cl5').trim()}
+QL1     ${cs.getPropertyValue('--ql1').trim()}
+
+Saturation : ${sat} %
+Brightness : ${brightness} %
+Bordures   : ${border} %
+Halo       : ${glow} px
+Fond       : ${panel} %`;
+}
+
+document.querySelectorAll('[data-preset]').forEach(button => {
+  button.addEventListener('click', () => {
+    applyPreset(button.dataset.preset);
+  });
+});
+
+['sat','brightness','border','glow','panel'].forEach(id => {
+  $(id).addEventListener('input', update);
+});
+
+applyPreset('broadcast');
+</script>
+</body>
+</html>
