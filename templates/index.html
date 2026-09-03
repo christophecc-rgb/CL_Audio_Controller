@@ -703,6 +703,21 @@
     .midi-return-console{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .midi-return.device-unavailable{opacity:.62;filter:saturate(.72);animation:none!important}
 
+    .midi-return::before {
+      content:"";
+      position:absolute;
+      inset:0;
+      z-index:0;
+      pointer-events:none;
+      opacity:0;
+      background:var(--console-accent);
+    }
+
+    .midi-return > * {
+      position:relative;
+      z-index:1;
+    }
+
     .midi-return.state-idle {
       border-color:var(--console-accent) !important;
       background:#15181d !important;
@@ -711,9 +726,13 @@
 
     .midi-return.state-waiting {
       border-color:var(--console-accent) !important;
-      background:#15181d !important;
+      background:color-mix(in srgb, var(--console-accent) 7%, #15181d) !important;
       box-shadow:0 0 0 1px color-mix(in srgb, var(--console-accent) 22%, transparent) !important;
-      animation:midiWaitingPulse 1.15s ease-in-out infinite alternate !important;
+      animation:midiWaitingPulse 1.6s ease-in-out infinite alternate !important;
+    }
+
+    .midi-return.state-waiting.recall-pulse::before {
+      animation:midiWaitingPulse 1.6s ease-in-out infinite alternate !important;
     }
 
     .midi-return.state-confirmed {
@@ -731,7 +750,7 @@
       box-shadow:
         0 0 0 2px color-mix(in srgb, var(--console-accent) 34%, transparent),
         0 0 18px color-mix(in srgb, var(--console-accent) 38%, transparent) !important;
-      animation:midiMismatchPulse .48s ease-in-out infinite alternate !important;
+      animation:midiMismatchPulse .65s ease-in-out infinite alternate !important;
     }
 
     .midi-return.state-timeout {
@@ -754,13 +773,15 @@
 
     @keyframes midiMismatchPulse {
       from {
+        transform:scale(1);
         filter:brightness(.82);
-        background:color-mix(in srgb, var(--console-accent) 8%, #15181d);
+        background:color-mix(in srgb, var(--console-accent) 6%, #15181d);
         box-shadow:0 0 8px color-mix(in srgb, var(--console-accent) 18%, transparent);
       }
       to {
+        transform:scale(1.008);
         filter:brightness(1.22);
-        background:color-mix(in srgb, var(--console-accent) 32%, #15181d);
+        background:color-mix(in srgb, var(--console-accent) 36%, #15181d);
         border-color:var(--console-text);
         box-shadow:
           0 0 0 2px color-mix(in srgb, var(--console-accent) 42%, transparent),
@@ -773,23 +794,25 @@
         filter:brightness(.88);
         background:color-mix(in srgb, var(--console-accent) 5%, #15181d);
         border-color:color-mix(in srgb, var(--console-accent) 48%, #15181d);
-        box-shadow:
-          0 0 0 1px color-mix(in srgb, var(--console-accent) 12%, transparent);
+        box-shadow:0 0 0 1px color-mix(in srgb, var(--console-accent) 12%, transparent);
       }
       to {
-        filter:brightness(1.14);
-        background:color-mix(in srgb, var(--console-accent) 30%, #15181d);
+        filter:brightness(1.12);
+        background:color-mix(in srgb, var(--console-accent) 24%, #15181d);
         border-color:var(--console-accent);
-        box-shadow:
-          0 0 0 2px color-mix(in srgb, var(--console-accent) 40%, transparent),
-          0 0 12px color-mix(in srgb, var(--console-accent) 34%, transparent);
+        box-shadow:0 0 0 2px color-mix(in srgb, var(--console-accent) 32%, transparent), 0 0 16px color-mix(in srgb, var(--console-accent) 30%, transparent);
       }
     }
 
 
     @media (prefers-reduced-motion:reduce) {
       .midi-return.state-waiting {
-        animation-duration:.65s !important;
+        animation-duration:1.6s !important;
+        animation-iteration-count:infinite !important;
+      }
+
+      .midi-return.state-mismatch {
+        animation-iteration-count:infinite !important;
       }
     }
 
@@ -863,7 +886,9 @@
       <button class="goto-button" id="gotoButton" type="button">ALLER À LA SCÈNE</button>
     </section>
 
-
+    <details class="advanced-options">
+      <summary>Options avancées</summary>
+    </details>
 
 <!-- Removed temporary test banner -->
   </main>
@@ -1346,6 +1371,8 @@
         }
       }
 
+      syncCurrentRecallAnimation(state, sessionMode, playing, paused);
+
       lastKnownState = state;
       failedStatusPolls = 0;
     }
@@ -1372,6 +1399,50 @@
     }
 
     let pendingTransportDesired = null;
+    let lastCurrentRecallKey = '';
+
+    function syncCurrentRecallAnimation(state, sessionMode, playing, paused) {
+      if (!currentCardEl || !window.CLMidiReturnVisual) return;
+      const sceneIndex = Number(state && state.playing_scene);
+      const activatedAt = Number(state && state.expected_activated_at);
+      const recallKey = [
+        state && state.set_generation,
+        state && state.play_mode,
+        Number.isFinite(sceneIndex) ? sceneIndex : '',
+        Number.isFinite(activatedAt) ? activatedAt : ''
+      ].join(':');
+      if (!sessionMode || !playing || paused || !Number.isFinite(activatedAt) || activatedAt <= 0) return;
+
+      if (!lastCurrentRecallKey) {
+        // Hydratation initiale : ne pas simuler un GO au simple chargement de la page.
+        lastCurrentRecallKey = recallKey;
+        return;
+      }
+
+      if (recallKey === lastCurrentRecallKey) return;
+      const previousRecallKey = lastCurrentRecallKey;
+      lastCurrentRecallKey = recallKey;
+      window.CLMidiReturnVisual.runtimeTrace('GO_EVENT_COUNT', {
+        source:'published-state',
+        oldRecallKey:previousRecallKey,
+        newRecallKey:recallKey,
+        containerClass:currentCardEl.className
+      });
+      window.CLMidiReturnVisual.restartCssAnimation(
+        currentCardEl,
+        'session-recall-pulse',
+        window.requestAnimationFrame.bind(window),
+        () => currentCardEl.classList.contains('session-playing'),
+        {
+          beginEvent:'GO_RESTART_BEGIN',
+          removeEvent:'GO_REMOVE',
+          raf1Event:'GO_RAF1',
+          raf2Event:'GO_RAF2',
+          addEvent:'GO_ADD',
+          details:{target:'currentCard',recallKey}
+        }
+      );
+    }
 
     async function act(action, desiredPlayingOverride = null) {
       if (action === 'play_pause') {

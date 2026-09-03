@@ -54,6 +54,81 @@ body.v2-energy-saver *::after {
   animation-play-state: paused !important;
 }
 
+/*
+ * Les deux templates déclarent midiWaitingPulse directement sur la carte.
+ * Cette feuille, chargée après eux, conserve la respiration globale et réserve
+ * les pseudo-éléments au renfort visuel du recall.
+ */
+.midi-return.state-waiting {
+  animation: midiWaitingPulse 1.6s ease-in-out infinite alternate !important;
+}
+
+.midi-return::before {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 0 !important;
+  pointer-events: none !important;
+  opacity: 0;
+  background: var(--console-accent) !important;
+}
+
+.midi-return::after {
+  content: "";
+  display: block;
+  position: absolute;
+  top: -22%;
+  bottom: -22%;
+  left: 0;
+  width: 70%;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+  border-radius: 42%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--console-accent) 20%, transparent) 24%,
+    color-mix(in srgb, var(--console-accent) 88%, transparent) 50%,
+    color-mix(in srgb, var(--console-accent) 24%, transparent) 76%,
+    transparent 100%
+  );
+  filter: blur(4px);
+}
+
+.midi-return > * {
+  position: relative;
+  z-index: 2;
+}
+
+@keyframes v2-midi-waiting-layer {
+  from {
+    opacity: .16;
+    box-shadow: inset 0 0 10px color-mix(in srgb, var(--console-accent) 32%, transparent);
+  }
+  to {
+    opacity: .48;
+    box-shadow: inset 0 0 26px color-mix(in srgb, var(--console-accent) 68%, transparent);
+  }
+}
+
+@keyframes v2-midi-waiting-sweep {
+  0%, 8% { opacity: 0; transform: translateX(-50%) skewX(-14deg); }
+  25% { opacity: .62; }
+  52% { opacity: .82; }
+  78% { opacity: .58; }
+  100% { opacity: 0; transform: translateX(145%) skewX(-14deg); }
+}
+
+.midi-return.state-waiting.recall-pulse::before {
+  animation: v2-midi-waiting-layer 2.8s ease-in-out infinite alternate !important;
+}
+
+.midi-return.state-waiting.recall-pulse::after {
+  animation: v2-midi-waiting-sweep 2.0s ease-in-out infinite !important;
+}
+
 .ltc-display {
   min-width: 0;
   padding: 9px 14px;
@@ -427,15 +502,22 @@ select {
 }
 
 @keyframes v2-live-ambient {
-  0%, 100% { opacity: .20; }
-  50% { opacity: .38; }
+  0%, 100% { opacity: .26; }
+  50% { opacity: .50; }
 }
 
 @keyframes v2-live-console-sweep {
-  0%, 12% { opacity: 0; transform: translateX(-120%) skewX(-18deg); }
-  24% { opacity: .34; }
-  54% { opacity: .16; }
-  72%, 100% { opacity: 0; transform: translateX(420%) skewX(-18deg); }
+  0%, 8% { opacity: 0; transform: translateX(-50%) skewX(-18deg); }
+  18% { opacity: .48; }
+  55% { opacity: .28; }
+  92%, 100% { opacity: 0; transform: translateX(145%) skewX(-18deg); }
+}
+
+@keyframes v2-live-console-sweep-recall {
+  0%, 8% { opacity: 0; transform: translateX(50%) skewX(-18deg); }
+  18% { opacity: .82; }
+  55% { opacity: .46; }
+  92%, 100% { opacity: 0; transform: translateX(516%) skewX(-18deg); }
 }
 
 .current-card.session-playing::before,
@@ -475,6 +557,10 @@ body.is-arrangement-playing .card.current::after {
   );
   filter: blur(5px);
   animation: v2-live-console-sweep 5.2s ease-in-out infinite !important;
+}
+
+.current-card.session-playing.session-recall-pulse::after {
+  animation-name: v2-live-console-sweep-recall !important;
 }
 
 .current-card .title,
@@ -578,7 +664,34 @@ body.is-arrangement-playing .card.current::after {
 .title-box-next.state-playing { border-color: rgba(88,166,255,.72) !important; animation: none !important; }
 .title-box-next.state-paused { border-color: var(--v2-border) !important; filter: saturate(.45); animation: none !important; }
 
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  .current-card.session-playing::before,
+  .current-card.is-playing::before {
+    animation-duration: 3.8s !important;
+    animation-iteration-count: infinite !important;
+  }
+
+  .current-card.session-playing::after,
+  .current-card.is-playing::after {
+    animation-duration: 5.2s !important;
+    animation-iteration-count: infinite !important;
+  }
+
+  .midi-return.state-waiting.recall-pulse::before {
+    animation-duration: 2.8s !important;
+    animation-iteration-count: infinite !important;
+  }
+
+  .midi-return.state-waiting.recall-pulse::after {
+    animation-duration: 2.0s !important;
+    animation-iteration-count: infinite !important;
+  }
+}
 
 @media (max-width: 800px) {
   .v2-app { padding-inline: 8px; }
@@ -620,19 +733,20 @@ body.is-arrangement-playing .card.current::after {
  */
 @media (orientation: landscape) and (max-height: 500px) {
   body:has(.v2-app[data-module="session"]) {
-    overflow: hidden !important;
+    overflow-x: hidden !important;
+    overflow-y: auto !important;
   }
 
   .v2-app[data-module="session"] {
     width: 100% !important;
-    height: 100dvh !important;
+    height: auto !important;
     min-height: 100dvh !important;
     padding:
       max(4px, env(safe-area-inset-top))
       max(8px, env(safe-area-inset-right))
       max(4px, env(safe-area-inset-bottom))
       max(8px, env(safe-area-inset-left)) !important;
-    grid-template-rows: 58px minmax(0, 1fr) !important;
+    grid-template-rows: 58px auto !important;
     gap: 5px !important;
   }
 
@@ -693,15 +807,15 @@ body.is-arrangement-playing .card.current::after {
 
   .v2-app[data-module="session"] .v2-workspace > .wrap {
     width: 100% !important;
-    height: 100% !important;
+    height: auto !important;
     max-width: none !important;
-    max-height: 100% !important;
+    max-height: none !important;
     padding: 7px !important;
     display: grid !important;
     grid-template-columns: repeat(12, minmax(0, 1fr)) !important;
     grid-template-rows: minmax(112px, 1fr) 58px 44px !important;
     gap: 6px !important;
-    overflow: hidden !important;
+    overflow: visible !important;
     border-radius: 13px !important;
   }
 
@@ -819,6 +933,11 @@ body.is-arrangement-playing .card.current::after {
     height: 36px !important;
     font-size: 10px !important;
     border-radius: 7px !important;
+  }
+
+  .v2-app[data-module="session"] .advanced-options {
+    grid-column: 1 / -1 !important;
+    grid-row: 4 !important;
   }
 }
 
@@ -1064,4 +1183,12 @@ body.is-arrangement-playing .card.current::after {
     margin-top: -2px !important;
     font-size: 8px !important;
   }
+}
+
+/* Session "En cours" : fond LIVE stable.
+   La vague ::after reste animée ; pas de respiration d'encadrement. */
+.current-card.session-playing::before,
+.current-card.is-playing::before {
+  animation: none !important;
+  opacity: .30 !important;
 }

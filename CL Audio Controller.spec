@@ -6,6 +6,7 @@ a = Analysis(
     binaries=[],
     datas=[
         ('app.py', '.'),
+        ('device_profiles.py', '.'),
         ('console_title_library.py', '.'),
         ('remote_window.py', '.'),
         ('cl_audio_logo.png', '.'),
@@ -14,7 +15,7 @@ a = Analysis(
         ('assets', 'assets'),
         ('arrangement_markers.json', '.'),
     ],
-    hiddenimports=['osc_transport', 'ltc_receiver', 'pythonosc.dispatcher', 'pythonosc.osc_server', 'pythonosc.udp_client'],
+    hiddenimports=['osc_transport', 'ltc_receiver', 'device_profiles', 'pythonosc.dispatcher', 'pythonosc.osc_server', 'pythonosc.udp_client'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

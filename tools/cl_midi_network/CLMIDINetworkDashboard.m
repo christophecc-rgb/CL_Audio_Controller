@@ -1314,7 +1314,10 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
             [[NSColor colorWithRed:0.045 green:0.055 blue:0.070 alpha:1.0]
                 blendedColorWithFraction:0.18 ofColor:identityBase];
         NSColor *consolePulseBackground = [consoleBackground blendedColorWithFraction:0.38 ofColor:consoleAccent];
-        NSColor *consoleWaitingBackground = [consoleBackground blendedColorWithFraction:0.32 ofColor:consoleAccent];
+        NSColor *consoleConfirmedBackground = [consoleBackground blendedColorWithFraction:0.22 ofColor:consoleAccent];
+        NSColor *consoleWaitingBackground = [consoleBackground blendedColorWithFraction:0.24 ofColor:consoleAccent];
+        NSColor *consoleStaleBackground = [consoleBackground blendedColorWithFraction:0.32
+                                                                           ofColor:[NSColor colorWithRed:0.025 green:0.030 blue:0.040 alpha:1.0]];
         for (NSUInteger index = 0; index < cards.count; index++) {
             if (cards[index] == NSNull.null) continue;
             NSView *card = cards[index]; NSTextField *programLabel = programLabels[index]; NSTextField *stateLabel = stateLabels[index];
@@ -1338,7 +1341,11 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
             id returnedLookup = expected[@"returned_title_lookup_memory"] ?: NSNull.null;
             (void)expectedTitle; (void)returnedTitle; (void)titleOffset; (void)expectedLookup; (void)returnedLookup;
             (void)expectedSource; (void)returnedSource; (void)expectedProgramSource; (void)returnedProgramSource; (void)latencyValue;
-            card.layer.backgroundColor = consoleBackground.CGColor;
+            card.layer.backgroundColor = (confirmed
+                ? consoleConfirmedBackground
+                : stale
+                ? consoleStaleBackground
+                : consoleBackground).CGColor;
             card.layer.borderColor = consoleAccent.CGColor;
             card.layer.borderWidth = mismatch ? 3.0 : (confirmed ? 2.0 : 1.5);
             card.layer.shadowColor = consoleAccent.CGColor;
@@ -1347,7 +1354,7 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
             card.layer.shadowRadius = mismatch ? 12.0 : (confirmed ? 8.0 : (stale ? 2.0 : 5.0));
 
             NSString *visualState = confirmed
-                ? (visualRecallActive ? @"recall_waiting" : @"confirmed")
+                ? @"confirmed"
                 : mismatch
                 ? @"mismatch"
                 : visualRecallActive
@@ -1397,7 +1404,8 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
                 pulse.repeatCount = HUGE_VALF;
                 pulse.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
                 [card.layer addAnimation:pulse forKey:@"clConsolePulse"];
-            } else if ([visualState isEqualToString:@"recall_waiting"] &&
+            } else if (([visualState isEqualToString:@"waiting"] ||
+                        [visualState isEqualToString:@"recall_waiting"]) &&
                        [card.layer animationForKey:@"clConsolePulse"] == nil) {
                 CABasicAnimation *haloPulse = [CABasicAnimation animationWithKeyPath:@"shadowOpacity"];
                 haloPulse.fromValue = @0.08;
@@ -1407,7 +1415,7 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
                 backgroundPulse.toValue = (__bridge id)consoleWaitingBackground.CGColor;
                 CAAnimationGroup *pulse = [CAAnimationGroup animation];
                 pulse.animations = @[haloPulse, backgroundPulse];
-                pulse.duration = 1.25;
+                pulse.duration = 1.60;
                 pulse.autoreverses = YES;
                 pulse.repeatCount = HUGE_VALF;
                 pulse.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
@@ -1420,7 +1428,7 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
                 backgroundPulse.values = @[
                     (__bridge id)consoleBackground.CGColor,
                     (__bridge id)consolePulseBackground.CGColor,
-                    (__bridge id)consoleBackground.CGColor
+                    (__bridge id)consoleConfirmedBackground.CGColor
                 ];
                 backgroundPulse.keyTimes = @[@0.0, @0.38, @1.0];
                 CAAnimationGroup *pulse = [CAAnimationGroup animation];

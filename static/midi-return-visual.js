@@ -3,14 +3,112 @@
 
   const FINAL_STATES = new Set(['confirmed', 'mismatch', 'timeout', 'idle']);
 
+  const runtimeDiagnostics = {
+    counters: {GO_EVENT_COUNT: 0, PROGRAM_RECALL_COUNT: 0, PROGRAM_RAF1_COUNT: 0, PROGRAM_RAF2_COUNT: 0},
+    entries: []
+  };
+
+  function runtimeTrace(event, details) {
+    if (event in runtimeDiagnostics.counters) runtimeDiagnostics.counters[event] += 1;
+    const detailText = details && typeof details === 'object'
+      ? Object.entries(details).map(([key, value]) => `${key}=${String(value)}`).join(' ')
+      : String(details || '');
+    runtimeDiagnostics.entries.push(`${new Date().toISOString()} ${event} ${detailText}`.trim());
+    if (root.console && typeof root.console.log === 'function') {
+      root.console.log('[CL_RUNTIME_ANIMATION]', event, JSON.stringify(details || {}));
+    }
+  }
+
+  function computedAnimationDetails(element) {
+    if (!root.getComputedStyle) return {};
+    const cardStyle = root.getComputedStyle(element);
+    const beforeStyle = root.getComputedStyle(element, '::before');
+    const afterStyle = root.getComputedStyle(element, '::after');
+    return {
+      className: element.className,
+      animationName: cardStyle.animationName,
+      animationDuration: cardStyle.animationDuration,
+      animationPlayState: cardStyle.animationPlayState,
+      parentOverflow: cardStyle.overflow,
+      beforeAnimationName: beforeStyle.animationName,
+      beforeAnimationDuration: beforeStyle.animationDuration,
+      beforeAnimationIterationCount: beforeStyle.animationIterationCount,
+      beforeAnimationPlayState: beforeStyle.animationPlayState,
+      beforeOpacity: beforeStyle.opacity,
+      beforeBackgroundColor: beforeStyle.backgroundColor,
+      beforeBackgroundImage: beforeStyle.backgroundImage,
+      beforeBoxShadow: beforeStyle.boxShadow,
+      beforeDisplay: beforeStyle.display,
+      beforeContent: beforeStyle.content,
+      beforePosition: beforeStyle.position,
+      beforeInset: [beforeStyle.top, beforeStyle.right, beforeStyle.bottom, beforeStyle.left].join(' '),
+      beforeWidth: beforeStyle.width,
+      beforeHeight: beforeStyle.height,
+      beforeZIndex: beforeStyle.zIndex,
+      afterAnimationName: afterStyle.animationName,
+      afterAnimationDuration: afterStyle.animationDuration,
+      afterAnimationPlayState: afterStyle.animationPlayState,
+      afterOpacity: afterStyle.opacity,
+      afterContent: afterStyle.content,
+      afterPosition: afterStyle.position,
+      afterInset: [afterStyle.top, afterStyle.right, afterStyle.bottom, afterStyle.left].join(' '),
+      afterWidth: afterStyle.width,
+      afterHeight: afterStyle.height,
+      afterZIndex: afterStyle.zIndex,
+      prefersReducedMotion: Boolean(root.matchMedia && root.matchMedia('(prefers-reduced-motion: reduce)').matches),
+      laterStyleSheets: root.document ? Array.from(root.document.styleSheets).map(sheet => sheet.href || 'inline') : []
+    };
+  }
+
+  function schedulePostAddDiagnostics(element, eventPrefix, details) {
+    [0, 50, 250, 1000, 4000].forEach(delay => {
+      root.setTimeout(() => {
+        runtimeTrace(`${eventPrefix}_AFTER_${delay}MS`, {
+          ...details,
+          ...computedAnimationDetails(element)
+        });
+      }, delay);
+    });
+  }
+
+  function restartCssAnimation(element, className, requestFrame, shouldApply, diagnostics) {
+    const generation = (element._cssAnimationGeneration || 0) + 1;
+    element._cssAnimationGeneration = generation;
+    if (diagnostics) runtimeTrace(diagnostics.beginEvent, {...diagnostics.details, classBefore:element.className});
+    element.classList.remove(className);
+    if (diagnostics) runtimeTrace(diagnostics.removeEvent, {...diagnostics.details, classAfterRemove:element.className});
+    void element.offsetWidth;
+    requestFrame(() => {
+      if (diagnostics) runtimeTrace(diagnostics.raf1Event, diagnostics.details);
+      requestFrame(() => {
+        if (diagnostics) runtimeTrace(diagnostics.raf2Event, diagnostics.details);
+        if (element._cssAnimationGeneration !== generation) return;
+        if (shouldApply && !shouldApply()) return;
+        element.classList.add(className);
+        if (diagnostics) runtimeTrace(diagnostics.addEvent, {
+          ...diagnostics.details,
+          classAfterAdd:element.className,
+          ...computedAnimationDetails(element)
+        });
+        if (diagnostics) schedulePostAddDiagnostics(
+          element,
+          diagnostics.addEvent,
+          diagnostics.details
+        );
+      });
+    });
+    return generation;
+  }
+
   function createController(options) {
     const applyState = options.applyState;
+    const restartWaiting = options.restartWaiting || (() => {});
     const now = options.now || Date.now;
     const requestFrame = options.requestFrame || root.requestAnimationFrame.bind(root);
     const setTimer = options.setTimer || root.setTimeout.bind(root);
     const clearTimer = options.clearTimer || root.clearTimeout.bind(root);
-    const waitingMs = options.waitingMs || 4000;
-    const confirmedMs = options.confirmedMs || 500;
+    const waitingMs = options.waitingMs || 1000;
+    const confirmedMs = options.confirmedMs || 2500;
 
     let lastExpectedKey = null;
     let pendingFinalState = null;
@@ -39,8 +137,8 @@
 
       if (finalState === 'confirmed') {
         if (pendingFinalKey && completedConfirmationKey === pendingFinalKey) {
-          phase = 'confirmed';
-          applyState('confirmed');
+          phase = 'idle';
+          applyState('idle');
           return;
         }
         phase = 'confirmed';
@@ -50,7 +148,8 @@
         timer = setTimer(() => {
           if (generation !== confirmationGeneration || phase !== 'confirmed') return;
           completedConfirmationKey = pendingFinalKey;
-          applyState('confirmed');
+          phase = 'idle';
+          applyState('idle');
         }, Math.max(0, confirmedUntil - now()));
         return;
       }
@@ -68,14 +167,18 @@
       showFinalState();
     };
 
-    const startWaiting = (expectedKey, expectedStartedAtMs, backendState, finalKey) => {
+    const startWaiting = (expectedKey, expectedStartedAtMs, backendState, finalKey, previousExpectedKey) => {
       generation += 1;
       cancelTimer();
       lastExpectedKey = expectedKey;
       pendingFinalState = null;
       pendingFinalKey = '';
       const reportedStart = Number(expectedStartedAtMs);
-      waitingUntil = (Number.isFinite(reportedStart) && reportedStart > 0 ? reportedStart : now()) + waitingMs;
+      const discoveredAt = now();
+      const visualStart = Number.isFinite(reportedStart) && reportedStart > 0
+        ? Math.max(reportedStart, discoveredAt)
+        : discoveredAt;
+      waitingUntil = visualStart + waitingMs;
       confirmedUntil = 0;
       rememberFinal(backendState, finalKey);
 
@@ -87,6 +190,7 @@
 
       // Cette affectation est synchrone : aucune réponse backend du même
       // cycle ne peut remplacer WAITING avant la première frame demandée.
+      restartWaiting({previousExpectedKey, expectedKey, expectedStartedAtMs});
       applyState('waiting');
       const waitingGeneration = generation;
       requestFrame(() => {
@@ -102,8 +206,16 @@
 
     return {
       update({expectedKey, expectedStartedAtMs, hasExpected, backendState, finalKey}) {
+        if (hasExpected && lastExpectedKey === null) {
+          // Hydratation initiale : l'EXPECTED déjà présent n'est pas un nouveau recall.
+          lastExpectedKey = expectedKey;
+          rememberFinal(backendState, finalKey);
+          showFinalState();
+          return phase;
+        }
+
         if (hasExpected && expectedKey !== lastExpectedKey) {
-          startWaiting(expectedKey, expectedStartedAtMs, backendState, finalKey);
+          startWaiting(expectedKey, expectedStartedAtMs, backendState, finalKey, lastExpectedKey);
           return phase;
         }
 
@@ -114,6 +226,19 @@
             rememberFinal(backendState, finalKey);
             showFinalState();
             return phase;
+          }
+
+          if (backendState === 'confirmed') {
+            rememberFinal(backendState, finalKey);
+
+            // La validation métier peut être immédiate, mais le WAITING
+            // visuel reste affiché jusqu'à son échéance frontend.
+            if (now() >= waitingUntil) {
+              generation += 1;
+              cancelTimer();
+              showFinalState();
+              return phase;
+            }
           }
           rememberFinal(backendState, finalKey);
           if (now() >= waitingUntil) {
@@ -214,10 +339,39 @@
       title.hidden = !view.title;
       if (!card._visualController) {
         card._visualController = createController({
-          waitingMs: 4000,
-          confirmedMs: 500,
+          waitingMs: 1000,
+          confirmedMs: 2500,
+          restartWaiting: diagnostic => {
+            const details = {
+              deviceId:view.id,
+              oldExpectedKey:diagnostic.previousExpectedKey,
+              newExpectedKey:diagnostic.expectedKey,
+              expectedActivatedAt:device.expected_activated_at
+            };
+            restartCssAnimation(card, 'recall-pulse', root.requestAnimationFrame.bind(root), () => (
+              card.classList.contains('state-waiting')
+            ), {
+              beginEvent:'PROGRAM_RECALL_COUNT',
+              removeEvent:'PROGRAM_REMOVE',
+              raf1Event:'PROGRAM_RAF1_COUNT',
+              raf2Event:'PROGRAM_RAF2_COUNT',
+              addEvent:'PROGRAM_ADD',
+              details
+            });
+          },
           applyState: state => {
             ['idle','waiting','confirmed','mismatch','timeout'].forEach(item => card.classList.toggle('state-' + item, state === item));
+
+            if (state === 'waiting') {
+              card.classList.add('recall-pulse');
+            } else if (card.classList.contains('recall-pulse')) {
+              runtimeTrace('PROGRAM_RECALL_REMOVE_BY_STATE', {
+                deviceId:view.id,
+                state,
+                classBeforeRemove:card.className
+              });
+              card.classList.remove('recall-pulse');
+            }
           }
         });
       }
@@ -244,5 +398,5 @@
     return visible.map(deviceViewModel);
   }
 
-  root.CLMidiReturnVisual = {createController, devicesFromState, visibleDevices, deviceViewModel, renderDeviceCards};
+  root.CLMidiReturnVisual = {createController, restartCssAnimation, runtimeTrace, runtimeDiagnostics, devicesFromState, visibleDevices, deviceViewModel, renderDeviceCards};
 })(typeof window !== 'undefined' ? window : globalThis);

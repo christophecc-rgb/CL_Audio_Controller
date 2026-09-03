@@ -194,7 +194,7 @@ class LiveSetGenerationTests(unittest.TestCase):
     def test_console_visual_states_follow_backend_validation_and_timeout(self):
         now = time.time()
         waiting = self.outgoing_snapshot("cl5", 112, now - 0.5)
-        timeout = self.outgoing_snapshot("cl5", 112, now - 2.1)
+        timeout = self.outgoing_snapshot("cl5", 112, now - 4.1)
         confirmed = self.outgoing_snapshot("cl5", 112, now - 0.2, 112, now)
         mismatch = self.outgoing_snapshot("cl5", 113, now - 0.2, 112, now)
         self.assertEqual(waiting["visual_state"], "waiting")
@@ -210,11 +210,35 @@ class LiveSetGenerationTests(unittest.TestCase):
         )
 
         # Le moteur temporel commun reste canonique.
-        self.assertIn("waitingMs = options.waitingMs || 4000", visual_source)
+        self.assertIn("waitingMs = options.waitingMs || 1000", visual_source)
         self.assertIn("expectedStartedAtMs", visual_source)
         self.assertIn("backendState === 'mismatch'", visual_source)
-        self.assertIn("confirmedMs = options.confirmedMs || 500", visual_source)
+        self.assertIn("confirmedMs = options.confirmedMs || 2500", visual_source)
         self.assertIn("requestFrame", visual_source)
+        self.assertIn("restartWaiting({previousExpectedKey, expectedKey, expectedStartedAtMs});", visual_source)
+        self.assertIn("restartCssAnimation(card, 'recall-pulse'", visual_source)
+        self.assertIn("void element.offsetWidth;", visual_source)
+        self.assertGreaterEqual(visual_source.count("requestFrame(() => {"), 2)
+
+        session_source = (PROJECT_ROOT / "templates/index.html").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(".midi-return.state-waiting.recall-pulse::before", session_source)
+        self.assertIn("background:var(--console-accent);", session_source)
+        self.assertIn("animation:midiWaitingPulse", session_source)
+        self.assertIn("'session-recall-pulse'", session_source)
+        self.assertIn("state && state.expected_activated_at", session_source)
+        self.assertIn("source:'published-state'", session_source)
+
+        shared_styles = (PROJECT_ROOT / "static/remote-v2.css").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn(".midi-return.state-waiting {", shared_styles)
+        self.assertIn("animation: midiWaitingPulse 1.6s ease-in-out infinite alternate !important;", shared_styles)
+        self.assertIn(".midi-return::before", shared_styles)
+        self.assertIn('content: "" !important;', shared_styles)
+        self.assertIn(".midi-return.state-waiting.recall-pulse::before", shared_styles)
+        self.assertIn("animation: v2-midi-waiting-layer", shared_styles)
 
         # Passe 3 : état + profil sont assemblés dans le renderer commun.
         self.assertIn("deviceViewModel", visual_source)
@@ -2267,6 +2291,10 @@ class LiveSetGenerationTests(unittest.TestCase):
         self.assertIn(".title-box-current.is-playing::after,", source)
         self.assertIn("animation: v2-live-console-sweep 5.2s ease-in-out infinite !important;", source)
         self.assertIn("@media (prefers-reduced-motion: reduce)", source)
+        reduced_motion = source.split("@media (prefers-reduced-motion: reduce)", 1)[1]
+        self.assertIn(".current-card.session-playing::before", reduced_motion)
+        self.assertIn(".current-card.session-playing::after", reduced_motion)
+        self.assertIn("animation-iteration-count: infinite !important;", reduced_motion)
 
     def test_session_has_a_dedicated_single_screen_iphone_landscape_layout(self):
         source = (PROJECT_ROOT / "static/remote-v2.css").read_text(encoding="utf-8")
