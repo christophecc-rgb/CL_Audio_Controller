@@ -49,6 +49,8 @@ class MidiAnalyzerAppTests(unittest.TestCase):
         for binding in ("session.typeFilter", "session.channelFilter", "session.sourceFilter", "session.searchText"):
             self.assertIn(binding, source)
         self.assertIn('@"Tous les canaux"', source)
+        for midi_type in ("Control Change", "Program Change", "Note On", "Note Off", "Pitch Bend"):
+            self.assertIn(f'@"{midi_type}"', source)
         self.assertIn("channel <= 16", source)
         self.assertIn("boldSystemFontOfSize:17", source)
         self.assertIn('pathForResource:@"paradis_latin_logo" ofType:@"jpg"', source)

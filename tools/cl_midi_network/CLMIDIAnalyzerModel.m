@@ -171,19 +171,41 @@ static NSDateFormatter *CLMIDIAnalyzerClock(void)
         _packet = event.packet;
         _timeText = [CLMIDIAnalyzerClock() stringFromDate:timestamp];
         _sourceText = event.packet.sourceName;
+        _commandTypeText = event.typeName;
         _channelText = event.channel != nil ? event.channel.stringValue : @"—";
         _hexText = event.packet.hexString;
+        _descriptionText = [self.class descriptionTextForEvent:event];
         if (command != nil)
         {
             [self applyCommand:command];
         }
-        else
-        {
-            _commandTypeText = @"(none)";
-            _descriptionText = event.typeName;
-        }
     }
     return self;
+}
+
++ (NSString *)descriptionTextForEvent:(CLMIDIEvent *)event
+{
+    if (event.controller != nil)
+        return [NSString stringWithFormat:@"CC %@ = %@", event.controller, event.value ?: @"—"];
+    if (event.note != nil)
+    {
+        if (event.pressure != nil)
+            return [NSString stringWithFormat:@"Note %@ · pression %@", event.note, event.pressure];
+        return [NSString stringWithFormat:@"Note %@ · vélocité %@", event.note, event.velocity ?: @"—"];
+    }
+    if (event.program != nil)
+        return [NSString stringWithFormat:@"Program %@", event.program];
+    if (event.pressure != nil)
+        return [NSString stringWithFormat:@"Pression %@", event.pressure];
+    if (event.pitchBend != nil)
+        return [NSString stringWithFormat:@"Pitch Bend %@", event.pitchBend];
+    if (event.songPosition != nil)
+        return [NSString stringWithFormat:@"Song Position %@", event.songPosition];
+    if (event.song != nil)
+        return [NSString stringWithFormat:@"Song %@", event.song];
+    if (event.value != nil)
+        return [NSString stringWithFormat:@"Value %@", event.value];
+    return event.typeName;
 }
 
 + (NSString *)typeTextForCommand:(CLCommand *)command
@@ -240,7 +262,6 @@ static NSDateFormatter *CLMIDIAnalyzerClock(void)
 - (void)applyCommand:(CLCommand *)command
 {
     _command = command;
-    _commandTypeText = [self.class typeTextForCommand:command];
     _descriptionText = [self.class descriptionTextForCommand:command];
     _cachedDetailText = nil;
 }
@@ -287,7 +308,7 @@ static NSDateFormatter *CLMIDIAnalyzerClock(void)
 - (BOOL)isRecordVisible:(CLMIDIAnalyzerRecord *)record
 {
     if (self.typeFilter.length > 0 &&
-        [record.commandTypeText rangeOfString:self.typeFilter options:NSCaseInsensitiveSearch].location == NSNotFound)
+        [record.commandTypeText caseInsensitiveCompare:self.typeFilter] != NSOrderedSame)
         return NO;
     if (self.channelFilter != nil && ![record.event.channel isEqualToNumber:self.channelFilter])
         return NO;

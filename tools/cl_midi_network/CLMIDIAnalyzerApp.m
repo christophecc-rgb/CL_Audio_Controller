@@ -165,7 +165,13 @@
     filters.orientation = NSUserInterfaceLayoutOrientationHorizontal;
     filters.spacing = 8;
     self.typeFilterButton = [[NSPopUpButton alloc] initWithFrame:NSZeroRect pullsDown:NO];
-    [self.typeFilterButton addItemsWithTitles:@[@"Tous les types", @"Program", @"Control", @"Note", @"Transport", @"System"]];
+    [self.typeFilterButton addItemsWithTitles:@[
+        @"Tous les types", @"Note Off", @"Note On", @"Polyphonic Key Pressure",
+        @"Control Change", @"Program Change", @"Channel Pressure", @"Pitch Bend",
+        @"System Exclusive", @"MIDI Time Code Quarter Frame", @"Song Position Pointer",
+        @"Song Select", @"Tune Request", @"Timing Clock", @"Start", @"Continue",
+        @"Stop", @"Active Sensing", @"System Reset", @"Data/Running Status", @"Unknown"
+    ]];
     self.typeFilterButton.target = self;
     self.typeFilterButton.action = @selector(filtersChanged:);
     self.channelFilterButton = [[NSPopUpButton alloc] initWithFrame:NSZeroRect pullsDown:NO];

@@ -94,7 +94,7 @@ int main(void)
             initWithCommand:program event:programEvent direction:@"RX" timestamp:[NSDate dateWithTimeIntervalSince1970:0]];
         [session addRecord:programRecord];
 
-        NSCAssert([programRecord.commandTypeText isEqualToString:@"PROGRAM"], @"Expected PROGRAM");
+        NSCAssert([programRecord.commandTypeText isEqualToString:@"Program Change"], @"Expected Program Change");
         NSCAssert([programRecord.channelText isEqualToString:@"16"], @"Expected channel 16");
         NSCAssert([programRecord.descriptionText isEqualToString:@"Program 42"], @"Expected program 42");
         NSCAssert([programRecord.hexText isEqualToString:@"CF 2A"], @"Expected raw dump");
@@ -113,7 +113,7 @@ int main(void)
         [session addRecord:stopRecord];
         NSCAssert(session.records.count == 2, @"Expected two records");
 
-        session.typeFilter = @"program";
+        session.typeFilter = @"Program Change";
         NSCAssert(session.visibleRecords.count == 1, @"Type filter failed");
         session.typeFilter = nil;
         session.channelFilter = @16;
@@ -183,20 +183,80 @@ int main(void)
         }
         CLMIDIAnalyzerRecord *correlatedProgram = session.records[5];
         NSCAssert(correlatedProgram.command != nil, @"Program command was not correlated");
-        NSCAssert([correlatedProgram.commandTypeText isEqualToString:@"PROGRAM"],
-                  @"Program row was not enriched");
+        NSCAssert([correlatedProgram.commandTypeText isEqualToString:@"Program Change"],
+                  @"Program row must retain its canonical MIDI type");
 
         [session clear];
-        session.typeFilter = @"program";
+        session.typeFilter = @"Program Change";
         CLMIDIAnalyzerRecord *deferredProgram = [[CLMIDIAnalyzerRecord alloc]
             initWithCommand:nil event:programEvent direction:@"RX" timestamp:[NSDate date]];
         [session addRecord:deferredProgram];
-        NSCAssert(session.visibleRecords.count == 0,
-                  @"Raw event must not match the program filter yet");
+        NSCAssert(session.visibleRecords.firstObject == deferredProgram,
+                  @"Raw Program Change must immediately match its MIDI type");
         [deferredProgram applyCommand:program];
         [session refreshVisibleRecords];
         NSCAssert(session.visibleRecords.firstObject == deferredProgram,
                   @"Enriched Program Change must become visible immediately");
+
+        [session clear];
+        session.typeFilter = nil;
+        session.channelFilter = nil;
+        session.sourceFilter = nil;
+        session.searchText = nil;
+        const UInt8 controlBytes[] = {0xB2, 0x14, 0x32};
+        const UInt8 channelThreeNoteOnBytes[] = {0x92, 0x4F, 0x64};
+        const UInt8 channelThreeNoteOffBytes[] = {0x82, 0x43, 0x40};
+        const UInt8 otherChannelProgramBytes[] = {0xC6, 0x2A};
+        CLMIDIAnalyzerRecord *controlRecord = [[CLMIDIAnalyzerRecord alloc]
+            initWithCommand:nil event:Event(controlBytes, sizeof(controlBytes), @"IAC Bus 1")
+            direction:@"RX" timestamp:[NSDate date]];
+        CLMIDIAnalyzerRecord *noteOnRecord = [[CLMIDIAnalyzerRecord alloc]
+            initWithCommand:nil event:Event(channelThreeNoteOnBytes, sizeof(channelThreeNoteOnBytes), @"IAC Bus 1")
+            direction:@"RX" timestamp:[NSDate date]];
+        CLMIDIAnalyzerRecord *noteOffRecord = [[CLMIDIAnalyzerRecord alloc]
+            initWithCommand:nil event:Event(channelThreeNoteOffBytes, sizeof(channelThreeNoteOffBytes), @"Other Source")
+            direction:@"RX" timestamp:[NSDate date]];
+        CLMIDIAnalyzerRecord *otherProgramRecord = [[CLMIDIAnalyzerRecord alloc]
+            initWithCommand:nil event:Event(otherChannelProgramBytes, sizeof(otherChannelProgramBytes), @"Other Source")
+            direction:@"RX" timestamp:[NSDate date]];
+        [session addRecords:@[controlRecord, noteOnRecord, noteOffRecord, otherProgramRecord]];
+
+        NSCAssert([controlRecord.channelText isEqualToString:@"3"] &&
+                  [controlRecord.commandTypeText isEqualToString:@"Control Change"] &&
+                  [controlRecord.descriptionText isEqualToString:@"CC 20 = 50"] &&
+                  ![controlRecord.descriptionText isEqualToString:controlRecord.commandTypeText],
+                  @"Control Change row mapping is incorrect");
+        NSCAssert([controlRecord.hexText isEqualToString:@"B2 14 32"], @"CC hex changed");
+        NSCAssert([noteOnRecord.channelText isEqualToString:@"3"] &&
+                  [noteOnRecord.commandTypeText isEqualToString:@"Note On"] &&
+                  [noteOnRecord.descriptionText isEqualToString:@"Note 79 · vélocité 100"] &&
+                  [noteOnRecord.hexText isEqualToString:@"92 4F 64"],
+                  @"Note On row mapping is incorrect");
+        NSCAssert([noteOffRecord.channelText isEqualToString:@"3"] &&
+                  [noteOffRecord.commandTypeText isEqualToString:@"Note Off"] &&
+                  [noteOffRecord.descriptionText isEqualToString:@"Note 67 · vélocité 64"] &&
+                  [noteOffRecord.hexText isEqualToString:@"82 43 40"],
+                  @"Note Off row mapping is incorrect");
+        NSCAssert([otherProgramRecord.channelText isEqualToString:@"7"] &&
+                  [otherProgramRecord.commandTypeText isEqualToString:@"Program Change"],
+                  @"Program Change type/channel must be decoded generically");
+
+        session.typeFilter = @"Control Change";
+        NSCAssert(session.visibleRecords.count == 1 && session.visibleRecords.firstObject == controlRecord,
+                  @"Control Change filter failed");
+        session.typeFilter = @"Note On";
+        NSCAssert(session.visibleRecords.count == 1 && session.visibleRecords.firstObject == noteOnRecord,
+                  @"Note On filter failed");
+        session.channelFilter = @3;
+        NSCAssert(session.visibleRecords.count == 1 && session.visibleRecords.firstObject == noteOnRecord,
+                  @"Combined type and channel filter failed");
+        session.sourceFilter = @"IAC";
+        NSCAssert(session.visibleRecords.count == 1 && session.visibleRecords.firstObject == noteOnRecord,
+                  @"Combined type, channel and source filter failed");
+        session.typeFilter = nil;
+        session.channelFilter = nil;
+        session.sourceFilter = nil;
+        NSCAssert(session.visibleRecords.count == 4, @"All types must retain every event");
     }
     return 0;
 }
