@@ -234,11 +234,12 @@ class LiveSetGenerationTests(unittest.TestCase):
             encoding="utf-8"
         )
         self.assertIn(".midi-return.state-waiting {", shared_styles)
-        self.assertIn("animation: midiWaitingPulse 1.6s ease-in-out infinite alternate !important;", shared_styles)
+        self.assertIn(".midi-return.state-waiting.recall-pulse::after", shared_styles)
+        self.assertIn("animation: v2-midi-waiting-sweep .72s ease-out 1 !important;", shared_styles)
         self.assertIn(".midi-return::before", shared_styles)
         self.assertIn('content: "" !important;', shared_styles)
         self.assertIn(".midi-return.state-waiting.recall-pulse::before", shared_styles)
-        self.assertIn("animation: v2-midi-waiting-layer", shared_styles)
+        self.assertIn("animation: v2-midi-waiting-sweep", shared_styles)
 
         # Passe 3 : état + profil sont assemblés dans le renderer commun.
         self.assertIn("deviceViewModel", visual_source)
