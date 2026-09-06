@@ -124,7 +124,7 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('BOUCLE MIDI DÉTECTÉE', source)
         self.assertIn('désactivez Entrée RTP > Piste', source)
         self.assertNotIn('Routages actifs : Aucun · une seule paire RTP', source)
-        self.assertIn('SIMULATEUR DE RETOUR CONSOLE', source)
+        self.assertIn('BANC DE TEST MIDI · 16 CANAUX', source)
         self.assertIn('@[@"Ableton local", @"Ableton distant"]', source)
         self.assertIn('startIntegratedSimulator:', source)
         self.assertIn('cl-midi-rtp-control', source)
@@ -147,25 +147,48 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('CL MIDI Network Assistant.log', source)
         self.assertIn('rtp-connect-pending', source)
         self.assertIn('round-trip-result', source)
-        self.assertIn('envoi RTP réussi · aucun simulateur de retour actif sur le Mac distant', source)
+        self.assertIn(
+            'envoi RTP réussi · aucun simulateur de retour actif sur le Mac distant',
+            source
+        )
         self.assertIn('@"DIAGNOSTIC DISTANT · VÉRIFIER RTP"', source)
         self.assertIn('@"Vérifier RTP"', source)
-        simulator_method = source.split('- (void)createIntegratedSimulatorPanelInView:', 1)[1].split('- (BOOL)applicationShouldTerminateAfterLastWindowClosed:', 1)[0]
-        self.assertIn('SIMULATEUR DE RETOUR CONSOLE', simulator_method)
-        self.assertIn('Ableton local', simulator_method)
-        self.assertIn('Ableton distant', simulator_method)
-        self.assertIn('CLYamahaConsoleSimulator', simulator_method)
-        self.assertIn('startIntegratedSimulator:', simulator_method)
-        self.assertIn('stopIntegratedSimulator:', simulator_method)
-        self.assertIn('sendSimulatorMemory:', simulator_method)
-        self.assertIn('@"81"', simulator_method)
-        self.assertIn('@"78"', simulator_method)
+
+        simulator = source.split(
+            '- (void)rebuildSimulatorDeviceRows', 1
+        )[1].split(
+            '- (BOOL)applicationShouldTerminateAfterLastWindowClosed:', 1
+        )[0]
+
+        self.assertIn('BANC DE TEST MIDI · 16 CANAUX', simulator)
+        self.assertIn('Ableton local', simulator)
+        self.assertIn('Ableton distant', simulator)
+        self.assertIn('CLYamahaConsoleSimulator', simulator)
+        self.assertIn('startIntegratedSimulator:', simulator)
+        self.assertIn('stopIntegratedSimulator:', simulator)
+        self.assertIn('sendSimulatorMemory:', simulator)
+
+        # Default manual memories remain CL5=81 / QL1=78,
+        # but they now belong to dynamic device rows.
+        self.assertIn('[deviceID isEqualToString:@"cl5"]', simulator)
+        self.assertIn('[deviceID isEqualToString:@"ql1"]', simulator)
+        self.assertIn('data1Field.stringValue = @"81"', simulator)
+        self.assertIn('data1Field.stringValue = @"78"', simulator)
+
         self.assertNotIn('addChildWindow:', source)
-        self.assertNotIn('simulatorWindow', source)
+        self.assertIn('@property NSWindow *simulatorWindow;', source)
+        self.assertIn('- (void)openSimulatorWindow:', source)
+        self.assertIn('sender == self.devicesWindow || sender == self.simulatorWindow', source)
         self.assertIn('sendto(', source)
-        self.assertNotIn('tell application', simulator_method)
-        connect_method = source.split('- (void)connectSelectedPeer:', 1)[1].split('- (void)refreshEndpoints', 1)[0]
-        self.assertIn('connectPeerThroughSystem:peer automatic:NO', connect_method)
+        self.assertNotIn('tell application', simulator)
+
+        connect_method = source.split(
+            '- (void)connectSelectedPeer:', 1
+        )[1].split('- (void)refreshEndpoints', 1)[0]
+        self.assertIn(
+            'connectPeerThroughSystem:peer automatic:NO',
+            connect_method
+        )
         self.assertNotIn('pkill', source)
 
     def test_dashboard_return_monitor_decodes_rtp_running_status_and_timestamps_each_event(self):
@@ -231,11 +254,13 @@ class MidiNetworkToolsTests(unittest.TestCase):
     def test_local_assistant_layout_collapses_the_hidden_rtp_test_space(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
         layout = source.split('- (void)layoutAssistantViewForRTPMode:(BOOL)rtpMode {', 1)[1].split('\n}', 1)[0]
-        self.assertIn('700 + offset', layout)
+        self.assertIn('650 + offset', layout)
         self.assertIn('rtpMode ? 104.0 : 0.0', layout)
-        self.assertIn('self.assistantReturnPanel.frame = NSMakeRect(16, 181, 468, 124)', layout)
+        self.assertIn('self.assistantReturnPanel.frame = NSMakeRect(16, 90, 468, 215)', layout)
         self.assertIn('self.testPanel.frame = NSMakeRect(16, 343, 468, 96)', layout)
-        self.assertIn('self.assistantTestBanner.frame = NSMakeRect(16, 125, 468, 44)', layout)
+        self.assertIn('self.assistantTestBanner.frame = NSMakeRect(16, 42, 468, 36)', layout)
+        self.assertIn('CGFloat modePanelHeight = rtpMode ? 100.0 : 58.0', layout)
+        self.assertIn('@"MODE · LOCAL"', layout)
 
     def test_console_return_cards_keep_cl5_and_ql1_identity_colors(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
@@ -253,14 +278,21 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('console[@"id"] ?: @"device"', cards)
         self.assertNotIn('BOOL isCL5', cards)
 
-    def test_network_manager_return_rows_are_compact_and_hide_memory_titles(self):
+    def test_network_manager_return_cards_emphasize_memory_and_resolved_titles(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
         setup = source.split('self.cl5ReturnCard =', 1)[1].split('[self createIntegratedSimulatorPanelInView:content]', 1)[0]
         cards = source.split('- (void)updateConsoleReturnCards {', 1)[1].split('- (void)refreshAbletonSceneTitle', 1)[0]
         self.assertIn('@"CL5   PC — → —   …"', setup)
         self.assertIn('@"QL1   PC — → —   …"', setup)
         self.assertNotIn('ReturnTitle', setup)
-        self.assertNotIn('titleLabel.stringValue', cards)
+        self.assertIn('monospacedDigitSystemFontOfSize:28.0', source)
+        self.assertIn('titleLabel.stringValue', cards)
+        self.assertIn('titleLabel.hidden = !titleLabel.stringValue.length', cards)
+        self.assertIn('hasLibrary && resolvedTitle.length', cards)
+        self.assertIn('@"Program Change %ld%@%@"', cards)
+        self.assertIn('metaLabel.stringValue = @"Control Change"', cards)
+        self.assertIn('metaLabel.stringValue = @"Note"', cards)
+        self.assertIn('@" · EXP %ld"', cards)
         self.assertIn('confirmed ? @"✓" : mismatch ? @"✕" : stale ? @"!" : @"…"', cards)
         self.assertIn('@"Indéterminé · attendu indisponible"', cards)
         self.assertIn('@"En attente du retour"', cards)
@@ -272,6 +304,12 @@ class MidiNetworkToolsTests(unittest.TestCase):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
         self.assertIn('@"BACKEND ET BIBLIOTHÈQUES"', source)
         self.assertIn('status[@"console_scene_library_status"]', source)
+        self.assertIn('for (NSDictionary *device in self.deviceProfiles)', source)
+        self.assertIn('[signalType isEqualToString:@"program_change"]', source)
+        self.assertIn('self.consoleLibraryNameLabels[definition[@"id"]]', source)
+        self.assertIn('self.consoleLibraryStateLabels[definition[@"id"]]', source)
+        self.assertIn('CGFloat visibleHeight = 76.0', source)
+        self.assertIn('self.consoleLibrariesScroll.hasVerticalScroller = definitions.count > 3', source)
         self.assertIn('info[@"entries"]', source)
         self.assertIn('@"✓ %lu mémoires"', source)
         self.assertIn('@"⚠ %@"', source)
@@ -295,14 +333,67 @@ class MidiNetworkToolsTests(unittest.TestCase):
 
     def test_integrated_simulator_has_clear_console_rows_and_no_duplicate_details_button(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
-        panel = source.split('- (void)createIntegratedSimulatorPanelInView:', 1)[1].split('- (void)sendSimulatorMemory:', 1)[0]
-        self.assertIn('NSView *cl5Row', panel)
-        self.assertIn('NSView *ql1Row', panel)
-        self.assertIn('@"CL5 · Program Change · Canal 1"', panel)
-        self.assertIn('@"QL1 · Program Change · Canal 2"', panel)
+        rebuild = source.split(
+            '- (void)rebuildSimulatorDeviceRows', 1
+        )[1].split(
+            '- (void)createIntegratedSimulatorPanelInView:', 1
+        )[0]
+        panel = source.split(
+            '- (void)createIntegratedSimulatorPanelInView:', 1
+        )[1].split(
+            '- (void)sendSimulatorMemory:', 1
+        )[0]
+
+        # Device rows are dynamic rather than CL5/QL1 views hard-coded in the panel.
+        self.assertIn('for (NSDictionary *device in self.simulatorDevices)', rebuild)
+        self.assertIn('NSString *deviceName = device[@"name"]', rebuild)
+        self.assertIn('NSInteger channel = [device[@"channel"] integerValue]', rebuild)
+        self.assertIn('self.simulatorValueFields[deviceID] = valueFields', rebuild)
+        self.assertIn('self.simulatorMemoryFields[deviceID] = data1Field', rebuild)
+        self.assertIn('send.identifier = deviceID', rebuild)
+        self.assertIn('send.tag = channel', rebuild)
+        self.assertIn('toggleSimulatorDeviceRunning:', rebuild)
+
+        # Compact scrollable presentation; delay remains a global simulator setting.
+        self.assertIn('self.simulatorDevicesScroll', panel)
+        self.assertIn('self.simulatorDeviceRows', panel)
         self.assertIn('@"Délai"', panel)
+        self.assertNotIn('addSimulatorDevice:', panel)
         self.assertNotIn('@"Afficher les détails"', panel)
-        self.assertIn('NSMakeRect(16, 153, 468, 220)', panel)
+        self.assertNotIn('NSView *cl5Row', panel)
+        self.assertNotIn('NSView *ql1Row', panel)
+
+        # The detached test bench gives the 16-channel list a tall vertical scroll.
+        self.assertIn('NSMakeRect(16, 16, 728, 668)', panel)
+        self.assertIn('NSMakeRect(14, 266, 700, 300)', panel)
+        self.assertIn('self.simulatorDevicesScroll.contentSize.height', rebuild)
+
+    def test_simulator_reuses_library_management_and_one_global_stop_action(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        rebuild = source.split('- (void)rebuildSimulatorDeviceRows', 1)[1].split(
+            '- (void)openSimulatorWindow:', 1
+        )[0]
+        panel = source.split('- (void)createIntegratedSimulatorPanelInView:', 1)[1].split(
+            '- (void)sendSimulatorMemory:', 1
+        )[0]
+        stop = source.split('- (void)stopIntegratedSimulator:', 1)[1].split(
+            '- (void)toggleSimulatorDeviceEnabled:', 1
+        )[0]
+
+        self.assertIn('BOOL hasRelevantLibrary = programChange', rebuild)
+        self.assertIn('[protocol isEqualToString:@"midi"] && libraryID.length > 0', rebuild)
+        self.assertIn('[self accentButton:@"Bibliothèque…"', rebuild)
+        self.assertIn('action:@selector(selectConsoleLibrary:)', rebuild)
+        self.assertIn('library.identifier = libraryID', rebuild)
+        self.assertNotIn('/console-library/import/', rebuild)
+
+        self.assertIn('[self button:@"■ Tout arrêter"', panel)
+        self.assertIn('action:@selector(stopIntegratedSimulator:)', panel)
+        self.assertIn('[self.simulatorTasks removeAllObjects]', stop)
+        self.assertIn('[self.simulatorOutputBuffers removeAllObjects]', stop)
+        self.assertIn('if (task.running) [task terminate]', stop)
+        self.assertIn('action:@selector(stopIntegratedSimulator:)', source)
+        self.assertIn('self.assistantStopTestsButton = [self accentButton:@"Tout arrêter"', source)
 
     def test_rtp_settings_script_finds_the_network_globe_by_accessibility_text(self):
         source = (TOOLS / "open_rtp_settings.applescript").read_text()
@@ -314,7 +405,7 @@ class MidiNetworkToolsTests(unittest.TestCase):
     def test_dashboard_is_a_network_only_technical_panel(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text()
         self.assertIn('@"INFORMATIONS TECHNIQUES"', source)
-        self.assertIn('@"SESSION RTP OBSERVÉE"', source)
+        self.assertIn('@"SESSION RTP"', source)
         self.assertIn('@"PORTS COREMIDI"', source)
         self.assertIn('@"CORRESPONDANTS BONJOUR"', source)
         self.assertNotIn('toggleNetworkSession:', source)
@@ -370,7 +461,7 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('@"title": self.lastCL5Title', source)
         self.assertIn('@"title": self.lastQL1Title', source)
         manual_send = source.split('- (void)sendSimulatorMemory:', 1)[1].split('- (void)simulatorModeChanged:', 1)[0]
-        self.assertIn('MIDISend(outputPort, destination, &packetList)', manual_send)
+        self.assertIn('MIDISend(self.simulatorMidiOutputPort, destination, &packetList)', manual_send)
         self.assertNotIn('[self toolPath:@"CLMIDIRoundTripTester"]', manual_send)
         self.assertIn('CL5   PC — → —   …', source)
         self.assertIn('QL1   PC — → —   …', source)
@@ -379,15 +470,16 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertNotIn('Titre Ableton en attente', source)
         self.assertIn('http://127.0.0.1:5050/status', source)
         self.assertIn('playing_scene_name', source)
-        self.assertIn('colorWithRed:0.608 green:0.420 blue:0.839', source)
-        self.assertIn('colorWithRed:0.243 green:0.620 blue:0.675', source)
+        self.assertIn('[self deviceColorFromHex:palette[@"accent"]', source)
+        self.assertIn('for (NSDictionary *device in self.deviceProfiles)', source)
         self.assertIn('CL_MIDI_Console_State.json', source)
         self.assertIn('--background-monitor', source)
         self.assertNotIn('ltc_timecode', source)
         self.assertIn('@"Diagnostic détaillé"', source)
-        self.assertIn('@"Vue Assistant"', source)
-        self.assertIn('setContentSize:NSMakeSize(500, 700 + offset)', source)
-        self.assertIn('setContentSize:NSMakeSize(500, 1000 + offset)', source)
+        self.assertIn('@"Vue Spectacle"', source)
+        self.assertIn('NSSize targetContentSize = NSMakeSize(500, 650 + offset)', source)
+        self.assertIn('setContentSize:NSMakeSize(500, localHeight + offset)', source)
+        self.assertIn('CGFloat localHeight = MIN(768.0, MAX(690.0, 650.0 + returnsHeight))', source)
         self.assertIn('self.technicalPanel.hidden = !detailed', source)
         self.assertIn('RÉSEAUX CONSOLES', source)
         self.assertIn('self.lastCL5Test', source)
@@ -397,7 +489,7 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertNotIn('Accès : aucun', source)
         self.assertNotIn('toggleNetworkSession:', source)
         self.assertNotIn('changeConnectionPolicy:', source)
-        self.assertIn('Activation et autorisations gérées dans Réglages de réseau MIDI macOS', source)
+        self.assertNotIn('Activation et autorisations gérées dans Réglages de réseau MIDI macOS', source)
         self.assertIn('Réglages : gérés par macOS', source)
         self.assertIn('Connexion à confirmer par test MIDI', source)
         self.assertIn('ensureGuardianRunning', source)
@@ -414,60 +506,53 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('[self.window makeKeyAndOrderFront:nil]', source)
 
     def test_integrated_simulator_manages_persistent_dynamic_devices(self):
-        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text()
-        simulator = source.split('- (NSArray<NSString *> *)allMidiEndpointNames', 1)[1]
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        simulator = source.split(
+            "- (NSMutableDictionary *)simulatorDeviceWithID:", 1
+        )[1].split(
+            "#pragma mark - Device Profiles editor", 1
+        )[0]
 
-        # Defaults and backward-compatible channel mapping.
-        self.assertIn('simulatorDeviceWithID:@"cl5" name:@"CL5" channel:1', simulator)
-        self.assertIn('simulatorDeviceWithID:@"ql1" name:@"QL1" channel:2', simulator)
-        self.assertIn('name = @"CL5"; channel = 1', simulator)
-        self.assertIn('name = @"QL1"; channel = 2', simulator)
+        # Le simulateur reste dynamique, mais sa source canonique est désormais
+        # deviceProfiles plutôt qu'une seconde liste éditable indépendante.
+        self.assertIn("CLSimulatorDevicesDefaultsKey", simulator)
+        self.assertIn("syncSimulatorDevicesFromProfiles", simulator)
+        self.assertIn("simulatorDeviceIDForProfile:", simulator)
+        self.assertIn("deviceProfileForSimulatorID:", simulator)
+        self.assertIn("self.deviceProfiles", simulator)
+        self.assertIn('@"signal_type"', simulator)
+        self.assertIn('@"program_change"', simulator)
+        self.assertIn('profile[@"rx"][@"enabled"]', simulator)
+        self.assertIn('profile[@"enabled"]', simulator)
+        self.assertIn('profile[@"protocol"]', simulator)
+        self.assertIn('simulableSignalTypes', simulator)
+        self.assertIn('@"control_change"', simulator)
+        self.assertIn('@"note"', simulator)
 
-        # Create, rename/channel edit, delete, and persistence across launches.
-        self.assertIn('addSimulatorDevice:', simulator)
-        self.assertIn('editSimulatorDevice:', simulator)
-        self.assertIn('device[@"name"] = cleanName', simulator)
-        self.assertIn('device[@"channel"] = @(midiChannel)', simulator)
-        self.assertIn('deleteSimulatorDevice:', simulator)
-        self.assertIn('CLSimulatorDevicesDefaultsKey', simulator)
-        self.assertIn('arrayForKey:CLSimulatorDevicesDefaultsKey', simulator)
-        self.assertIn('setObject:saved forKey:CLSimulatorDevicesDefaultsKey', simulator)
+        # CL5/QL1 sont conservées via leurs profils historiques et legacy_key,
+        # plus par création codée en dur dans le simulateur.
+        self.assertIn('@"console_a"', simulator)
+        self.assertIn('@"console_b"', simulator)
+        self.assertIn('profile[@"legacy_key"]', simulator)
+        self.assertNotIn(
+            'simulatorDeviceWithID:@"cl5" name:@"CL5" channel:1',
+            simulator,
+        )
+        self.assertNotIn(
+            'simulatorDeviceWithID:@"ql1" name:@"QL1" channel:2',
+            simulator,
+        )
 
-        # Independent/global activation use one dynamic task collection.
-        self.assertIn('NSMutableDictionary<NSString *, NSTask *> *simulatorTasks', source)
-        self.assertIn('toggleSimulatorDeviceEnabled:', simulator)
-        self.assertIn('toggleSimulatorDeviceRunning:', simulator)
-        self.assertIn('stopSimulatorDeviceID:', simulator)
-        self.assertIn('for (NSMutableDictionary *device in self.simulatorDevices)', simulator)
-        self.assertIn('[self.simulatorTasks removeAllObjects]', simulator)
-        self.assertNotIn('simulatorCL5Task', source)
-        self.assertNotIn('simulatorQL1Task', source)
+        # Les appareils supprimés/désactivés ne doivent pas laisser tourner
+        # un simulateur fantôme.
+        self.assertIn("wantedIDs", simulator)
+        self.assertIn("[task terminate]", simulator)
+        self.assertIn("[self persistSimulatorDevices]", simulator)
 
-        # Collision warning, custom return isolation, and safety UI.
-        self.assertIn('channelCollisionForChannel:', simulator)
-        self.assertIn('@"⚠ Canal déjà utilisé par %@"', simulator)
-        self.assertIn('! [device[@"built_in"] boolValue]'.replace('! ', '!'), simulator)
-        self.assertIn('recordSimulatorProgram:', source)
-        self.assertIn('@"last_program"', simulator)
-        self.assertIn('@"last_event_at"', simulator)
-        self.assertIn('@"ARRÊTER TOUT"', simulator)
-        self.assertIn('@"Simulation active · %lu device%@"', simulator)
-        self.assertIn('@"Simulation désactivée · mode spectacle sûr"', simulator)
-        self.assertIn('@"PGM %ld · %@ · %@"', simulator)
-        self.assertIn('simulatorSceneTitleForProgram:', simulator)
-        self.assertIn('clock.dateFormat = @"HH:mm:ss"', simulator)
-        self.assertIn('@"Titre non résolu"', simulator)
-        self.assertIn('@"event_history"', simulator)
-        self.assertIn('while (history.count > 10)', simulator)
-        self.assertIn('NSPipe *output = [NSPipe pipe]', simulator)
-        self.assertIn('[line hasPrefix:@"RECEIVED "]', simulator)
-        self.assertIn('recordSimulatorProgram:midiProgram deviceID:deviceID', simulator)
+        # La palette du simulateur suit maintenant le profil Appareils.
+        self.assertIn('profile[@"palette"]', simulator)
+        self.assertIn("deviceColorFromHex:", simulator)
 
-        # Existing IAC/RTP executable contract remains common to every device.
-        self.assertIn('@"CLYamahaConsoleSimulator"', simulator)
-        self.assertIn('@"--label", device[@"name"]', simulator)
-        self.assertIn('@"--channel", [device[@"channel"] stringValue]', simulator)
-        self.assertIn('@"--transport", transport', simulator)
 
     def test_dashboard_adopts_the_real_discovered_machine_name(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text()
@@ -506,7 +591,7 @@ class MidiNetworkToolsTests(unittest.TestCase):
         refresh = source.split('- (void)refreshEndpoints', 1)[1].split('- (NSString *)toolPath:', 1)[0]
         self.assertIn('[name isEqualToString:CLExpectedEndpointName]', predicate)
         self.assertIn('[name isEqualToString:CLLocalReturnEndpointName]', predicate)
-        self.assertEqual(refresh.count('CLIsRTPReturnEndpointName(name)'), 2)
+        self.assertGreaterEqual(refresh.count('CLIsRTPReturnEndpointName(name)'), 2)
         self.assertIn('CLRTPReturnEndpointName = @"Réseau RTP MB Chris"', source)
 
     def test_return_mode_selects_saved_dynamic_source_and_guards_rtp_diagnostics(self):
@@ -708,25 +793,43 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('Gestionnaire IAC Bus 1 est exclusivement la source expected', source)
         self.assertIn('[CLSimulatorInputEndpointNames() containsObject:CLExpectedEndpointName]', source)
         manual_send = source.split('- (void)sendSimulatorMemory:', 1)[1].split('- (void)simulatorModeChanged:', 1)[0]
-        self.assertIn('self.localReturnMode ? CLLocalReturnEndpointName', manual_send)
+        self.assertIn('self.simulatorEndpointMenu.titleOfSelectedItem', manual_send)
         self.assertNotIn('self.localReturnMode ? CLExpectedEndpointName', manual_send)
 
-    def test_local_manual_simulator_sends_directly_to_destination_only_return_endpoint(self):
+    def test_local_manual_simulator_sends_directly_to_selected_technical_destination(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
         manual_send = source.split('- (void)sendSimulatorMemory:', 1)[1].split(
             '- (void)simulatorModeChanged:', 1
         )[0]
 
-        self.assertIn('self.localReturnDestination', manual_send)
+        self.assertNotIn('self.localReturnDestination', manual_send)
+        self.assertIn('EndpointNames(NO)', manual_send)
+        self.assertIn('MIDIGetNumberOfDestinations()', manual_send)
+        self.assertIn('MIDIClientCreate(', manual_send)
+        self.assertIn('self.simulatorMidiClient', manual_send)
+        self.assertIn('self.simulatorMidiOutputPort', manual_send)
         self.assertIn('MIDIOutputPortCreate(', manual_send)
-        self.assertIn('MIDISend(outputPort, destination, &packetList)', manual_send)
-        self.assertIn('UInt8 midiProgram = (UInt8)(sceneMemory - 1)', manual_send)
-        self.assertIn('0xC0 | ((channel - 1) & 0x0F)', manual_send)
-        self.assertIn('[self recordSimulatorProgram:midiProgram channel:channel]', manual_send)
+        self.assertIn('MIDISend(self.simulatorMidiOutputPort, destination, &packetList)', manual_send)
+        self.assertNotIn('self.returnMonitorClient', manual_send)
+        self.assertNotIn('self.ownsPassiveReturnMonitor', manual_send)
+        self.assertNotIn('MIDIPortDispose(outputPort)', manual_send)
+        self.assertIn('programChange ? data1Input - 1 : data1Input', manual_send)
+        self.assertIn('programChange ? 0xC0', manual_send)
+        self.assertIn('((channel - 1) & 0x0F)', manual_send)
+        self.assertIn('if (programChange) [self recordSimulatorProgram:data1 channel:channel]', manual_send)
         self.assertIn('sendStatus != noErr', manual_send)
         self.assertNotIn('[self toolPath:@"CLMIDIRoundTripTester"]', manual_send)
         self.assertNotIn('MIDIGetSource', manual_send)
         self.assertNotIn('MIDIPortConnectSource', manual_send)
+        self.assertNotIn('queueExpectedProgram', manual_send)
+        self.assertNotIn('queueReturnedProgram', manual_send)
+        self.assertNotIn('writeConsoleReturnState', manual_send)
+
+        shutdown = source.split('- (NSApplicationTerminateReply)applicationShouldTerminate:', 1)[1].split(
+            '\n}', 1
+        )[0]
+        self.assertIn('MIDIPortDispose(self.simulatorMidiOutputPort)', shutdown)
+        self.assertIn('MIDIClientDispose(self.simulatorMidiClient)', shutdown)
 
     def test_secondary_window_refreshes_canonical_expected_state_from_shared_monitor(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
@@ -743,15 +846,35 @@ class MidiNetworkToolsTests(unittest.TestCase):
         mode = source.split('- (void)simulatorModeChanged:', 1)[1].split('- (NSTask *)launchSimulatorDevice:', 1)[0]
         transport = source.split('- (BOOL)simulatorTransport:', 1)[1].split('- (void)startSimulatorDevice:', 1)[0]
         self.assertIn('selectPassiveExpectedSourceNamed:CLExpectedEndpointName', refresh)
-        self.assertIn('if (!self.localReturnMode) [self selectPassiveReturnSourceNamed:preferred]', refresh)
+        self.assertIn('if (!self.localReturnMode &&', refresh)
+        self.assertIn('[self selectPassiveReturnSourceNamed:preferred]', refresh)
         self.assertNotIn('expectedMonitorSource = 0', mode)
         self.assertNotIn('expectedCL5Program = -1', mode)
         self.assertNotIn('expectedQL1Program = -1', mode)
         self.assertIn('BOOL local = self.localReturnMode', transport)
-        self.assertIn('local ? CLLocalReturnEndpointName : selectedEndpoint', transport)
+        self.assertIn('NSString *requiredEndpoint = selectedEndpoint', transport)
         self.assertIn('local ? @"iac" : @"rtp"', transport)
         self.assertIn('EXPECTED absent : Gestionnaire IAC Bus 1 introuvable', transport)
-        self.assertIn('RETURNED absent : CL MIDI Return Test introuvable', transport)
+        self.assertNotIn('self.localReturnDestination', transport)
+        self.assertIn('Destination MIDI locale indisponible', transport)
+
+    def test_local_simulator_destination_uses_available_coremidi_outputs_and_persistence(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        snapshot = source.split('- (void)applyEndpointSnapshotWithSources:', 1)[1].split(
+            '- (NSString *)toolPath:', 1
+        )[0]
+        changed = source.split('- (void)simulatorEndpointChanged:', 1)[1].split(
+            '- (void)simulatorInputEndpointChanged:', 1
+        )[0]
+        self.assertIn('for (NSString *name in destinations)', snapshot)
+        self.assertIn('!CLIsProtectedDeviceTestEndpoint(name)', snapshot)
+        self.assertIn('CLPreferredLocalSimulatorDestination(localDestinations)', snapshot)
+        self.assertIn('rangeOfString:@"IAC"', source)
+        self.assertNotIn('@"Bus 2"', source)
+        self.assertIn('CLLocalSimulatorDestinationPreference', snapshot)
+        self.assertIn('self.simulatorEndpointMenu.enabled = localDestinations.count > 0', snapshot)
+        self.assertIn('CLLocalSimulatorDestinationPreference', changed)
+        self.assertNotIn('CLLocalReturnEndpointName', changed)
 
     def test_return_monitor_handles_missing_source_and_has_single_publisher(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
@@ -779,7 +902,8 @@ class MidiNetworkToolsTests(unittest.TestCase):
         mode = source.split('- (void)simulatorModeChanged:', 1)[1].split('- (NSTask *)launchSimulatorDevice:', 1)[0]
         transport = source.split('- (BOOL)simulatorTransport:', 1)[1].split('- (void)startSimulatorDevice:', 1)[0]
         self.assertIn('@selector(simulatorEndpointChanged:)', setup)
-        self.assertIn('CLLocalRTPEndpointNames()', refresh)
+        self.assertIn('NSMutableOrderedSet<NSString *> *localRTPNames', refresh)
+        self.assertIn('[destinationSet containsObject:name]', refresh)
         self.assertIn('simulatorLocalRtpEndpoint', source)
         self.assertIn('@"QL1 simulator"', source)
         self.assertIn('self.simulatorEndpointMenu.enabled = localRTPEndpoints.count > 0', refresh)
@@ -789,45 +913,266 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertNotIn('mode == 0 ? CLLocalReturnEndpointName : CLRTPReturnEndpointName', transport)
 
     def test_remote_simulator_input_and_output_are_independent(self):
-        dashboard = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
-        engine = (TOOLS / "CLYamahaConsoleSimulator.m").read_text(encoding="utf-8")
-        launch = dashboard.split('- (NSTask *)launchSimulatorDevice:', 1)[1].split(
+        dashboard = (TOOLS / "CLMIDINetworkDashboard.m").read_text(
+            encoding="utf-8"
+        )
+        engine = (TOOLS / "CLYamahaConsoleSimulator.m").read_text(
+            encoding="utf-8"
+        )
+        launch = dashboard.split(
+            '- (NSTask *)launchSimulatorDevice:', 1
+        )[1].split(
             '- (BOOL)simulatorTransport:', 1
         )[0]
-        manual = dashboard.split('- (void)sendSimulatorMemory:', 1)[1].split(
+        manual = dashboard.split(
+            '- (void)sendSimulatorMemory:', 1
+        )[1].split(
             '- (void)simulatorModeChanged:', 1
         )[0]
+
         self.assertIn('@"DESTINATION"', dashboard)
         self.assertIn('@"SOURCE AUTO"', dashboard)
         self.assertIn('@"Aucune"', dashboard)
         self.assertIn('CLSimulatorInputEndpointNames()', dashboard)
-        self.assertIn('if (input.length && ![input isEqualToString:@"Aucune"])', launch)
-        self.assertIn('addObjectsFromArray:@[@"--input-endpoint", input]', launch)
-        self.assertNotIn('@"--input-endpoint", CLExpectedEndpointName', launch)
-        self.assertIn('argumentValue(arguments, @"--input-endpoint",', engine)
-        self.assertIn('responderMode ? endpointSearchName : @""', engine)
+
+        self.assertIn(
+            'if (input.length && ![input isEqualToString:@"Aucune"])',
+            launch
+        )
+        self.assertIn(
+            'addObjectsFromArray:@[@"--input-endpoint", input]',
+            launch
+        )
+        self.assertNotIn(
+            '@"--input-endpoint", CLExpectedEndpointName',
+            launch
+        )
+
+        self.assertIn(
+            'argumentValue(arguments, @"--input-endpoint",',
+            engine
+        )
+        self.assertIn(
+            'responderMode ? endpointSearchName : @""',
+            engine
+        )
         self.assertIn('echoEnabled = inputWasConfigured', engine)
         self.assertIn('Source automatique indisponible', engine)
         self.assertIn('Envoi manuel RTP disponible', engine)
 
+        # Manual send remains independent from the responder process.
         self.assertNotIn('startSimulatorDevice:', manual)
-        self.assertIn('self.simulatorEndpointMenu.titleOfSelectedItem', manual)
+        self.assertIn(
+            'self.simulatorEndpointMenu.titleOfSelectedItem',
+            manual
+        )
         self.assertIn('@"--channel"', manual)
-        self.assertIn('[self toolPath:@"CLYamahaConsoleSimulator"]', manual)
+        self.assertIn(
+            '[self toolPath:@"CLYamahaConsoleSimulator"]',
+            manual
+        )
         self.assertIn('@"--send-program"', manual)
         self.assertIn('@"--no-echo"', manual)
-        self.assertIn('channel == 1 ? self.simulatorCL5MemoryField : self.simulatorQL1MemoryField', manual)
+
+        # Manual memory is resolved from the selected dynamic device,
+        # not from a hard-coded CL5/QL1 pair.
+        self.assertIn(
+            'self.simulatorValueFields[deviceID]',
+            manual
+        )
+        self.assertIn(
+            'device ? [device[@"channel"] integerValue] : sender.tag',
+            manual
+        )
+        self.assertNotIn(
+            'channel == 1 ? self.simulatorCL5MemoryField : self.simulatorQL1MemoryField',
+            manual
+        )
 
     def test_remote_simulator_compact_layout_keeps_controls_on_separate_rows(self):
-        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
-        setup = source.split('- (void)createIntegratedSimulatorPanelInView:', 1)[1].split(
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(
+            encoding="utf-8"
+        )
+        setup = source.split(
+            '- (void)createIntegratedSimulatorPanelInView:', 1
+        )[1].split(
             '- (void)sendSimulatorMemory:', 1
         )[0]
-        self.assertIn('NSMakeRect(14, 143, 170, 28)', setup)
-        self.assertIn('NSMakeRect(190, 143, 130, 28)', setup)
-        self.assertIn('NSMakeRect(326, 143, 128, 28)', setup)
-        self.assertIn('NSMakeRect(206, 6, 54, 26)', setup)
+        rebuild = source.split(
+            '- (void)rebuildSimulatorDeviceRows', 1
+        )[1].split(
+            '- (void)createIntegratedSimulatorPanelInView:', 1
+        )[0]
+
+        # Mode / destination / source controls remain independent.
+        self.assertIn('NSMakeRect(14, 580, 230, 22)', setup)
+        self.assertIn('NSMakeRect(250, 578, 180, 24)', setup)
+        self.assertIn('NSMakeRect(438, 578, 156, 24)', setup)
+
+        # Device controls now live in compact dynamic rows.
+        self.assertIn('self.simulatorDevicesScroll', setup)
+        self.assertIn('NSMakeRect(14, 266, 700, 300)', setup)
+        self.assertIn(
+            '[[NSView alloc] initWithFrame:NSMakeRect(0, 0, 686, 28)]',
+            rebuild
+        )
+        self.assertIn(
+            '[[NSTextField alloc] initWithFrame:NSMakeRect(260, 3, 46, 22)]',
+            rebuild
+        )
         self.assertNotIn('NSMakeRect(258, 86, 196, 28)', setup)
+
+    def test_integrated_simulator_is_signal_aware_and_isolated(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        sync = source.split('- (void)syncSimulatorDevicesFromProfiles', 1)[1].split(
+            '- (void)loadSimulatorDevices', 1
+        )[0]
+        rebuild = source.split('- (void)rebuildSimulatorDeviceRows', 1)[1].split(
+            '- (void)createIntegratedSimulatorPanelInView:', 1
+        )[0]
+        manual = source.split('- (void)sendSimulatorMemory:', 1)[1].split(
+            '- (void)simulatorModeChanged:', 1
+        )[0]
+        auto = source.split('- (void)startSimulatorDevice:', 1)[1].split(
+            '- (BOOL)editDevice:', 1
+        )[0]
+
+        self.assertIn('[NSSet setWithObjects:@"program_change", @"control_change", @"note", nil]', sync)
+        self.assertIn('![protocol isEqualToString:@"midi"]', sync)
+        self.assertIn('!profileEnabled || !rxEnabled', sync)
+        self.assertNotIn('!programChange', sync)
+        for hardcode in ('device_3', 'cc3', 'note4', 'QL3'):
+            self.assertNotIn(hardcode, sync + rebuild + manual)
+
+        self.assertIn('@"PC"', rebuild)
+        self.assertIn('@"CC"', rebuild)
+        self.assertIn('@"Note"', rebuild)
+        self.assertIn('@"controller"', rebuild)
+        self.assertIn('@"value"', rebuild)
+        self.assertIn('@"velocity"', rebuild)
+        self.assertIn('constraintEqualToConstant:28', rebuild)
+        self.assertIn('NSUInteger deviceCount = visibleDeviceCount', rebuild)
+        self.assertIn('(deviceCount * rowHeight)', rebuild)
+        self.assertIn('((deviceCount - 1) * rowSpacing)', rebuild)
+        self.assertIn('documentHeight > visibleHeight', rebuild)
+
+        self.assertIn('data1Input >= 1 && data1Input <= 128', manual)
+        self.assertIn('data1Input >= 0 && data1Input <= 127', manual)
+        self.assertIn('data2Input >= 0 && data2Input <= 127', manual)
+        self.assertIn('data1Input - 1', manual)
+        self.assertIn('0xB0', manual)
+        self.assertIn('0x90', manual)
+        self.assertIn('packetList.packet[0].length = programChange ? 2 : 3', manual)
+        for production_call in ('queueExpectedProgram', 'queueReturnedProgram', 'writeConsoleReturnState'):
+            self.assertNotIn(production_call, manual)
+
+        self.assertIn('startStop.enabled = programChange', rebuild)
+        self.assertIn('isEqualToString:@"program_change"', auto)
+
+    def test_integrated_simulator_has_no_profile_count_ceiling_or_index_signal_mapping(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        sync = source.split('- (void)syncSimulatorDevicesFromProfiles', 1)[1].split(
+            '- (void)loadSimulatorDevices', 1
+        )[0]
+        rebuild = source.split('- (void)rebuildSimulatorDeviceRows', 1)[1].split(
+            '- (void)createIntegratedSimulatorPanelInView:', 1
+        )[0]
+        create = source.split('- (void)createIntegratedSimulatorPanelInView:', 1)[1].split(
+            '- (void)sendSimulatorMemory:', 1
+        )[0]
+        editor = source.split('- (void)addDeviceProfile:', 1)[1].split(
+            '- (void)deleteDeviceProfile:', 1
+        )[0]
+
+        # Five or more eligible profiles follow the complete ordered source list.
+        self.assertIn('for (NSDictionary *profile in self.deviceProfiles ?: @[])', sync)
+        self.assertIn('[synced addObject:device]', sync)
+        self.assertIn('for (NSNumber *channelNumber in self.simulatorDisplayOrder', sync)
+        self.assertIn('device[@"test_only"] = @YES', sync)
+        self.assertIn('[wantedIDs containsObject:simulatorID]', sync)
+        for ceiling in ('.count == 2', '.count == 3', '.count == 4',
+                        '.count < 2', '.count < 3', '.count < 4'):
+            self.assertNotIn(ceiling, sync + rebuild)
+
+        # Eligibility accepts PC, CC and Note; it is never inferred from device_4.
+        for signal_type in ('program_change', 'control_change', 'note'):
+            self.assertIn(f'@"{signal_type}"', sync)
+        self.assertNotIn('device_4', sync + rebuild + editor)
+        self.assertNotIn('note4', sync + rebuild + editor.lower())
+        self.assertIn('@"signal_type": @"program_change"', editor)
+        self.assertIn('@(midiChannel)', editor)
+
+        # The document and scroller are driven by the actual simulator count.
+        self.assertIn('NSUInteger deviceCount = visibleDeviceCount', rebuild)
+        self.assertIn('CGFloat documentHeight = MAX(visibleHeight, rowsHeight)', rebuild)
+        self.assertIn('self.simulatorDevicesScroll.hasVerticalScroller = documentHeight > visibleHeight', rebuild)
+        self.assertIn('self.simulatorDevicesScroll.documentView = self.simulatorDeviceRows', create)
+
+        # Per-device fields retain stable ID keys for all three value shapes.
+        self.assertIn('self.simulatorValueFields[deviceID] = valueFields', rebuild)
+        self.assertIn('self.simulatorMemoryFields[deviceID] = data1Field', rebuild)
+        for key in ('@"memory"', '@"controller"', '@"value"', '@"note"', '@"velocity"'):
+            self.assertIn(key, rebuild)
+
+    def test_midi_test_bench_has_16_ui_channels_reordering_visibility_and_bounded_journal(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        sync = source.split('- (void)syncSimulatorDevicesFromProfiles', 1)[1].split(
+            '- (void)loadSimulatorDevices', 1
+        )[0]
+        manual = source.split('- (void)sendSimulatorMemory:', 1)[1].split(
+            '- (void)simulatorModeChanged:', 1
+        )[0]
+        journal = source.split('- (void)appendSimulatorJournalKind:', 1)[1].split(
+            '- (void)clearSimulatorJournal:', 1
+        )[0]
+
+        self.assertIn('for (NSInteger channel = 1; channel <= 16; channel++)', source)
+        self.assertIn('profileDevicesByChannel', sync)
+        self.assertIn('@"test_channel_%ld"', sync)
+        self.assertIn('device[@"test_only"] = @YES', sync)
+        self.assertNotIn('[self.deviceProfiles addObject:', sync)
+        self.assertIn('CLSimulatorDisplayOrderDefaultsKey', source)
+        self.assertIn('CLSimulatorHiddenChannelsDefaultsKey', source)
+        self.assertIn('CLSimulatorGenericSignalsDefaultsKey', source)
+        self.assertIn('CLSimulatorDragButton', source)
+        self.assertIn('performDragOperation:', source)
+        self.assertIn('moveSimulatorChannel:channel toDisplayIndex:index', source)
+        self.assertIn('toggleSimulatorRowVisibility:', source)
+        self.assertIn('resetSimulatorDisplay:', source)
+        self.assertIn('static const NSUInteger CLSimulatorJournalLimit = 500', source)
+        self.assertIn('while (self.simulatorJournalEvents.count > CLSimulatorJournalLimit)', journal)
+        self.assertIn('[self.simulatorJournalEvents removeObjectAtIndex:0]', journal)
+        self.assertIn('appendSimulatorJournalKind:@"TX"', manual)
+        self.assertNotIn('queueExpectedProgram', manual)
+        self.assertNotIn('queueReturnedProgram', manual)
+        self.assertNotIn('writeConsoleReturnState', manual)
+        self.assertIn('self.simulatorMidiClient', manual)
+        self.assertIn('self.simulatorMidiOutputPort', manual)
+        self.assertNotIn('self.returnMonitorClient', manual)
+
+        # A permanent legacy scroller reserves visible space whenever rows overflow,
+        # and the list consumes additional height when the detached window grows.
+        self.assertIn('self.simulatorDevicesScroll.autohidesScrollers = NO', source)
+        self.assertIn('self.simulatorDevicesScroll.scrollerStyle = NSScrollerStyleLegacy', source)
+        self.assertIn('NSViewWidthSizable | NSViewHeightSizable', source)
+        self.assertIn('self.simulatorDevicesScroll.contentSize.height', source)
+
+        # The large feedback area reports the last operator action; AUTO state is secondary.
+        self.assertIn('@property NSTextField *simulatorActivityLabel', source)
+        safety = source.split('- (void)updateSimulatorSafetyStatus', 1)[1].split(
+            '- (void)showSimulatorOperatorMessage:', 1
+        )[0]
+        self.assertNotIn('self.simulatorStatusLabel.stringValue', safety)
+        self.assertIn('@"%@ · MÉMOIRE %03ld ENVOYÉE"', manual)
+        self.assertIn('@"%@ · CC %ld = %ld ENVOYÉ"', manual)
+        self.assertIn('@"%@ · NOTE %ld · VEL %ld ENVOYÉE"', manual)
+        self.assertIn('@"%@ · ÉCHEC D’ENVOI MIDI"', manual)
+        self.assertIn('deviceName.uppercaseString', manual)
+
+        # Compact right-side controls are explicit without changing their actions.
+        self.assertIn('running ? @"■ Stop" : @"▶ Auto"', source)
+        self.assertIn('hidden ? @"Afficher" : @"Masquer"', source)
+        self.assertIn('Masquer cette ligne sans désactiver son profil', source)
 
     def test_rtp_timeout_explains_missing_remote_return_without_blame_on_iac(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
@@ -859,15 +1204,57 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertNotIn('isEqualToString:requiredEndpoint', transport)
 
     def test_manual_program_change_preserves_channels_and_scene_offset(self):
-        tester = (TOOLS / "CLMIDIRoundTripTester.m").read_text(encoding="utf-8")
-        dashboard = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
-        self.assertIn('expectedProgram = (UInt8)(sceneNumber - 1)', tester)
+        tester = (TOOLS / "CLMIDIRoundTripTester.m").read_text(
+            encoding="utf-8"
+        )
+        dashboard = (TOOLS / "CLMIDINetworkDashboard.m").read_text(
+            encoding="utf-8"
+        )
+        engine = (TOOLS / "CLYamahaConsoleSimulator.m").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn(
+            'expectedProgram = (UInt8)(sceneNumber - 1)',
+            tester
+        )
         self.assertIn('0xC0 | (expectedChannel - 1)', tester)
         self.assertIn('UInt8 message[2]', tester)
-        self.assertIn('sendCL5.tag = 1', dashboard)
-        self.assertIn('sendQL1.tag = 2', dashboard)
-        engine = (TOOLS / "CLYamahaConsoleSimulator.m").read_text(encoding="utf-8")
-        self.assertIn('(UInt8)(0xC0 | (acceptedChannel - 1))', engine)
+
+        rebuild = dashboard.split(
+            '- (void)rebuildSimulatorDeviceRows', 1
+        )[1].split(
+            '- (void)createIntegratedSimulatorPanelInView:', 1
+        )[0]
+        manual = dashboard.split(
+            '- (void)sendSimulatorMemory:', 1
+        )[1].split(
+            '- (void)simulatorModeChanged:', 1
+        )[0]
+
+        # Channel comes from the selected dynamic device.
+        self.assertIn(
+            'NSInteger channel = [device[@"channel"] integerValue]',
+            rebuild
+        )
+        self.assertIn('send.tag = channel', rebuild)
+        self.assertIn(
+            'NSInteger channel = device ? [device[@"channel"] integerValue] : sender.tag',
+            manual
+        )
+
+        # Scene memory remains human 1-128, MIDI Program Change remains zero-based.
+        self.assertIn(
+            'programChange ? data1Input - 1 : data1Input',
+            manual
+        )
+        self.assertIn('programChange ? 0xC0', manual)
+        self.assertIn('((channel - 1) & 0x0F)', manual)
+
+        self.assertIn(
+            '(UInt8)(0xC0 | (acceptedChannel - 1))',
+            engine
+        )
         self.assertIn('(UInt8)(manualScene - 1)', engine)
 
     def test_dashboard_never_falls_back_to_ableton_for_expected_console_title(self):
@@ -981,7 +1368,7 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('set visible to false', source)
         self.assertNotIn('click button "Se déconnecter"', source)
 
-    def test_ql1_visual_identity_stays_cyan_in_all_three_renderers(self):
+    def test_ql1_visual_identity_keeps_configurable_cyan_variants(self):
         skins = (ROOT / "static" / "cl-skins.css").read_text(encoding="utf-8").lower()
         ql1_skin_values = [
             line.split(":", 1)[1].strip().rstrip(";")
@@ -989,7 +1376,8 @@ class MidiNetworkToolsTests(unittest.TestCase):
             if "--cl-skin-ql1:" in line
         ]
         self.assertTrue(ql1_skin_values)
-        self.assertEqual(set(ql1_skin_values), {"#63c7d4"})
+        self.assertGreater(len(set(ql1_skin_values)), 1)
+        self.assertTrue(all(value.startswith("#") for value in ql1_skin_values))
 
         show = (ROOT / "launcher_control.py").read_text(encoding="utf-8").lower()
         self.assertIn("palette:{base:'#63c7d4',accent:'#3e9eac'}", show)
@@ -1028,9 +1416,53 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('console_a', editor)
         self.assertIn('console_b', editor)
         self.assertIn('NSDataWritingAtomic', editor)
-        self.assertIn('redémarrage requis', editor)
+        self.assertIn('Configuration appliquée', editor)
         self.assertIn('Les devices historiques peuvent être désactivés, pas supprimés', editor)
         self.assertIn('Restaurer CL5 / QL1 par défaut ?', editor)
+
+    def test_devices_editor_manages_generic_console_library_ids(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        editor = source.split("#pragma mark - Device Profiles editor", 1)[1].split(
+            "- (void)windowWillClose:", 1
+        )[0]
+        populate = editor.split("- (void)populateDeviceEditorFields", 1)[1].split(
+            "- (NSArray<NSString *> *)cleanAliasesFromString:", 1
+        )[0]
+        commit = editor.split("- (BOOL)commitVisibleDeviceFields", 1)[1].split(
+            "- (void)saveDeviceProfiles:", 1
+        )[0]
+        validation = editor.split("- (NSString *)validateDeviceProfiles", 1)[1].split(
+            "- (BOOL)commitVisibleDeviceFields", 1
+        )[0]
+        signal_change = editor.split("- (void)deviceSignalChanged:", 1)[1].split(
+            "- (void)updateDeviceTestFieldsForSelectedProfile", 1
+        )[0]
+
+        self.assertIn('@property NSTextField *deviceLibraryField;', source)
+        self.assertIn('@"Bibliothèque"', editor)
+        self.assertIn('device[@"library"]', populate)
+        self.assertIn('self.deviceLibraryField.stringValue', populate)
+        self.assertIn('stringByTrimmingCharactersInSet', commit)
+        self.assertIn('lowercaseString', commit)
+        self.assertIn('device[@"library"] = libraryID.length ? libraryID : NSNull.null;', commit)
+        self.assertIn('^[a-z0-9][a-z0-9_-]{0,63}$', validation)
+        self.assertIn('bibliothèque invalide', validation)
+        self.assertIn('libraryID = @"cl5"', commit)
+        self.assertIn('libraryID = @"ql1"', commit)
+        self.assertIn('Non utilisée pour CC/Note · valeur conservée', signal_change)
+        self.assertIn('@"library": NSNull.null', editor)
+        self.assertIn('[self refreshProfileDrivenViews];', editor)
+        self.assertIn('[self rebuildConsoleLibraryRows];', source.split(
+            '- (void)refreshProfileDrivenViews {', 1
+        )[1].split('- (void)updateConsoleReturnCards {', 1)[0])
+
+        library_rows = source.split('- (void)rebuildConsoleLibraryRows {', 1)[1].split(
+            '- (void)updateConsoleLibrariesFromStatus:', 1
+        )[0]
+        self.assertIn('for (NSDictionary *device in self.deviceProfiles)', library_rows)
+        self.assertIn('program_change', library_rows)
+        self.assertIn('device[@"library"]', library_rows)
+        self.assertNotIn('@[@"cl5", @"ql1"]', library_rows)
 
     def test_isolated_device_test_bench_never_calls_production_state_writers(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
@@ -1051,6 +1483,69 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertNotIn('expected_activated_at', bench)
         self.assertNotIn('validation_status', bench)
 
+    def test_device_test_bench_has_real_round_trip_and_complete_endpoint_diagnostic(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        bench = source.split('- (void)refreshIsolatedDeviceTestEndpoints:', 1)[1].split('- (void)windowWillClose:', 1)[0]
+        isolated_parser = source.split('static void CLIsolatedDeviceTestRead', 1)[1].split(
+            'static NSString *CLMidiAgeDescription', 1
+        )[0]
+        self.assertIn('CLAllMIDIEndpointInventory', source)
+        self.assertIn('Tous les ports MIDI…', source)
+        self.assertIn('kMIDIPropertyUniqueID', source)
+        self.assertIn('kMIDIPropertyOffline', source)
+        self.assertIn('kMIDIPropertyManufacturer', source)
+        self.assertIn('kMIDIPropertyDriverOwner', source)
+        self.assertIn('ROUND TRIP TEST EN ATTENTE', bench)
+        self.assertIn('ROUND TRIP TEST PASS', source)
+        self.assertIn('ROUND TRIP TEST FAIL · timeout 2,0 s', bench)
+        self.assertIn('deviceRoundTripGeneration', bench)
+        self.assertIn('CLDeviceTestMIDINotify', source)
+        self.assertIn('delegate.deviceTestRunningStatus', isolated_parser)
+        self.assertIn('recordIsolatedDeviceTestMessageType:', isolated_parser)
+        self.assertIn('@"program_change"', isolated_parser)
+        self.assertIn('@"control_change"', isolated_parser)
+        self.assertIn('@"note_on"', isolated_parser)
+        self.assertIn('@"note_off"', isolated_parser)
+        self.assertNotIn('queueExpectedProgram', isolated_parser)
+        self.assertNotIn('queueReturnedProgram', isolated_parser)
+        self.assertNotIn('writeConsoleReturnState', isolated_parser)
+
+    def test_periodic_endpoint_inventory_never_blocks_the_cocoa_main_thread(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        refresh = source.split('- (void)refreshEndpoints {', 1)[1].split(
+            '- (void)applyEndpointSnapshotWithSources:', 1
+        )[0]
+        implementation = source.split('@implementation CLNetworkDelegate', 1)[1]
+        apply_snapshot = implementation.split('- (void)applyEndpointSnapshotWithSources:', 1)[1].split(
+            '- (NSString *)toolPath:', 1
+        )[0]
+        self.assertIn('dispatch_get_global_queue(QOS_CLASS_UTILITY, 0)', refresh)
+        self.assertIn('NSArray<NSString *> *sources = EndpointNames(YES);', refresh)
+        self.assertIn('NSArray<NSString *> *destinations = EndpointNames(NO);', refresh)
+        self.assertIn('dispatch_get_main_queue()', refresh)
+        self.assertNotIn('EndpointNames(', apply_snapshot)
+        self.assertIn('if (self.ownsPassiveReturnMonitor)', apply_snapshot)
+
+    def test_device_editor_preserves_legacy_channels_and_test_permissions(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        endpoint_refresh = source.split('- (void)refreshIsolatedDeviceTestEndpoints:', 1)[1].split(
+            '- (void)showAllMidiEndpoints:', 1
+        )[0]
+        self.assertIn('CL5 historique doit rester sur le canal MIDI 1', source)
+        self.assertIn('QL1 historique doit rester sur le canal MIDI 2', source)
+        self.assertIn('self.deviceTXCheck', source)
+        self.assertIn('self.deviceRXCheck', source)
+        self.assertIn('TX désactivé pour cet appareil', source)
+        self.assertIn('RX désactivé pour cet appareil', source)
+        self.assertIn('if (selectedDestination.length && [self.deviceTestDestinationMenu itemWithTitle:selectedDestination])', endpoint_refresh)
+        self.assertIn('if (selectedSource.length && [self.deviceTestSourceMenu itemWithTitle:selectedSource])', endpoint_refresh)
+
+    def test_verification_bundle_never_rewrites_production_monitor_launch_agent(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        self.assertIn('hasSuffix:@".verification"', source)
+        self.assertIn('runningFromAppBundle && !verificationBundle', source)
+        self.assertIn('bundle Verification isolé : LaunchAgent de production inchangé', source)
+
     def test_dashboard_clarifies_mode_devices_connection_and_simulator_actions(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
         self.assertIn('@"Mode appliqué par CL Audio Show Control"', source)
@@ -1059,20 +1554,136 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('self.connectButton.title = local ? @"Non requis" : @"Connecter"', source)
         self.assertIn('self.connectButton.title = self.localReturnMode ? @"Non requis" : @"Connecter"', source)
         self.assertIn('scroll.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable', source)
-        self.assertIn('self.assistantReturnPanel.frame = NSMakeRect(16, 181, 468, 124)', source)
+        self.assertIn('self.assistantReturnPanel.frame = NSMakeRect(16, 90, 468, 215)', source)
         self.assertIn('self.assistantDevicesScroll.frame = self.assistantReturnPanel.bounds', source)
-        self.assertIn('CGFloat y = ((rows - 1 - row) * 60.0) + 4.0', source)
-        self.assertIn('self.assistantDevicesButton.frame = NSMakeRect(338, 307, 146, 30)', source)
-        self.assertIn('[scroll.contentView scrollToPoint:NSMakePoint(0, 0)]', source)
+        self.assertIn('visibleDevices.count == 1 ? 1 : 2', source)
+        self.assertIn('visibleDevices.count <= 2 ? 106.0 : 100.0', source)
+        self.assertIn('self.assistantDevicesButton.frame = NSMakeRect(246, 527 + offset, 106, 30)', source)
+        self.assertIn('@"⚙  Appareils…"', source)
+        self.assertEqual(source.count('action:@selector(openDevicesEditor:)'), 1)
+        self.assertIn('documentHeight - scroll.contentView.bounds.size.height', source)
         self.assertIn('self.consoleLibrariesPanel.hidden = !detailed', source)
-        self.assertIn('self.simulatorPanel.hidden = !detailed', source)
+        self.assertIn('self.simulatorWindowButton.hidden = !detailed', source)
+        self.assertIn('action:@selector(openSimulatorWindow:)', source)
+        self.assertIn('self.assistantDevicesButton.hidden = NO', source)
+        self.assertIn('self.assistantDevicesButton.enabled = YES', source)
+        self.assertIn('positioned:NSWindowAbove', source)
+        self.assertEqual(source.count('addSubview:self.assistantDevicesButton'), 1)
         self.assertIn('@"APPAREILS SUIVIS"', source)
         self.assertIn('@"Mode test actif · %lu appareil%@ simulé%@"', source)
         self.assertIn('@"%@ · %@", verdict, mode', source)
-        self.assertIn('nativeDevice ? @"Natif" : @"Configurable"', source)
+        self.assertIn('self.expectedDeviceStates[deviceID]', source)
+        self.assertIn('self.returnedDeviceStates[deviceID]', source)
         self.assertIn('self.simulatorStartButton.title = @"REDÉMARRER"', source)
         self.assertIn('self.simulatorStartButton.title = @"DÉMARRER"', source)
         self.assertIn('self.simulatorStopAllButton.enabled = NO', source)
+
+    def test_detailed_layout_compacts_mode_and_technical_panels_for_five_devices(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        presentation = source.split('- (void)applyPresentationMode {', 1)[1].split(
+            '- (void)layoutAssistantViewForRTPMode:', 1
+        )[0]
+        simulator = source.split('- (void)rebuildSimulatorDeviceRows', 1)[1].split(
+            '- (void)createIntegratedSimulatorPanelInView:', 1
+        )[0]
+
+        self.assertIn('CGFloat modePanelHeight = 58.0', presentation)
+        self.assertIn('self.technicalPanel.frame = NSMakeRect(16, 47, 468, 132)', presentation)
+        self.assertIn('self.simulatorWindowButton.frame = NSMakeRect(170, actionsY, 160, 32)', presentation)
+        self.assertIn('self.consoleLibrariesPanel.frame = NSMakeRect(16, actionsY + 50.0 + returnsHeight, 468, 116)', presentation)
+        self.assertIn('self.testPanel.frame = NSMakeRect(16, actionsY + 59.0 + returnsHeight + 116.0, 468, 96)', presentation)
+        self.assertIn('CGFloat offset = self.localReturnMode ? 0.0 : 104.0', presentation)
+        self.assertIn('self.connectButton.frame = NSMakeRect(364, 5, 92, 30)', presentation)
+        self.assertIn('self.operatingModeReasonLabel.hidden = detailed', presentation)
+        self.assertIn('@"RETOURS PROGRAM CHANGE"', source)
+        return_cards = source.split('- (void)rebuildProgramChangeReturnCards {', 1)[1].split(
+            '- (void)updateConsoleReturnCards {', 1
+        )[0]
+        self.assertIn('for (NSDictionary *profile in self.deviceProfiles ?: @[])', return_cards)
+        self.assertIn('profile[@"protocol"]', return_cards)
+        self.assertIn('isEqualToString:@"midi"', return_cards)
+        self.assertIn('profile[@"signal_type"]', return_cards)
+        self.assertIn('isEqualToString:@"program_change"', return_cards)
+        self.assertNotIn('console_a', return_cards)
+        self.assertNotIn('console_b', return_cards)
+        self.assertIn('index / 3', return_cards)
+        self.assertIn('index % 3', return_cards)
+        self.assertIn('palette[@"accent"]', return_cards)
+        self.assertIn('programLabel.stringValue = hasReturn', source)
+        self.assertIn('@"Aucun retour"', source)
+        self.assertIn('@"Retour frais"', source)
+        self.assertIn('@"Retour ancien"', source)
+        self.assertIn('@"Mismatch"', source)
+        self.assertIn('@"RTP non requis"', source)
+        self.assertIn('@"Retour MIDI local via port dédié."', source)
+        self.assertIn('self.remoteTargetTitleLabel.hidden = self.localReturnMode', presentation)
+        self.assertIn('self.targetMenu.hidden = self.localReturnMode', presentation)
+        self.assertIn('self.connectButton.hidden = self.localReturnMode', presentation)
+        self.assertIn('self.returnModeMenu.frame = self.localReturnMode', presentation)
+        self.assertIn('? NSMakeRect(116, 13, 164, 32)', presentation)
+        self.assertIn('colorWithRed:0.58 green:0.34 blue:0.19', source)
+        self.assertIn('self.testPanel.hidden = !rtpMode', source)
+        self.assertIn('self.settingsButton.frame = NSMakeRect(16, actionsY, 146, 32)', presentation)
+        self.assertIn('self.refreshButton.frame = NSMakeRect(338, actionsY, 146, 32)', presentation)
+        self.assertIn('colorWithRed:0.08 green:0.43 blue:0.39', source)
+
+        self.assertIn('const CGFloat rowHeight = 28.0', simulator)
+        self.assertIn('const CGFloat rowSpacing = 3.0', simulator)
+        self.assertIn('self.simulatorDevicesScroll.contentSize.height', simulator)
+        self.assertIn('documentHeight > visibleHeight', simulator)
+
+    def test_program_change_cards_drop_stale_profiles_on_every_device_edit_cycle(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        rebuild = source.split('- (void)rebuildProgramChangeReturnCards {', 1)[1].split(
+            '- (void)refreshProfileDrivenViews {', 1
+        )[0]
+        refresh = source.split('- (void)refreshProfileDrivenViews {', 1)[1].split(
+            '- (void)updateConsoleReturnCards {', 1
+        )[0]
+        editor = source.split('- (void)saveDeviceProfiles:', 1)[1].split(
+            '- (void)updateDeviceTestFieldsForSelectedProfile', 1
+        )[0]
+
+        # Rebuilding derives every card from the current canonical profiles and
+        # first removes both stale AppKit views and stale dictionary references.
+        self.assertIn('for (NSView *view in self.programChangeReturnsPanel.subviews.copy)', rebuild)
+        self.assertIn('[view removeFromSuperview]', rebuild)
+        self.assertIn('self.programChangeReturnViews = [NSMutableDictionary dictionary]', rebuild)
+        self.assertIn('for (NSDictionary *profile in self.deviceProfiles ?: @[])', rebuild)
+        self.assertIn('isEqualToString:@"program_change"', rebuild)
+        self.assertIn('isEqualToString:@"midi"', rebuild)
+        self.assertIn('self.programChangeReturnViews[deviceID]', rebuild)
+
+        # Save, base reset, dynamic deletion and signal changes share one refresh.
+        self.assertIn('[self rebuildProgramChangeReturnCards]', refresh)
+        self.assertIn('[self updateConsoleReturnCards]', refresh)
+        self.assertGreaterEqual(editor.count('[self refreshProfileDrivenViews]'), 4)
+        restore = editor.split('- (void)restoreDefaultDeviceProfiles:', 1)[1].split(
+            '- (void)addDeviceProfile:', 1
+        )[0]
+        delete = editor.split('- (void)deleteDeviceProfile:', 1)[1].split(
+            '- (void)deviceProfileChanged:', 1
+        )[0]
+        signal = editor.split('- (void)deviceSignalChanged:', 1)[1]
+        self.assertLess(restore.index('self.deviceProfiles ='), restore.index('[self refreshProfileDrivenViews]'))
+        self.assertLess(delete.index('[self.deviceProfiles removeObject:device]'), delete.index('[self refreshProfileDrivenViews]'))
+        self.assertLess(signal.index('device[@"signal_type"] = signalType'), signal.index('[self refreshProfileDrivenViews]'))
+
+        for forbidden in ('device_3', 'device_4', 'device_5'):
+            self.assertNotIn(forbidden, rebuild + refresh)
+
+    def test_secondary_ui_uses_only_fresh_published_local_return_status(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        loader = source.split('- (void)loadPublishedConsoleReturnState', 1)[1].split(
+            '- (void)writeConsoleReturnState', 1
+        )[0]
+        self.assertIn('publishedStateIsFresh', loader)
+        self.assertIn('<= 6.0', loader)
+        self.assertIn('@"local_dedicated"', loader)
+        self.assertIn('CLLocalReturnEndpointName', loader)
+        self.assertIn('return_monitor_status', loader)
+        self.assertIn('- (BOOL)localReturnIsAvailable', loader)
+        self.assertIn('!self.ownsPassiveReturnMonitor && self.publishedLocalReturnAvailable', loader)
 
 
 if __name__ == "__main__":

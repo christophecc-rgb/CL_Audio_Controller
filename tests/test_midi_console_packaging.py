@@ -95,7 +95,7 @@ class MidiConsolePackagingTests(unittest.TestCase):
         self.assertNotIn("CL MIDI RTP Simulator.app", source)
         dashboard = (ROOT / "tools" / "cl_midi_network" / "CLMIDINetworkDashboard.m").read_text()
         engine = (ROOT / "tools" / "cl_midi_network" / "CLYamahaConsoleSimulator.m").read_text()
-        self.assertIn("SIMULATEUR DE RETOUR CONSOLE", dashboard)
+        self.assertIn("BANC DE TEST MIDI · 16 CANAUX", dashboard)
         self.assertIn('@"Ableton local", @"Ableton distant"', dashboard)
         self.assertIn('@"--transport", transport', dashboard)
         self.assertIn("Gestionnaire IAC Bus 1 est exclusivement la source expected", dashboard)
