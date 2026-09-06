@@ -644,8 +644,35 @@ def load_console_scene_library(path: Path, expected_family: str) -> Dict[int, st
     return result
 
 
+def configured_console_library_ids() -> tuple[str, ...]:
+    """Bibliothèques déclarées par les profils MIDI Program Change.
+
+    Cette lecture est volontairement indépendante du routage de production :
+    elle permet au Network Manager de gérer une nouvelle bibliothèque dès que
+    devices.json l'a enregistrée, sans activer ce device dans la production.
+    """
+    configuration = load_device_configuration_result().configuration
+    result = []
+    seen = set()
+    for device in configuration.devices:
+        library_id = str(device.library or "").strip().lower()
+        if (
+            device.protocol != "midi"
+            or device.signal_type != "program_change"
+            or not library_id
+            or library_id in seen
+        ):
+            continue
+        seen.add(library_id)
+        result.append(library_id)
+    return tuple(result)
+
+
 def load_console_scene_libraries() -> Dict[str, Dict[int, str]]:
-    return {name: CONSOLE_LIBRARY_STORE.load(name).get("library", {}) for name in ("cl5", "ql1")}
+    return {
+        name: CONSOLE_LIBRARY_STORE.load(name).get("library", {})
+        for name in configured_console_library_ids()
+    }
 
 
 class ConsoleSceneResolution(dict):
@@ -1250,7 +1277,7 @@ def state_snapshot_locked() -> Dict[str, Any]:
     snapshot["console_title_offsets"] = dict(state.get("console_title_offsets") or {"cl5": 0, "ql1": 0})
     snapshot["console_title_offset_range"] = {"min": CONSOLE_TITLE_OFFSET_MIN, "max": CONSOLE_TITLE_OFFSET_MAX}
     snapshot["console_scene_library_status"] = {}
-    for name, metadata in CONSOLE_LIBRARY_STORE.status().items():
+    for name, metadata in CONSOLE_LIBRARY_STORE.status(configured_console_library_ids()).items():
         snapshot["console_scene_library_status"][name] = {
             key: value for key, value in metadata.items() if key != "library"
         }
@@ -3434,8 +3461,8 @@ def console_scene_title():
     """Lookup canonique pour les consommateurs natifs, sans parseur local."""
     console = str(request.args.get("console") or "").strip().lower()
     raw_value = request.args.get("midi_program")
-    if console not in ("cl5", "ql1"):
-        return jsonify({"ok": False, "error": "console invalide"}), 400
+    if console not in configured_console_library_ids():
+        return jsonify({"ok": False, "error": "bibliothèque invalide"}), 400
     try:
         midi_program = int(raw_value)
     except (TypeError, ValueError):
@@ -3468,8 +3495,8 @@ def import_console_library(console: str):
     """Import local uniquement; le client ne choisit jamais le chemin de destination."""
     if not _local_request():
         return jsonify(ok=False, message="Import réservé au Mac serveur"), 403
-    if console.lower() not in ("cl5", "ql1"):
-        return jsonify(ok=False, message="Console invalide"), 400
+    if console.lower() not in configured_console_library_ids():
+        return jsonify(ok=False, message="Bibliothèque invalide"), 400
     upload = request.files.get("file")
     if upload is None:
         return jsonify(ok=False, message="Fichier absent"), 400
@@ -3492,7 +3519,7 @@ def import_console_library(console: str):
 
 @app.route("/console-library/reveal/<console>", methods=["POST"])
 def reveal_console_library(console: str):
-    if not _local_request() or console.lower() not in ("cl5", "ql1"):
+    if not _local_request() or console.lower() not in configured_console_library_ids():
         return jsonify(ok=False, message="Action non autorisée"), 403
     target = CONSOLE_LIBRARY_STORE.canonical_path(console.lower())
     if not target.exists():

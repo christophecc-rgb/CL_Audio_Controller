@@ -16,6 +16,7 @@ from typing import Any, Dict, Iterable, Optional
 
 
 CONSOLES = ("cl5", "ql1")
+LIBRARY_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 MAX_FILE_SIZE = 16 * 1024 * 1024
 MAX_ENTRIES = 128
 SUPPORTED_EXTENSIONS = {".clf", ".csv", ".tsv", ".json", ".txt"}
@@ -56,10 +57,25 @@ class ParsedImport:
 
 
 def normalize_console(value: Any) -> str:
+    """Normalise un identifiant de bibliothèque sûr.
+
+    CL5/QL1 restent les identifiants historiques. Les profils peuvent toutefois
+    déclarer d'autres bibliothèques stables, par exemple ql3.
+    """
     key = str(value or "").strip().lower()
-    if key not in CONSOLES:
-        raise LibraryImportError("console inconnue (CL5 ou QL1 attendue)")
+    if not LIBRARY_ID_PATTERN.fullmatch(key):
+        raise LibraryImportError("identifiant de bibliothèque invalide")
     return key
+
+
+def console_clf_family(value: Any) -> Optional[str]:
+    """Retourne la famille Yamaha attendue pour un import CLF."""
+    key = normalize_console(value)
+    if key.startswith("cl"):
+        return "cl5"
+    if key.startswith("ql"):
+        return "ql1"
+    return None
 
 
 def _add(rows: Dict[str, Dict[int, str]], console: Any, memory: Any, title: Any,
@@ -76,13 +92,14 @@ def _add(rows: Dict[str, Dict[int, str]], console: Any, memory: Any, title: Any,
         raise LibraryImportError(f"titre vide pour {key.upper()} mémoire {number}")
     if len(clean_title) > 255 or any(ord(char) < 32 and char != "\t" for char in clean_title):
         raise LibraryImportError(f"titre invalide pour {key.upper()} mémoire {number}")
-    existing = rows[key].get(number)
+    library = rows.setdefault(key, {})
+    existing = library.get(number)
     if existing == clean_title:
         warnings.append(f"doublon exact ignoré: {key.upper()} mémoire {number}")
         return
     if existing is not None:
         raise LibraryImportError(f"doublon ambigu: {key.upper()} mémoire {number}")
-    rows[key][number] = clean_title
+    library[number] = clean_title
 
 
 def _decode_text(data: bytes) -> str:
@@ -136,6 +153,11 @@ def _parse_txt(text: str, assigned_console: Optional[str], rows: Dict[str, Dict[
         if not line.strip() or line.lstrip().startswith("#"):
             continue
         parts = line.split("\t")
+        normalized_header = tuple(part.strip().lower() for part in parts)
+        if normalized_header in (("memory", "title"), ("mémoire", "titre"),
+                                 ("console", "memory", "title"),
+                                 ("console", "mémoire", "titre")):
+            continue
         if len(parts) == 2 and assigned_console:
             console, memory, title = assigned_console, parts[0], parts[1]
         elif len(parts) == 3:
@@ -151,12 +173,17 @@ def parse_clf(data: bytes, assigned_console: Optional[str]) -> Dict[str, Dict[in
     header = data[0x10:0x30].decode("ascii", errors="ignore").strip("\x00 ").upper()
     detected = "cl5" if header.startswith("CL") else "ql1" if header.startswith("QL") else None
     console = normalize_console(assigned_console or detected)
-    if detected and assigned_console and detected != normalize_console(assigned_console):
+    expected_family = console_clf_family(console)
+    if assigned_console and expected_family is None:
+        raise LibraryImportError(
+            f"famille CLF inconnue pour la bibliothèque {console.upper()}"
+        )
+    if detected and expected_family and detected != expected_family:
         raise LibraryImportError(f"ce CLF semble destiné à {detected.upper()}")
     scene_count = int.from_bytes(data[0x0C:0x0E], "big")
     if not 1 <= scene_count <= 4096 or 0x38 + scene_count * 8 > len(data):
         raise LibraryImportError("structure CLF invalide")
-    result = {name: {} for name in CONSOLES}
+    result = {console: {}}
     for memory in range(1, min(scene_count, MAX_ENTRIES) + 1):
         entry = 0x30 + memory * 8
         if int.from_bytes(data[entry:entry + 2], "big") != memory:
@@ -187,7 +214,11 @@ def parse_import(data: bytes, source_name: str, assigned_console: Optional[str] 
     extension = Path(name).suffix.lower()
     if extension not in SUPPORTED_EXTENSIONS:
         raise LibraryImportError("format inconnu; utiliser CLF, CSV, TSV, JSON ou TXT")
-    rows = {console: {} for console in CONSOLES}
+    rows = (
+        {normalize_console(assigned_console): {}}
+        if assigned_console
+        else {console: {} for console in CONSOLES}
+    )
     warnings: list[str] = []
     if extension == ".clf":
         rows = parse_clf(data, assigned_console)
@@ -259,8 +290,8 @@ class ConsoleLibraryStore:
             raise
         return self.load(key)
 
-    def status(self) -> Dict[str, Dict[str, Any]]:
-        return {console: self.load(console) for console in CONSOLES}
+    def status(self, consoles: Iterable[str] = CONSOLES) -> Dict[str, Dict[str, Any]]:
+        return {normalize_console(console): self.load(console) for console in consoles}
 
     def migrate_legacy(self, desktop: Path) -> Dict[str, str]:
         result: Dict[str, str] = {}

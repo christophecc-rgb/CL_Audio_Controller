@@ -92,6 +92,26 @@ class DeviceProfileTests(unittest.TestCase):
         with self.assertRaises(NotImplementedError):
             DeviceTestBench(DeviceConfiguration(devices=(future,))).test_send(future.id, 1)
 
+    def test_enabled_cc_and_note_are_valid_configuration_but_not_production_supported(self):
+        for signal_type in ("control_change", "note"):
+            with self.subTest(signal_type=signal_type):
+                device = replace(
+                    self.ql1,
+                    id=f"device_{signal_type}",
+                    display_name=signal_type,
+                    enabled=True,
+                    legacy_key=None,
+                    midi_channel=3,
+                    signal_type=signal_type,
+                    ableton_track_aliases=(),
+                    library=None,
+                )
+                configuration = DeviceConfiguration(
+                    devices=self.configuration.devices + (device,)
+                )
+                validate_device_configuration(configuration)
+                self.assertFalse(device.supported)
+
     def test_legacy_cl5_ql1_configuration_is_softly_adapted(self):
         migrated = device_configuration_from_dict({
             "cl5": {"display_name": "CL5"},

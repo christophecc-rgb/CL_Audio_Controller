@@ -256,7 +256,13 @@ def validate_device_configuration(configuration: DeviceConfiguration) -> None:
         aliases = tuple(alias.strip() for alias in device.ableton_track_aliases if alias.strip())
         if device.enabled and device.signal_type == "program_change" and not aliases:
             raise DeviceConfigurationError(f"{device.id} : au moins un alias Ableton est requis")
-        if device.enabled and not device.supported:
+        # Control Change et Note sont configurables et testables dans le
+        # Network Manager, mais restent volontairement hors production Python.
+        configurable_test_signal = (
+            device.protocol == "midi"
+            and device.signal_type in {"control_change", "note"}
+        )
+        if device.enabled and not device.supported and not configurable_test_signal:
             raise DeviceConfigurationError(
                 f"{device.id} : {device.protocol}/{device.signal_type} n’est pas encore supporté"
             )

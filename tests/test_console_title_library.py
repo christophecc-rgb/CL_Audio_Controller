@@ -45,11 +45,44 @@ class ConsoleTitleLibraryTests(unittest.TestCase):
         parsed = self.parse("# memory tab title\n6\tGÉNÉRIQUE\n", "show.txt")
         self.assertEqual(parsed.libraries["cl5"], {6: "GÉNÉRIQUE"})
 
+    def test_export_style_txt_header_bom_and_windows_lines_are_reimportable(self):
+        parsed = self.parse(
+            "\ufeffmemory\ttitle\r\n1\tOUVERTURE\r\n64\tENTRACTE\r\n128\tFINAL\r\n",
+            "modele.txt",
+            "generic_library",
+        )
+        self.assertEqual(
+            parsed.libraries["generic_library"],
+            {1: "OUVERTURE", 64: "ENTRACTE", 128: "FINAL"},
+        )
+        self.assertEqual(
+            [entry["midi_program"] for entry in parsed.canonical_for("generic_library")["entries"]],
+            [0, 63, 127],
+        )
+
+    def test_txt_with_only_a_header_is_rejected(self):
+        with self.assertRaisesRegex(LibraryImportError, "aucune entrée valide"):
+            self.parse("memory\ttitle\r\n", "vide.txt", "generic_library")
+
     def test_existing_clf_parser_and_console_assignment(self):
         parsed = parse_import(self.clf(), "CL5.CLF", "cl5")
         self.assertEqual(parsed.libraries["cl5"], {1: "OUVERTURE"})
         with self.assertRaisesRegex(LibraryImportError, "destiné à CL5"):
             parse_import(self.clf(), "wrong.CLF", "ql1")
+
+    def test_dynamic_ql_library_id_keeps_ql_clf_family(self):
+        parsed = parse_import(self.clf(family=b"QL"), "QL3.CLF", "ql3")
+        self.assertEqual(parsed.libraries["ql3"], {1: "OUVERTURE"})
+        canonical = parsed.canonical_for("ql3")
+        self.assertEqual(canonical["console"], "QL3")
+
+    def test_dynamic_text_library_id_is_supported(self):
+        parsed = self.parse("memory,title\n1,SCENE QL3\n", "ql3.csv", "ql3")
+        self.assertEqual(parsed.libraries["ql3"], {1: "SCENE QL3"})
+
+    def test_clf_family_mismatch_still_rejected_for_dynamic_id(self):
+        with self.assertRaisesRegex(LibraryImportError, "destiné à CL5"):
+            parse_import(self.clf(family=b"CL"), "wrong.CLF", "ql3")
 
     def test_all_text_formats_are_canonically_equivalent(self):
         values = [
