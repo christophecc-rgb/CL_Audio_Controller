@@ -243,6 +243,31 @@ class GenericDeviceProductionStateTests(unittest.TestCase):
                 ["console_a", "console_b"],
             )
 
+    def test_control_change_and_note_are_published_but_not_routed_in_production(self):
+        base = self.configuration.by_id("device_3")
+        control = replace(
+            base, id="lighting_control", midi_channel=4,
+            signal_type="control_change", ableton_track_aliases=(), library=None,
+        )
+        note = replace(
+            base, id="sampler_notes", midi_channel=5,
+            signal_type="note", ableton_track_aliases=(), library=None,
+        )
+        configuration = replace(
+            self.configuration, devices=self.configuration.devices + (control, note),
+        )
+        with mock.patch.object(self.app, "DEVICE_CONFIGURATION", configuration):
+            routed = [device.id for device in self.app.production_device_profiles()]
+            with self.app.lock:
+                snapshot = self.app.state_snapshot_locked()
+
+        self.assertEqual(routed, ["console_a", "console_b", "device_3"])
+        devices = {device["id"]: device for device in snapshot["devices"]}
+        self.assertFalse(devices["lighting_control"]["production_supported"])
+        self.assertFalse(devices["sampler_notes"]["production_supported"])
+        self.assertIsNone(devices["lighting_control"]["library"])
+        self.assertIsNone(devices["sampler_notes"]["library"])
+
 
 if __name__ == "__main__":
     unittest.main()

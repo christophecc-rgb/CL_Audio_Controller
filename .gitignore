@@ -51,6 +51,8 @@ Releases/
 pip-wheel-metadata/
 
 # Journaux et fichiers temporaires
+show_cues_audio/*
+!show_cues_audio/.gitkeep
 *.log
 *.tmp
 *.temp

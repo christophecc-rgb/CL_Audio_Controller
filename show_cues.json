@@ -1,0 +1,186 @@
+{
+  "version": 1,
+  "cues": [
+    {
+      "id": "cue_0001",
+      "mode": "timed",
+      "text": "Jade entre jardin — HF 3",
+      "posts": [
+        "FOH",
+        "PLATEAU"
+      ],
+      "status": "official",
+      "timecode": "00:00:05:00"
+    },
+    {
+      "id": "cue_0002",
+      "mode": "timed",
+      "text": "Préparer micro Roxane — HF 5",
+      "posts": [
+        "FOH",
+        "RETOURS"
+      ],
+      "status": "official",
+      "timecode": "00:00:10:00"
+    },
+    {
+      "id": "cue_0003",
+      "mode": "timed",
+      "text": "Ambiance scène",
+      "posts": [
+        "LUMIERE"
+      ],
+      "status": "official",
+      "timecode": "00:00:15:00"
+    },
+    {
+      "id": "cue_0004",
+      "mode": "timed",
+      "text": "Départ playback après noir",
+      "posts": [
+        "FOH",
+        "RETOURS"
+      ],
+      "status": "official",
+      "timecode": "00:00:20:00"
+    },
+    {
+      "id": "cue_0005",
+      "mode": "timed",
+      "text": "TOP changement costume",
+      "posts": [
+        "PLATEAU"
+      ],
+      "status": "official",
+      "timecode": "00:00:25:00"
+    },
+    {
+      "id": "cue_0006",
+      "mode": "timed",
+      "text": "Lumière scène 50 %",
+      "posts": [
+        "LUMIERE"
+      ],
+      "status": "official",
+      "timecode": "00:00:30:00"
+    },
+    {
+      "id": "cue_0007",
+      "mode": "manual",
+      "text": "Préparer Jade côté jardin",
+      "posts": [
+        "PLATEAU"
+      ],
+      "status": "official",
+      "section": "PARTIE PARLÉE",
+      "order": 1
+    },
+    {
+      "id": "cue_0008",
+      "mode": "library",
+      "text": "Reprise après incident",
+      "posts": [
+        "FOH",
+        "RETOURS",
+        "PLATEAU",
+        "LUMIERE"
+      ],
+      "status": "official"
+    },
+    {
+      "id": "cue_729bbb1290c3",
+      "mode": "timed",
+      "text": "Mettre de l'echo",
+      "posts": [
+        "FOH"
+      ],
+      "status": "draft",
+      "audio": {
+        "filename": "cue_729bbb1290c3.mp4",
+        "mime_type": "audio/mp4"
+      },
+      "timecode": "18:01:50:12"
+    },
+    {
+      "id": "cue_88dc1946aed2",
+      "mode": "timed",
+      "text": "Toxic",
+      "posts": [
+        "FOH",
+        "RETOURS"
+      ],
+      "status": "draft",
+      "timecode": "18:03:03:09"
+    },
+    {
+      "id": "cue_782f9ca73705",
+      "mode": "library",
+      "text": "Apporter micro Meneuse",
+      "posts": [
+        "FOH"
+      ],
+      "status": "draft"
+    },
+    {
+      "id": "cue_6a1b12a0a161",
+      "mode": "manual",
+      "text": "Envoi JiNGLE",
+      "posts": [
+        "FOH"
+      ],
+      "status": "draft",
+      "section": "TALK Meneuse Directrice",
+      "order": 1
+    },
+    {
+      "id": "cue_79c0fa565400",
+      "mode": "manual",
+      "text": "Quand la directrice parle",
+      "posts": [
+        "FOH"
+      ],
+      "status": "draft",
+      "section": "PARTIE PARLÉE",
+      "order": 2
+    },
+    {
+      "id": "cue_bb2ed5bf8b64",
+      "mode": "manual",
+      "text": "Eteind micro cravate",
+      "posts": [
+        "FOH",
+        "RETOURS"
+      ],
+      "status": "draft",
+      "section": "PARTIE PARLÉE",
+      "order": 3
+    },
+    {
+      "id": "cue_42cbe7643f73",
+      "mode": "manual",
+      "text": "Recup micro",
+      "posts": [
+        "PLATEAU"
+      ],
+      "status": "draft",
+      "section": "PARTIE PARLÉE",
+      "order": 4
+    },
+    {
+      "id": "cue_bc6b5ca00c33",
+      "mode": "manual",
+      "text": "REC MAC",
+      "posts": [
+        "FOH",
+        "RETOURS"
+      ],
+      "status": "draft",
+      "audio": {
+        "filename": "cue_bc6b5ca00c33.mp4",
+        "mime_type": "audio/mp4"
+      },
+      "section": "CAPTURES AUDIO",
+      "order": 1
+    }
+  ]
+}

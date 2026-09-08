@@ -15,6 +15,8 @@ from pathlib import Path
 from typing import Any, Mapping, Optional
 
 
+CONFIGURABLE_PROTOCOLS = frozenset({"midi"})
+CONFIGURABLE_SIGNAL_TYPES = frozenset({"program_change", "control_change", "note"})
 SUPPORTED_PROTOCOLS = frozenset({"midi"})
 FUTURE_PROTOCOLS = frozenset({"osc"})
 SUPPORTED_SIGNAL_TYPES = frozenset({"program_change"})
@@ -67,8 +69,20 @@ class DeviceProfile:
     rx_enabled: bool = True
 
     @property
-    def supported(self) -> bool:
+    def configurable(self) -> bool:
+        return (
+            self.protocol in CONFIGURABLE_PROTOCOLS
+            and self.signal_type in CONFIGURABLE_SIGNAL_TYPES
+        )
+
+    @property
+    def production_supported(self) -> bool:
         return self.protocol in SUPPORTED_PROTOCOLS and self.signal_type in SUPPORTED_SIGNAL_TYPES
+
+    @property
+    def supported(self) -> bool:
+        """Alias historique du support par le routage Python de production."""
+        return self.production_supported
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -86,6 +100,8 @@ class DeviceProfile:
             "legacy_key": self.legacy_key,
             "tx": {"enabled": self.tx_enabled},
             "rx": {"enabled": self.rx_enabled},
+            "configurable": self.configurable,
+            "production_supported": self.production_supported,
             "supported": self.supported,
         }
 
@@ -256,13 +272,7 @@ def validate_device_configuration(configuration: DeviceConfiguration) -> None:
         aliases = tuple(alias.strip() for alias in device.ableton_track_aliases if alias.strip())
         if device.enabled and device.signal_type == "program_change" and not aliases:
             raise DeviceConfigurationError(f"{device.id} : au moins un alias Ableton est requis")
-        # Control Change et Note sont configurables et testables dans le
-        # Network Manager, mais restent volontairement hors production Python.
-        configurable_test_signal = (
-            device.protocol == "midi"
-            and device.signal_type in {"control_change", "note"}
-        )
-        if device.enabled and not device.supported and not configurable_test_signal:
+        if device.enabled and not device.configurable:
             raise DeviceConfigurationError(
                 f"{device.id} : {device.protocol}/{device.signal_type} n’est pas encore supporté"
             )
@@ -273,7 +283,7 @@ def validate_device_configuration(configuration: DeviceConfiguration) -> None:
                     f"{device.id} : collision de canal MIDI avec {previous}"
                 )
             enabled_midi_channels[device.midi_channel] = device.id
-        if device.enabled and device.supported:
+        if device.enabled and device.production_supported:
             for alias in (device.id, device.legacy_key, *aliases):
                 normalized_alias = " ".join(str(alias or "").casefold().split())
                 if not normalized_alias:
@@ -362,10 +372,7 @@ def device_ui_snapshots(configuration: DeviceConfiguration,
     historical = midi_console or {}
     snapshots: list[dict[str, Any]] = []
     for device in configuration.devices:
-        production_supported = (
-            device.id in {"console_a", "console_b"}
-            and device.legacy_key in {"cl5", "ql1"}
-        )
+        production_supported = device.production_supported
         production_state = (
             dict(historical.get(device.legacy_key) or {})
             if production_supported else {}

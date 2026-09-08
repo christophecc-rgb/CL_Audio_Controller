@@ -14,6 +14,7 @@
 
 import json
 import hmac
+import ipaddress
 import re
 import socket
 import threading
@@ -22,6 +23,8 @@ import time
 import uuid
 import secrets
 import subprocess
+import zipfile
+from xml.etree import ElementTree as ET
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Tuple
 from pathlib import Path
@@ -31,7 +34,7 @@ from build_identity import BUILD_ID, IDENTITY_PROTOCOL_VERSION, SERVICE_NAME
 from ableton_targets import DEFAULT_CONFIG_PATH, load_target
 from server_ownership import OwnershipRecordError, write_record
 from console_title_library import ConsoleLibraryStore, LibraryImportError, MAX_FILE_SIZE, parse_import
-from device_profiles import DeviceProfile, load_device_configuration_result
+from device_profiles import DeviceProfile, device_ui_snapshots, load_device_configuration_result
 
 multiprocessing.freeze_support()
 
@@ -45,6 +48,19 @@ import socket
 from pythonosc import udp_client
 from osc_transport import OSCTransport
 from ltc_receiver import LTCReceiver, LTC_BIND_HOST, LTC_PORT
+from show_cues import (
+    SHOW_POSTS, SHOW_SECTIONS, activate_show_cue_session, active_session_paths, create_show_cue,
+    create_show_cue_session, delete_show_cue, delete_show_cue_session,
+    duplicate_show_cue_session, initialize_show_cue_sessions, load_show_document,
+    persistent_show_cue_directory, rename_show_cue_session, save_show_document,
+    select_show_cues, select_timed_cues, show_cues_for_conduite, show_cues_for_post,
+    timecode_to_units, update_show_cue,
+)
+from showcue_builder import (
+    BUILDER_SECTIONS, BUILDER_TYPES, ORIGINS, builder_import_values, export_csv, export_xlsx,
+    import_csv, import_xlsx, load_builder_document, normalize_builder_document, save_builder_document,
+    resolve_builder_cue, resolved_builder_document, validate_builder_document,
+)
 
 SERVER_STARTED_MONOTONIC = time.monotonic()
 SERVER_STARTED_AT = time.time()
@@ -114,6 +130,38 @@ print(json.dumps({
 # source selon le profil Ableton actif (loopback en Local, cible en Distant).
 LTC_UDP_IP = LTC_BIND_HOST
 LTC_UDP_PORT = LTC_PORT
+SHOW_CUES_HISTORICAL_DIRECTORY = Path(__file__).resolve().parent
+SHOW_CUES_DEFAULT_DATA_DIRECTORY = persistent_show_cue_directory()
+SHOW_CUES_DATA_DIRECTORY = SHOW_CUES_DEFAULT_DATA_DIRECTORY
+SHOW_CUES_PATH = SHOW_CUES_DATA_DIRECTORY / "show_cues.json"
+SHOW_CUES_AUDIO_PATH = SHOW_CUES_DATA_DIRECTORY / "show_cues_audio"
+SHOW_CUES_LOCK = threading.RLock()
+SHOW_CALLS_LOCK = threading.RLock()
+SHOW_CALLS: Dict[str, Dict[str, Any]] = {}
+SHOW_BUILDER_IMPORTS: Dict[str, Dict[str, Any]] = {}
+SHOW_CALL_TIMEOUT_SECONDS = 60.0
+SHOW_CALL_ACK_SECONDS = 5.0
+SHOW_CUE_AUDIO_MAX_BYTES = 50 * 1024 * 1024
+SHOW_CUE_LTC_FRESH_SECONDS = 2.0  # Même fenêtre que LTCReceiver.connection_timeout.
+SHOW_CUE_AUDIO_EXTENSIONS = {
+    "audio/webm": "webm", "audio/ogg": "ogg", "audio/mp4": "mp4",
+    "audio/x-m4a": "m4a", "audio/wav": "wav", "audio/x-wav": "wav",
+}
+
+
+def ensure_show_cue_storage():
+    """Initialise la bibliothèque et renvoie la session active unique du serveur."""
+    historical = ((SHOW_CUES_HISTORICAL_DIRECTORY,)
+                  if SHOW_CUES_DATA_DIRECTORY == SHOW_CUES_DEFAULT_DATA_DIRECTORY else ())
+    registry = initialize_show_cue_sessions(SHOW_CUES_DATA_DIRECTORY, historical)
+    cue_path, audio_path = active_session_paths(SHOW_CUES_DATA_DIRECTORY, registry)
+    return registry, cue_path, audio_path
+
+
+def require_active_show_session(values, registry):
+    session_id = str((values or {}).get("session_id") or "").strip()
+    if session_id != registry["active_session_id"]:
+        raise RuntimeError("La session active a changé. Rechargez puis recommencez.")
 
 # Max for Live Crossfader Bridge
 M4L_IP = "127.0.0.1"
@@ -495,6 +543,14 @@ def parse_scene_duration_seconds(name: Any) -> Optional[float]:
     return float(int(match.group(1)) * 60 + int(match.group(2)))
 
 
+def showcue_display_title(value: Any) -> str:
+    """Titre court réservé à ShowCue, sans modifier le titre Ableton brut."""
+    title = str(value or "").strip()
+    if not title or title == "—":
+        return "—"
+    return re.split(r"\s*[;|]\s*", title, maxsplit=1)[0].strip() or "—"
+
+
 PGM_CHANGE_CLIP_RE = re.compile(
     r"^\s*(?:PGM\s+CHANGE|CC(?:\s+CHANGE|\s*[_-]))\s*(\d{1,3})\s*$",
     re.IGNORECASE,
@@ -511,7 +567,7 @@ def production_device_profiles():
     return tuple(
         device for device in DEVICE_CONFIGURATION.devices
         if device.enabled and device.protocol == "midi"
-        and device.signal_type == "program_change" and device.supported
+        and device.signal_type == "program_change" and device.production_supported
     )
 
 
@@ -1021,6 +1077,7 @@ state: Dict[str, Any] = {
     "last_fired_scene_name": "—",
     "is_playing": False,
     "scene_duration_seconds": None,
+    "scene_duration_is_clip": False,
     "remaining_seconds": None,
     "playback_deadline": None,
     "connected": False,
@@ -1181,6 +1238,14 @@ def normalize_transport_state_locked():
 
     if not is_playing and play_mode == "arrangement" and not bool(state.get("is_paused", False)):
         state["play_mode"] = "stopped"
+
+
+def refresh_playback_remaining_locked() -> None:
+    """Actualise le compte à rebours serveur partagé, sans interrogation Ableton."""
+    deadline = state.get("playback_deadline")
+    if (deadline is not None and bool(state.get("is_playing", False))
+            and not bool(state.get("is_paused", False))):
+        state["remaining_seconds"] = max(0.0, float(deadline) - time.time())
 
 lock = threading.RLock()
 scene_transaction_lock = threading.Lock()
@@ -1600,7 +1665,13 @@ def state_snapshot_locked() -> Dict[str, Any]:
     )
     state["device_states"] = device_states
     snapshot["device_states"] = device_states
-    snapshot["devices"] = list(device_states.values())
+    published_devices = {
+        device["id"]: device for device in device_ui_snapshots(DEVICE_CONFIGURATION)
+    }
+    published_devices.update(device_states)
+    snapshot["devices"] = [
+        published_devices[device.id] for device in DEVICE_CONFIGURATION.devices
+    ]
     if not snapshot.get("set_ready", False):
         snapshot.update({
             "scenes": {},
@@ -1662,6 +1733,7 @@ def reset_live_set_state_locked(set_id: Optional[str], reason: str) -> int:
         "is_playing": False,
         "is_paused": False,
         "scene_duration_seconds": None,
+        "scene_duration_is_clip": False,
         "remaining_seconds": None,
         "playback_deadline": None,
         "arrangement_time": 0.0,
@@ -3147,6 +3219,7 @@ def scan_playing_scene_from_tracks():
                 state["has_show_started"] = True
                 state["play_mode"] = "session"
                 state["scene_duration_seconds"] = duration_seconds
+                state["scene_duration_is_clip"] = False
                 state["remaining_seconds"] = duration_seconds
                 state["playback_deadline"] = (
                     detected_at + duration_seconds
@@ -3416,6 +3489,679 @@ def arrangement_page():
     return render_template("arrangement.html")
 
 
+@app.route("/show-info")
+def show_info_page():
+    return render_template("show_info.html", posts=SHOW_POSTS, sections=SHOW_SECTIONS,
+                           builder_local=request_is_loopback())
+
+
+def request_is_loopback():
+    try:
+        return ipaddress.ip_address(str(request.remote_addr or "")).is_loopback
+    except ValueError:
+        return False
+
+
+@app.before_request
+def protect_local_builder_routes():
+    """Protège le Builder complet selon l'adresse réelle de la connexion."""
+    if not request.path.startswith("/show-info/builder"):
+        return None
+    if not request_is_loopback():
+        return jsonify({"ok": False, "message": "CL ShowCue Builder est disponible uniquement en local"}), 403
+    return None
+
+
+@app.route("/show-info/builder")
+def show_info_builder_page():
+    return render_template("showcue_builder.html", types=BUILDER_TYPES,
+                           sections=BUILDER_SECTIONS, origins=ORIGINS)
+
+
+def active_builder_path(values=None):
+    registry, cue_path, _ = ensure_show_cue_storage()
+    if values is not None:
+        require_active_show_session(values, registry)
+    return registry, cue_path.parent / "showcue_builder.json"
+
+
+def showcue_sections(cues, builder=None):
+    values = list(SHOW_SECTIONS)
+    values.extend(cue.get("section", "") for cue in cues if cue.get("mode") == "manual")
+    values.extend(cue.get("section", "") for cue in (builder or {}).get("cues", []))
+    unique = []
+    for value in values:
+        value = str(value or "").strip()
+        if value and value.casefold() not in {item.casefold() for item in unique}:
+            unique.append(value)
+    return unique
+
+
+def builder_distribution_snapshot(document):
+    """Vue réseau minimale issue du document Builder de la session active."""
+    roles = []
+    for role in sorted({row["role"] for row in document["distribution"] if row["role"]},
+                       key=str.casefold):
+        alternatives = [dict(row) for row in document["distribution"] if row["role"] == role]
+        active = [row for row in alternatives if row["active"]]
+        roles.append({"role": role, "active": active[0] if len(active) == 1 else None,
+                      "alternatives": alternatives,
+                      "status": "active" if len(active) == 1 else "multiple" if active else "missing"})
+    return {"revision": document["revision"], "roles": roles}
+
+
+def resolve_showcue_builder_metadata(cues, distribution):
+    resolved_cues = []
+    for cue in cues:
+        metadata = cue.get("builder") if isinstance(cue.get("builder"), dict) else None
+        if not metadata or not metadata.get("role"):
+            resolved_cues.append(cue)
+            continue
+        builder_cue = {"role": metadata.get("role"), "text": cue.get("text", ""),
+                       "artist": metadata.get("artist_override", ""),
+                       "microphone": metadata.get("microphone_override", ""),
+                       "iem": metadata.get("iem_override", ""),
+                       "equipment": metadata.get("equipment_override", "")}
+        resolved_cues.append({**cue, "resolved": resolve_builder_cue(builder_cue, distribution)})
+    return resolved_cues
+
+
+@app.route("/show-info/distribution/active", methods=["PUT"])
+def show_info_set_active_artist():
+    values = request.get_json(silent=True) or {}
+    try:
+        if request_show_post(values, "post") != "PLATEAU":
+            return jsonify({"ok": False, "message": "Modification réservée au poste PLATEAU"}), 403
+        role = str(values.get("role") or "").strip()
+        artist = str(values.get("artist") or "").strip()
+        if not role:
+            raise ValueError("Rôle manquant")
+        with SHOW_CUES_LOCK:
+            registry, path = active_builder_path(values)
+            document = load_builder_document(path)
+            if int(values.get("revision", -1)) != document["revision"]:
+                raise RuntimeError("Distribution modifiée. Rechargement nécessaire.")
+            matching = [row for row in document["distribution"] if row["role"] == role]
+            if not matching or (artist and not any(row["artist"] == artist for row in matching)):
+                raise ValueError("Affectation inconnue")
+            if artist and sum(row["artist"] == artist for row in matching) != 1:
+                raise ValueError("DOUBLON À FUSIONNER dans le Builder")
+            for row in matching:
+                row["active"] = bool(artist and row["artist"] == artist)
+            document["revision"] += 1
+            document = save_builder_document(path, document)
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 409
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+    return jsonify({"ok": True, "active_session_id": registry["active_session_id"],
+                    "distribution": builder_distribution_snapshot(document)})
+
+
+@app.route("/show-info/builder/document")
+def show_info_builder_document():
+    try:
+        with SHOW_CUES_LOCK:
+            registry, path = active_builder_path()
+            document = load_builder_document(path)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 500
+    return jsonify({"ok": True, "session_id": registry["active_session_id"],
+                    "document": resolved_builder_document(document),
+                    "sections": showcue_sections([], document),
+                    "validation": validate_builder_document(document)})
+
+
+@app.route("/show-info/builder/document", methods=["PUT"])
+def show_info_save_builder_document():
+    values = request.get_json(silent=True) or {}
+    try:
+        with SHOW_CUES_LOCK:
+            registry, path = active_builder_path(values)
+            current = load_builder_document(path)
+            incoming = values.get("document") or {}
+            if int(incoming.get("revision", 0)) != current["revision"]:
+                raise RuntimeError("Document Builder modifié. Rechargement nécessaire.")
+            candidate = normalize_builder_document(
+                {**incoming, "revision": current["revision"] + 1})
+            conflicts = validate_builder_document(candidate)["roles_with_multiple_active_artists"]
+            if conflicts:
+                raise ValueError("un seul artiste actif par rôle : " + ", ".join(conflicts))
+            document = save_builder_document(path, candidate)
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 409
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+    return jsonify({"ok": True, "session_id": registry["active_session_id"],
+                    "document": resolved_builder_document(document),
+                    "sections": showcue_sections([], document),
+                    "validation": validate_builder_document(document)})
+
+
+@app.route("/show-info/builder/import", methods=["POST"])
+def show_info_preview_builder_import():
+    upload = request.files.get("file")
+    if upload is None:
+        return jsonify({"ok": False, "message": "Fichier manquant"}), 400
+    payload = upload.read()
+    if len(payload) > 10 * 1024 * 1024:
+        return jsonify({"ok": False, "message": "Fichier trop volumineux"}), 413
+    try:
+        if str(upload.filename or "").lower().endswith(".xlsx"):
+            document, unknown = import_xlsx(payload)
+        elif str(upload.filename or "").lower().endswith(".csv"):
+            document, unknown = import_csv(payload)
+        else:
+            raise ValueError("Format attendu : XLSX ou CSV")
+    except (ValueError, UnicodeError, zipfile.BadZipFile, KeyError, ET.ParseError) as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+    with SHOW_CUES_LOCK:
+        _, current_path = active_builder_path()
+        document["revision"] = load_builder_document(current_path)["revision"]
+    return jsonify({"ok": True, "document": resolved_builder_document(document), "unknown_columns": unknown,
+                    "validation": validate_builder_document(document), "saved": False})
+
+
+@app.route("/show-info/builder/export.<format_name>")
+def show_info_export_builder(format_name):
+    try:
+        with SHOW_CUES_LOCK:
+            _, path = active_builder_path()
+            document = load_builder_document(path)
+        if format_name == "xlsx":
+            payload, mime = export_xlsx(document), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        elif format_name == "csv":
+            payload, mime = export_csv(document), "text/csv; charset=utf-8"
+        else:
+            return jsonify({"ok": False, "message": "Format inconnu"}), 404
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 500
+    response = app.response_class(payload, mimetype=mime)
+    response.headers["Content-Disposition"] = f'attachment; filename="ShowCue_Builder.{format_name}"'
+    return response
+
+
+def builder_collision_keys(values):
+    return {(item["mode"], item.get("timecode", ""), item.get("section", ""),
+             item["text"].casefold(), tuple(item["posts"])) for item in values}
+
+
+@app.route("/show-info/builder/showcue-preview", methods=["POST"])
+def show_info_builder_showcue_preview():
+    values = request.get_json(silent=True) or {}
+    try:
+        with SHOW_CUES_LOCK:
+            registry, builder_path = active_builder_path(values)
+            builder = load_builder_document(builder_path)
+            mapped = builder_import_values(builder)
+            _, cue_path, _ = ensure_show_cue_storage()
+            official = load_show_document(cue_path)
+            existing_keys = builder_collision_keys(official["cues"])
+            collisions = [item["builder"]["builder_id"] for item in mapped
+                          if next(iter(builder_collision_keys([item]))) in existing_keys]
+            for old_token, old_preview in list(SHOW_BUILDER_IMPORTS.items()):
+                if time.time() - old_preview["created_at"] > 900:
+                    SHOW_BUILDER_IMPORTS.pop(old_token, None)
+            token = secrets.token_urlsafe(24)
+            serialized = json.dumps(builder, ensure_ascii=False, sort_keys=True)
+            SHOW_BUILDER_IMPORTS[token] = {"session_id": registry["active_session_id"],
+                                           "builder": serialized, "created_at": time.time()}
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 409
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+    validation = validate_builder_document(builder)
+    return jsonify({"ok": True, "token": token, "summary": validation,
+                    "collisions": collisions, "ready": validation["ready"] and not collisions,
+                    "will_add": len(mapped), "will_replace": 0, "information_lost": []})
+
+
+@app.route("/show-info/builder/showcue-import", methods=["POST"])
+def show_info_builder_showcue_import():
+    values = request.get_json(silent=True) or {}
+    token = str(values.get("token") or "")
+    preview = SHOW_BUILDER_IMPORTS.pop(token, None)
+    if not preview or values.get("confirm") is not True:
+        return jsonify({"ok": False, "message": "Prévisualisation ou confirmation manquante"}), 400
+    try:
+        with SHOW_CUES_LOCK:
+            registry, builder_path = active_builder_path({"session_id": preview["session_id"]})
+            if registry["active_session_id"] != preview["session_id"]:
+                raise RuntimeError("La session active a changé. Nouvelle prévisualisation requise.")
+            builder = load_builder_document(builder_path)
+            if json.dumps(builder, ensure_ascii=False, sort_keys=True) != preview["builder"]:
+                raise RuntimeError("Le Builder a changé. Nouvelle prévisualisation requise.")
+            mapped = builder_import_values(builder)
+            _, cue_path, _ = ensure_show_cue_storage()
+            document = load_show_document(cue_path)
+            existing_keys = builder_collision_keys(document["cues"])
+            if any(next(iter(builder_collision_keys([item]))) in existing_keys for item in mapped):
+                raise ValueError("collision avec la conduite existante")
+            created = []
+            for item in mapped:
+                document, cue = create_show_cue(document, item)
+                created.append(cue)
+            save_show_document(cue_path, document)
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 409
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+    return jsonify({"ok": True, "created": created}), 201
+
+
+def cleanup_show_calls_locked(now: Optional[float] = None) -> None:
+    """Nettoie uniquement les voyants CALL expirés."""
+    current = time.time() if now is None else float(now)
+    expired = []
+    for call_id, item in SHOW_CALLS.items():
+        if item["state"] == "acknowledged":
+            reference = float(item.get("acknowledged_at") or item["created_at"])
+            lifetime = SHOW_CALL_ACK_SECONDS
+        else:
+            reference = float(item["created_at"])
+            lifetime = SHOW_CALL_TIMEOUT_SECONDS
+        if current - reference >= lifetime:
+            expired.append(call_id)
+    for call_id in expired:
+        SHOW_CALLS.pop(call_id, None)
+
+
+def show_call_snapshot(post: str) -> Dict[str, Any]:
+    with SHOW_CALLS_LOCK:
+        cleanup_show_calls_locked()
+        incoming = [dict(item) for item in SHOW_CALLS.values()
+                    if item["destination"] == post and item["state"] == "calling"]
+        outgoing = [dict(item) for item in SHOW_CALLS.values()
+                    if item["source"] == post]
+    return {"incoming": incoming, "outgoing": outgoing}
+
+
+def request_show_post(values: Any, key: str) -> str:
+    if not isinstance(values, dict):
+        raise ValueError("Données JSON invalides")
+    post = str(values.get(key) or "").strip().upper()
+    if post not in SHOW_POSTS:
+        raise ValueError("Poste inconnu")
+    return post
+
+
+@app.route("/show-info/sessions")
+def show_info_sessions():
+    try:
+        with SHOW_CUES_LOCK:
+            registry, _, _ = ensure_show_cue_storage()
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 500
+    return jsonify({"ok": True, **registry})
+
+
+@app.route("/show-info/sessions", methods=["POST"])
+def show_info_create_session():
+    values = request.get_json(silent=True) or {}
+    try:
+        with SHOW_CUES_LOCK:
+            registry, _, _ = ensure_show_cue_storage()
+            registry = create_show_cue_session(SHOW_CUES_DATA_DIRECTORY, registry,
+                                               values.get("name"))
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+    return jsonify({"ok": True, **registry}), 201
+
+
+@app.route("/show-info/sessions/<session_id>/activate", methods=["POST"])
+def show_info_activate_session(session_id):
+    try:
+        with SHOW_CUES_LOCK:
+            registry, _, _ = ensure_show_cue_storage()
+            registry = activate_show_cue_session(SHOW_CUES_DATA_DIRECTORY, registry, session_id)
+    except KeyError:
+        return jsonify({"ok": False, "message": "Session inconnue"}), 404
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+    return jsonify({"ok": True, **registry})
+
+
+@app.route("/show-info/sessions/<session_id>", methods=["PUT"])
+def show_info_rename_session(session_id):
+    values = request.get_json(silent=True) or {}
+    try:
+        with SHOW_CUES_LOCK:
+            registry, _, _ = ensure_show_cue_storage()
+            registry = rename_show_cue_session(SHOW_CUES_DATA_DIRECTORY, registry, session_id,
+                                               values.get("name"))
+    except KeyError:
+        return jsonify({"ok": False, "message": "Session inconnue"}), 404
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+    return jsonify({"ok": True, **registry})
+
+
+@app.route("/show-info/sessions/<session_id>/duplicate", methods=["POST"])
+def show_info_duplicate_session(session_id):
+    values = request.get_json(silent=True) or {}
+    try:
+        with SHOW_CUES_LOCK:
+            registry, _, _ = ensure_show_cue_storage()
+            registry = duplicate_show_cue_session(
+                SHOW_CUES_DATA_DIRECTORY, registry, session_id, values.get("name"))
+    except KeyError:
+        return jsonify({"ok": False, "message": "Session inconnue"}), 404
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+    return jsonify({"ok": True, **registry}), 201
+
+
+@app.route("/show-info/sessions/<session_id>", methods=["DELETE"])
+def show_info_delete_session(session_id):
+    values = request.get_json(silent=True) or {}
+    try:
+        with SHOW_CUES_LOCK:
+            registry, _, _ = ensure_show_cue_storage()
+            session = next(item for item in registry["sessions"] if item["id"] == session_id)
+            if str(values.get("confirmation_name") or "") != session["name"]:
+                raise ValueError("confirmation du nom de session incorrecte")
+            registry = delete_show_cue_session(SHOW_CUES_DATA_DIRECTORY, registry, session_id)
+    except (KeyError, StopIteration):
+        return jsonify({"ok": False, "message": "Session inconnue"}), 404
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+    return jsonify({"ok": True, **registry})
+
+
+@app.route("/show-info/status")
+def show_info_status():
+    post = str(request.args.get("post") or "FOH").strip().upper()
+    if post not in SHOW_POSTS:
+        return jsonify({"ok": False, "message": "Poste inconnu"}), 400
+    try:
+        with SHOW_CUES_LOCK:
+            registry, cue_path, _ = ensure_show_cue_storage()
+            cues = load_show_document(cue_path)["cues"]
+            try:
+                builder = load_builder_document(cue_path.parent / "showcue_builder.json")
+                distribution = builder_distribution_snapshot(builder)
+                cues = resolve_showcue_builder_metadata(cues, builder["distribution"])
+            except Exception:
+                # Le Builder reste un consommateur isolé : sa panne ne bloque jamais ShowCue.
+                distribution = builder_distribution_snapshot({"revision": 0, "distribution": []})
+        with lock:
+            timecode = str(state.get("ltc_timecode") or "--:--:--:--")
+            connected = bool(state.get("ltc_connected", False))
+            raw_title = (str(state.get("arrangement_marker") or "").strip()
+                         if str(state.get("play_mode") or "") == "arrangement"
+                         else str(state.get("playing_scene_name") or "").strip())
+            playing = bool(state.get("is_playing", False))
+            play_mode = str(state.get("play_mode") or "stopped")
+            position_label = str(state.get("arrangement_time_label") or "")
+            refresh_playback_remaining_locked()
+            remaining_seconds = state.get("remaining_seconds")
+            duration_seconds = state.get("scene_duration_seconds")
+        try:
+            duration_value = float(duration_seconds)
+            remaining_value = float(remaining_seconds)
+            elapsed_seconds = max(0.0, duration_value - remaining_value)
+        except (TypeError, ValueError):
+            elapsed_seconds = None
+        classified_cues = [cue for cue in cues if cue.get("status") == "official"]
+        try:
+            timecode_to_units(timecode)
+            has_valid_timecode = True
+        except ValueError:
+            has_valid_timecode = False
+        selected = select_show_cues(classified_cues, timecode, post) if has_valid_timecode else {
+            "previous_second": None, "previous": None, "current": None,
+            "next": None, "following": None}
+        conduite_current = (
+            select_timed_cues(classified_cues, timecode)["current"]
+            if has_valid_timecode else None
+        )
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 500
+    try:
+        calls = show_call_snapshot(post)
+    except Exception:
+        calls = {"incoming": [], "outgoing": []}
+    return jsonify({"ok": True, "post": post,
+                    "active_session_id": registry["active_session_id"],
+                    "active_session_name": next(
+                        item["name"] for item in registry["sessions"]
+                        if item["id"] == registry["active_session_id"]),
+                    "sessions": registry["sessions"],
+                    "distribution": distribution,
+                    "sections": showcue_sections(cues),
+                    "title": showcue_display_title(raw_title),
+                    "ltc_timecode": timecode, "ltc_connected": connected,
+                    "is_playing": playing, "play_mode": play_mode,
+                    "position_label": position_label,
+                    "scene_duration_seconds": duration_seconds,
+                    "elapsed_seconds": elapsed_seconds,
+                    "remaining_seconds": remaining_seconds,
+                    "manual": show_cues_for_post(cues, post, "manual"),
+                    "library": show_cues_for_post(cues, post, "library"),
+                    "drafts": [cue for mode in ("timed", "manual", "library")
+                               for cue in show_cues_for_post(cues, post, mode)
+                               if cue["status"] == "draft"],
+                    "conduite": {
+                        mode: show_cues_for_conduite(cues, mode)
+                        for mode in ("timed", "manual", "library")
+                    },
+                    "calls": calls,
+                    "conduite_current_id": conduite_current["id"] if conduite_current else None,
+                    **selected})
+
+
+@app.route("/show-info/call", methods=["POST"])
+def show_info_create_call():
+    values = request.get_json(silent=True)
+    try:
+        source = request_show_post(values, "source")
+        destination = request_show_post(values, "destination")
+        if source == destination:
+            raise ValueError("Un poste ne peut pas s’appeler lui-même")
+        now = time.time()
+        item = {
+            "id": str(uuid.uuid4()), "source": source, "destination": destination,
+            "state": "calling", "created_at": now, "acknowledged_at": None,
+        }
+        with SHOW_CALLS_LOCK:
+            cleanup_show_calls_locked(now)
+            SHOW_CALLS[item["id"]] = item
+    except ValueError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+    return jsonify({"ok": True, "call": dict(item)}), 201
+
+
+@app.route("/show-info/call/<call_id>/ack", methods=["POST"])
+def show_info_ack_call(call_id):
+    values = request.get_json(silent=True)
+    try:
+        post = request_show_post(values, "post")
+        with SHOW_CALLS_LOCK:
+            cleanup_show_calls_locked()
+            item = SHOW_CALLS.get(call_id)
+            if item is None:
+                return jsonify({"ok": False, "message": "CALL inconnu"}), 404
+            if item["destination"] != post:
+                return jsonify({"ok": False, "message": "Acquittement interdit"}), 403
+            if item["state"] != "calling":
+                return jsonify({"ok": False, "message": "CALL déjà acquitté"}), 409
+            item["state"] = "acknowledged"
+            item["acknowledged_at"] = time.time()
+            result = dict(item)
+    except ValueError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+    return jsonify({"ok": True, "call": result})
+
+
+@app.route("/show-info/call/<call_id>/cancel", methods=["POST"])
+def show_info_cancel_call(call_id):
+    values = request.get_json(silent=True)
+    try:
+        post = request_show_post(values, "post")
+        with SHOW_CALLS_LOCK:
+            cleanup_show_calls_locked()
+            item = SHOW_CALLS.get(call_id)
+            if item is None:
+                return jsonify({"ok": False, "message": "CALL inconnu"}), 404
+            if item["source"] != post:
+                return jsonify({"ok": False, "message": "Annulation interdite"}), 403
+            SHOW_CALLS.pop(call_id, None)
+    except ValueError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+    return jsonify({"ok": True})
+
+
+@app.route("/show-info/capture", methods=["POST"])
+def show_info_capture():
+    """Fige un instantané du LTC publié, sans action vers Ableton."""
+    with lock:
+        timecode = str(state.get("ltc_timecode") or "")
+        connected = bool(state.get("ltc_connected", False))
+        playing = bool(state.get("is_playing", False))
+        last_received_at = state.get("ltc_last_received_at")
+    try:
+        timecode_to_units(timecode)
+    except ValueError:
+        connected = False
+    fresh = (last_received_at is None or
+             time.time() - float(last_received_at) <= SHOW_CUE_LTC_FRESH_SECONDS)
+    usable = connected and playing and fresh
+    return jsonify({"ok": True, "mode": "timed" if usable else "manual",
+                    "timecode": timecode if usable else None})
+
+
+@app.route("/show-info/cues", methods=["POST"])
+def show_info_create_cue():
+    values = request.get_json(silent=True)
+    if not isinstance(values, dict):
+        return jsonify({"ok": False, "message": "Données JSON invalides"}), 400
+    try:
+        with SHOW_CUES_LOCK:
+            registry, cue_path, _ = ensure_show_cue_storage()
+            require_active_show_session(values, registry)
+            document = load_show_document(cue_path)
+            document, cue = create_show_cue(document, values)
+            save_show_document(cue_path, document)
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 409
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+    return jsonify({"ok": True, "cue": cue}), 201
+
+
+@app.route("/show-info/audio", methods=["POST"])
+def show_info_create_audio_cue():
+    """Stocke une capture ponctuelle puis crée son brouillon, sans flux de production."""
+    upload = request.files.get("audio")
+    try:
+        context = json.loads(request.form.get("context") or "{}")
+    except json.JSONDecodeError:
+        context = None
+    if upload is None or not isinstance(context, dict):
+        return jsonify({"ok": False, "message": "Capture audio ou contexte invalide"}), 400
+    mime_type = str(upload.mimetype or "").split(";", 1)[0].lower()
+    extension = SHOW_CUE_AUDIO_EXTENSIONS.get(mime_type)
+    if not extension:
+        return jsonify({"ok": False, "message": "Format audio non pris en charge"}), 415
+    payload = upload.stream.read(SHOW_CUE_AUDIO_MAX_BYTES + 1)
+    if not payload or len(payload) > SHOW_CUE_AUDIO_MAX_BYTES:
+        return jsonify({"ok": False, "message": "Capture audio vide ou supérieure à 50 Mo"}), 413
+    values = {
+        "mode": context.get("mode"), "text": "Capture audio à compléter",
+        "posts": context.get("posts") or ["FOH"], "status": "draft",
+    }
+    if values["mode"] == "timed":
+        values["timecode"] = context.get("timecode")
+    elif values["mode"] == "manual":
+        values["section"] = context.get("section") or "CAPTURES AUDIO"
+    try:
+        with SHOW_CUES_LOCK:
+            registry, cue_path, audio_directory = ensure_show_cue_storage()
+            require_active_show_session(context, registry)
+            document = load_show_document(cue_path)
+            document, cue = create_show_cue(document, values)
+            filename = f"{cue['id']}.{extension}"
+            cue_audio = {"filename": filename, "mime_type": mime_type}
+            document, cue = update_show_cue(document, cue["id"], {"audio": cue_audio})
+            audio_directory.mkdir(parents=True, exist_ok=True)
+            audio_path = audio_directory / filename
+            temporary_path = audio_directory / f".{filename}.tmp"
+            try:
+                temporary_path.write_bytes(payload)
+                os.replace(temporary_path, audio_path)
+                save_show_document(cue_path, document)
+            except Exception:
+                temporary_path.unlink(missing_ok=True)
+                audio_path.unlink(missing_ok=True)
+                raise
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 409
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+    return jsonify({"ok": True, "cue": cue}), 201
+
+
+@app.route("/show-info/cues/<cue_id>/audio")
+def show_info_audio(cue_id):
+    try:
+        with SHOW_CUES_LOCK:
+            registry, cue_path, audio_directory = ensure_show_cue_storage()
+            requested_session = str(request.args.get("session_id") or registry["active_session_id"])
+            if requested_session != registry["active_session_id"]:
+                raise RuntimeError("La session active a changé")
+            document = load_show_document(cue_path)
+            cue = next(item for item in document["cues"] if item["id"] == cue_id)
+            audio = cue.get("audio")
+            if not audio:
+                raise KeyError(cue_id)
+    except (OSError, ValueError, RuntimeError, json.JSONDecodeError, KeyError, StopIteration):
+        return jsonify({"ok": False, "message": "Audio inconnu"}), 404
+    return send_from_directory(audio_directory, audio["filename"],
+                               mimetype=audio["mime_type"], conditional=True)
+
+
+@app.route("/show-info/cues/<cue_id>", methods=["PUT"])
+def show_info_update_cue(cue_id):
+    values = request.get_json(silent=True)
+    if not isinstance(values, dict):
+        return jsonify({"ok": False, "message": "Données JSON invalides"}), 400
+    try:
+        with SHOW_CUES_LOCK:
+            registry, cue_path, _ = ensure_show_cue_storage()
+            require_active_show_session(values, registry)
+            document = load_show_document(cue_path)
+            document, cue = update_show_cue(document, cue_id, values)
+            save_show_document(cue_path, document)
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 409
+    except KeyError:
+        return jsonify({"ok": False, "message": "Cue inconnu"}), 404
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+    return jsonify({"ok": True, "cue": cue})
+
+
+@app.route("/show-info/cues/<cue_id>", methods=["DELETE"])
+def show_info_delete_cue(cue_id):
+    try:
+        with SHOW_CUES_LOCK:
+            registry, cue_path, audio_directory = ensure_show_cue_storage()
+            require_active_show_session(request.args, registry)
+            document = load_show_document(cue_path)
+            document, cue = delete_show_cue(document, cue_id)
+            save_show_document(cue_path, document)
+            audio = cue.get("audio")
+            if audio:
+                (audio_directory / audio["filename"]).unlink(missing_ok=True)
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 409
+    except KeyError:
+        return jsonify({"ok": False, "message": "Cue inconnu"}), 404
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+    return jsonify({"ok": True})
+
+
 @app.route("/status")
 def status():
     # IMPORTANT : /status doit rester non bloquant.
@@ -3432,9 +4178,7 @@ def status():
                 state["play_mode"] = "stopped"
                 state["is_paused"] = False
 
-            deadline = state.get("playback_deadline")
-            if deadline is not None and bool(state.get("is_playing", False)) and not bool(state.get("is_paused", False)):
-                state["remaining_seconds"] = max(0.0, float(deadline) - time.time())
+            refresh_playback_remaining_locked()
 
             data = state_snapshot_locked()
         else:
@@ -3454,6 +4198,787 @@ def status():
     data["arrangement_markers"] = data.get("arrangement_markers", [])
     data["arrangement_markers_source"] = data.get("arrangement_markers_source", "CACHE")
     return jsonify(data)
+
+
+
+
+
+
+@app.route("/show-audio/track-hierarchy")
+def show_audio_track_hierarchy():
+    """Diagnostic read-only ciblé de la hiérarchie des pistes Ableton."""
+
+    with lock:
+        generation = int(state.get("set_generation", 0))
+        set_ready = bool(state.get("set_ready", False))
+        set_name = str(state.get("current_set_name", "") or "")
+
+    if not set_ready:
+        return jsonify({
+            "ok": False,
+            "error": "Live Set non prêt",
+            "tracks": [],
+        }), 409
+
+    names_response = query(
+        "/live/song/get/track_names",
+        timeout=0.45,
+        expected_generation=generation,
+        apply_response=False,
+    )
+
+    track_names = [
+        str(value or "").strip()
+        for value in list(names_response or [])
+    ]
+
+    raw_start = request.args.get("start", "37")
+    raw_end = request.args.get("end", "67")
+
+    try:
+        first = max(0, int(raw_start))
+        last = min(len(track_names) - 1, int(raw_end))
+    except (TypeError, ValueError):
+        return jsonify({
+            "ok": False,
+            "error": "start/end invalides",
+            "tracks": [],
+        }), 400
+
+    if last < first:
+        return jsonify({
+            "ok": False,
+            "error": "plage invalide",
+            "tracks": [],
+        }), 400
+
+    tracks = []
+
+    for track_index in range(first, last + 1):
+        entry = {
+            "track_index": track_index,
+            "track_name": track_names[track_index],
+            "is_foldable": None,
+            "is_grouped": None,
+        }
+
+        for prop in ("is_foldable", "is_grouped"):
+            response = query(
+                f"/live/track/get/{prop}",
+                track_index,
+                timeout=0.12,
+                expected_generation=generation,
+                apply_response=False,
+            )
+
+            values = list(response or [])
+
+            if values:
+                value = values[-1]
+
+                if isinstance(value, bool):
+                    entry[prop] = value
+                elif isinstance(value, (int, float)):
+                    if value in (0, 0.0):
+                        entry[prop] = False
+                    elif value in (1, 1.0):
+                        entry[prop] = True
+                    else:
+                        entry[prop] = value
+                else:
+                    entry[prop] = value
+
+        tracks.append(entry)
+
+    return jsonify({
+        "ok": True,
+        "set_name": set_name,
+        "set_generation": generation,
+        "track_count": len(track_names),
+        "range_start": first,
+        "range_end": last,
+        "tracks": tracks,
+    })
+
+
+@app.route("/show-audio/tracks-bulk")
+def show_audio_tracks_bulk():
+    """Snapshot read-only bulk des états mute/ON des pistes demandées."""
+
+    raw_indices = str(
+        request.args.get("track_indices", "") or ""
+    ).strip()
+
+    with lock:
+        generation = int(state.get("set_generation", 0))
+        set_ready = bool(state.get("set_ready", False))
+        set_name = str(
+            state.get("current_set_name", "") or ""
+        )
+
+    if not set_ready:
+        return jsonify({
+            "ok": False,
+            "error": "Live Set non prêt",
+            "set_generation": generation,
+            "tracks": [],
+        }), 409
+
+    track_names_response = query(
+        "/live/song/get/track_names",
+        timeout=0.45,
+        expected_generation=generation,
+        apply_response=False,
+    )
+
+    track_names = [
+        str(value or "").strip()
+        for value in list(track_names_response or [])
+    ]
+
+    track_count = len(track_names)
+
+    if raw_indices:
+        requested_indices = []
+
+        for raw_value in raw_indices.split(","):
+            raw_value = raw_value.strip()
+
+            if not raw_value:
+                continue
+
+            try:
+                track_index = int(raw_value)
+            except (TypeError, ValueError):
+                return jsonify({
+                    "ok": False,
+                    "error": (
+                        f"track_index invalide: {raw_value!r}"
+                    ),
+                    "tracks": [],
+                }), 400
+
+            if not 0 <= track_index < track_count:
+                return jsonify({
+                    "ok": False,
+                    "error": (
+                        f"track_index hors limites: {track_index}"
+                    ),
+                    "track_count": track_count,
+                    "tracks": [],
+                }), 400
+
+            if track_index not in requested_indices:
+                requested_indices.append(track_index)
+    else:
+        requested_indices = list(range(track_count))
+
+    # AbletonOSC renvoie ici une valeur par piste pour track.mute.
+    response = query(
+        "/live/song/get/track_data",
+        0,
+        -1,
+        "track.mute",
+        timeout=0.60,
+        expected_generation=generation,
+        apply_response=False,
+    )
+
+    values = list(response or [])
+
+    if not values:
+        return jsonify({
+            "ok": False,
+            "error": "états mute indisponibles",
+            "set_name": set_name,
+            "set_generation": generation,
+            "track_count": track_count,
+            "tracks": [],
+        }), 503
+
+    tracks = []
+
+    for track_index in requested_indices:
+        raw_value = (
+            values[track_index]
+            if track_index < len(values)
+            else None
+        )
+
+        track_mute = None
+
+        if isinstance(raw_value, bool):
+            track_mute = raw_value
+        elif isinstance(raw_value, (int, float)):
+            if raw_value in (0, 0.0):
+                track_mute = False
+            elif raw_value in (1, 1.0):
+                track_mute = True
+
+        tracks.append({
+            "track_index": track_index,
+            "track_name": track_names[track_index],
+            "track_mute": track_mute,
+            "track_on": (
+                None
+                if track_mute is None
+                else not track_mute
+            ),
+        })
+
+    return jsonify({
+        "ok": True,
+        "set_name": set_name,
+        "set_generation": generation,
+        "track_count": track_count,
+        "tracks": tracks,
+    })
+
+
+@app.route("/show-audio/tracks")
+def show_audio_tracks():
+    """Snapshot read-only ON/OFF des pistes Ableton demandées."""
+    raw_indices = str(request.args.get("track_indices", "") or "").strip()
+
+    if not raw_indices:
+        return jsonify({
+            "ok": False,
+            "error": "track_indices requis",
+            "tracks": [],
+        }), 400
+
+    requested_indices = []
+
+    for raw_value in raw_indices.split(","):
+        raw_value = raw_value.strip()
+
+        if not raw_value:
+            continue
+
+        try:
+            track_index = int(raw_value)
+        except (TypeError, ValueError):
+            return jsonify({
+                "ok": False,
+                "error": f"track_index invalide: {raw_value!r}",
+                "tracks": [],
+            }), 400
+
+        if track_index < 0:
+            return jsonify({
+                "ok": False,
+                "error": f"track_index négatif: {track_index}",
+                "tracks": [],
+            }), 400
+
+        if track_index not in requested_indices:
+            requested_indices.append(track_index)
+
+    if not requested_indices:
+        return jsonify({
+            "ok": False,
+            "error": "aucun track_index valide",
+            "tracks": [],
+        }), 400
+
+    with lock:
+        generation = int(state.get("set_generation", 0))
+        set_ready = bool(state.get("set_ready", False))
+        set_name = str(state.get("current_set_name", "") or "")
+
+    if not set_ready:
+        return jsonify({
+            "ok": False,
+            "error": "Live Set non prêt",
+            "set_generation": generation,
+            "tracks": [],
+        }), 409
+
+    names_response = query(
+        "/live/song/get/track_names",
+        timeout=0.45,
+        expected_generation=generation,
+        apply_response=False,
+    )
+
+    track_names = [
+        str(item or "").strip()
+        for item in list(names_response or [])
+    ]
+
+    tracks = []
+
+    for track_index in requested_indices:
+        track_name = (
+            track_names[track_index]
+            if 0 <= track_index < len(track_names)
+            else ""
+        )
+
+        mute_response = query(
+            "/live/track/get/mute",
+            track_index,
+            timeout=0.20,
+            expected_generation=generation,
+            apply_response=False,
+        )
+
+        muted = None
+
+        if mute_response:
+            values = list(mute_response)
+
+            # AbletonOSC répond normalement [track_index, mute].
+            # On lit donc depuis la fin afin de récupérer l'état mute,
+            # sans confondre l'index de piste avec la valeur.
+            for item in reversed(values):
+                if isinstance(item, bool):
+                    muted = bool(item)
+                    break
+
+                try:
+                    numeric = float(item)
+                except (TypeError, ValueError):
+                    continue
+
+                if numeric in (0.0, 1.0):
+                    muted = bool(int(numeric))
+                    break
+
+        tracks.append({
+            "track_index": track_index,
+            "track_name": track_name,
+            "track_mute": muted,
+            "track_on": None if muted is None else not muted,
+        })
+
+    return jsonify({
+        "ok": True,
+        "set_name": set_name,
+        "set_generation": generation,
+        "tracks": tracks,
+    })
+
+
+
+@app.route("/show-audio/scene-clips-bulk")
+def show_audio_scene_clips_bulk():
+    """Inventaire read-only des clips de plusieurs scènes en une acquisition.
+
+    Utilise la matrice aplatie renvoyée par /live/song/get/track_data :
+        position = offset_piste * nombre_scenes + index_scene
+
+    Aucune scène n'est lancée et aucune propriété Live n'est modifiée.
+    """
+    raw_indices = str(
+        request.args.get("scene_indices", "") or ""
+    ).strip()
+
+    with lock:
+        generation = int(state.get("set_generation", 0))
+        set_ready = bool(state.get("set_ready", False))
+        set_name = str(
+            state.get("current_set_name", "") or ""
+        )
+
+    if not set_ready:
+        return jsonify({
+            "ok": False,
+            "error": "Live Set non prêt",
+            "set_generation": generation,
+            "scenes": [],
+        }), 409
+
+    scene_names_response = query(
+        "/live/song/get/scenes/name",
+        timeout=0.45,
+        expected_generation=generation,
+        apply_response=False,
+    )
+
+    scene_names = [
+        str(value or "").strip()
+        for value in list(scene_names_response or [])
+    ]
+
+    scene_count = len(scene_names)
+
+    if scene_count <= 0:
+        return jsonify({
+            "ok": False,
+            "error": "aucune scène Ableton reçue",
+            "set_generation": generation,
+            "scenes": [],
+        }), 503
+
+    if raw_indices:
+        requested_indices = []
+
+        for raw_value in raw_indices.split(","):
+            raw_value = raw_value.strip()
+
+            if not raw_value:
+                continue
+
+            try:
+                scene_index = int(raw_value)
+            except (TypeError, ValueError):
+                return jsonify({
+                    "ok": False,
+                    "error": (
+                        f"scene_index invalide: "
+                        f"{raw_value!r}"
+                    ),
+                    "scenes": [],
+                }), 400
+
+            if not 0 <= scene_index < scene_count:
+                return jsonify({
+                    "ok": False,
+                    "error": (
+                        f"scene_index hors limites: "
+                        f"{scene_index}"
+                    ),
+                    "scene_count": scene_count,
+                    "scenes": [],
+                }), 400
+
+            if scene_index not in requested_indices:
+                requested_indices.append(scene_index)
+    else:
+        requested_indices = list(range(scene_count))
+
+    track_names_response = query(
+        "/live/song/get/track_names",
+        timeout=0.45,
+        expected_generation=generation,
+        apply_response=False,
+    )
+
+    track_names = [
+        str(value or "").strip()
+        for value in list(track_names_response or [])
+    ]
+
+    tempo_response = query(
+        "/live/song/get/tempo",
+        timeout=0.20,
+        expected_generation=generation,
+        apply_response=False,
+    )
+
+    tempo = None
+
+    if tempo_response:
+        for value in reversed(list(tempo_response)):
+            candidate = safe_float(value)
+
+            if candidate is not None and candidate > 0:
+                tempo = candidate
+                break
+
+    if tempo is None or tempo <= 0:
+        return jsonify({
+            "ok": False,
+            "error": "tempo Ableton indisponible",
+            "set_generation": generation,
+            "scenes": [],
+        }), 503
+
+    scenes_by_index = {
+        scene_index: {
+            "scene_index": scene_index,
+            "scene_name": scene_names[scene_index],
+            "tempo": tempo,
+            "clips": [],
+        }
+        for scene_index in requested_indices
+    }
+
+    # Même taille de chunk que la route historique.
+    chunk_size = 6
+
+    for chunk_start in range(
+        0,
+        len(track_names),
+        chunk_size,
+    ):
+        if not generation_is_current(generation):
+            return jsonify({
+                "ok": False,
+                "error": "Live Set changé pendant le scan",
+                "set_generation": generation,
+                "scenes": [],
+            }), 409
+
+        chunk_end = min(
+            len(track_names),
+            chunk_start + chunk_size,
+        )
+
+        names_response = query(
+            "/live/song/get/track_data",
+            chunk_start,
+            chunk_end,
+            "clip.name",
+            timeout=0.45,
+            expected_generation=generation,
+            apply_response=False,
+        )
+
+        lengths_response = query(
+            "/live/song/get/track_data",
+            chunk_start,
+            chunk_end,
+            "clip.length",
+            timeout=0.45,
+            expected_generation=generation,
+            apply_response=False,
+        )
+
+        name_values = list(names_response or [])
+        length_values = list(lengths_response or [])
+
+        for offset, track_index in enumerate(
+            range(chunk_start, chunk_end)
+        ):
+            base_index = offset * scene_count
+
+            for scene_index in requested_indices:
+                value_index = base_index + scene_index
+
+                if value_index >= len(length_values):
+                    continue
+
+                length_beats = safe_float(
+                    length_values[value_index]
+                )
+
+                if (
+                    length_beats is None
+                    or length_beats <= 0
+                ):
+                    continue
+
+                clip_name = ""
+
+                if value_index < len(name_values):
+                    clip_name = str(
+                        name_values[value_index] or ""
+                    ).strip()
+
+                duration_seconds = (
+                    float(length_beats)
+                    * 60.0
+                    / float(tempo)
+                )
+
+                scenes_by_index[scene_index]["clips"].append({
+                    "track_index": int(track_index),
+                    "track_name": track_names[track_index],
+                    "clip_name": clip_name,
+                    "length_beats": float(length_beats),
+                    "duration_seconds": duration_seconds,
+                })
+
+    return jsonify({
+        "ok": True,
+        "set_name": set_name,
+        "set_generation": generation,
+        "scene_count": scene_count,
+        "track_count": len(track_names),
+        "tempo": tempo,
+        "scenes": [
+            scenes_by_index[index]
+            for index in requested_indices
+        ],
+    })
+
+
+@app.route("/show-audio/scene-clips")
+def show_audio_scene_clips():
+    """Inventaire read-only des clips présents sur une scène Ableton.
+
+    Cette route est volontairement indépendante de la logique historique
+    TABLEAU / durée de playback. Elle ne sélectionne aucun clip : elle publie
+    uniquement les données réelles nécessaires à CL Show Audio Builder.
+    """
+    raw_scene_index = request.args.get("scene_index")
+    try:
+        scene_index = int(str(raw_scene_index).strip())
+    except (TypeError, ValueError):
+        return jsonify({
+            "ok": False,
+            "error": "scene_index invalide",
+        }), 400
+
+    with lock:
+        generation = int(state.get("set_generation", 0))
+        set_ready = bool(state.get("set_ready", False))
+        scenes = dict(state.get("scenes") or {})
+        scene_name = str(scenes.get(scene_index, "") or "")
+
+    if not set_ready:
+        return jsonify({
+            "ok": False,
+            "error": "Live Set non prêt",
+            "set_generation": generation,
+        }), 409
+
+    if scene_index < 0 or scene_index not in scenes:
+        return jsonify({
+            "ok": False,
+            "error": "scène inconnue",
+            "scene_index": scene_index,
+            "set_generation": generation,
+        }), 404
+
+    track_names_response = query(
+        "/live/song/get/track_names",
+        timeout=0.30,
+        expected_generation=generation,
+        apply_response=False,
+    )
+    if not track_names_response:
+        return jsonify({
+            "ok": False,
+            "error": "pistes Ableton indisponibles",
+            "scene_index": scene_index,
+            "set_generation": generation,
+        }), 503
+
+    track_names = [
+        str(name or "")
+        for name in track_names_response
+    ]
+
+    scene_count = max(
+        len(scenes),
+        scene_index + 1,
+    )
+
+    clips = []
+    chunk_size = 6
+
+    for start in range(0, len(track_names), chunk_size):
+        if not generation_is_current(generation):
+            return jsonify({
+                "ok": False,
+                "error": "Live Set modifié pendant la lecture",
+                "scene_index": scene_index,
+                "set_generation": generation,
+            }), 409
+
+        end = min(
+            len(track_names),
+            start + chunk_size,
+        )
+
+        names_response = query(
+            "/live/song/get/track_data",
+            start,
+            end,
+            "clip.name",
+            timeout=0.45,
+            expected_generation=generation,
+            apply_response=False,
+        )
+
+        lengths_response = query(
+            "/live/song/get/track_data",
+            start,
+            end,
+            "clip.length",
+            timeout=0.45,
+            expected_generation=generation,
+            apply_response=False,
+        )
+
+        names = list(names_response or ())
+        lengths = list(lengths_response or ())
+
+        for offset, track_index in enumerate(range(start, end)):
+            value_index = (
+                offset * scene_count
+                + scene_index
+            )
+
+            clip_name = (
+                str(names[value_index] or "").strip()
+                if value_index < len(names)
+                else ""
+            )
+
+            length_beats = (
+                safe_float(lengths[value_index])
+                if value_index < len(lengths)
+                else None
+            )
+
+            if not clip_name and (
+                length_beats is None
+                or length_beats <= 0
+            ):
+                continue
+
+            track_on = is_track_enabled(
+                int(track_index),
+                expected_generation=generation,
+            )
+
+            clips.append({
+                "track_index": int(track_index),
+                "track_name": track_names[track_index],
+                "track_on": bool(track_on),
+                "track_mute": not bool(track_on),
+                "clip_name": clip_name,
+                "length_beats": (
+                    float(length_beats)
+                    if length_beats is not None
+                    and length_beats > 0
+                    else None
+                ),
+            })
+
+    tempo_response = query(
+        "/live/song/get/tempo",
+        timeout=0.20,
+        expected_generation=generation,
+        apply_response=False,
+    )
+    tempo = (
+        safe_float(list(tempo_response)[-1])
+        if tempo_response
+        else None
+    )
+
+    for clip in clips:
+        length_beats = clip.get("length_beats")
+        if (
+            length_beats is not None
+            and tempo is not None
+            and tempo > 0
+        ):
+            clip["duration_seconds"] = (
+                float(length_beats)
+                * 60.0
+                / float(tempo)
+            )
+        else:
+            clip["duration_seconds"] = None
+
+    return jsonify({
+        "ok": True,
+        "scene_index": scene_index,
+        "scene_name": scene_name,
+        "set_generation": generation,
+        "tempo": (
+            float(tempo)
+            if tempo is not None
+            else None
+        ),
+        "clips": clips,
+    })
 
 
 @app.route("/console-scene-title")
@@ -3926,6 +5451,7 @@ def resolve_scene_clip_duration_async(
             ):
                 return
             state["scene_duration_seconds"] = duration_seconds
+            state["scene_duration_is_clip"] = True
             state["playback_deadline"] = playback_started_at + duration_seconds
             state["remaining_seconds"] = max(
                 0.0,
@@ -4031,6 +5557,7 @@ def execute_go_transaction(request_id: str, expected_generation: int, scene_numb
             state["is_playing"] = True
             state["is_paused"] = False
             state["scene_duration_seconds"] = duration_seconds
+            state["scene_duration_is_clip"] = False
             state["remaining_seconds"] = duration_seconds
             state["playback_deadline"] = (now + duration_seconds) if duration_seconds is not None else None
             should_resolve_clip_duration = duration_seconds is None

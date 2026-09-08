@@ -110,7 +110,46 @@ class DeviceProfileTests(unittest.TestCase):
                     devices=self.configuration.devices + (device,)
                 )
                 validate_device_configuration(configuration)
-                self.assertFalse(device.supported)
+                self.assertTrue(device.configurable)
+                self.assertFalse(device.production_supported)
+
+    def test_mixed_signal_configuration_loads_without_default_fallback(self):
+        control = replace(
+            self.ql1, id="lighting_control", display_name="LIGHTING CC",
+            legacy_key=None, midi_channel=3, signal_type="control_change",
+            ableton_track_aliases=(), library=None,
+        )
+        note = replace(
+            self.ql1, id="sampler_notes", display_name="SAMPLER NOTES",
+            legacy_key=None, midi_channel=4, signal_type="note",
+            ableton_track_aliases=(), library=None,
+        )
+        program = replace(
+            self.ql1, id="console_c", display_name="QL3", legacy_key=None,
+            midi_channel=5, ableton_track_aliases=("PGM CHANGE QL3",), library="ql3",
+        )
+        configuration = replace(
+            self.configuration,
+            profile_id="mixed",
+            profile_name="Configuration mixte",
+            devices=self.configuration.devices + (control, note, program),
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "devices.json"
+            path.write_text(json.dumps(configuration.to_dict()), encoding="utf-8")
+            result = load_device_configuration_result(path)
+
+        self.assertEqual(result.source, "file")
+        self.assertIsNone(result.error)
+        self.assertEqual(result.configuration.profile_id, "mixed")
+        self.assertEqual(
+            [device.id for device in result.configuration.devices],
+            ["console_a", "console_b", "lighting_control", "sampler_notes", "console_c"],
+        )
+        self.assertFalse(result.configuration.by_id("lighting_control").production_supported)
+        self.assertFalse(result.configuration.by_id("sampler_notes").production_supported)
+        self.assertTrue(result.configuration.by_id("console_c").production_supported)
+        self.assertEqual(result.configuration.by_id("console_c").library, "ql3")
 
     def test_legacy_cl5_ql1_configuration_is_softly_adapted(self):
         migrated = device_configuration_from_dict({
@@ -223,7 +262,7 @@ class DeviceProfileTests(unittest.TestCase):
         self.assertTrue(devices[1]["production_supported"])
         self.assertEqual(devices[1]["legacy_key"], "ql1")
         self.assertEqual(devices[1]["midi_channel"], 2)
-        self.assertFalse(devices[2]["production_supported"])
+        self.assertTrue(devices[2]["production_supported"])
         self.assertEqual(devices[2]["status"], "unavailable")
         self.assertIsNone(devices[2]["expected"])
         self.assertIsNone(devices[2]["returned"])
