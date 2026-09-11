@@ -19,7 +19,7 @@ a = Analysis(
         ('show_cues.json', '.'),
         ('show_cues_audio', 'show_cues_audio'),
     ],
-    hiddenimports=['osc_transport', 'ltc_receiver', 'show_cues', 'showcue_builder', 'device_profiles', 'pythonosc.dispatcher', 'pythonosc.osc_server', 'pythonosc.udp_client'],
+    hiddenimports=['show_audio_print_engine', 'osc_transport', 'ltc_receiver', 'show_cues', 'showcue_builder', 'device_profiles', 'pythonosc.dispatcher', 'pythonosc.osc_server', 'pythonosc.udp_client'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

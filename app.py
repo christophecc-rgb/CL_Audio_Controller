@@ -30,6 +30,7 @@ from typing import Any, Dict, Optional, Tuple
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
+from show_audio_print_engine import PrintEngineError, capture_clean
 from build_identity import BUILD_ID, IDENTITY_PROTOCOL_VERSION, SERVICE_NAME
 from ableton_targets import DEFAULT_CONFIG_PATH, load_target
 from server_ownership import OwnershipRecordError, write_record
@@ -1787,10 +1788,39 @@ def osc_reply(address, *args, source_host=None):
             setGeneration=int(state.get("set_generation", 0)),
         )
         generation_log("startup_received")
+
         with lock:
-            generation = reset_live_set_state_locked(None, "startup")
-            set_bootstrap_step_locked("attente de Song.file_path", "/live/startup reçu")
-        start_live_set_bootstrap(generation)
+            generation = int(state.get("set_generation", 0))
+            transaction = _bootstrap_transaction
+            bootstrap_active = (
+                transaction is not None
+                and transaction.generation == generation
+                and not transaction.completed
+                and not transaction.cancelled
+            )
+
+            if bootstrap_active:
+                # /live/startup peut être renvoyé par Ableton pendant le
+                # bootstrap. Il ne doit pas ouvrir une nouvelle génération
+                # ni invalider la transaction actuellement propriétaire.
+                set_bootstrap_step_locked(
+                    "bootstrap déjà actif",
+                    "/live/startup ignoré pendant la transaction courante",
+                )
+                write_bootstrap_diagnostic(
+                    "live-startup-ignored-during-bootstrap",
+                    setGeneration=generation,
+                    transactionGeneration=transaction.generation,
+                )
+            else:
+                generation = reset_live_set_state_locked(None, "startup")
+                set_bootstrap_step_locked(
+                    "attente de Song.file_path",
+                    "/live/startup reçu",
+                )
+
+        if not bootstrap_active:
+            start_live_set_bootstrap(generation)
         return
     generation_log("orphan_reply_ignored", address=address)
 
@@ -2612,13 +2642,33 @@ def apply_live_set_bootstrap_locked(
     global _bootstrap_generation
 
     if int(state.get("set_generation", 0)) != int(generation):
+        write_bootstrap_diagnostic("bootstrap-apply-rejected",
+            reason="generation_mismatch",
+            transactionGeneration=generation,
+            stateGeneration=state.get("set_generation"))
         return False
     if state.get("set_ready", False):
+        write_bootstrap_diagnostic("bootstrap-apply-rejected",
+            reason="set_already_ready",
+            generation=generation)
         return False
 
     set_id = file_path or f"unsaved:{generation}"
     current_id = str(state.get("current_set_id") or "")
-    if current_id and not current_id.startswith("pending:") and current_id != set_id:
+    temporary_same_generation = current_id == f"unsaved:{generation}"
+    if (
+        current_id
+        and not current_id.startswith("pending:")
+        and not temporary_same_generation
+        and current_id != set_id
+    ):
+        write_bootstrap_diagnostic(
+            "bootstrap-apply-rejected",
+            reason="set_identity_mismatch",
+            generation=generation,
+            currentSetId=current_id,
+            transactionSetId=set_id,
+        )
         return False
 
     new_scenes = {
@@ -4204,6 +4254,204 @@ def status():
 
 
 
+
+
+def _show_audio_offline_loop_query(address: str, *, timeout=0.75):
+    response = ableton_transport.query(
+        address,
+        timeout=timeout,
+        context={"purpose": "show-audio-offline-export"},
+    )
+
+    if not response:
+        raise RuntimeError(
+            f"aucune réponse AbletonOSC : {address}"
+        )
+
+    return tuple(response)[-1]
+
+
+def _show_audio_offline_loop_send(
+    address: str,
+    value,
+) -> None:
+    if ableton_transport.send(address, value) is not True:
+        diagnostics = ableton_transport.diagnostics()
+        detail = diagnostics.get("last_error") or "envoi refusé"
+        raise RuntimeError(
+            f"écriture AbletonOSC impossible : "
+            f"{address} : {detail}"
+        )
+
+
+def _show_audio_offline_loop_confirm(loop_start, loop_length, loop_enabled):
+    """Confirme l'état Live via le transport existant, dans un budget de 2 s."""
+    import math
+
+    deadline = time.monotonic() + 2.0
+    last_error = "valeurs relues différentes de la demande"
+    while time.monotonic() < deadline:
+        try:
+            values = []
+            for field in ("loop_start", "loop_length", "loop"):
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise RuntimeError("délai de confirmation écoulé")
+                values.append(_show_audio_offline_loop_query(
+                    f"/live/song/get/{field}", timeout=min(0.2, remaining),
+                ))
+            # OSC représente les booléens par 0/1 ; refuser toute autre valeur.
+            actual_loop = values[2]
+            if (time.monotonic() <= deadline
+                    and math.isclose(float(values[0]), loop_start, rel_tol=0, abs_tol=1e-6)
+                    and math.isclose(float(values[1]), loop_length, rel_tol=0, abs_tol=1e-6)
+                    and isinstance(actual_loop, (bool, int, float))
+                    and actual_loop in (0, 1)
+                    and bool(actual_loop) is loop_enabled):
+                return {"loop_start": float(values[0]), "loop_length": float(values[1]), "loop": bool(actual_loop)}
+        except (RuntimeError, TypeError, ValueError) as exc:
+            last_error = str(exc)
+        remaining = deadline - time.monotonic()
+        if remaining > 0:
+            time.sleep(min(0.05, remaining))
+    raise RuntimeError(
+        "Ableton n'a pas appliqué la boucle offline demandée : " + last_error
+    )
+
+
+@app.route(
+    "/show-audio/offline/live-loop",
+    methods=["POST"],
+)
+def show_audio_offline_live_loop():
+    """
+    Transaction locale réservée au rendu Show Audio offline.
+
+    Le backend possède déjà le socket OSC de réponses 11001 :
+    aucun second listener n'est créé par le Builder Desktop.
+    """
+    payload = request.get_json(silent=True) or {}
+    action = str(payload.get("action") or "").strip().lower()
+
+    if action not in ("prepare", "restore"):
+        return jsonify({
+            "ok": False,
+            "message": "action Live offline invalide",
+        }), 400
+
+    try:
+        loop_start = float(payload["loop_start"])
+        loop_length = float(payload["loop_length"])
+        loop_enabled = bool(payload["loop"])
+    except (KeyError, TypeError, ValueError):
+        return jsonify({
+            "ok": False,
+            "message": "paramètres boucle Live invalides",
+        }), 400
+
+    if loop_start < 0 or loop_length <= 0:
+        return jsonify({
+            "ok": False,
+            "message": "valeurs boucle Live invalides",
+        }), 400
+
+    try:
+        with transport_command_lock:
+            if action == "prepare":
+                previous = {
+                    "loop_start": float(
+                        _show_audio_offline_loop_query(
+                            "/live/song/get/loop_start"
+                        )
+                    ),
+                    "loop_length": float(
+                        _show_audio_offline_loop_query(
+                            "/live/song/get/loop_length"
+                        )
+                    ),
+                    "loop": bool(
+                        _show_audio_offline_loop_query(
+                            "/live/song/get/loop"
+                        )
+                    ),
+                }
+
+                try:
+                    _show_audio_offline_loop_send(
+                        "/live/song/set/loop_start",
+                        loop_start,
+                    )
+                    _show_audio_offline_loop_send(
+                        "/live/song/set/loop_length",
+                        loop_length,
+                    )
+                    _show_audio_offline_loop_send(
+                        "/live/song/set/loop",
+                        1 if loop_enabled else 0,
+                    )
+                    confirmed = _show_audio_offline_loop_confirm(loop_start, loop_length, loop_enabled)
+
+                except Exception:
+                    # Si la préparation échoue à mi-chemin,
+                    # remettre immédiatement l'état initial.
+                    try:
+                        _show_audio_offline_loop_send(
+                            "/live/song/set/loop_start",
+                            previous["loop_start"],
+                        )
+                        _show_audio_offline_loop_send(
+                            "/live/song/set/loop_length",
+                            previous["loop_length"],
+                        )
+                        _show_audio_offline_loop_send(
+                            "/live/song/set/loop",
+                            1 if previous["loop"] else 0,
+                        )
+                        _show_audio_offline_loop_confirm(
+                            previous["loop_start"], previous["loop_length"], previous["loop"],
+                        )
+                    except Exception:
+                        pass
+                    raise
+
+                return jsonify({
+                    "ok": True,
+                    "action": "prepare",
+                    "previous": previous,
+                    "confirmed": confirmed,
+                    "target": {
+                        "loop_start": loop_start,
+                        "loop_length": loop_length,
+                        "loop": loop_enabled,
+                    },
+                })
+
+            _show_audio_offline_loop_send(
+                "/live/song/set/loop_start",
+                loop_start,
+            )
+            _show_audio_offline_loop_send(
+                "/live/song/set/loop_length",
+                loop_length,
+            )
+            _show_audio_offline_loop_send(
+                "/live/song/set/loop",
+                1 if loop_enabled else 0,
+            )
+            _show_audio_offline_loop_confirm(loop_start, loop_length, loop_enabled)
+
+            return jsonify({
+                "ok": True,
+                "action": "restore",
+            })
+
+    except Exception as exc:
+        return jsonify({
+            "ok": False,
+            "message": str(exc),
+        }), 503
+
+
 @app.route("/show-audio/track-hierarchy")
 def show_audio_track_hierarchy():
     """Diagnostic read-only ciblé de la hiérarchie des pistes Ableton."""
@@ -4433,6 +4681,366 @@ def show_audio_tracks_bulk():
         "track_count": track_count,
         "tracks": tracks,
     })
+
+
+
+@app.route("/show-audio/print/preflight")
+def show_audio_print_preflight():
+    """Préflight read-only du futur Print Engine Show Audio."""
+
+    raw_slot_index = str(request.args.get("slot_index", "0") or "0").strip()
+
+    try:
+        slot_index = int(raw_slot_index)
+    except (TypeError, ValueError):
+        return jsonify({
+            "ok": False,
+            "error": f"slot_index invalide: {raw_slot_index!r}",
+        }), 400
+
+    if slot_index < 0:
+        return jsonify({
+            "ok": False,
+            "error": f"slot_index négatif: {slot_index}",
+        }), 400
+
+    with lock:
+        generation = int(state.get("set_generation", 0))
+        set_ready = bool(state.get("set_ready", False))
+        set_name = str(state.get("current_set_name", "") or "")
+
+    if not set_ready:
+        return jsonify({
+            "ok": False,
+            "error": "Live Set non prêt",
+            "set_generation": generation,
+        }), 409
+
+    try:
+        names_response = query(
+            "/live/song/get/track_names",
+            timeout=0.45,
+            expected_generation=generation,
+            apply_response=False,
+        )
+
+        track_names = [
+            str(value or "").strip()
+            for value in list(names_response or [])
+        ]
+
+        matches = [
+            index
+            for index, name in enumerate(track_names)
+            if name == "RESAMPLE"
+        ]
+
+        if not matches:
+            return jsonify({
+                "ok": False,
+                "error": "piste RESAMPLE introuvable",
+                "set_name": set_name,
+                "set_generation": generation,
+            }), 404
+
+        if len(matches) > 1:
+            return jsonify({
+                "ok": False,
+                "error": "plusieurs pistes RESAMPLE trouvées",
+                "set_name": set_name,
+                "set_generation": generation,
+                "track_indices": matches,
+            }), 409
+
+        track_index = matches[0]
+
+        can_be_armed_response = query(
+            "/live/track/get/can_be_armed",
+            track_index,
+            timeout=0.35,
+            expected_generation=generation,
+            apply_response=False,
+        )
+
+        arm_response = query(
+            "/live/track/get/arm",
+            track_index,
+            timeout=0.35,
+            expected_generation=generation,
+            apply_response=False,
+        )
+
+        input_routing_response = query(
+            "/live/track/get/input_routing_type",
+            track_index,
+            timeout=0.35,
+            expected_generation=generation,
+            apply_response=False,
+        )
+
+        available_input_routing_response = query(
+            "/live/track/get/available_input_routing_types",
+            track_index,
+            timeout=0.45,
+            expected_generation=generation,
+            apply_response=False,
+        )
+
+        slot_has_clip_response = query(
+            "/live/clip_slot/get/has_clip",
+            track_index,
+            slot_index,
+            timeout=0.35,
+            expected_generation=generation,
+            apply_response=False,
+        )
+
+    except Exception as exc:
+        return jsonify({
+            "ok": False,
+            "error": f"erreur AbletonOSC: {exc}",
+            "set_name": set_name,
+            "set_generation": generation,
+        }), 502
+
+    def _last_value(response):
+        values = list(response or [])
+        return values[-1] if values else None
+
+    can_be_armed = bool(_last_value(can_be_armed_response))
+    armed = bool(_last_value(arm_response))
+    input_routing_type = _last_value(input_routing_response)
+    slot_has_clip = bool(_last_value(slot_has_clip_response))
+
+    available_input_routing_types = [
+        str(value)
+        for value in list(available_input_routing_response or [])[1:]
+    ]
+
+    reasons = []
+
+    if not can_be_armed:
+        reasons.append("la piste ne peut pas être armée")
+
+    if slot_has_clip:
+        reasons.append("le slot test contient déjà un clip")
+
+    safe_for_test = (
+        can_be_armed
+        and not slot_has_clip
+    )
+
+    return jsonify({
+        "ok": True,
+        "set_name": set_name,
+        "set_generation": generation,
+        "track_name": "RESAMPLE",
+        "track_index": track_index,
+        "can_be_armed": can_be_armed,
+        "armed": armed,
+        "input_routing_type": input_routing_type,
+        "available_input_routing_types": available_input_routing_types,
+        "slot_index": slot_index,
+        "slot_has_clip": slot_has_clip,
+        "safe_for_test": safe_for_test,
+        "reasons": reasons,
+    })
+
+
+
+@app.route("/show-audio/print/clip-info")
+def show_audio_print_clip_info():
+    """Informations read-only sur un clip enregistré par le Print Engine."""
+
+    try:
+        track_index = int(str(request.args.get("track_index", "")).strip())
+        slot_index = int(str(request.args.get("slot_index", "")).strip())
+    except (TypeError, ValueError):
+        return jsonify({
+            "ok": False,
+            "error": "track_index et slot_index doivent être des entiers",
+        }), 400
+
+    if track_index < 0 or slot_index < 0:
+        return jsonify({
+            "ok": False,
+            "error": "track_index et slot_index doivent être >= 0",
+        }), 400
+
+    with lock:
+        generation = int(state.get("set_generation", 0))
+        set_ready = bool(state.get("set_ready", False))
+        set_name = str(state.get("current_set_name", "") or "")
+
+    if not set_ready:
+        return jsonify({
+            "ok": False,
+            "error": "Live Set non prêt",
+            "set_generation": generation,
+        }), 409
+
+    def _last_value(response):
+        values = list(response or [])
+        return values[-1] if values else None
+
+    try:
+        has_clip_response = query(
+            "/live/clip_slot/get/has_clip",
+            track_index,
+            slot_index,
+            timeout=0.35,
+            expected_generation=generation,
+            apply_response=False,
+        )
+
+        has_clip = bool(_last_value(has_clip_response))
+
+        if not has_clip:
+            return jsonify({
+                "ok": False,
+                "error": "aucun clip dans ce slot",
+                "set_name": set_name,
+                "set_generation": generation,
+                "track_index": track_index,
+                "slot_index": slot_index,
+                "has_clip": False,
+            }), 409
+
+        file_path_response = query(
+            "/live/clip/get/file_path",
+            track_index,
+            slot_index,
+            timeout=0.35,
+            expected_generation=generation,
+            apply_response=False,
+        )
+
+        length_response = query(
+            "/live/clip/get/length",
+            track_index,
+            slot_index,
+            timeout=0.35,
+            expected_generation=generation,
+            apply_response=False,
+        )
+
+        recording_response = query(
+            "/live/clip/get/is_recording",
+            track_index,
+            slot_index,
+            timeout=0.35,
+            expected_generation=generation,
+            apply_response=False,
+        )
+
+    except Exception as exc:
+        return jsonify({
+            "ok": False,
+            "error": f"erreur AbletonOSC: {exc}",
+            "set_name": set_name,
+            "set_generation": generation,
+            "track_index": track_index,
+            "slot_index": slot_index,
+        }), 502
+
+    return jsonify({
+        "ok": True,
+        "set_name": set_name,
+        "set_generation": generation,
+        "track_index": track_index,
+        "slot_index": slot_index,
+        "has_clip": True,
+        "file_path": _last_value(file_path_response),
+        "length": _last_value(length_response),
+        "is_recording": bool(_last_value(recording_response)),
+    })
+
+
+
+
+@app.route("/show-audio/print/capture-clean", methods=["POST"])
+def show_audio_print_capture_clean():
+    """Capture CLEAN explicitement déclenchée via le Print Engine."""
+
+    payload = request.get_json(silent=True) or {}
+
+    try:
+        scene_number = int(payload.get("scene_number"))
+        slot_index = int(payload.get("slot_index"))
+        duration_seconds = float(payload.get("duration_seconds"))
+    except (TypeError, ValueError):
+        return jsonify({
+            "ok": False,
+            "error": "scene_number, slot_index et duration_seconds requis",
+        }), 400
+
+    if scene_number < 1:
+        return jsonify({"ok": False, "error": "scene_number doit être >= 1"}), 400
+    if slot_index < 0:
+        return jsonify({"ok": False, "error": "slot_index doit être >= 0"}), 400
+    if not (0 < duration_seconds <= 3600):
+        return jsonify({
+            "ok": False,
+            "error": "duration_seconds doit être > 0 et <= 3600",
+        }), 400
+
+    with lock:
+        generation = int(state.get("set_generation", 0))
+        set_ready = bool(state.get("set_ready", False))
+        set_name = str(state.get("current_set_name", "") or "")
+
+    if not set_ready:
+        return jsonify({
+            "ok": False,
+            "error": "Live Set non prêt",
+            "set_generation": generation,
+        }), 409
+
+    scene_index = scene_number - 1
+
+    def _fire_scene(index):
+        request_id = f"show-audio-print-{time.time_ns()}"
+        ok, message = execute_go_transaction(
+            request_id,
+            generation,
+            index + 1,
+        )
+        if not ok:
+            raise PrintEngineError(message)
+
+    try:
+        result = capture_clean(
+            query=query,
+            send=send,
+            fire_scene=_fire_scene,
+            generation=generation,
+            scene_index=scene_index,
+            slot_index=slot_index,
+            duration_seconds=duration_seconds,
+        )
+    except PrintEngineError as exc:
+        return jsonify({
+            "ok": False,
+            "error": str(exc),
+            "set_name": set_name,
+            "set_generation": generation,
+        }), 409
+    except Exception as exc:
+        return jsonify({
+            "ok": False,
+            "error": f"erreur Print Engine: {exc}",
+            "set_name": set_name,
+            "set_generation": generation,
+        }), 500
+
+    return jsonify({
+        "ok": True,
+        "set_name": set_name,
+        "set_generation": generation,
+        "scene_number": scene_number,
+        **result,
+    })
+
 
 
 @app.route("/show-audio/tracks")

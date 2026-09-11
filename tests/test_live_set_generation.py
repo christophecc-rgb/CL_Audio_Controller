@@ -24,6 +24,34 @@ def load_app_module():
 
 
 class LiveSetGenerationTests(unittest.TestCase):
+
+    def test_startup_during_active_bootstrap_does_not_create_new_generation(self):
+        generation = 3
+
+        self.app.state["set_generation"] = generation
+        self.app.state["current_set_id"] = f"pending:{generation}"
+        self.app.state["set_ready"] = False
+
+        transaction = self.app._new_bootstrap_transaction(generation)
+        self.app._bootstrap_transaction = transaction
+        self.app._bootstrap_generation = generation
+        self.app.state["bootstrap_running"] = True
+
+        with mock.patch.object(
+            self.app,
+            "reset_live_set_state_locked",
+            wraps=self.app.reset_live_set_state_locked,
+        ) as reset_state, mock.patch.object(
+            self.app,
+            "start_live_set_bootstrap",
+        ) as start_bootstrap:
+            self.app.osc_reply("/live/startup")
+
+        self.assertEqual(self.app.state["set_generation"], generation)
+        reset_state.assert_not_called()
+        start_bootstrap.assert_not_called()
+        self.assertIs(self.app._bootstrap_transaction, transaction)
+
     def test_ableton_connection_is_the_single_source_of_midi_roles(self):
         self.assertEqual(self.app.ableton_midi_roles("local"), {
             "mode": "Local", "expected_source": "Gestionnaire IAC Bus 1",
@@ -1452,6 +1480,28 @@ class LiveSetGenerationTests(unittest.TestCase):
         self.assertFalse(after["has_show_started"])
         self.assertIsNone(after["current_scene"])
         self.assertEqual(after["playing_scene_name"], "—")
+
+    def test_bootstrap_accepts_confirmed_file_path_over_same_generation_unsaved_id(self):
+        generation = 6
+
+        self.app.state["set_generation"] = generation
+        self.app.state["current_set_id"] = f"unsaved:{generation}"
+        self.app.state["set_ready"] = False
+
+        applied = self.app.apply_live_set_bootstrap_locked(
+            generation,
+            "/Users/test/S8.als",
+            "S8",
+            1,
+            ("Intro", "S8"),
+        )
+
+        self.assertTrue(applied)
+        self.assertEqual(
+            self.app.state["current_set_id"],
+            "/Users/test/S8.als",
+        )
+        self.assertTrue(self.app.state["set_ready"])
 
     def test_set_ready_requires_a_complete_matching_bootstrap(self):
         with self.app.lock:

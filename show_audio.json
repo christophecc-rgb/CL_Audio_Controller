@@ -1,0 +1,99 @@
+{
+  "version": 1,
+  "revision": 3,
+  "variants": [
+    {
+      "id": "demo_jade_roxy_alice",
+      "number": "42",
+      "title": "JADE",
+      "role": "ROXY",
+      "artist": "Alice",
+      "key": "Gm",
+      "playback": "JADE_ROXY_Gm.wav",
+      "scene_index": 41,
+      "scene_name": "42 JADE ROXY",
+      "export": true,
+      "notes": ""
+    },
+    {
+      "id": "scene_032_meneuse_jade",
+      "number": "3",
+      "title": "SUPREME",
+      "role": "Meneuse",
+      "artist": "Jade",
+      "key": "",
+      "playback": "SUPREME  (C)",
+      "scene_index": 32,
+      "scene_name": "3 -  SUPREME ; BPM ; KEY ; 3:40",
+      "export": true,
+      "notes": ""
+    }
+  ],
+  "medleys": [
+    {
+      "id": "medley_gigi_never_love_dancing_queen",
+      "title": "GIGI / NEVER / LOVE / DANCING QUEEN",
+      "scene_numbers": [
+        41,
+        42,
+        43,
+        44
+      ],
+      "export_parts": true,
+      "export_full": true,
+      "play_mode": "follow"
+    },
+    {
+      "id": "medley_dua_free_proud_cant_stop",
+      "title": "meddley SING SING",
+      "scene_numbers": [
+        64,
+        65,
+        66,
+        67
+      ],
+      "numbering": "live",
+      "export_parts": true,
+      "export_full": true,
+      "play_mode": "follow"
+    }
+  ],
+  "playback_tracks": [
+    "TONA BASSE (A)",
+    "TONA HAUTE (B)",
+    "DETUNED (B)",
+    "27 Jade Naomi",
+    "28 PB guillaume",
+    "29 PB LEANA",
+    "30 PB MARGAUX",
+    "31 PB JADE",
+    "33 MANON",
+    "34 FALONE",
+    "35 DELPHINE",
+    "36 STEFANIE",
+    "37 AMALIA",
+    "38 Jade N",
+    "39 Mathilde",
+    "40 VIOLONS / spare",
+    "MARGAUX-KEY-DIR",
+    "MARGAUX-TONY-DIR",
+    "MARGAUX-BENY-DIR",
+    "MARGAUX-GUI-CYR-DIR",
+    "JADE.C -TOONY- DIRECTRICES",
+    "JADE.C -DAVID- DIRECTRICE",
+    "DELPHINE -CYRIL-DIR",
+    "JADE.C -KEY- RYAN/VENUS",
+    "JADE.C-BENY-RYAN/VENUS",
+    "JADE-GUI/CYR-DIR",
+    "JADE FLO VENUS/R",
+    "leana-Gui/Cyril-VENUS/Ryan",
+    "66 TABLEAUX",
+    "67 Bruitages Eau"
+  ],
+  "playback_groups": [
+    "26 PLAYBACKS",
+    "32 PRESHOW",
+    "41 SAISON 7"
+  ],
+  "playback_source_mode": "live"
+}
