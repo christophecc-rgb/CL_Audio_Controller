@@ -48,6 +48,17 @@ def _text(value):
     return str(value if value is not None else "").strip()
 
 
+ROLE_ALIASES = {
+    "preshow punk": "punk",
+}
+
+
+def _role_key(value):
+    """Clé de comparaison d'un rôle sans modifier son libellé affiché."""
+    normalized = re.sub(r"\\s+", " ", _text(value)).strip().casefold()
+    return ROLE_ALIASES.get(normalized, normalized)
+
+
 def _boolean(value, field):
     if isinstance(value, bool):
         return value
@@ -169,14 +180,54 @@ def validate_builder_document(document):
     cues, distribution = document["cues"], document["distribution"]
     invalid_tc = [cue["id"] for cue in cues if cue["timecode"] and not _valid_timecode(cue["timecode"])]
     empty_text = [cue["id"] for cue in cues if not cue["text"]]
-    known_roles = {row["role"] for row in distribution if row["role"]}
+    known_role_keys = {_role_key(row["role"]) for row in distribution if row["role"]}
     known_artists = {row["artist"] for row in distribution if row["artist"]}
-    unknown_roles = sorted({cue["role"] for cue in cues if cue["role"] and cue["role"] not in known_roles})
-    unknown_artists = sorted({cue["artist"] for cue in cues if cue["artist"] and cue["artist"] not in known_artists})
-    roles = sorted(known_roles | {cue["role"] for cue in cues if cue["role"]})
-    active_by_role = {role: [row for row in distribution if row["role"] == role and row["active"]] for role in roles}
-    missing_active = [role for role, rows in active_by_role.items() if not rows]
-    multiple_active = [role for role, rows in active_by_role.items() if len(rows) > 1]
+
+    cue_role_labels = {}
+    distribution_role_labels = {}
+
+    for row in distribution:
+        if row["role"]:
+            distribution_role_labels.setdefault(_role_key(row["role"]), row["role"])
+
+    for cue in cues:
+        if cue["role"]:
+            cue_role_labels.setdefault(_role_key(cue["role"]), cue["role"])
+
+    unknown_roles = sorted({
+        cue["role"] for cue in cues
+        if cue["role"] and _role_key(cue["role"]) not in known_role_keys
+    })
+
+    unknown_artists = sorted({
+        cue["artist"] for cue in cues
+        if cue["artist"] and cue["artist"] not in known_artists
+    })
+
+    role_keys = sorted(set(distribution_role_labels) | set(cue_role_labels))
+
+    active_by_role = {
+        role_key: [
+            row for row in distribution
+            if _role_key(row["role"]) == role_key and row["active"]
+        ]
+        for role_key in role_keys
+    }
+
+    def role_label(role_key):
+        return cue_role_labels.get(role_key) or distribution_role_labels.get(role_key) or role_key
+
+    missing_active = [
+        role_label(role_key)
+        for role_key, rows in active_by_role.items()
+        if not rows
+    ]
+
+    multiple_active = [
+        role_label(role_key)
+        for role_key, rows in active_by_role.items()
+        if len(rows) > 1
+    ]
     empty_roles = [index for index, row in enumerate(distribution, 1) if not row["role"]]
     empty_artists = [index for index, row in enumerate(distribution, 1) if not row["artist"]]
     assignment_duplicates, assignment_seen = [], set()
@@ -235,7 +286,7 @@ def resolve_builder_cue(cue, distribution):
     cue = normalize_builder_document({"cues": [cue], "distribution": []})["cues"][0]
     rows = [row for row in normalize_builder_document(
         {"cues": [], "distribution": distribution})["distribution"]
-            if cue["role"] and row["role"] == cue["role"] and row["active"]]
+            if cue["role"] and _role_key(row["role"]) == _role_key(cue["role"]) and row["active"]]
     active = rows[0] if len(rows) == 1 else {}
     slots = [dict(slot) for slot in active.get("equipment_slots", [])]
     overrides = {key: bool(cue[key]) for key in ("artist", "microphone", "iem", "equipment")}

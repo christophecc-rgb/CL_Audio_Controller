@@ -28,3 +28,5 @@ packaging==26.2
 altgraph==0.17.5
 macholib==1.16.4
 setuptools==82.0.1
+
+pypdf>=5.0

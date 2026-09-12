@@ -433,7 +433,7 @@ class ShowCueRouteTests(unittest.TestCase):
         self.assertIn("captureTimecodeInto", source)
         self.assertNotIn("[['timecode-field',formSmpte", source)
         self.assertEqual(source.count("button.textContent='CAPTURER TC'"), 2)
-        self.assertIn("block.append(head,lines)", source)
+        self.assertIn("block.append(lines)", source)
         self.assertIn("manual-inline-nav", source)
         self.assertIn("setManualAnchor(cues,anchors[anchorIndex-1])", source)
         self.assertIn("event.dataTransfer.setData('text/plain',section)", source)

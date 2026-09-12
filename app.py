@@ -57,6 +57,7 @@ from show_cues import (
     select_show_cues, select_timed_cues, show_cues_for_conduite, show_cues_for_post,
     timecode_to_units, update_show_cue,
 )
+from showcue_pdf_import import PdfImportError, import_pdf_bytes
 from showcue_builder import (
     BUILDER_SECTIONS, BUILDER_TYPES, ORIGINS, builder_import_values, export_csv, export_xlsx,
     import_csv, import_xlsx, load_builder_document, normalize_builder_document, save_builder_document,
@@ -1244,8 +1245,12 @@ def normalize_transport_state_locked():
 def refresh_playback_remaining_locked() -> None:
     """Actualise le compte à rebours serveur partagé, sans interrogation Ableton."""
     deadline = state.get("playback_deadline")
-    if (deadline is not None and bool(state.get("is_playing", False))
-            and not bool(state.get("is_paused", False))):
+    if (
+        deadline is not None
+        and str(state.get("play_mode") or "") != "arrangement"
+        and bool(state.get("is_playing", False))
+        and not bool(state.get("is_paused", False))
+    ):
         state["remaining_seconds"] = max(0.0, float(deadline) - time.time())
 
 lock = threading.RLock()
@@ -2338,6 +2343,27 @@ def refresh_arrangement_time():
             break
     if value is None:
         return
+
+    # current_song_time et les cue points Ableton sont exprimés
+    # en beats. On récupère donc le tempo courant pour convertir
+    # l'écart depuis le locator en secondes réelles.
+    tempo = None
+    try:
+        tempo_response = query(
+            "/live/song/get/tempo",
+            timeout=0.20,
+            expected_generation=generation,
+            apply_response=False,
+        )
+        if tempo_response:
+            for item in list(tempo_response)[::-1]:
+                candidate = safe_float(item)
+                if candidate is not None and candidate > 0:
+                    tempo = float(candidate)
+                    break
+    except Exception:
+        tempo = None
+
     with lock:
         if int(state.get("set_generation", 0)) != generation:
             return
@@ -2352,9 +2378,15 @@ def refresh_arrangement_time():
         previous_marker = str(state.get("arrangement_marker") or "—")
         current_marker = "—"
         current_marker_cue_index = -1
-        for marker_index, marker in enumerate(state.get("arrangement_markers", [])):
+        current_marker_list_index = -1
+        current_marker_time = None
+        arrangement_markers = list(state.get("arrangement_markers", []))
+
+        for marker_index, marker in enumerate(arrangement_markers):
             if float(value) + 0.01 >= float(marker.get("time", 0)):
                 current_marker = str(marker.get("name") or "—")
+                current_marker_time = float(marker.get("time", 0))
+                current_marker_list_index = marker_index
                 try:
                     current_marker_cue_index = int(marker.get("cue_index", marker_index))
                 except (TypeError, ValueError):
@@ -2362,6 +2394,92 @@ def refresh_arrangement_time():
             else:
                 break
         state["arrangement_marker"] = current_marker
+
+        # En Arrangement, le locator courant et le locator suivant
+        # définissent directement la plage du tableau.
+        #
+        # current_song_time et marker["time"] sont en beats :
+        # secondes = beats * 60 / BPM.
+        if (
+            str(state.get("play_mode") or "") == "arrangement"
+            and current_marker_time is not None
+            and current_marker_list_index >= 0
+            and tempo is not None
+            and tempo > 0
+        ):
+            elapsed_beats = max(
+                0.0,
+                float(value) - float(current_marker_time),
+            )
+
+            elapsed_seconds = (
+                elapsed_beats * 60.0 / float(tempo)
+            )
+
+            next_marker_time = None
+
+            if current_marker_list_index + 1 < len(arrangement_markers):
+                try:
+                    next_marker_time = float(
+                        arrangement_markers[
+                            current_marker_list_index + 1
+                        ].get("time", 0)
+                    )
+                except (TypeError, ValueError):
+                    next_marker_time = None
+
+            if (
+                next_marker_time is not None
+                and next_marker_time > float(current_marker_time)
+            ):
+                duration_beats = (
+                    next_marker_time
+                    - float(current_marker_time)
+                )
+
+                duration_seconds = (
+                    duration_beats * 60.0 / float(tempo)
+                )
+
+                elapsed_seconds = min(
+                    duration_seconds,
+                    elapsed_seconds,
+                )
+
+                state["scene_duration_seconds"] = duration_seconds
+                state["remaining_seconds"] = max(
+                    0.0,
+                    duration_seconds - elapsed_seconds,
+                )
+
+                # En Arrangement, la vraie tête de lecture fait foi.
+                state["playback_deadline"] = None
+
+            else:
+                # Dernier locator : on conserve une éventuelle durée connue,
+                # sinon on expose au moins le temps écoulé via le status.
+                existing_duration = state.get("scene_duration_seconds")
+
+                try:
+                    existing_duration = (
+                        float(existing_duration)
+                        if existing_duration is not None
+                        else None
+                    )
+                except (TypeError, ValueError):
+                    existing_duration = None
+
+                if existing_duration is not None:
+                    elapsed_seconds = min(
+                        existing_duration,
+                        elapsed_seconds,
+                    )
+
+                    state["remaining_seconds"] = max(
+                        0.0,
+                        existing_duration - elapsed_seconds,
+                    )
+
         if (
             state.get("play_mode") == "arrangement"
             and current_marker != "—"
@@ -3712,12 +3830,137 @@ def show_info_preview_builder_import():
                     "validation": validate_builder_document(document), "saved": False})
 
 
+
+@app.route("/show-info/builder/import.pdf", methods=["POST"])
+def show_info_import_builder_pdf():
+    upload = request.files.get("file")
+
+    if upload is None:
+        return jsonify({
+            "ok": False,
+            "message": "Fichier PDF manquant",
+        }), 400
+
+    filename = str(upload.filename or "")
+
+    if not filename.lower().endswith(".pdf"):
+        return jsonify({
+            "ok": False,
+            "message": "Format attendu : PDF",
+        }), 400
+
+    payload = upload.read()
+
+    if len(payload) > 20 * 1024 * 1024:
+        return jsonify({
+            "ok": False,
+            "message": "PDF trop volumineux",
+        }), 413
+
+    try:
+        document = import_pdf_bytes(payload)
+
+        with SHOW_CUES_LOCK:
+            _, current_path = active_builder_path()
+
+            current = load_builder_document(
+                current_path
+            )
+
+            document["revision"] = current["revision"]
+
+        document = normalize_builder_document(
+            document
+        )
+
+        resolved = resolved_builder_document(
+            document
+        )
+
+        validation = validate_builder_document(
+            document
+        )
+
+    except PdfImportError as exc:
+        return jsonify({
+            "ok": False,
+            "message": str(exc),
+        }), 400
+
+    except (
+        OSError,
+        ValueError,
+        json.JSONDecodeError,
+    ) as exc:
+        return jsonify({
+            "ok": False,
+            "message": str(exc),
+        }), 500
+
+    return jsonify({
+        "ok": True,
+        "document": resolved,
+        "validation": validation,
+        "saved": False,
+        "source": "PDF",
+        "cue_count": len(document.get("cues", [])),
+    })
+
+
 @app.route("/show-info/builder/export.<format_name>")
 def show_info_export_builder(format_name):
     try:
         with SHOW_CUES_LOCK:
             _, path = active_builder_path()
             document = load_builder_document(path)
+
+            # Synchronise le TC du Builder avec la conduite officielle.
+            _, cue_path, _ = ensure_show_cue_storage()
+            show_document = load_show_document(cue_path)
+
+            official_by_builder_id = {}
+
+            for cue in show_document.get("cues", []):
+                if cue.get("status") != "official":
+                    continue
+
+                builder_meta = cue.get("builder") or {}
+                builder_id = str(
+                    builder_meta.get("builder_id") or ""
+                ).strip()
+
+                if builder_id:
+                    official_by_builder_id[builder_id] = cue
+
+            exported_cues = []
+
+            for builder_cue in document.get("cues", []):
+                exported = dict(builder_cue)
+
+                builder_id = str(
+                    builder_cue.get("id") or ""
+                ).strip()
+
+                current = official_by_builder_id.get(builder_id)
+
+                if current is not None:
+                    if (
+                        current.get("mode") == "timed"
+                        and current.get("timecode")
+                    ):
+                        exported["timecode"] = str(
+                            current["timecode"]
+                        )
+                    else:
+                        exported["timecode"] = ""
+
+                exported_cues.append(exported)
+
+            document = {
+                **document,
+                "cues": exported_cues,
+            }
+
         if format_name == "xlsx":
             payload, mime = export_xlsx(document), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         elif format_name == "csv":
@@ -3916,6 +4159,69 @@ def show_info_delete_session(session_id):
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         return jsonify({"ok": False, "message": str(exc)}), 400
     return jsonify({"ok": True, **registry})
+
+
+
+
+
+# showcue_network_address
+def showcue_local_ipv4():
+    """Retourne l'adresse IPv4 locale utilisable depuis le réseau."""
+    sock = None
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.connect(("8.8.8.8", 80))
+        return str(sock.getsockname()[0])
+    except OSError:
+        try:
+            return socket.gethostbyname(socket.gethostname())
+        except OSError:
+            return "127.0.0.1"
+    finally:
+        if sock is not None:
+            sock.close()
+
+
+@app.route("/show-info/network")
+def show_info_network():
+    ip = showcue_local_ipv4()
+    port = 5050
+
+    return jsonify({
+        "ok": True,
+        "ip": ip,
+        "port": port,
+        "url": f"http://{ip}:{port}/show-info",
+    })
+
+
+@app.route("/show-info/clock")
+def show_info_clock():
+    """Horloge civile du serveur, indépendante du LTC spectacle."""
+    now = time.time()
+    local_now = time.localtime(now)
+    fractional = now - int(now)
+
+    seconds_since_midnight = (
+        local_now.tm_hour * 3600
+        + local_now.tm_min * 60
+        + local_now.tm_sec
+        + fractional
+    )
+
+    timezone_name = ""
+    try:
+        timezone_index = 1 if local_now.tm_isdst > 0 else 0
+        timezone_name = time.tzname[timezone_index]
+    except (IndexError, TypeError):
+        pass
+
+    return jsonify({
+        "ok": True,
+        "server_epoch_ms": int(now * 1000),
+        "server_clock_seconds": seconds_since_midnight,
+        "timezone": timezone_name,
+    })
 
 
 @app.route("/show-info/status")
@@ -4168,6 +4474,165 @@ def show_info_audio(cue_id):
         return jsonify({"ok": False, "message": "Audio inconnu"}), 404
     return send_from_directory(audio_directory, audio["filename"],
                                mimetype=audio["mime_type"], conditional=True)
+
+
+
+@app.route("/show-info/conduite/order", methods=["PUT"])
+def show_info_update_conduite_order():
+    values = request.get_json(silent=True) or {}
+    cue_ids = values.get("cue_ids")
+
+    if (
+        not isinstance(cue_ids, list)
+        or not cue_ids
+        or any(not isinstance(cue_id, str) or not cue_id.strip() for cue_id in cue_ids)
+        or len(set(cue_ids)) != len(cue_ids)
+    ):
+        return jsonify({"ok": False, "message": "Ordre de conduite invalide"}), 400
+
+    try:
+        with SHOW_CUES_LOCK:
+            registry, cue_path, _ = ensure_show_cue_storage()
+            require_active_show_session(values, registry)
+
+            document = load_show_document(cue_path)
+
+            official_ids = [
+                cue["id"]
+                for cue in document["cues"]
+                if cue.get("status") == "official"
+                and cue.get("mode") != "library"
+            ]
+
+            if set(cue_ids) != set(official_ids):
+                raise RuntimeError(
+                    "La conduite a changé. Rechargez puis recommencez le déplacement."
+                )
+
+            for position, cue_id in enumerate(cue_ids, 1):
+                document, _ = update_show_cue(
+                    document,
+                    cue_id,
+                    {"conduite_order": position * 10}
+                )
+
+            save_show_document(cue_path, document)
+
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 409
+    except KeyError:
+        return jsonify({"ok": False, "message": "Cue inconnu"}), 404
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+
+    return jsonify({
+        "ok": True,
+        "cue_ids": cue_ids,
+        "count": len(cue_ids),
+    })
+
+
+
+@app.route("/show-info/cues/bulk-post", methods=["POST"])
+def show_info_bulk_post():
+    values = request.get_json(silent=True) or {}
+
+    cue_ids = values.get("cue_ids")
+    post = str(values.get("post") or "").strip().upper()
+    enabled = values.get("enabled")
+
+    if (
+        not isinstance(cue_ids, list)
+        or not cue_ids
+        or any(not isinstance(cue_id, str) or not cue_id.strip() for cue_id in cue_ids)
+        or len(set(cue_ids)) != len(cue_ids)
+    ):
+        return jsonify({"ok": False, "message": "Sélection de cues invalide"}), 400
+
+    if post not in SHOW_POSTS:
+        return jsonify({"ok": False, "message": "Poste invalide"}), 400
+
+    if not isinstance(enabled, bool):
+        return jsonify({"ok": False, "message": "État de destination invalide"}), 400
+
+    try:
+        with SHOW_CUES_LOCK:
+            registry, cue_path, _ = ensure_show_cue_storage()
+            require_active_show_session(values, registry)
+
+            document = load_show_document(cue_path)
+
+            selected = {
+                cue["id"]: cue
+                for cue in document["cues"]
+                if cue["id"] in cue_ids
+            }
+
+            if len(selected) != len(cue_ids):
+                raise KeyError("cue")
+
+            # Une fiche officielle ne doit jamais terminer sans destinataire.
+            if not enabled:
+                blocked = [
+                    cue
+                    for cue in selected.values()
+                    if post in cue.get("posts", ())
+                    and len(cue.get("posts", ())) <= 1
+                ]
+
+                if blocked:
+                    names = ", ".join(cue.get("text", cue["id"]) for cue in blocked[:3])
+                    if len(blocked) > 3:
+                        names += "…"
+
+                    raise ValueError(
+                        "Impossible de retirer "
+                        + post
+                        + " : au moins une fiche n'aurait plus aucun destinataire ("
+                        + names
+                        + ")"
+                    )
+
+            for cue_id in cue_ids:
+                current = next(
+                    cue
+                    for cue in document["cues"]
+                    if cue["id"] == cue_id
+                )
+
+                posts = list(current.get("posts", ()))
+
+                if enabled:
+                    if post not in posts:
+                        posts.append(post)
+                else:
+                    posts = [
+                        item
+                        for item in posts
+                        if item != post
+                    ]
+
+                document, _ = update_show_cue(
+                    document,
+                    cue_id,
+                    {"posts": posts}
+                )
+
+            save_show_document(cue_path, document)
+
+    except RuntimeError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 409
+    except KeyError:
+        return jsonify({"ok": False, "message": "Cue inconnu"}), 404
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+
+    return jsonify({
+        "ok": True,
+        "count": len(cue_ids),
+        "post": post,
+        "enabled": enabled,
+    })
 
 
 @app.route("/show-info/cues/<cue_id>", methods=["PUT"])
@@ -6383,7 +6848,28 @@ def action():
                 state["sync_source"] = "Télécommande"
         else:
             show_arrangement_view()
+
+            # SHOWCUE: preload arrangement markers before playback
+            # Les locators sont indispensables pour déterminer le tableau
+            # courant ainsi que sa durée en mode Arrangement.
+            arrangement_markers = load_arrangement_markers(
+                force_live=True,
+                expected_generation=action_generation,
+            )
+
             with lock:
+                if (
+                    int(state.get("set_generation", 0)) == int(action_generation)
+                    and arrangement_markers
+                ):
+                    state["arrangement_markers"] = arrangement_markers
+                    state["arrangement_markers_source"] = str(
+                        arrangement_markers[0].get(
+                            "source",
+                            state.get("arrangement_markers_source", "CACHE"),
+                        )
+                    )
+
                 arrangement_context_name = str(state.get("arrangement_marker") or "").strip()
                 arrangement_context_index = -1
                 for marker_index, marker in enumerate(state.get("arrangement_markers") or []):

@@ -319,6 +319,14 @@ def _normalize_cue(raw, index, used_ids):
         raise ValueError(f"cue {cue_id} : mode, statut ou texte invalide")
     cue = {"id": cue_id, "mode": mode, "text": text,
            "posts": _normalize_posts(raw.get("posts", ())), "status": status}
+
+    # Ordre visuel persistant de la CONDUITE.
+    # Indépendant du timecode utilisé par le moteur LIVE.
+    if raw.get("conduite_order") is not None:
+        try:
+            cue["conduite_order"] = float(raw["conduite_order"])
+        except (TypeError, ValueError):
+            raise ValueError(f"cue {cue_id} : conduite_order invalide")
     builder = raw.get("builder")
     if builder is not None:
         if not isinstance(builder, dict):
@@ -414,6 +422,17 @@ def save_show_document(path: Path, document):
         raise
 
 
+
+# Conserve l'ordre visuel de CONDUITE dans toutes les vues publiques.
+_showcue_public_cue_without_conduite_order = _public_cue
+
+def _public_cue(cue):
+    public = _showcue_public_cue_without_conduite_order(cue)
+    if cue.get("conduite_order") is not None:
+        public["conduite_order"] = cue["conduite_order"]
+    return public
+
+
 def create_show_cue(document, values):
     cues = list(document["cues"])
     data = dict(values or {})
@@ -438,7 +457,7 @@ def update_show_cue(document, cue_id, values):
             continue
         updated = _public_cue(current)
         for key in ("mode", "text", "posts", "status", "timecode", "section", "order",
-                    "anchor_after", "audio", "builder"):
+                    "anchor_after", "audio", "builder", "conduite_order"):
             if key in values:
                 updated[key] = values[key]
         used_ids = {cue["id"] for position, cue in enumerate(cues) if position != index}

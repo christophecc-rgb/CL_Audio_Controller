@@ -10,7 +10,7 @@
 @media(max-width:760px){.cue-line{grid-template-columns:82px minmax(0,1fr) auto;padding:7px 0}.cue-line .destinations{grid-column:auto}.edit-icon{grid-column:auto;grid-row:auto}.manual-lines .cue-line{grid-template-columns:28px minmax(0,1fr) auto}.manual-lines .destinations{grid-column:auto}}@media(max-width:600px){.cue-line .destinations{grid-column:2/4}.edit-icon{grid-column:4;grid-row:1}.manual-lines .destinations{grid-column:2/4}}@media(max-width:420px){.cue-line{grid-template-columns:70px minmax(0,1fr) auto}.destination{min-width:32px}}
 .ableton-strip{display:grid;grid-template-columns:minmax(180px,1fr) repeat(3,auto);align-items:end;gap:clamp(14px,3vw,36px);margin-bottom:12px;padding:14px 18px}.ableton-scene{color:#e0ad59;font-size:clamp(1.15rem,2.4vw,1.7rem);font-weight:900}.ableton-value{margin-top:5px;color:#d6a34f;font:800 .92rem ui-monospace,monospace}.live-current-head{display:flex;align-items:center;justify-content:space-between;gap:14px}.live-edit{align-self:flex-start;font-size:1rem}.smpte-editor{display:flex;align-items:center;gap:5px;margin-top:8px}.smpte-part{display:grid;grid-template-rows:auto 42px auto auto;justify-items:center}.smpte-part button{width:42px;border:0;background:transparent;color:#948a7d;padding:1px;font-size:.65rem}.smpte-part input{width:46px;border:1px solid #4b6353;border-radius:7px;background:#0b0d0b;color:var(--ltc);padding:8px 3px;text-align:center;font:850 1rem ui-monospace,monospace}.smpte-part small{color:var(--muted);font-size:.58rem;font-weight:900;letter-spacing:.08em}.smpte-separator{color:var(--ltc);font:850 1.05rem ui-monospace,monospace;margin-top:7px}.quick-dialog{width:min(520px,calc(100% - 24px))}
 @media(max-width:760px){.ableton-strip{grid-template-columns:1fr 1fr;align-items:start}.ableton-main,.ableton-ltc{grid-column:1/3}.live-ltc{font-size:1.45rem}.live-current-head{align-items:flex-start}}@media(max-width:420px){.ableton-strip{gap:10px;padding:12px}.smpte-part input{width:40px}.smpte-part button{width:38px}}
-.statusbar{grid-template-columns:auto minmax(112px,auto) 1fr auto auto auto}.call-button{padding:6px 10px;font-size:.72rem;letter-spacing:.06em}.call-button.calling,.call-item.calling{border-color:#c78c32;background:#5a3c12;color:#ffe0a2;animation:call-pulse 1.8s ease-in-out infinite}.call-button.incoming,.incoming-card{border-color:#e0a23e;background:#6a4614;color:#fff1cc}.call-button.acknowledged,.call-item.acknowledged{border-color:#4b9b68;background:#214c32;color:#d9ffe6}.call-panel{width:min(420px,calc(100% - 24px))}.call-targets{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}.call-targets button{padding:10px 4px}.call-list{display:grid;gap:7px;margin-top:14px}.call-item{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:.8rem;font-weight:900}.call-incoming{position:fixed;z-index:20;right:18px;top:86px;display:grid;gap:8px;width:min(340px,calc(100% - 36px))}.incoming-card{border:2px solid #e0a23e;border-radius:10px;box-shadow:0 12px 35px #000b;padding:14px}.incoming-title{font-size:1.05rem;font-weight:950}.incoming-card button{margin-top:10px;width:100%;background:#d18c25;border-color:#f0b34f;color:#171009}@keyframes call-pulse{50%{filter:brightness(1.22)}}
+.statusbar{grid-template-columns:auto minmax(112px,auto) 1fr auto auto auto auto}.call-button{padding:6px 10px;font-size:.72rem;letter-spacing:.06em}.call-button.calling,.call-item.calling{border-color:#c78c32;background:#5a3c12;color:#ffe0a2;animation:call-pulse 1.8s ease-in-out infinite}.call-button.incoming,.incoming-card{border-color:#e0a23e;background:#6a4614;color:#fff1cc}.call-button.acknowledged,.call-item.acknowledged{border-color:#4b9b68;background:#214c32;color:#d9ffe6}.call-panel{width:min(420px,calc(100% - 24px))}.call-targets{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}.call-targets button{padding:10px 4px}.call-list{display:grid;gap:7px;margin-top:14px}.call-item{display:flex;align-items:center;justify-content:space-between;gap:10px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:.8rem;font-weight:900}.call-incoming{position:fixed;z-index:20;right:18px;top:86px;display:grid;gap:8px;width:min(340px,calc(100% - 36px))}.incoming-card{border:2px solid #e0a23e;border-radius:10px;box-shadow:0 12px 35px #000b;padding:14px}.incoming-title{font-size:1.05rem;font-weight:950}.incoming-card button{margin-top:10px;width:100%;background:#d18c25;border-color:#f0b34f;color:#171009}@keyframes call-pulse{50%{filter:brightness(1.22)}}
 .ableton-strip{grid-template-columns:minmax(220px,1fr) repeat(3,auto);gap:8px 22px;padding:9px 14px}.ableton-scene{font-size:clamp(1.05rem,2vw,1.45rem)}.ableton-value{margin-top:2px;font-size:.84rem}.conduite-grid{grid-template-columns:minmax(0,1fr) minmax(240px,300px)}.content-panel{padding:14px}.cue-line{grid-template-columns:96px minmax(160px,1fr) auto 28px;gap:6px;padding:5px 0}.destinations{gap:2px}.destination{min-width:31px;padding:4px;font-size:.56rem}.edit-icon{min-width:26px;padding:4px}
 @media(max-width:760px){.statusbar{grid-template-columns:1fr auto auto}.call-button{grid-column:3;grid-row:2}.ableton-strip{grid-template-columns:repeat(3,1fr)}.ableton-main,.ableton-ltc{grid-column:1/4}.call-incoming{top:118px}.conduite-grid{grid-template-columns:1fr}}@media(max-width:600px){.call-targets{grid-template-columns:1fr 1fr}}
 .live-past{display:grid;gap:3px;margin-bottom:8px}.past-line{display:grid;grid-template-columns:108px minmax(0,1fr);gap:10px;padding:4px 10px;color:#aaa198;font-size:.78rem}.past-line.near{color:#d0c8bc;font-size:.86rem}.past-time{color:var(--ltc);font-family:ui-monospace,monospace}.live-current{min-height:clamp(190px,34vh,390px);padding:clamp(18px,4vw,48px)}.live-ahead{margin-top:8px;gap:8px}.ahead-card{min-height:92px;padding:13px 16px}.conduite-grid{grid-template-columns:minmax(0,2fr) minmax(260px,1fr);align-items:start}.conduite-grid>*{min-width:0}.stack,.content-panel,.manual-nav,.cue-line,.line-text{min-width:0}.content-panel{padding:12px}.content-panel h3{margin-bottom:9px}.sequence{gap:0}.cue-line{padding:3px 0;min-height:31px}.destination{padding:3px 4px}.edit-icon{padding:3px 5px}.cue-line.current-timed{border-left:3px solid #c64949;background:#401a1c;box-shadow:inset 0 0 0 1px #722e32;padding-left:5px}.cue-line.current-timed .line-text{color:#fff}.manual-nav{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px}.manual-nav button{min-width:0;padding:7px 4px;font-size:.68rem}.manual-nav .quiet{grid-column:1/3}.stack .cue-line{grid-template-columns:74px minmax(0,1fr) auto 26px}.stack .line-text{overflow-wrap:anywhere}.anchor-control{display:grid;grid-template-columns:auto minmax(0,1fr);padding:6px}.anchor-control select{width:100%;min-width:0}.tools button{padding:7px 10px}.manual-block summary{padding-block:6px}
@@ -22,15 +22,1587 @@
 </style>
 
 
+<style id="showcue-hf-quick-edit">
+.quick-posts{
+    display:flex;
+    flex-wrap:wrap;
+    gap:7px;
+    margin:8px 0 14px;
+}
+.quick-post{
+    min-width:54px;
+    padding:7px 11px;
+    border:1px solid #514940;
+    background:#24201c;
+    color:#b9b0a4;
+}
+.quick-post.active{
+    border-color:#c79b50;
+    background:#5a4523;
+    color:#fff2d2;
+}
+.cue-actions{
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    gap:5px;
+}
+.delete-icon{
+    min-width:30px;
+    padding:5px 8px;
+    color:#ffaaa6;
+    border-color:#754542;
+    background:#351b1a;
+}
+.delete-icon:hover{
+    border-color:#b75c57;
+    background:#542321;
+}
+</style>
+
+<style id="showcue-conduite-toolbar-actions-layout">
+
+/* ==========================================================
+   BARRE CONDUITE TOUJOURS ACCESSIBLE
+   ========================================================== */
+
+#view-conduite .conduite-workbar{
+    position:sticky !important;
+    top:0 !important;
+    z-index:80 !important;
+
+    background:#100e0b !important;
+    border:1px solid var(--line) !important;
+    border-radius:9px !important;
+
+    padding:8px 10px !important;
+    margin-bottom:8px !important;
+
+    box-shadow:
+        0 7px 16px rgba(0,0,0,.42),
+        inset 0 -1px 0 rgba(255,255,255,.025);
+}
+
+/* Le groupe de boutons reste toujours visible */
+#view-conduite .conduite-workbar .tools{
+    display:flex !important;
+    align-items:center !important;
+    justify-content:flex-end !important;
+    gap:6px !important;
+    flex-wrap:nowrap !important;
+    min-width:max-content !important;
+}
+
+/* CAPTURE TC plus identifiable */
+#capture-tc{
+    display:inline-flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+
+    min-width:116px !important;
+    white-space:nowrap !important;
+
+    border-color:#497d63 !important;
+    background:#173326 !important;
+    color:#aef3c9 !important;
+
+    font-weight:950 !important;
+}
+
+#capture-tc:not(:disabled):hover{
+    background:#204833 !important;
+}
+
+
+/* ==========================================================
+   LIGNES CONDUITE
+   ========================================================== */
+
+/*
+ * On réserve explicitement :
+ *   TC | TEXTE | POSTES | EDITION
+ */
+#timed-sequence .cue-line{
+    grid-template-columns:
+        92px
+        minmax(250px,1fr)
+        minmax(174px,max-content)
+        64px
+        !important;
+
+    column-gap:8px !important;
+    align-items:center !important;
+}
+
+/* Les boutons de postes ne doivent jamais passer sous l'édition */
+#timed-sequence .destinations{
+    display:flex !important;
+    align-items:center !important;
+    justify-content:flex-end !important;
+
+    gap:3px !important;
+
+    min-width:174px !important;
+    width:max-content !important;
+
+    white-space:nowrap !important;
+    overflow:visible !important;
+}
+
+#timed-sequence .destinations .destination{
+    flex:0 0 auto !important;
+    min-width:31px !important;
+    padding-left:5px !important;
+    padding-right:5px !important;
+}
+
+
+/* Zone édition totalement indépendante */
+#timed-sequence .cue-actions{
+    display:flex !important;
+    align-items:center !important;
+    justify-content:flex-end !important;
+
+    gap:3px !important;
+
+    min-width:60px !important;
+    width:60px !important;
+
+    position:relative !important;
+    z-index:4 !important;
+}
+
+#timed-sequence .cue-actions button{
+    flex:0 0 auto !important;
+    position:static !important;
+    margin:0 !important;
+}
+
+
+/* ==========================================================
+   CUES MANUELS IMPORTÉS
+   ========================================================== */
+
+#timed-sequence .compact-manual .cue-line.manual-cue-row{
+    grid-template-columns:
+        minmax(250px,1fr)
+        minmax(174px,max-content)
+        64px
+        !important;
+
+    column-gap:8px !important;
+}
+
+
+/* ==========================================================
+   PETITS ÉCRANS
+   ========================================================== */
+
+@media(max-width:950px){
+
+    #view-conduite .conduite-workbar{
+        grid-template-columns:1fr auto !important;
+    }
+
+    #view-conduite .conduite-ableton{
+        grid-column:1/-1 !important;
+    }
+
+    #timed-sequence .cue-line{
+        grid-template-columns:
+            76px
+            minmax(190px,1fr)
+            minmax(160px,max-content)
+            58px
+            !important;
+    }
+
+    #timed-sequence .compact-manual .cue-line.manual-cue-row{
+        grid-template-columns:
+            minmax(190px,1fr)
+            minmax(160px,max-content)
+            58px
+            !important;
+    }
+
+    #timed-sequence .destinations{
+        min-width:160px !important;
+    }
+
+    #timed-sequence .cue-actions{
+        min-width:54px !important;
+        width:54px !important;
+    }
+}
+
+</style>
+
+
+<style id="showcue-current-cue-pulse">
+
+@keyframes showcue-current-pulse{
+    0%,100%{
+        background:rgba(190,70,45,.10);
+        box-shadow:
+            inset 4px 0 0 #d75f45,
+            inset 0 0 0 1px rgba(215,95,69,.12);
+    }
+
+    50%{
+        background:rgba(190,70,45,.22);
+        box-shadow:
+            inset 4px 0 0 #ff7b5d,
+            inset 0 0 0 1px rgba(255,123,93,.30);
+    }
+}
+
+#timed-sequence .cue-line.current-timed{
+    animation:showcue-current-pulse 1.2s ease-in-out infinite;
+}
+
+#timed-sequence .cue-line.current-timed .line-text{
+    color:#ffd9cc !important;
+    font-weight:950 !important;
+}
+
+#timed-sequence .cue-line.current-timed .line-time{
+    color:#ff8c70 !important;
+}
+
+#timed-sequence .cue-line.current-timed .inline-capture-tc.has-timecode{
+    color:#ff9b82 !important;
+}
+
+@media (prefers-reduced-motion: reduce){
+    #timed-sequence .cue-line.current-timed{
+        animation:none !important;
+        background:rgba(190,70,45,.18) !important;
+        box-shadow:inset 4px 0 0 #ff7b5d !important;
+    }
+}
+
+</style>
+
+
+<style id="showcue-live-current-active-state">
+
+/* ==========================================================
+   CUE ACTUEL — LIVE
+   État actif permanent, sans clignotement
+   ========================================================== */
+
+#view-live .live-current{
+    position:relative;
+
+    border:
+        1px solid rgba(212,166,85,.48) !important;
+
+    background:
+        linear-gradient(
+            135deg,
+            rgba(58,43,23,.52) 0%,
+            rgba(29,24,18,.90) 42%,
+            rgba(20,18,15,.98) 100%
+        ) !important;
+
+    box-shadow:
+        inset 4px 0 0 rgba(218,169,83,.85),
+        inset 0 0 28px rgba(211,160,70,.045),
+        0 4px 18px rgba(0,0,0,.22) !important;
+}
+
+
+/* petit repère ACTUEL */
+#view-live .live-current::before{
+    content:'EN COURS';
+
+    position:absolute;
+    top:12px;
+    right:14px;
+
+    padding:3px 7px;
+
+    border:
+        1px solid rgba(216,173,98,.30);
+
+    border-radius:5px;
+
+    background:
+        rgba(80,57,27,.35);
+
+    color:#ddb36c;
+
+    font-size:.55rem;
+    font-weight:1000;
+    letter-spacing:.10em;
+
+    pointer-events:none;
+}
+
+
+/* titre principal */
+#view-live .live-current .current-text{
+    color:#fff2db !important;
+
+    text-shadow:
+        0 1px 0 rgba(0,0,0,.7),
+        0 0 18px rgba(218,169,83,.07);
+}
+
+
+/* libellé CUE ACTUEL */
+#view-live .live-current .cue-kicker .label{
+    color:#cfa75f !important;
+}
+
+
+/* TC / métadonnées */
+#view-live .live-current .cue-meta{
+    color:#69e7a0 !important;
+}
+
+
+/* triangle ou indicateur éventuel devant le titre */
+#view-live .live-current .current-text::first-letter{
+    color:#dfa94c;
+}
+
+</style>
+
+
+<style id="showcue-live-ableton-emphasis">
+
+/* Cartouche scène Ableton LIVE */
+#view-live .live-scene,
+#view-live .ableton-status,
+#view-live .scene-status{
+    min-height:72px;
+    padding:12px 16px !important;
+}
+
+/* Titre de scène */
+#view-live #ableton-scene,
+#view-live #title{
+    font-size:1.35rem !important;
+    font-weight:1000 !important;
+    line-height:1.05 !important;
+    letter-spacing:-.015em;
+}
+
+/* Libellés */
+#view-live #ableton-elapsed,
+#view-live #ableton-duration,
+#view-live #ableton-remaining{
+    font-size:1.08rem !important;
+    font-weight:1000 !important;
+    line-height:1 !important;
+}
+
+/* Colonnes temps */
+#view-live .scene-time,
+#view-live .ableton-time,
+#view-live .scene-metric{
+    min-width:72px;
+}
+
+/* Libellés ÉCOULÉ / DURÉE / RESTE */
+#view-live .scene-time .label,
+#view-live .ableton-time .label,
+#view-live .scene-metric .label{
+    font-size:.68rem !important;
+    letter-spacing:.10em !important;
+    margin-bottom:5px !important;
+}
+
+/* Temps restant plus visible */
+#view-live #ableton-remaining{
+    font-size:1.22rem !important;
+    color:#f0bd67 !important;
+}
+
+/* Écoulé et durée */
+#view-live #ableton-elapsed,
+#view-live #ableton-duration{
+    color:#dca959 !important;
+}
+
+/* Plus d'espace entre les trois valeurs */
+#view-live .scene-times,
+#view-live .ableton-times,
+#view-live .scene-metrics{
+    gap:22px !important;
+}
+
+/* Responsive */
+@media(max-width:760px){
+    #view-live #ableton-scene,
+    #view-live #title{
+        font-size:1.12rem !important;
+    }
+
+    #view-live #ableton-elapsed,
+    #view-live #ableton-duration,
+    #view-live #ableton-remaining{
+        font-size:.95rem !important;
+    }
+}
+
+</style>
+
+
+
+
+<style id="showcue-responsive-v6">
+
+/* ==========================================================
+   BASE
+   ========================================================== */
+
+html,
+body{
+    max-width:100%;
+    overflow-x:hidden;
+}
+
+body{
+    margin:0;
+}
+
+.shell{
+    width:min(1500px,100%) !important;
+    max-width:100% !important;
+    box-sizing:border-box;
+}
+
+.showcue-header-v6{
+    width:100%;
+    box-sizing:border-box;
+    margin-bottom:14px;
+}
+
+
+/* ==========================================================
+   BRAND ROW
+   ========================================================== */
+
+.v6-brand-row{
+    display:grid;
+    grid-template-columns:minmax(220px,36%) minmax(160px,1fr) auto;
+    align-items:center;
+    gap:22px;
+
+    padding:12px 14px;
+
+    background:#0e0d0c;
+    border-bottom:1px solid #29251f;
+}
+
+.v6-logo{
+    display:block;
+
+    width:100%;
+    max-width:390px;
+    height:88px;
+
+    object-fit:contain;
+    object-position:left center;
+
+    background:#050505;
+
+    border-radius:8px;
+}
+
+.v6-product-kicker{
+    margin-bottom:3px;
+
+    color:#81786f;
+
+    font-size:.56rem;
+    font-weight:800;
+
+    letter-spacing:.18em;
+}
+
+.v6-product-name{
+    color:#f1ede7;
+
+    font-size:1.35rem;
+    font-weight:700;
+
+    letter-spacing:-.02em;
+}
+
+.v6-transport{
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+
+    gap:8px;
+}
+
+
+/* ==========================================================
+   SESSION / POST / IP
+   ========================================================== */
+
+.v6-context-row{
+    display:grid;
+
+    grid-template-columns:
+        minmax(190px,260px)
+        minmax(120px,170px)
+        minmax(220px,1fr);
+
+    align-items:end;
+
+    gap:12px;
+
+    padding:10px 14px;
+
+    background:#100e0c;
+    border-bottom:1px solid #29251f;
+}
+
+.v6-context-field{
+    min-width:0;
+}
+
+.v6-label{
+    display:block;
+
+    margin-bottom:4px;
+
+    color:#81786f;
+
+    font-size:.54rem;
+    font-weight:950;
+
+    letter-spacing:.15em;
+}
+
+.v6-context-field select{
+    width:100%;
+    min-width:0;
+
+    min-height:32px;
+
+    background:#171411;
+    border-color:#4a4238;
+
+    font-weight:900;
+}
+
+.v6-network-slot{
+    display:flex;
+    align-items:center;
+
+    min-width:0;
+}
+
+
+/* Badge IP existant */
+#showcue-network-address{
+    max-width:100% !important;
+    min-width:0 !important;
+
+    overflow:hidden !important;
+    text-overflow:ellipsis !important;
+    white-space:nowrap !important;
+
+    margin:0 !important;
+
+    padding:5px 8px !important;
+
+    border-color:#3c352d !important;
+    background:#15120f !important;
+
+    font-size:.61rem !important;
+}
+
+#showcue-network-address strong{
+    color:#d3a457 !important;
+}
+
+
+/* ==========================================================
+   NAVIGATION
+   ========================================================== */
+
+.v6-navigation{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) auto;
+
+    align-items:stretch;
+
+    border-bottom:1px solid #302a23;
+}
+
+.v6-tabs{
+    display:grid !important;
+
+    grid-template-columns:repeat(4,1fr);
+
+    gap:0 !important;
+    margin:0 !important;
+}
+
+.v6-tabs .tab{
+    min-height:45px;
+
+    border:0 !important;
+    border-radius:0 !important;
+
+    background:#0f0e0d !important;
+    color:#8e8992;
+
+    font-size:.72rem;
+    font-weight:950;
+
+    letter-spacing:.07em;
+}
+
+.v6-tabs .tab.active{
+    position:relative;
+
+    background:#16120d !important;
+    color:#fff;
+}
+
+.v6-tabs .tab.active::after{
+    content:"";
+
+    position:absolute;
+
+    left:16%;
+    right:16%;
+    bottom:0;
+
+    height:3px;
+
+    background:#d5a64e;
+
+    border-radius:3px 3px 0 0;
+}
+
+.v6-secondary-actions{
+    display:flex;
+    align-items:center;
+
+    gap:6px;
+
+    padding:6px 9px;
+
+    border-left:1px solid #302a23;
+}
+
+.v6-builder{
+    border-color:#735397 !important;
+    background:#31213e !important;
+    color:#dabdff !important;
+
+    font-weight:950 !important;
+}
+
+.v6-session-menu{
+    position:relative;
+}
+
+.v6-session-menu summary{
+    list-style:none;
+
+    padding:7px 9px;
+
+    border:1px solid #443b31;
+    border-radius:6px;
+
+    background:#171411;
+    color:#b3aaa0;
+
+    cursor:pointer;
+
+    font-size:.62rem;
+    font-weight:900;
+}
+
+.v6-session-menu summary::-webkit-details-marker{
+    display:none;
+}
+
+.v6-session-panel{
+    position:absolute;
+
+    z-index:300;
+
+    top:calc(100% + 7px);
+    right:0;
+
+    width:180px;
+
+    display:grid;
+    gap:5px;
+
+    padding:8px;
+
+    border:1px solid #453d34;
+    border-radius:8px;
+
+    background:#15120f;
+
+    box-shadow:0 10px 30px #000a;
+}
+
+.v6-session-panel button{
+    width:100%;
+}
+
+
+/* ==========================================================
+   CLOCKS
+   ========================================================== */
+
+.v6-clocks{
+    display:grid !important;
+
+    grid-template-columns:1fr 1fr;
+
+    gap:0;
+
+    margin:0 !important;
+
+    padding:8px 14px !important;
+
+    background:#100e0c;
+
+    border-bottom:1px solid #302a23;
+}
+
+.v6-clock{
+    display:flex;
+    align-items:center;
+
+    gap:12px;
+
+    min-width:0;
+}
+
+.v6-clock-ltc{
+    justify-content:flex-end;
+}
+
+.v6-clock .server-clock{
+    font-size:1.55rem !important;
+}
+
+.v6-clock .ltc{
+    font-size:1.65rem !important;
+}
+
+
+/* ==========================================================
+   LIVE
+   ========================================================== */
+
+#view-live{
+    min-width:0;
+}
+
+#view-live .ableton-strip{
+    width:100%;
+    box-sizing:border-box;
+}
+
+.live-current{
+    box-sizing:border-box;
+    width:100%;
+}
+
+.live-ahead{
+    display:grid;
+    grid-template-columns:2fr 1fr;
+
+    gap:8px;
+}
+
+
+/* ==========================================================
+   TABLETTE
+   ========================================================== */
+
+@media(max-width:850px){
+
+    .v6-brand-row{
+        grid-template-columns:minmax(180px,32%) 1fr auto;
+        gap:14px;
+    }
+
+    .v6-logo{
+        height:74px;
+    }
+
+    .v6-context-row{
+        grid-template-columns:1.4fr .8fr 1.6fr;
+    }
+
+}
+
+
+/* ==========================================================
+   MOBILE / IPHONE
+   ========================================================== */
+
+@media(max-width:650px){
+
+    .shell{
+        padding-left:10px !important;
+        padding-right:10px !important;
+    }
+
+    .showcue-header-v6{
+        margin-bottom:10px;
+    }
+
+
+    /* ----------------------
+       LOGO
+       ---------------------- */
+
+    .v6-brand-row{
+        display:grid;
+
+        grid-template-columns:1fr auto;
+        grid-template-areas:
+            "logo logo"
+            "product transport";
+
+        gap:10px;
+
+        padding:10px 8px;
+    }
+
+    .v6-logo{
+        grid-area:logo;
+
+        justify-self:center;
+
+        width:min(100%,360px);
+        max-width:360px;
+        height:88px;
+
+        object-position:center;
+    }
+
+    .v6-product{
+        grid-area:product;
+    }
+
+    .v6-product-name{
+        font-size:1.2rem;
+    }
+
+    .v6-transport{
+        grid-area:transport;
+
+        align-self:center;
+    }
+
+
+    /* ----------------------
+       SESSION / POST / IP
+       ---------------------- */
+
+    .v6-context-row{
+        grid-template-columns:1fr 1fr;
+
+        gap:9px;
+
+        padding:9px 8px;
+    }
+
+    .v6-network-slot{
+        grid-column:1 / -1;
+    }
+
+    #showcue-network-address{
+        width:100% !important;
+        box-sizing:border-box !important;
+
+        justify-content:flex-start !important;
+    }
+
+
+    /* ----------------------
+       NAVIGATION
+       ---------------------- */
+
+    .v6-navigation{
+        display:block;
+    }
+
+    .v6-tabs{
+        grid-template-columns:1fr 1fr;
+    }
+
+    .v6-tabs .tab{
+        min-height:48px;
+
+        font-size:.68rem;
+    }
+
+    .v6-secondary-actions{
+        justify-content:flex-end;
+
+        border-left:0;
+        border-top:1px solid #302a23;
+
+        padding:7px 8px;
+    }
+
+
+    /* ----------------------
+       HORLOGES
+       ---------------------- */
+
+    .v6-clocks{
+        display:grid !important;
+
+        grid-template-columns:1fr;
+
+        gap:5px;
+
+        padding:8px !important;
+    }
+
+    .v6-clock,
+    .v6-clock-ltc{
+        display:grid;
+
+        grid-template-columns:58px minmax(0,1fr);
+
+        justify-content:stretch;
+
+        gap:8px;
+    }
+
+    .v6-clock .server-clock,
+    .v6-clock .ltc{
+        justify-self:end;
+
+        font-size:1.35rem !important;
+
+        white-space:nowrap;
+    }
+
+
+    /* ----------------------
+       ABLETON
+       ---------------------- */
+
+    #view-live .ableton-strip{
+        display:grid !important;
+
+        grid-template-columns:repeat(3,1fr) !important;
+
+        gap:6px !important;
+
+        padding:9px !important;
+    }
+
+    #view-live .ableton-main{
+        grid-column:1 / -1 !important;
+
+        min-width:0;
+    }
+
+    #view-live .ableton-scene{
+        overflow:hidden;
+        text-overflow:ellipsis;
+        white-space:nowrap;
+
+        font-size:1rem !important;
+    }
+
+    #view-live .ableton-value{
+        font-size:.86rem !important;
+    }
+
+
+    /* ----------------------
+       CUE COURANT
+       ---------------------- */
+
+    #view-live .live-current{
+        min-height:330px !important;
+
+        padding:
+            28px
+            22px
+            54px !important;
+    }
+
+    #view-live .current-text{
+        font-size:clamp(2.1rem,10vw,3.3rem) !important;
+
+        line-height:.96 !important;
+
+        overflow-wrap:anywhere;
+    }
+
+    #view-live .cue-meta{
+        font-size:.9rem !important;
+    }
+
+
+    /* ----------------------
+       PROCHAIN / SUIVANT
+       ---------------------- */
+
+    .live-ahead{
+        grid-template-columns:1fr !important;
+    }
+
+    .ahead-card{
+        min-height:105px !important;
+    }
+
+
+    /* ----------------------
+       CONDUITE
+       ---------------------- */
+
+    #view-conduite .conduite-workbar{
+        position:static !important;
+
+        display:grid !important;
+
+        grid-template-columns:1fr !important;
+
+        gap:7px !important;
+    }
+
+    #view-conduite .conduite-workbar .tools{
+        width:100% !important;
+
+        display:grid !important;
+
+        grid-template-columns:1fr 1fr !important;
+
+        min-width:0 !important;
+    }
+
+    #view-conduite .conduite-workbar .tools button,
+    #view-conduite .conduite-workbar .tools a{
+        min-width:0 !important;
+        width:100% !important;
+    }
+
+
+    /* ----------------------
+       PANELS
+       ---------------------- */
+
+    .panel,
+    .content-panel{
+        max-width:100% !important;
+        box-sizing:border-box !important;
+    }
+
+}
+
+</style>
+
+
+<style id="showcue-mobile-tabs-compact-v7">
+
+@media(max-width:650px){
+
+    .v6-navigation{
+        display:block !important;
+    }
+
+    .v6-tabs{
+        display:grid !important;
+
+        grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+
+        gap:4px !important;
+
+        padding:6px 6px !important;
+        margin:0 !important;
+    }
+
+    .v6-tabs .tab{
+        min-height:28px !important;
+
+        padding:3px 4px !important;
+
+        border:1px solid #302a23 !important;
+        border-radius:5px !important;
+
+        background:#12100e !important;
+
+        color:#8f8992 !important;
+
+        font-size:.54rem !important;
+        font-weight:950 !important;
+
+        line-height:1 !important;
+        letter-spacing:.04em !important;
+
+        white-space:nowrap !important;
+    }
+
+    .v6-tabs .tab.active{
+        background:#2a2115 !important;
+        border-color:#8c6933 !important;
+
+        color:#f6e3bd !important;
+    }
+
+    .v6-tabs .tab.active::after{
+        display:none !important;
+    }
+
+    .v6-secondary-actions{
+        padding:4px 6px !important;
+
+        min-height:0 !important;
+    }
+
+}
+
+@media(max-width:420px){
+
+    .v6-tabs{
+        grid-template-columns:repeat(2,1fr) !important;
+    }
+
+    .v6-tabs .tab{
+        min-height:27px !important;
+
+        font-size:.56rem !important;
+    }
+
+}
+
+</style>
+
+
+<style id="showcue-mobile-density-v8">
+
+@media(max-width:650px){
+
+    /* ======================================================
+       1. SUPPRIMER LE BOUTON SESSION DU HEADER MOBILE
+       ====================================================== */
+
+    .v6-session-menu{
+        display:none !important;
+    }
+
+    .v6-secondary-actions{
+        min-height:0 !important;
+        padding:3px 6px !important;
+        border-top:0 !important;
+    }
+
+    /* BUILDER reste accessible s'il est présent */
+    .v6-builder{
+        min-height:26px !important;
+        padding:3px 7px !important;
+        font-size:.52rem !important;
+    }
+
+
+    /* ======================================================
+       2. QUATRE ONGLETS SUR UNE SEULE LIGNE
+       ====================================================== */
+
+    .v6-tabs{
+        display:grid !important;
+        grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+
+        gap:3px !important;
+
+        padding:4px 5px !important;
+        margin:0 !important;
+    }
+
+    .v6-tabs .tab{
+        min-width:0 !important;
+        min-height:25px !important;
+
+        padding:2px 2px !important;
+
+        border:1px solid #302a23 !important;
+        border-radius:4px !important;
+
+        font-size:.46rem !important;
+        font-weight:950 !important;
+
+        line-height:1 !important;
+        letter-spacing:.015em !important;
+
+        white-space:nowrap !important;
+        overflow:hidden !important;
+        text-overflow:ellipsis !important;
+    }
+
+    .v6-tabs .tab.active::after{
+        display:none !important;
+    }
+
+
+    /* ======================================================
+       3. CACHER LES DEUX CUES PRÉCÉDENTS SUR MOBILE
+       ====================================================== */
+
+    #view-live .live-past{
+        display:none !important;
+    }
+
+
+    /* ======================================================
+       4. CARTOUCHE ABLETON ULTRA COMPACT
+       ====================================================== */
+
+    #view-live .ableton-strip{
+        display:grid !important;
+
+        grid-template-columns:
+            minmax(0,1.8fr)
+            auto
+            auto
+            auto !important;
+
+        align-items:center !important;
+
+        gap:10px !important;
+
+        min-height:0 !important;
+
+        padding:7px 10px !important;
+
+        border-radius:8px !important;
+    }
+
+    #view-live .ableton-main{
+        grid-column:auto !important;
+
+        min-width:0 !important;
+    }
+
+    #view-live .ableton-strip > div{
+        min-width:0 !important;
+    }
+
+    #view-live .ableton-strip .label{
+        margin:0 0 1px !important;
+
+        font-size:.42rem !important;
+        line-height:1 !important;
+        letter-spacing:.07em !important;
+    }
+
+    #view-live .ableton-scene{
+        margin:0 !important;
+
+        max-width:100% !important;
+
+        font-size:.72rem !important;
+        line-height:1.05 !important;
+        font-weight:900 !important;
+
+        white-space:nowrap !important;
+        overflow:hidden !important;
+        text-overflow:ellipsis !important;
+    }
+
+    #view-live .ableton-value{
+        margin:0 !important;
+
+        font-size:.68rem !important;
+        line-height:1 !important;
+        font-weight:900 !important;
+
+        white-space:nowrap !important;
+    }
+
+
+    /* ======================================================
+       5. RAPPROCHER LE CUE ACTUEL
+       ====================================================== */
+
+    #view-live{
+        gap:6px !important;
+    }
+
+    #view-live .live-current{
+        margin-top:0 !important;
+    }
+
+}
+
+</style>
+
+
+<style id="showcue-mobile-density-v9">
+
+@media(max-width:650px){
+
+    /* ======================================================
+       RESSERRER LE HEADER / LTC
+       ====================================================== */
+
+    .v6-clocks{
+        margin-bottom:2px !important;
+        padding-top:5px !important;
+        padding-bottom:5px !important;
+    }
+
+    .showcue-header-v6{
+        margin-bottom:3px !important;
+    }
+
+
+    /* ======================================================
+       SCÈNE ABLETON : PETITE BANDE TECHNIQUE
+       ====================================================== */
+
+    #view-live .ableton-strip{
+        margin-top:0 !important;
+        margin-bottom:4px !important;
+
+        min-height:44px !important;
+
+        padding:5px 8px !important;
+
+        grid-template-columns:
+            minmax(0,1.9fr)
+            auto
+            auto
+            auto !important;
+
+        gap:8px !important;
+
+        border-radius:7px !important;
+    }
+
+    #view-live .ableton-strip .label{
+        font-size:.36rem !important;
+
+        color:#7f786f !important;
+
+        letter-spacing:.06em !important;
+    }
+
+    #view-live .ableton-scene{
+        font-size:.62rem !important;
+        font-weight:800 !important;
+
+        color:#c7b187 !important;
+
+        letter-spacing:0 !important;
+
+        white-space:nowrap !important;
+        overflow:hidden !important;
+        text-overflow:ellipsis !important;
+    }
+
+    #view-live .ableton-value{
+        font-size:.60rem !important;
+        font-weight:850 !important;
+
+        color:#d3b36f !important;
+    }
+
+
+    /* ======================================================
+       RAPPROCHER LE CUE ACTUEL
+       ====================================================== */
+
+    #view-live{
+        margin-top:0 !important;
+    }
+
+    #view-live .live-current{
+        margin-top:0 !important;
+
+        min-height:300px !important;
+
+        padding:
+            22px
+            20px
+            44px !important;
+    }
+
+    #view-live .cue-kicker{
+        margin-bottom:8px !important;
+    }
+
+    #view-live .current-text{
+        margin-top:0 !important;
+    }
+
+
+    /* ======================================================
+       RÉDUIRE LES ESPACES ENTRE BLOCS LIVE
+       ====================================================== */
+
+    #view-live .live-ahead{
+        margin-top:4px !important;
+        gap:4px !important;
+    }
+
+    #view-live .ahead-card{
+        min-height:88px !important;
+
+        padding:10px 12px !important;
+    }
+
+}
+
+</style>
+
 </head>
-<body><main class="shell"><header class="topbar"><div class="statusbar"><div class="brand"><img src="/assets/paradis%20latin.jpg" alt="Paradis Latin Cabaret"><span class="brand-divider" aria-hidden="true"></span><h1>CL ShowCue</h1></div><label class="post-control"><span class="eyebrow">Poste</span><select id="post">{% for post in posts %}<option>{{ post }}</option>{% endfor %}</select></label><div class="show-title" id="title">—</div><button class="call-button" id="call-button">CALL</button><div class="transport" id="transport">STOP</div><div class="ltc" id="ltc">--:--:--:--</div></div><div class="sessionbar"><span class="eyebrow">Session</span><select id="session"></select><button id="session-new">NOUVELLE</button><button id="session-rename">RENOMMER</button><button id="session-duplicate">DUPLIQUER</button><button class="danger" id="session-delete">SUPPRIMER</button></div><nav class="tabs" aria-label="Vues ShowCue"><button class="tab active" data-view="live" aria-selected="true">LIVE</button><button class="tab" data-view="conduite" aria-selected="false">CONDUITE</button><button class="tab" data-view="distribution" aria-selected="false">DISTRIBUTION</button><button class="tab" data-view="captures" aria-selected="false">PRÉPARATION <span id="draft-count"></span></button></nav></header>
+<body><main class="shell"><header class="topbar showcue-header-v6">
+
+  <div class="v6-brand-row">
+
+    <img
+      class="v6-logo"
+      src="/assets/paradis%20latin.jpg"
+      alt="Paradis Latin Cabaret"
+    >
+
+    <div class="v6-product">
+      <div class="v6-product-kicker">CL AUDIO</div>
+      <div class="v6-product-name">CL ShowCue</div>
+    </div>
+
+    <div class="v6-transport">
+      <button class="call-button" id="call-button">CALL</button>
+      <div class="transport" id="transport">STOP</div>
+    </div>
+
+  </div>
+
+
+  <div class="v6-context-row">
+
+    <label class="v6-context-field">
+      <span class="v6-label">SESSION</span>
+      <select id="session"></select>
+    </label>
+
+    <label class="v6-context-field">
+      <span class="v6-label">POSTE</span>
+      <select id="post">
+        {% for post in posts %}
+        <option>{{ post }}</option>
+        {% endfor %}
+      </select>
+    </label>
+
+    <div class="v6-network-slot"></div>
+
+    <span id="title" hidden>—</span>
+
+  </div>
+
+
+  <div class="v6-navigation">
+
+    <nav class="tabs v6-tabs" aria-label="Vues ShowCue">
+
+      <button
+        class="tab active"
+        data-view="live"
+        aria-selected="true"
+      >
+        LIVE
+      </button>
+
+      <button
+        class="tab"
+        data-view="conduite"
+        aria-selected="false"
+      >
+        CONDUITE
+      </button>
+
+      <button
+        class="tab"
+        data-view="distribution"
+        aria-selected="false"
+      >
+        DISTRIBUTION
+      </button>
+
+      <button
+        class="tab"
+        data-view="captures"
+        aria-selected="false"
+      >
+        PRÉPARATION <span id="draft-count"></span>
+      </button>
+
+    </nav>
+
+
+    <div class="v6-secondary-actions">
+
+      {% if builder_local %}
+      <button
+        type="button"
+        class="v6-builder"
+        onclick="location.href='/show-info/builder'"
+      >
+        BUILDER
+      </button>
+      {% endif %}
+
+      <details class="v6-session-menu">
+
+        <summary>SESSION ▾</summary>
+
+        <div class="v6-session-panel">
+
+          <button id="session-new">NOUVELLE</button>
+          <button id="session-rename">RENOMMER</button>
+          <button id="session-duplicate">DUPLIQUER</button>
+          <button class="danger" id="session-delete">SUPPRIMER</button>
+
+        </div>
+
+      </details>
+
+    </div>
+
+  </div>
+
+
+  <div class="operation-clocks v6-clocks">
+
+    <div class="operation-clock v6-clock">
+      <span class="operation-clock-label">HEURE</span>
+      <span class="server-clock" id="server-clock">--:--:--</span>
+    </div>
+
+    <div class="operation-clock v6-clock v6-clock-ltc">
+      <span class="operation-clock-label">LTC</span>
+      <span class="ltc" id="ltc">--:--:--:--</span>
+    </div>
+
+  </div>
+
+</header>
 <section class="view active" id="view-live"><article class="panel ableton-strip"><div class="ableton-main"><div class="label">Scène Ableton</div><div class="ableton-scene" id="ableton-scene">—</div></div><div><div class="label">Écoulé</div><div class="ableton-value" id="ableton-elapsed">—</div></div><div><div class="label">Durée</div><div class="ableton-value" id="ableton-duration">—</div></div><div><div class="label">Reste</div><div class="ableton-value" id="ableton-remaining">—</div></div></article><div class="live-past"><div class="past-line"><span class="past-time" id="past-second-time"></span><span id="past-second"></span></div><div class="past-line near"><span class="past-time" id="past-time"></span><span id="past"></span></div></div><article class="panel live-current"><div class="current-copy"><div class="live-current-head"><div class="cue-kicker"><span class="label">Cue actuel</span></div><button class="quiet live-edit" id="live-edit" hidden title="Correction rapide" aria-label="Corriger rapidement le cue courant">✎</button></div><div class="current-text" id="current">Aucun cue atteint</div><div class="cue-meta" id="current-meta"></div></div></article><div class="live-ahead"><article class="panel ahead-card ahead-next"><div class="label">Prochain</div><div class="ahead-text" id="next">—</div><div class="ahead-time" id="next-time"></div></article><article class="panel ahead-card ahead-following"><div class="label">Suivant</div><div class="ahead-text" id="following">—</div><div class="ahead-time" id="following-time"></div></article></div></section>
-<section class="view" id="view-conduite"><div class="section-head conduite-workbar"><div class="conduite-heading"><span class="conduite-session-name" id="conduite-session-name">Session actuelle</span><span class="conduite-separator">—</span><span class="conduite-title">CONDUITE</span></div><div class="tools"><button class="primary" id="add-cue">+ CUE</button><button class="record" id="capture-audio">● CAPTURE</button></div></div><div class="section-filters" id="section-filters"></div><div class="conduite-grid"><article class="panel content-panel"><h3>Déroulement complet</h3><div class="sequence" id="timed-sequence"></div></article></div></section>
+<section class="view" id="view-conduite"><div class="section-head conduite-workbar"><div class="conduite-heading"><span class="conduite-session-name" id="conduite-session-name">Session actuelle</span><span class="conduite-separator">—</span><span class="conduite-title">CONDUITE</span></div><div class="tools"><button class="primary" id="add-cue">+ CUE</button><button class="quiet capture-tc-button" id="capture-tc">⏱ CAPTURE TC</button><button class="record" id="capture-audio">● CAPTURE AUDIO</button></div></div><div class="section-filters" id="section-filters"></div><div class="conduite-grid"><article class="panel content-panel"><h3>Déroulement complet</h3><div class="sequence" id="timed-sequence"></div></article></div></section>
 <section class="view" id="view-distribution"><div class="section-head"><div><div class="label">Affectations de la session</div><h2>Distribution du jour</h2></div></div><article class="panel content-panel"><div class="muted distribution-note" id="distribution-note"></div><div class="distribution-list" id="distribution-list"></div></article></section>
 <section class="view" id="view-captures"><div class="section-head"><div><div class="label">Création et classement</div><h2>Préparation</h2></div><div class="tools"><button class="primary" id="draft-add-cue">+ CUE</button><button class="record" id="draft-capture-audio">● CAPTURE</button><button id="add-library">+ RÉSERVE</button>{% if builder_local %}<button type="button" onclick="location.href='/show-info/builder'">BUILDER</button>{% endif %}</div></div><div class="preparation-grid"><article class="panel content-panel"><h3>À placer</h3><div class="muted capture-intro">Éléments à intégrer dans la conduite ou à conserver en réserve.</div><div id="draft-list"></div></article><article class="panel content-panel"><h3>Réserve</h3><div id="library"></div></article></div></section><div class="error" id="error"></div></main>
 <dialog id="recorder"><h2>Capture audio</h2><div class="muted" id="record-context"></div><label class="field">Entrée audio<select id="audio-input"></select></label><div class="muted" id="record-state">Autorisation micro requise au premier usage.</div><div class="error" id="record-error"></div><div class="actions"><button id="record-cancel">ANNULER</button><button class="primary" id="record-start" disabled>DÉMARRER</button><button class="record" id="record-stop" disabled>ARRÊTER</button></div></dialog>
 <dialog id="editor"><form method="dialog" id="cue-form"><h2 id="editor-title">Nouveau cue</h2><div class="muted" id="captured-label"></div><audio id="form-audio" controls hidden></audio><div class="field" id="timecode-field"><div class="label">Timecode</div><div class="smpte-editor" id="form-smpte"></div><input type="hidden" id="form-timecode"></div><label class="field" id="section-field">Section<input id="form-section" list="manual-sections" maxlength="80"><datalist id="manual-sections"></datalist></label><label class="field" id="anchor-field">Position après<select id="form-anchor"><option value="">FIN DE CONDUITE</option></select></label><label class="field">Texte<textarea id="form-text" rows="3" maxlength="1000" required></textarea></label><div class="label">Destinataires <button type="button" class="quiet" id="destinations-all">TOUS</button></div><div class="posts" id="form-posts">{% for post in posts %}<label><input type="checkbox" value="{{ post }}"> {{ post }}</label>{% endfor %}</div><label class="field" id="status-field">État<select id="form-status"><option value="draft">À placer</option><option value="official">Dans la conduite</option></select></label><div class="error" id="form-error"></div><div class="actions"><button type="button" class="danger delete-action" id="editor-delete" hidden>SUPPRIMER LE CUE</button><button type="button" id="editor-cancel">ANNULER</button><button class="primary" value="default" id="save">ENREGISTRER</button></div></form></dialog>
-<dialog id="quick-editor" class="quick-dialog"><form method="dialog" id="quick-form"><h2>Correction rapide</h2><div class="field" id="quick-timecode-field"><div class="label">Timecode</div><div class="smpte-editor" id="quick-smpte"></div></div><label class="field">Texte<textarea id="quick-text" rows="4" maxlength="1000" required></textarea></label><div class="error" id="quick-error"></div><div class="actions"><button type="button" class="danger delete-action" id="quick-delete">SUPPRIMER LE CUE</button><button type="button" id="quick-cancel">ANNULER</button><button class="primary" value="default">VALIDER</button></div></form></dialog>
+<dialog id="quick-editor" class="quick-dialog"><form method="dialog" id="quick-form"><h2>Correction rapide</h2><div class="field" id="quick-timecode-field"><div class="label">Timecode</div><div class="smpte-editor" id="quick-smpte"></div></div><label class="field">Texte<textarea id="quick-text" rows="4" maxlength="1000" required></textarea></label><div class="label">Destinataires</div><div class="quick-posts" id="quick-posts"></div><div class="error" id="quick-error"></div><div class="actions"><button type="button" class="danger delete-action" id="quick-delete">SUPPRIMER LE CUE</button><button type="button" id="quick-cancel">ANNULER</button><button class="primary" value="default">VALIDER</button></div></form></dialog>
 <div class="call-incoming" id="call-incoming" aria-live="assertive"></div>
 <dialog id="call-panel" class="call-panel"><h2>Appeler</h2><div class="call-targets">{% for post in posts %}<button type="button" data-call-target="{{ post }}">{{ {'FOH':'FOH','RETOURS':'RET','PLATEAU':'PLT','LUMIERE':'LUM'}[post] }}</button>{% endfor %}</div><div class="call-list" id="call-outgoing"></div><div class="error" id="call-error"></div><div class="actions"><button type="button" id="call-close">FERMER</button></div></dialog>
 <script>
@@ -44,9 +1616,9 @@ function scoped(values={},sessionId=snapshot.active_session_id){return{...values
 function renderSessions(data){const current=data.active_session_id;sessionEl.innerHTML='';(data.sessions||[]).forEach(item=>{const option=document.createElement('option');option.value=item.id;option.textContent=item.name;sessionEl.append(option)});sessionEl.value=current;$('conduite-session-name').textContent=data.active_session_name||'Session actuelle';$('session-delete').disabled=(data.sessions||[]).length<2}
 function cueMeta(cue){if(!cue)return'';const resolved=cue.resolved||{},equipment=(resolved.equipment_slots||[]).map(slot=>slot.value);return[cue.timecode,cue.section,resolved.role,resolved.artist,...equipment].filter(Boolean).join(' · ')}function renderLiveCue(prefix,cue){$(prefix).textContent=cue?cue.text:prefix==='current'?'Aucun cue atteint':'—';const time=$(prefix+'-time');if(time)time.textContent=cueMeta(cue)}
 const destinationLabels={FOH:'FOH',RETOURS:'RET',PLATEAU:'PLT',LUMIERE:'LUM'};
-function actionButton(cue){const button=document.createElement('button');button.className='quiet edit-icon';button.textContent='✎';button.title='Modifier le cue';button.setAttribute('aria-label','Modifier '+cue.text);button.onclick=()=>openEditor(cue);return button}
+function actionButton(cue){const button=document.createElement('button');button.className='quiet edit-icon';button.textContent='✎';button.title='Modifier le cue';button.setAttribute('aria-label','Modifier '+cue.text);button.onclick=()=>openEditor(cue);return button}function deleteActionButton(cue){const button=document.createElement('button');button.className='quiet delete-icon';button.textContent='⌫';button.title='Supprimer le cue';button.setAttribute('aria-label','Supprimer '+cue.text);button.onclick=async event=>{event.stopPropagation();await deleteCue(cue)};return button}
 function destinations(cue){const group=document.createElement('div');group.className='destinations';Object.entries(destinationLabels).forEach(([post,label])=>{const button=document.createElement('button'),active=cue.posts.includes(post);button.className='destination'+(active?' active':'');button.textContent=label;button.title=(active?'Retirer ':'Ajouter ')+post;button.setAttribute('aria-pressed',active);button.onclick=async event=>{event.stopPropagation();const posts=active?cue.posts.filter(item=>item!==post):[...cue.posts,post];if(!posts.length){$('error').textContent='Un cue doit conserver au moins un destinataire.';return}button.disabled=true;try{await api('/show-info/cues/'+encodeURIComponent(cue.id),{method:'PUT',body:JSON.stringify(scoped({posts}))});await refresh()}catch(error){$('error').textContent=error.message}finally{button.disabled=false}};group.append(button)});return group}
-function isTimecode(value){return /^\d{2}:\d{2}:\d{2}:\d{2}$/.test(String(value||''))}function cueLine(cue,position){const row=document.createElement('div'),time=document.createElement('div'),text=document.createElement('div'),targets=destinations(cue),edit=actionButton(cue);row.className='cue-line';row.dataset.cueId=cue.id;if(cue.mode==='timed'&&cue.id===snapshot.conduite_current_id)row.classList.add('current-timed');time.className='line-time'+(isTimecode(position)?' true-time':'');time.textContent=position;text.className='line-text';text.textContent=cue.text;if(cue.mode==='library'){const meta=document.createElement('div');row.classList.add('library-line');meta.className='library-meta';meta.append(time,targets);row.append(text,edit,meta)}else row.append(time,text,targets,edit);return row}
+function isTimecode(value){return /^\d{2}:\d{2}:\d{2}:\d{2}$/.test(String(value||''))}function cueLine(cue,position){const row=document.createElement('div'),time=document.createElement('div'),text=document.createElement('div'),targets=destinations(cue),edit=actionButton(cue),actions=document.createElement('div');actions.className='cue-actions';actions.append(edit);if(cue.status==='official'&&cue.mode!=='library')actions.append(deleteActionButton(cue));row.className='cue-line';row.dataset.cueId=cue.id;if(cue.mode==='timed'&&cue.id===snapshot.conduite_current_id)row.classList.add('current-timed');time.className='line-time'+(isTimecode(position)?' true-time':'');time.textContent=position;text.className='line-text';text.textContent=cue.text;if(cue.mode==='library'){const meta=document.createElement('div');row.classList.add('library-line');meta.className='library-meta';meta.append(time,targets);row.append(text,actions,meta)}else row.append(time,text,targets,actions);return row}
 function manualSectionKey(section){return'cl-show-info-manual-'+snapshot.active_session_id+'-'+postEl.value+'-'+section}async function setManualAnchor(cues,anchorAfter){await Promise.all(cues.map(cue=>api('/show-info/cues/'+encodeURIComponent(cue.id),{method:'PUT',body:JSON.stringify(scoped({anchor_after:anchorAfter}))})));await refresh()}function manualBlock(section,cues,timed){const details=document.createElement('details'),summary=document.createElement('summary'),title=document.createElement('span'),marker=document.createElement('span'),lines=document.createElement('div'),nav=document.createElement('div'),up=document.createElement('button'),down=document.createElement('button'),previous=document.createElement('button'),next=document.createElement('button'),localCues=cues.filter(cue=>cue.posts.includes(postEl.value)),key=manualSectionKey(section),anchors=[...timed.map(cue=>cue.id),''],currentAnchor=(cues.find(cue=>cue.anchor_after)||{}).anchor_after||'',anchorIndex=Math.max(0,anchors.indexOf(currentAnchor));let index=Math.max(0,Math.min(Number(localStorage.getItem(key)||0),Math.max(0,localCues.length-1)));details.className='manual-block';details.open=true;details.draggable=true;details.dataset.manualSection=section;details.ondragstart=event=>{details.classList.add('dragging');event.dataTransfer.setData('text/plain',section)};details.ondragend=()=>details.classList.remove('dragging');title.textContent='☰  '+section+' · '+cues.length+' cue'+(cues.length>1?'s':'');marker.textContent='SANS LTC';summary.append(title,marker);lines.className='manual-lines';cues.forEach(cue=>{const row=cueLine(cue,String(cue.order));if(localCues[index]&&cue.id===localCues[index].id)row.classList.add('manual-current');lines.append(row)});nav.className='manual-section-nav';up.textContent='↑';up.title='Déplacer le bloc plus haut';up.setAttribute('aria-label',up.title);up.disabled=anchorIndex===0;up.onclick=()=>setManualAnchor(cues,anchors[anchorIndex-1]);down.textContent='↓';down.title='Déplacer le bloc plus bas';down.setAttribute('aria-label',down.title);down.disabled=anchorIndex>=anchors.length-1;down.onclick=()=>setManualAnchor(cues,anchors[anchorIndex+1]);previous.textContent='◀';previous.title='Cue manuel précédent';previous.setAttribute('aria-label',previous.title);next.textContent='▶';next.title='Cue manuel suivant';next.setAttribute('aria-label',next.title);previous.disabled=!localCues.length||index===0;next.disabled=!localCues.length||index>=localCues.length-1;previous.onclick=()=>{localStorage.setItem(key,--index);renderSequence()};next.onclick=()=>{localStorage.setItem(key,++index);renderSequence()};nav.append(up,down,previous,next);details.append(summary,lines,nav);return details}
 let lastConduiteActiveId=null;function followConduiteActive(){const id=snapshot.conduite_current_id;if(!id||id===lastConduiteActiveId||!$('view-conduite').classList.contains('active'))return;const selection=window.getSelection(),control=document.activeElement;if((selection&&!selection.isCollapsed)||(control&&control!==document.body&&/^(INPUT|TEXTAREA|SELECT|BUTTON|SUMMARY)$/.test(control.tagName)))return;const row=$('timed-sequence').querySelector('[data-cue-id="'+CSS.escape(id)+'"]');if(row){lastConduiteActiveId=id;row.scrollIntoView({behavior:'smooth',block:'center'})}}
 let sectionFilter='TOUT';function renderSectionFilters(sections){const box=$('section-filters'),names=['TOUT',...sections];if(sectionFilter!=='TOUT'&&!sections.includes(sectionFilter))sectionFilter='TOUT';box.innerHTML='';names.forEach(name=>{const button=document.createElement('button');button.className='section-filter'+(name===sectionFilter?' active':'');button.textContent=name;button.onclick=()=>{sectionFilter=name;renderSequence()};box.append(button)})}function manualDropTarget(element,anchorAfter,groups){element.ondragover=event=>{if(event.dataTransfer.types.includes('text/plain')){event.preventDefault();element.classList.add('manual-drop-target','drop-target')}};element.ondragleave=()=>element.classList.remove('manual-drop-target','drop-target');element.ondrop=async event=>{event.preventDefault();element.classList.remove('manual-drop-target','drop-target');const cues=groups.get(event.dataTransfer.getData('text/plain'));if(cues)try{await setManualAnchor(cues,anchorAfter)}catch(error){$('error').textContent=error.message}}}function renderSequence(){const box=$('timed-sequence'),data=snapshot.conduite||{},timed=(data.timed||[]).filter(cue=>cue.status==='official'),allManual=(data.manual||[]).filter(cue=>cue.status==='official'),sections=[...new Set(allManual.map(cue=>cue.section))],manual=sectionFilter==='TOUT'?allManual:allManual.filter(cue=>cue.section===sectionFilter),groups=new Map();renderSectionFilters(sections);manual.forEach(cue=>{if(!groups.has(cue.section))groups.set(cue.section,[]);groups.get(cue.section).push(cue)});box.innerHTML='';const placed=new Set();timed.forEach(cue=>{const row=cueLine(cue,cue.timecode);manualDropTarget(row,cue.id,groups);box.append(row);groups.forEach((cues,section)=>{const anchor=cues.find(item=>item.anchor_after);if(anchor&&anchor.anchor_after===cue.id){box.append(manualBlock(section,cues,timed));placed.add(section)}})});groups.forEach((cues,section)=>{if(!placed.has(section))box.append(manualBlock(section,cues,timed))});const end=document.createElement('div');end.className='manual-end-drop';manualDropTarget(end,'',groups);box.append(end);if(!timed.length&&!groups.size)box.innerHTML='<div class="empty">Conduite vide</div>';followConduiteActive()}
@@ -66,7 +1638,7 @@ async function stopStream(){if(mediaStream)mediaStream.getTracks().forEach(track
 async function beginRecording(context){const selected=$('audio-input').value;localStorage.setItem('cl-showcue-audio-input',selected);mediaStream=await navigator.mediaDevices.getUserMedia({audio:selected?{deviceId:{exact:selected}}:true});recordChunks=[];mediaRecorder=new MediaRecorder(mediaStream);mediaRecorder.ondataavailable=event=>{if(event.data.size)recordChunks.push(event.data)};mediaRecorder.onstop=()=>uploadRecording(context);mediaRecorder.start();$('record-state').textContent='ENREGISTREMENT EN COURS';$('record-start').disabled=true;$('audio-input').disabled=true;$('record-stop').disabled=false}async function uploadRecording(context){const blob=new Blob(recordChunks,{type:mediaRecorder.mimeType||'audio/webm'}),form=new FormData();form.append('audio',blob,'capture');form.append('context',JSON.stringify({...context,posts:Object.keys(destinationLabels)}));try{const result=await api('/show-info/audio',{method:'POST',body:form});recordedDraft=result.cue;recorderDialog.close();captured=result.cue.timecode||null;openEditor(result.cue)}catch(error){$('record-error').textContent=error.message}finally{await stopStream();$('record-stop').disabled=true}}
 async function captureAudio(){try{const context=await api('/show-info/capture',{method:'POST',body:'{}'});captured=context.timecode;recorderDialog.dataset.context=JSON.stringify(scoped(context));$('record-context').textContent=context.mode==='timed'?'LTC FIGÉ · '+context.timecode:'SANS LTC · CUE MANUEL';$('record-error').textContent='';$('record-state').textContent='Préparation des entrées système…';$('record-start').disabled=true;$('audio-input').disabled=false;recorderDialog.showModal();await prepareInputs()}catch(error){await stopStream();$('record-error').textContent=error.message;if(!recorderDialog.open)recorderDialog.showModal()}}$('capture-audio').onclick=$('draft-capture-audio').onclick=captureAudio;$('record-start').onclick=async()=>{try{await beginRecording(JSON.parse(recorderDialog.dataset.context))}catch(error){await stopStream();$('record-error').textContent=error.name==='NotFoundError'?'La source sélectionnée a disparu. Choisissez une autre entrée.':error.message;$('audio-input').disabled=false;$('record-start').disabled=false;await listInputs()}};$('record-stop').onclick=()=>{if(mediaRecorder&&mediaRecorder.state==='recording')mediaRecorder.stop()};$('record-cancel').onclick=async()=>{if(mediaRecorder&&mediaRecorder.state==='recording'){mediaRecorder.onstop=null;mediaRecorder.stop()}await stopStream();$('audio-input').disabled=false;recorderDialog.close()};$('audio-input').onchange=()=>localStorage.setItem('cl-showcue-audio-input',$('audio-input').value);
 async function cancelEditor(){clearTimeout(editorFocusTimer);editorFocusTimer=null;const disposable=recordedDraft&&editing&&recordedDraft.id===editing.id;if(disposable){try{await api('/show-info/cues/'+encodeURIComponent(editing.id)+'?session_id='+encodeURIComponent(editor.dataset.sessionId),{method:'DELETE'});recordedDraft=null}catch(error){$('form-error').textContent=error.message;return}}editor.close();editing=null;classifying=false;captured=null;await refresh()}$('editor-cancel').onclick=cancelEditor;$('editor-delete').onclick=async()=>{if(await deleteCue(editing,'form-error',editor.dataset.sessionId)){editor.close();editing=null;classifying=false;captured=null;await refresh()}};
-function openQuickEditor(cue){quickEditing=cue;quickEditor.dataset.sessionId=snapshot.active_session_id;$('quick-text').value=cue.text;$('quick-timecode-field').hidden=cue.mode!=='timed';quickSmpte.set(cue.timecode||'00:00:00:00');$('quick-error').textContent='';quickEditor.showModal()}$('quick-cancel').onclick=()=>{quickEditor.close();quickEditing=null;refresh()};$('quick-delete').onclick=async()=>{if(await deleteCue(quickEditing,'quick-error',quickEditor.dataset.sessionId)){quickEditor.close();quickEditing=null;await refresh()}};$('quick-form').addEventListener('submit',async event=>{event.preventDefault();if(!quickEditing)return;const payload={},text=$('quick-text').value,timecode=quickSmpte.get();if(text!==quickEditing.text)payload.text=text;if(quickEditing.mode==='timed'&&timecode!==quickEditing.timecode)payload.timecode=timecode;if(!Object.keys(payload).length){quickEditor.close();quickEditing=null;await refresh();return}try{await api('/show-info/cues/'+encodeURIComponent(quickEditing.id),{method:'PUT',body:JSON.stringify(scoped(payload,quickEditor.dataset.sessionId))});quickEditor.close();quickEditing=null;await refresh()}catch(error){$('quick-error').textContent=error.message}});
+function renderQuickPosts(cue){const box=$('quick-posts');box.innerHTML='';Object.entries(destinationLabels).forEach(([post,label])=>{const button=document.createElement('button');button.type='button';button.className='quick-post'+(cue.posts.includes(post)?' active':'');button.dataset.post=post;button.textContent=label;button.setAttribute('aria-pressed',cue.posts.includes(post));button.onclick=()=>{const active=button.classList.contains('active'),count=box.querySelectorAll('.quick-post.active').length;if(active&&count===1){$('quick-error').textContent='Un cue doit conserver au moins un destinataire.';return}$('quick-error').textContent='';button.classList.toggle('active');button.setAttribute('aria-pressed',button.classList.contains('active'))};box.append(button)})}function quickCheckedPosts(){return[...$('quick-posts').querySelectorAll('.quick-post.active')].map(button=>button.dataset.post)}function openQuickEditor(cue){quickEditing=cue;quickEditor.dataset.sessionId=snapshot.active_session_id;$('quick-text').value=cue.text;$('quick-timecode-field').hidden=cue.mode!=='timed';quickSmpte.set(cue.timecode||'00:00:00:00');renderQuickPosts(cue);$('quick-error').textContent='';quickEditor.showModal()}$('quick-cancel').onclick=()=>{quickEditor.close();quickEditing=null;refresh()};$('quick-delete').onclick=async()=>{if(await deleteCue(quickEditing,'quick-error',quickEditor.dataset.sessionId)){quickEditor.close();quickEditing=null;await refresh()}};$('quick-form').addEventListener('submit',async event=>{event.preventDefault();if(!quickEditing)return;const payload={},text=$('quick-text').value,timecode=quickSmpte.get(),posts=quickCheckedPosts();if(text!==quickEditing.text)payload.text=text;if(quickEditing.mode==='timed'&&timecode!==quickEditing.timecode)payload.timecode=timecode;if(JSON.stringify(posts)!==JSON.stringify(quickEditing.posts))payload.posts=posts;if(!Object.keys(payload).length){quickEditor.close();quickEditing=null;await refresh();return}try{await api('/show-info/cues/'+encodeURIComponent(quickEditing.id),{method:'PUT',body:JSON.stringify(scoped(payload,quickEditor.dataset.sessionId))});quickEditor.close();quickEditing=null;await refresh()}catch(error){$('quick-error').textContent=error.message}});
 $('cue-form').addEventListener('submit',async event=>{event.preventDefault();const mode=editor.dataset.mode,payload={session_id:editor.dataset.sessionId,mode,text:$('form-text').value,posts:checkedPosts(),status:editing?(classifying?'official':$('form-status').value):'draft'};if(mode==='timed')payload.timecode=$('form-timecode').value;if(mode==='manual'){payload.section=$('form-section').value;payload.anchor_after=$('form-anchor').value;if(classifying&&(!editing||editing.mode!=='manual')){const sameSection=((snapshot.conduite&&snapshot.conduite.manual)||[]).filter(cue=>cue.section===payload.section);payload.order=Math.max(0,...sameSection.map(cue=>Number(cue.order)||0))+1}}try{const url=editing?'/show-info/cues/'+encodeURIComponent(editing.id):'/show-info/cues',method=editing?'PUT':'POST';await api(url,{method,body:JSON.stringify(payload)});recordedDraft=null;editor.close();editing=null;classifying=false;captured=null;await refresh()}catch(error){$('form-error').textContent=error.message}});
 sessionEl.onchange=async()=>{const target=sessionEl.value;sessionEl.disabled=true;try{await api('/show-info/sessions/'+encodeURIComponent(target)+'/activate',{method:'POST',body:'{}'});lastConduiteActiveId=null;sessionEl.blur();await refresh()}catch(error){$('error').textContent=error.message}finally{sessionEl.disabled=false}};
 $('session-new').onclick=async()=>{const name=window.prompt('Nom de la nouvelle session :');if(name===null)return;try{await api('/show-info/sessions',{method:'POST',body:JSON.stringify({name})});lastConduiteActiveId=null;sessionEl.blur();await refresh()}catch(error){$('error').textContent=error.message}};
@@ -83,10 +1655,3992 @@ const showCueVisualLtc=(()=>{const fps=25,pattern=/^\d{2}:\d{2}:\d{2}:\d{2}$/,el
 const showCueServerRender=render;render=function(data){showCueServerRender(data);showCueVisualLtc.sync(data)};
 async function captureTimecodeInto(editorControl,errorId){try{const result=await api('/show-info/capture',{method:'POST',body:'{}'});if(!result.timecode){$(errorId).textContent='Aucun LTC capturable : lecture arrêtée, signal absent ou invalide.';return}editorControl.set(result.timecode);if(editorControl===formSmpte){editor.dataset.mode='timed';$('timecode-field').hidden=false;$('section-field').hidden=true;$('anchor-field').hidden=true}$(errorId).textContent='LTC capturé : '+result.timecode}catch(error){$(errorId).textContent=error.message}}
 [['quick-timecode-field',quickSmpte,'quick-error']].forEach(([field,control,errorId])=>{const label=$(field).querySelector('.label'),button=document.createElement('button');button.type='button';button.className='quiet';button.textContent='CAPTURER TC';button.onclick=()=>captureTimecodeInto(control,errorId);label.append(' ',button)});
+
+async function captureNewTimedCue(){
+    const button=$('capture-tc');
+    if(button)button.disabled=true;
+
+    try{
+        const result=await api('/show-info/capture',{
+            method:'POST',
+            body:'{}'
+        });
+
+        if(!result.timecode || !isTimecode(result.timecode)){
+            throw new Error(
+                'Aucun LTC capturable : lecture arrêtée, signal absent ou invalide.'
+            );
+        }
+
+        captured=result.timecode;
+
+        openEditor(null,'timed');
+
+        formSmpte.set(result.timecode);
+
+        $('captured-label').textContent='LTC CAPTURÉ · '+result.timecode;
+        $('form-error').textContent='';
+
+    }catch(error){
+        $('error').textContent=error.message;
+    }finally{
+        if(button)button.disabled=false;
+    }
+}
+
+$('capture-tc').onclick=captureNewTimedCue;
+
 const sharedShowCueSections={{ sections|tojson }};
 const showCueOpenEditor=openEditor;openEditor=function(...args){showCueOpenEditor(...args);const list=$('manual-sections'),known=[...sharedShowCueSections,...(snapshot.sections||[])];known.forEach(section=>{if(![...list.options].some(option=>option.value.toLocaleLowerCase('fr')===section.toLocaleLowerCase('fr')))list.append(new Option('',section))});const button=document.createElement('button');button.type='button';button.className='quiet';button.textContent='CAPTURER TC';button.onclick=()=>captureTimecodeInto(formSmpte,'form-error');$('captured-label').append(' ',button)};
-const originalManualBlock=manualBlock;manualBlock=function(section,cues,timed){const block=document.createElement('div'),head=document.createElement('div'),lines=document.createElement('div'),localCues=cues.filter(cue=>cue.posts.includes(postEl.value)),key=manualSectionKey(section),anchors=[...timed.map(cue=>cue.id),''],currentAnchor=(cues.find(cue=>cue.anchor_after)||{}).anchor_after||'',anchorIndex=Math.max(0,anchors.indexOf(currentAnchor));let index=Math.max(0,Math.min(Number(localStorage.getItem(key)||0),Math.max(0,localCues.length-1)));block.className='manual-block compact-manual';block.draggable=true;block.dataset.manualSection=section;block.ondragstart=event=>{block.classList.add('dragging');event.dataTransfer.setData('text/plain',section)};block.ondragend=()=>block.classList.remove('dragging');head.className='manual-compact-head';head.textContent='☰  '+section+' · SANS LTC';lines.className='manual-lines';cues.forEach(cue=>{const row=cueLine(cue,String(cue.order));if(localCues[index]&&cue.id===localCues[index].id){row.classList.add('manual-current');const nav=document.createElement('div'),make=(text,title,disabled,handler)=>{const button=document.createElement('button');button.textContent=text;button.title=title;button.disabled=disabled;button.onclick=handler;return button};nav.className='manual-inline-nav';nav.append(make('↑','Déplacer le bloc plus haut',anchorIndex===0,()=>setManualAnchor(cues,anchors[anchorIndex-1])),make('↓','Déplacer le bloc plus bas',anchorIndex>=anchors.length-1,()=>setManualAnchor(cues,anchors[anchorIndex+1])),make('◀','Cue manuel précédent',index===0,()=>{localStorage.setItem(key,--index);renderSequence()}),make('▶','Cue manuel suivant',!localCues.length||index>=localCues.length-1,()=>{localStorage.setItem(key,++index);renderSequence()}));row.append(nav)}lines.append(row)});block.append(head,lines);return block};
+const originalManualBlock=manualBlock;manualBlock=function(section,cues,timed){const block=document.createElement('div'),lines=document.createElement('div'),localCues=cues.filter(cue=>cue.posts.includes(postEl.value)),key=manualSectionKey(section);let index=Math.max(0,Math.min(Number(localStorage.getItem(key)||0),Math.max(0,localCues.length-1)));block.className='manual-block compact-manual';block.draggable=true;block.dataset.manualSection=section;block.title='Glisser pour déplacer ce cue dans la conduite';block.ondragstart=event=>{block.classList.add('dragging');event.dataTransfer.setData('text/plain',section)};block.ondragend=()=>block.classList.remove('dragging');lines.className='manual-lines';cues.forEach(cue=>{const row=cueLine(cue,'');row.classList.add('manual-cue-row');if(localCues[index]&&cue.id===localCues[index].id)row.classList.add('manual-current');lines.append(row)});block.append(lines);return block};
 const conduiteWorkbar=document.querySelector('.conduite-workbar'),conduiteTools=conduiteWorkbar.querySelector('.tools'),conduiteAbleton=document.createElement('div');conduiteAbleton.className='conduite-ableton';conduiteAbleton.innerHTML='<span><b>SCÈNE ABLETON</b> <strong id="conduite-ableton-title">—</strong></span><span><b>ÉCOULÉ</b> <strong id="conduite-elapsed">—</strong></span><span><b>DURÉE</b> <strong id="conduite-duration">—</strong></span><span><b>RESTE</b> <strong id="conduite-remaining">—</strong></span>';conduiteWorkbar.insertBefore(conduiteAbleton,conduiteTools);const contextualRender=render;render=function(data){contextualRender(data);$('conduite-ableton-title').textContent=data.title||'—';$('conduite-elapsed').textContent=formatSeconds(data.elapsed_seconds);$('conduite-duration').textContent=formatSeconds(data.scene_duration_seconds);$('conduite-remaining').textContent=formatSeconds(data.remaining_seconds)};
 </script>
 <style>.conduite-workbar{display:grid;grid-template-columns:auto minmax(260px,1fr) auto;align-items:center}.conduite-ableton{display:flex;align-items:center;justify-content:center;gap:14px;min-width:0;color:#d7cec1;font-size:.7rem}.conduite-ableton span{white-space:nowrap}.conduite-ableton b{color:var(--muted);font-size:.58rem;margin-right:3px}.conduite-ableton strong{color:#e0ad59}.compact-manual{border-top:1px solid var(--line);background:transparent}.manual-compact-head{height:23px;display:flex;align-items:center;padding:2px 6px;color:#d9aa5f;font-size:.66rem;font-weight:900;letter-spacing:.04em}.compact-manual .manual-lines{padding:0 4px 3px}.compact-manual .cue-line{grid-template-columns:32px minmax(160px,1fr) auto 26px auto;min-height:32px;padding:2px 0}.compact-manual .manual-current{border-left:2px solid #c89543;background:#c895430b}.manual-inline-nav{display:flex;gap:2px}.manual-inline-nav button{min-width:24px;padding:3px;font-size:.65rem}.distribution-list{display:grid}.distribution-row{display:grid;grid-template-columns:minmax(130px,.7fr) minmax(180px,1fr) 1.4fr;align-items:center;gap:12px;border-top:1px solid var(--line);padding:10px 0}.distribution-row:first-child{border-top:0}.distribution-role{font-weight:950}.distribution-tech{color:var(--muted);font-size:.78rem}.distribution-row select{width:100%}.distribution-note{margin-bottom:12px}@media(max-width:900px){.conduite-workbar{grid-template-columns:1fr auto}.conduite-ableton{grid-column:1/-1;justify-content:flex-start;flex-wrap:wrap}.compact-manual .cue-line{grid-template-columns:28px minmax(100px,1fr) auto 26px}.manual-inline-nav{grid-column:2/-1}.distribution-row{grid-template-columns:1fr}.tabs{overflow-x:auto}}</style>
+
+<style id="manual-cue-final-layout">
+/* Rendu final des cues manuels dans la conduite */
+.compact-manual{
+    border-top:1px solid var(--line) !important;
+    background:#15120d !important;
+    cursor:grab;
+}
+
+.compact-manual:active{
+    cursor:grabbing;
+}
+
+.compact-manual .manual-lines{
+    padding:0 4px !important;
+}
+
+.compact-manual .cue-line.manual-cue-row{
+    grid-template-columns:minmax(160px,1fr) auto 26px !important;
+    min-height:31px !important;
+    padding:3px 0 3px 6px !important;
+}
+
+.compact-manual .manual-cue-row .line-time{
+    display:none !important;
+}
+
+.compact-manual .manual-current{
+    border-left:2px solid #c89543 !important;
+    background:#c895430b !important;
+}
+
+.manual-compact-head,
+.manual-inline-nav,
+.manual-section-nav{
+    display:none !important;
+}
+
+@media(max-width:760px){
+    .compact-manual .cue-line.manual-cue-row{
+        grid-template-columns:minmax(100px,1fr) auto 26px !important;
+    }
+}
+</style>
+
+
+<script id="showcue-server-clock-script">
+let serverClockSeconds = null;
+let serverClockPerf = null;
+let serverClockSyncTimer = null;
+
+function formatServerClock(seconds){
+    if(!Number.isFinite(seconds)) return '--:--:--';
+
+    const day = 24 * 60 * 60;
+    let value = ((seconds % day) + day) % day;
+
+    const hours = Math.floor(value / 3600);
+    value -= hours * 3600;
+
+    const minutes = Math.floor(value / 60);
+    const secs = Math.floor(value - minutes * 60);
+
+    return (
+        String(hours).padStart(2,'0') + ':' +
+        String(minutes).padStart(2,'0') + ':' +
+        String(secs).padStart(2,'0')
+    );
+}
+
+function drawServerClock(){
+    const display = document.getElementById('server-clock');
+
+    if(display && serverClockSeconds !== null && serverClockPerf !== null){
+        const elapsed = (performance.now() - serverClockPerf) / 1000;
+        display.textContent = formatServerClock(serverClockSeconds + elapsed);
+    }
+}
+
+async function syncServerClock(){
+    const display = document.getElementById('server-clock');
+
+    try{
+        const started = performance.now();
+        const response = await fetch('/show-info/clock', {cache:'no-store'});
+        const finished = performance.now();
+        const data = await response.json();
+
+        if(!response.ok || !data.ok){
+            throw new Error(data.message || 'Horloge serveur indisponible');
+        }
+
+        /*
+         * Compensation simple de la moitié du temps aller-retour :
+         * on estime que la réponse serveur a été produite au milieu
+         * de la requête réseau.
+         */
+        const halfRoundTrip = (finished - started) / 2000;
+
+        serverClockSeconds =
+            Number(data.server_clock_seconds) + halfRoundTrip;
+
+        serverClockPerf = finished;
+
+        if(display){
+            display.classList.remove('sync-error');
+            display.title =
+                'Heure du serveur' +
+                (data.timezone ? ' · ' + data.timezone : '');
+        }
+
+    }catch(error){
+        if(display){
+            display.classList.add('sync-error');
+            display.title = 'Synchronisation heure serveur impossible';
+        }
+    }
+}
+
+syncServerClock();
+drawServerClock();
+
+setInterval(drawServerClock, 250);
+serverClockSyncTimer = setInterval(syncServerClock, 30000);
+</script>
+
+<style id="showcue-production-layout-v4">
+
+/* ==========================================================
+   HEADER GENERAL — COMPACT
+   ========================================================== */
+
+.showcue-header{
+    display:flex !important;
+    align-items:center !important;
+    justify-content:space-between !important;
+    gap:14px !important;
+    min-height:38px !important;
+    padding:2px 0 3px !important;
+}
+
+.showcue-header-main{
+    display:flex !important;
+    align-items:center !important;
+    gap:12px !important;
+    min-width:0 !important;
+}
+
+.showcue-header-main .brand,
+.showcue-header-main .post-control{
+    flex:0 0 auto !important;
+}
+
+/* Le titre de scène est affiché dans CONDUITE, pas deux fois. */
+.showcue-header-main .show-title{
+    display:none !important;
+}
+
+.showcue-header-status{
+    display:flex !important;
+    align-items:center !important;
+    justify-content:flex-end !important;
+    gap:8px !important;
+    margin-left:auto !important;
+    padding:0 !important;
+    border:0 !important;
+}
+
+.showcue-header-actions{
+    display:flex !important;
+    align-items:center !important;
+    gap:8px !important;
+}
+
+.showcue-header-actions .call-button{
+    padding:5px 9px !important;
+    font-size:.66rem !important;
+}
+
+.showcue-header-actions .transport{
+    font-size:.72rem !important;
+}
+
+
+/* ==========================================================
+   SESSION + ONGLETS
+   ========================================================== */
+
+.sessionbar{
+    min-height:30px !important;
+    margin-top:2px !important;
+    gap:5px !important;
+}
+
+.sessionbar select{
+    min-width:180px !important;
+    padding:5px 7px !important;
+}
+
+.sessionbar button{
+    padding:4px 7px !important;
+    font-size:.59rem !important;
+}
+
+.tabs{
+    margin-top:3px !important;
+}
+
+.tab{
+    padding-top:7px !important;
+    padding-bottom:7px !important;
+}
+
+
+/* ==========================================================
+   HEURE + LTC
+   Informations majeures mais hauteur maîtrisée.
+   ========================================================== */
+
+.operation-clocks{
+    display:grid !important;
+    grid-template-columns:minmax(0,1fr) 1px minmax(0,1.35fr) !important;
+    align-items:center !important;
+
+    min-height:58px !important;
+    margin:0 !important;
+    padding:6px 13px !important;
+
+    border-top:1px solid #3b342c !important;
+    border-bottom:1px solid #3b342c !important;
+
+    background:#0d0b09 !important;
+}
+
+.operation-clock{
+    display:flex !important;
+    align-items:baseline !important;
+    gap:9px !important;
+    min-width:0 !important;
+    white-space:nowrap !important;
+}
+
+.operation-clock-real{
+    justify-content:flex-start !important;
+}
+
+.operation-clock-ltc{
+    justify-content:flex-end !important;
+}
+
+.operation-clock-divider{
+    display:block !important;
+    width:1px !important;
+    height:30px !important;
+    justify-self:center !important;
+    background:#4c443b !important;
+}
+
+.operation-clock-label{
+    color:#8f867a !important;
+    font-size:.52rem !important;
+    font-weight:950 !important;
+    letter-spacing:.13em !important;
+}
+
+.operation-clock .server-clock{
+    color:#f4ece2 !important;
+    font:900 clamp(1.35rem,2.7vw,1.9rem)/1
+         ui-monospace,SFMono-Regular,monospace !important;
+    letter-spacing:.02em !important;
+    font-variant-numeric:tabular-nums !important;
+}
+
+.operation-clock .ltc{
+    color:var(--ltc) !important;
+    font:950 clamp(1.55rem,3vw,2.15rem)/1
+         ui-monospace,SFMono-Regular,monospace !important;
+    letter-spacing:.025em !important;
+    font-variant-numeric:tabular-nums !important;
+}
+
+.server-clock.sync-error{
+    color:#d28d86 !important;
+}
+
+
+/* ==========================================================
+   CONDUITE
+   ========================================================== */
+
+#view-conduite{
+    padding-top:8px !important;
+}
+
+#view-conduite .conduite-workbar{
+    position:sticky !important;
+    top:0 !important;
+    z-index:4 !important;
+
+    display:grid !important;
+    grid-template-columns:auto minmax(0,1fr) auto !important;
+    align-items:center !important;
+
+    gap:8px 18px !important;
+
+    min-height:56px !important;
+    margin:0 0 6px !important;
+    padding:7px 11px !important;
+
+    border:1px solid #3c352d !important;
+    border-radius:9px !important;
+
+    background:rgba(18,16,14,.98) !important;
+    box-shadow:none !important;
+}
+
+
+/* OP 2026 — CONDUITE */
+
+.conduite-heading{
+    display:flex !important;
+    align-items:baseline !important;
+    gap:7px !important;
+    min-width:max-content !important;
+}
+
+.conduite-session-name{
+    max-width:210px !important;
+    overflow:hidden !important;
+
+    color:#e3b565 !important;
+
+    font-size:.76rem !important;
+    font-weight:950 !important;
+
+    text-overflow:ellipsis !important;
+    white-space:nowrap !important;
+}
+
+.conduite-separator{
+    color:#6d655b !important;
+}
+
+.conduite-title{
+    color:#ede6dd !important;
+    font-size:.69rem !important;
+    font-weight:950 !important;
+    letter-spacing:.09em !important;
+}
+
+
+/* ==========================================================
+   SCENE / ECOULE / DUREE / RESTE
+   ========================================================== */
+
+.conduite-ableton{
+    display:flex !important;
+    align-items:center !important;
+    justify-content:flex-start !important;
+
+    gap:14px !important;
+
+    min-width:0 !important;
+    overflow:hidden !important;
+}
+
+.conduite-ableton span{
+    display:flex !important;
+    align-items:baseline !important;
+
+    gap:4px !important;
+    min-width:0 !important;
+
+    white-space:nowrap !important;
+}
+
+.conduite-ableton b{
+    margin:0 !important;
+
+    color:#898075 !important;
+
+    font-size:.48rem !important;
+    font-weight:950 !important;
+    letter-spacing:.07em !important;
+}
+
+.conduite-ableton strong{
+    color:#e4b35b !important;
+
+    font-size:.80rem !important;
+    font-weight:950 !important;
+
+    line-height:1 !important;
+    font-variant-numeric:tabular-nums !important;
+}
+
+/* Scène = information principale de la cartouche. */
+#conduite-ableton-title{
+    display:inline-block !important;
+
+    max-width:240px !important;
+    overflow:hidden !important;
+
+    color:#f0ba5e !important;
+
+    font-size:.94rem !important;
+    font-weight:950 !important;
+
+    text-overflow:ellipsis !important;
+    white-space:nowrap !important;
+}
+
+/* RESTE légèrement prioritaire sur écoulé/durée. */
+#conduite-remaining{
+    color:#ffd474 !important;
+    font-size:.88rem !important;
+}
+
+
+/* ==========================================================
+   + CUE / CAPTURE — PETITS
+   ========================================================== */
+
+.conduite-workbar .tools{
+    display:flex !important;
+    align-items:center !important;
+    flex-wrap:nowrap !important;
+
+    gap:5px !important;
+
+    width:auto !important;
+    margin:0 !important;
+}
+
+.conduite-workbar .tools button{
+    flex:0 0 auto !important;
+
+    min-height:0 !important;
+
+    padding:4px 7px !important;
+
+    border-radius:6px !important;
+
+    font-size:.56rem !important;
+    line-height:1 !important;
+}
+
+
+/* ==========================================================
+   FILTRES
+   ========================================================== */
+
+#view-conduite .section-filters{
+    display:flex !important;
+    flex-wrap:wrap !important;
+
+    gap:4px !important;
+
+    margin:0 0 6px !important;
+}
+
+#view-conduite .section-filter{
+    padding:3px 7px !important;
+    font-size:.57rem !important;
+}
+
+
+/* ==========================================================
+   DEROULEMENT COMPLET
+   ========================================================== */
+
+#view-conduite .content-panel{
+    padding:10px 12px !important;
+}
+
+#view-conduite .content-panel h3{
+    margin:0 0 7px !important;
+    font-size:.90rem !important;
+}
+
+#view-conduite .cue-line{
+    min-height:31px !important;
+}
+
+
+/* ==========================================================
+   LARGEUR MOYENNE
+   ========================================================== */
+
+@media(max-width:1100px){
+
+    #view-conduite .conduite-workbar{
+        gap:7px 10px !important;
+    }
+
+    .conduite-ableton{
+        gap:9px !important;
+    }
+
+    #conduite-ableton-title{
+        max-width:180px !important;
+        font-size:.86rem !important;
+    }
+
+    .conduite-ableton strong{
+        font-size:.74rem !important;
+    }
+
+    .conduite-ableton b{
+        font-size:.45rem !important;
+    }
+}
+
+
+/* ==========================================================
+   TABLETTE
+   ========================================================== */
+
+@media(max-width:800px){
+
+    #view-conduite .conduite-workbar{
+        grid-template-columns:minmax(0,1fr) auto !important;
+        gap:6px 9px !important;
+    }
+
+    .conduite-heading{
+        grid-column:1 !important;
+        grid-row:1 !important;
+    }
+
+    .conduite-workbar .tools{
+        grid-column:2 !important;
+        grid-row:1 !important;
+    }
+
+    .conduite-ableton{
+        grid-column:1 / -1 !important;
+        grid-row:2 !important;
+
+        padding-top:5px !important;
+
+        border-top:1px solid #302a24 !important;
+
+        overflow-x:auto !important;
+    }
+
+    #conduite-ableton-title{
+        max-width:220px !important;
+    }
+
+    .operation-clocks{
+        min-height:54px !important;
+    }
+
+    .operation-clock .server-clock{
+        font-size:1.25rem !important;
+    }
+
+    .operation-clock .ltc{
+        font-size:1.45rem !important;
+    }
+}
+
+
+/* ==========================================================
+   MOBILE
+   ========================================================== */
+
+@media(max-width:520px){
+
+    .operation-clocks{
+        grid-template-columns:1fr !important;
+        gap:4px !important;
+        padding:6px 9px !important;
+    }
+
+    .operation-clock-divider{
+        display:none !important;
+    }
+
+    .operation-clock-real,
+    .operation-clock-ltc{
+        justify-content:space-between !important;
+    }
+
+    .operation-clock .server-clock,
+    .operation-clock .ltc{
+        font-size:1.18rem !important;
+    }
+
+    .conduite-session-name{
+        max-width:125px !important;
+    }
+
+    .conduite-ableton{
+        gap:7px !important;
+    }
+}
+
+</style>
+
+
+<style id="showcue-capture-tc-style">
+.capture-tc-button{
+    border-color:#4b6353 !important;
+    background:#18241d !important;
+    color:#9ce3b7 !important;
+    white-space:nowrap;
+}
+
+.capture-tc-button:hover{
+    border-color:#62a77c !important;
+    background:#203329 !important;
+}
+
+.conduite-workbar .capture-tc-button{
+    padding:4px 7px !important;
+    font-size:.56rem !important;
+}
+</style>
+
+
+<script id="showcue-conduite-capture-tc-stable-order">
+/*
+ * CONDUITE :
+ * - clic sur une fiche = sélection
+ * - CAPTURE TC affecte le cue sélectionné
+ * - les cues importés Builder restent classés selon builder.number
+ * - le TC ne devient JAMAIS une clé de tri de la CONDUITE
+ * - LIVE continue d'utiliser le TC normalement côté serveur
+ */
+
+let selectedConduiteCueId = null;
+
+
+/* ----------------------------------------------------------
+   Helpers
+---------------------------------------------------------- */
+
+function conduiteCueSection(cue){
+    return String(
+        cue.section ||
+        (cue.builder && cue.builder.section) ||
+        ''
+    ).trim();
+}
+
+function conduiteBuilderNumber(cue){
+    const raw = cue && cue.builder ? cue.builder.number : '';
+    const value = Number(raw);
+
+    return Number.isFinite(value) && value > 0
+        ? value
+        : null;
+}
+
+function conduiteOrderedCues(){
+    const data = snapshot.conduite || {};
+
+    /*
+     * Important :
+     * On conserve les fiches legacy devant les cues Builder.
+     * Pour les cues Builder, builder.number = ordre de la feuille importée.
+     */
+    const source = [
+        ...(data.timed || []),
+        ...(data.manual || [])
+    ].filter(cue => cue.status === 'official');
+
+    return source
+        .map((cue,index)=>({
+            cue,
+            index,
+            builderNumber: conduiteBuilderNumber(cue)
+        }))
+        .sort((a,b)=>{
+            const aBuilder = a.builderNumber !== null;
+            const bBuilder = b.builderNumber !== null;
+
+            if(aBuilder && bBuilder){
+                if(a.builderNumber !== b.builderNumber){
+                    return a.builderNumber - b.builderNumber;
+                }
+                return a.index - b.index;
+            }
+
+            if(aBuilder !== bBuilder){
+                /*
+                 * Les anciennes fiches existantes restent devant
+                 * l'import Builder.
+                 */
+                return aBuilder ? 1 : -1;
+            }
+
+            return a.index - b.index;
+        })
+        .map(item=>item.cue);
+}
+
+
+/* ----------------------------------------------------------
+   Sélection visuelle d'une fiche
+---------------------------------------------------------- */
+
+const stableOrderBaseCueLine = cueLine;
+
+cueLine = function(cue,position){
+    const row = stableOrderBaseCueLine(cue,position);
+
+    if(
+        cue &&
+        cue.status === 'official' &&
+        cue.mode !== 'library'
+    ){
+        row.classList.add('conduite-selectable');
+
+        if(cue.id === selectedConduiteCueId){
+            row.classList.add('conduite-selected');
+        }
+
+        row.addEventListener('click',event=>{
+            /*
+             * Les boutons FOH/RET/etc., édition et suppression
+             * conservent leur fonction et ne sélectionnent pas la ligne.
+             */
+            if(event.target.closest(
+                'button,input,textarea,select,a,summary'
+            )){
+                return;
+            }
+
+            selectedConduiteCueId = cue.id;
+
+            document
+                .querySelectorAll('#timed-sequence .cue-line')
+                .forEach(item=>{
+                    item.classList.toggle(
+                        'conduite-selected',
+                        item.dataset.cueId === cue.id
+                    );
+                });
+
+            const captureButton = $('capture-tc');
+
+            if(captureButton){
+                captureButton.textContent='⏱ CAPTURE TC → '+cue.text;
+                captureButton.title='Capturer le LTC sur : '+cue.text;
+            }
+
+            $('error').textContent='';
+        });
+    }
+
+    return row;
+};
+
+
+/* ----------------------------------------------------------
+   Rendu CONDUITE dans l'ordre fixe
+---------------------------------------------------------- */
+
+renderSequence = function(){
+    const box = $('timed-sequence');
+    const all = conduiteOrderedCues();
+
+    const sections = [
+        ...new Set(
+            all
+                .map(conduiteCueSection)
+                .filter(Boolean)
+        )
+    ];
+
+    renderSectionFilters(sections);
+
+    const visible = sectionFilter === 'TOUT'
+        ? all
+        : all.filter(
+            cue => conduiteCueSection(cue) === sectionFilter
+        );
+
+    box.innerHTML='';
+
+    visible.forEach(cue=>{
+        const position =
+            cue.mode === 'timed' && isTimecode(cue.timecode)
+                ? cue.timecode
+                : '';
+
+        const row = cueLine(cue,position);
+
+        /*
+         * Un TC ne modifie jamais la place de la ligne ici.
+         * L'ordre vient uniquement de builder.number.
+         */
+        box.append(row);
+    });
+
+    if(!visible.length){
+        box.innerHTML='<div class="empty">Conduite vide</div>';
+    }
+
+    followConduiteActive();
+};
+
+
+/* ----------------------------------------------------------
+   CAPTURE TC sur la fiche sélectionnée
+---------------------------------------------------------- */
+
+async function captureTcOnSelectedConduiteCue(){
+    const button = $('capture-tc');
+
+    if(!selectedConduiteCueId){
+        $('error').textContent=
+            'Sélectionnez d’abord une fiche dans la conduite.';
+        return;
+    }
+
+    const cue = conduiteOrderedCues().find(
+        item => item.id === selectedConduiteCueId
+    );
+
+    if(!cue){
+        $('error').textContent=
+            'La fiche sélectionnée n’existe plus. Sélectionnez-la de nouveau.';
+        selectedConduiteCueId=null;
+        return;
+    }
+
+    if(button)button.disabled=true;
+
+    try{
+        const capture = await api(
+            '/show-info/capture',
+            {
+                method:'POST',
+                body:'{}'
+            }
+        );
+
+        if(!capture.timecode || !isTimecode(capture.timecode)){
+            throw new Error(
+                'Aucun LTC capturable : lecture arrêtée, signal absent ou invalide.'
+            );
+        }
+
+        /*
+         * On transforme si nécessaire le cue manuel en timed,
+         * MAIS on ne touche ni au texte, ni aux postes,
+         * ni aux métadonnées Builder.
+         *
+         * update_show_cue() conserve donc builder.number.
+         */
+        await api(
+            '/show-info/cues/'+encodeURIComponent(cue.id),
+            {
+                method:'PUT',
+                body:JSON.stringify(
+                    scoped({
+                        mode:'timed',
+                        timecode:capture.timecode
+                    })
+                )
+            }
+        );
+
+        $('error').textContent=
+            'TC CAPTURÉ · '+
+            capture.timecode+
+            ' · '+
+            cue.text;
+
+        await refresh();
+
+        /*
+         * La sélection reste sur la même fiche après refresh.
+         */
+        const selected = document.querySelector(
+            '#timed-sequence [data-cue-id="'+
+            CSS.escape(selectedConduiteCueId)+
+            '"]'
+        );
+
+        if(selected){
+            selected.classList.add('conduite-selected');
+        }
+
+    }catch(error){
+        $('error').textContent=error.message;
+
+    }finally{
+        if(button)button.disabled=false;
+    }
+}
+
+
+/*
+ * Remplace l'ancien comportement :
+ * CAPTURE TC ne crée plus un nouveau cue dans CONDUITE.
+ */
+$('capture-tc').onclick = captureTcOnSelectedConduiteCue;
+
+</script>
+
+<style id="showcue-conduite-capture-tc-stable-order-style">
+
+#timed-sequence .conduite-selectable{
+    cursor:pointer;
+}
+
+#timed-sequence .conduite-selectable:hover{
+    background:rgba(201,149,67,.055);
+}
+
+#timed-sequence .conduite-selected{
+    background:rgba(201,149,67,.13) !important;
+    box-shadow:
+        inset 3px 0 0 #d7a653,
+        inset 0 0 0 1px rgba(215,166,83,.18);
+}
+
+#timed-sequence .conduite-selected .line-text{
+    color:#fff4dc;
+}
+
+</style>
+
+
+<script id="showcue-inline-capture-tc">
+(function(){
+
+    async function captureTcForCue(cue, button){
+        if(!cue || !cue.id) return;
+
+        const original = button.innerHTML;
+        button.disabled = true;
+        button.textContent = '…';
+
+        try{
+            const capture = await api(
+                '/show-info/capture',
+                {
+                    method:'POST',
+                    body:'{}'
+                }
+            );
+
+            if(!capture.timecode || !isTimecode(capture.timecode)){
+                throw new Error(
+                    'Aucun LTC capturable : lecture arrêtée, signal absent ou invalide.'
+                );
+            }
+
+            await api(
+                '/show-info/cues/' + encodeURIComponent(cue.id),
+                {
+                    method:'PUT',
+                    body:JSON.stringify(
+                        scoped({
+                            mode:'timed',
+                            timecode:capture.timecode
+                        })
+                    )
+                }
+            );
+
+            $('error').textContent =
+                'TC CAPTURÉ · ' +
+                capture.timecode +
+                ' · ' +
+                cue.text;
+
+            await refresh();
+
+        }catch(error){
+            $('error').textContent = error.message;
+            button.disabled = false;
+            button.innerHTML = original;
+        }
+    }
+
+
+    /*
+     * cueLine a déjà reçu les autres enrichissements.
+     * On conserve tout et on ne modifie que la zone TC.
+     */
+    const inlineTcBaseCueLine = cueLine;
+
+    cueLine = function(cue, position){
+        const row = inlineTcBaseCueLine(cue, position);
+
+        if(
+            !cue ||
+            cue.status !== 'official' ||
+            cue.mode === 'library'
+        ){
+            return row;
+        }
+
+        const time = row.querySelector('.line-time');
+
+        if(!time){
+            return row;
+        }
+
+        time.innerHTML = '';
+
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'inline-capture-tc';
+
+        const hasTc =
+            cue.mode === 'timed' &&
+            isTimecode(cue.timecode);
+
+        if(hasTc){
+            button.classList.add('has-timecode');
+            button.textContent = cue.timecode;
+            button.title =
+                'TC actuel : ' +
+                cue.timecode +
+                ' — cliquer pour recapturer';
+            button.setAttribute(
+                'aria-label',
+                'Recapturer le TC de ' + cue.text
+            );
+        }else{
+            button.classList.add('needs-timecode');
+            button.innerHTML =
+                '<span class="inline-tc-icon">⏱</span>';
+            button.title =
+                'Capturer le TC pour : ' + cue.text;
+            button.setAttribute(
+                'aria-label',
+                'Capturer le TC de ' + cue.text
+            );
+        }
+
+        button.onclick = async event => {
+            event.preventDefault();
+            event.stopPropagation();
+            await captureTcForCue(cue, button);
+        };
+
+        time.append(button);
+
+        return row;
+    };
+
+
+    /*
+     * Le bouton global n'est plus nécessaire pour le calage
+     * des fiches existantes.
+     */
+    const globalCapture = $('capture-tc');
+
+    if(globalCapture){
+        globalCapture.hidden = true;
+    }
+
+})();
+</script>
+
+<style id="showcue-inline-capture-tc-style">
+
+/* ----------------------------------------------------------
+   COLONNE TC
+   ---------------------------------------------------------- */
+
+#timed-sequence .line-time{
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+
+    min-width:92px !important;
+    overflow:visible !important;
+}
+
+
+/* ----------------------------------------------------------
+   BOUTON SANS TC
+   ---------------------------------------------------------- */
+
+.inline-capture-tc.needs-timecode{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+
+    width:30px;
+    height:25px;
+
+    padding:0 !important;
+
+    border:1px solid #4f8067 !important;
+    border-radius:6px !important;
+
+    background:#162b20 !important;
+    color:#87e6ae !important;
+
+    cursor:pointer;
+}
+
+.inline-capture-tc.needs-timecode:hover{
+    background:#214532 !important;
+    border-color:#69b687 !important;
+}
+
+.inline-tc-icon{
+    font-size:.78rem;
+    line-height:1;
+}
+
+
+/* ----------------------------------------------------------
+   TC DÉJÀ CAPTURÉ
+   ---------------------------------------------------------- */
+
+.inline-capture-tc.has-timecode{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+
+    min-width:82px;
+
+    padding:3px 5px !important;
+
+    border:1px solid transparent !important;
+    border-radius:5px !important;
+
+    background:transparent !important;
+    color:#57e69a !important;
+
+    font-family:monospace;
+    font-size:.68rem;
+    font-weight:950;
+
+    cursor:pointer;
+    white-space:nowrap;
+}
+
+.inline-capture-tc.has-timecode:hover{
+    border-color:#497c63 !important;
+    background:#173125 !important;
+}
+
+
+/* ----------------------------------------------------------
+   FEEDBACK PENDANT CAPTURE
+   ---------------------------------------------------------- */
+
+.inline-capture-tc:disabled{
+    opacity:.65;
+    cursor:wait;
+}
+
+
+/* ----------------------------------------------------------
+   On rétablit la colonne TC sur les cues importés/manuels.
+   L'ancien CSS la masquait.
+   ---------------------------------------------------------- */
+
+#timed-sequence
+.compact-manual
+.cue-line.manual-cue-row{
+    grid-template-columns:
+        92px
+        minmax(250px,1fr)
+        minmax(174px,max-content)
+        64px
+        !important;
+}
+
+#timed-sequence
+.compact-manual
+.manual-cue-row
+.line-time{
+    display:flex !important;
+}
+
+
+/* ----------------------------------------------------------
+   MOBILE / PETITE FENÊTRE
+   ---------------------------------------------------------- */
+
+@media(max-width:950px){
+
+    #timed-sequence
+    .compact-manual
+    .cue-line.manual-cue-row{
+        grid-template-columns:
+            70px
+            minmax(190px,1fr)
+            minmax(160px,max-content)
+            58px
+            !important;
+    }
+
+    #timed-sequence .line-time{
+        min-width:70px !important;
+    }
+
+    .inline-capture-tc.has-timecode{
+        min-width:68px;
+        font-size:.58rem;
+    }
+}
+
+</style>
+
+
+<script id="showcue-persistent-conduite-dragdrop">
+(function(){
+
+    let draggedConduiteCueId = null;
+
+
+    function persistentConduiteNumber(cue){
+        const value = Number(cue && cue.conduite_order);
+
+        return Number.isFinite(value)
+            ? value
+            : null;
+    }
+
+
+    /*
+     * Remplace la version précédente :
+     *
+     * 1. conduite_order si déjà sauvegardé
+     * 2. ordre Builder initial tant qu'aucun drag n'a été effectué
+     * 3. ordre reçu du serveur pour les anciennes fiches
+     *
+     * Le timecode n'intervient jamais ici.
+     */
+    conduiteOrderedCues = function(){
+        const data = snapshot.conduite || {};
+
+        const source = [
+            ...(data.timed || []),
+            ...(data.manual || [])
+        ].filter(cue => cue.status === 'official');
+
+        const anyPersistent = source.some(
+            cue => persistentConduiteNumber(cue) !== null
+        );
+
+        return source
+            .map((cue,index)=>({
+                cue,
+                index,
+                persistent:persistentConduiteNumber(cue),
+                builderNumber:
+                    cue.builder &&
+                    Number.isFinite(Number(cue.builder.number))
+                        ? Number(cue.builder.number)
+                        : null
+            }))
+            .sort((a,b)=>{
+
+                /*
+                 * Dès qu'un ordre persistant existe,
+                 * il devient la seule référence.
+                 */
+                if(anyPersistent){
+                    const ao = a.persistent !== null
+                        ? a.persistent
+                        : 1000000 + a.index;
+
+                    const bo = b.persistent !== null
+                        ? b.persistent
+                        : 1000000 + b.index;
+
+                    return ao - bo || a.index - b.index;
+                }
+
+                /*
+                 * Première utilisation :
+                 * on reprend exactement notre ordre actuel.
+                 */
+                const aBuilder = a.builderNumber !== null;
+                const bBuilder = b.builderNumber !== null;
+
+                if(aBuilder && bBuilder){
+                    return (
+                        a.builderNumber - b.builderNumber ||
+                        a.index - b.index
+                    );
+                }
+
+                if(aBuilder !== bBuilder){
+                    return aBuilder ? 1 : -1;
+                }
+
+                return a.index - b.index;
+            })
+            .map(item => item.cue);
+    };
+
+
+    async function saveConduiteOrder(cues){
+        const cueIds = cues.map(cue => cue.id);
+
+        await api(
+            '/show-info/conduite/order',
+            {
+                method:'PUT',
+                body:JSON.stringify(
+                    scoped({cue_ids:cueIds})
+                )
+            }
+        );
+    }
+
+
+    async function moveConduiteCue(sourceId,targetId,after=false){
+        if(!sourceId || sourceId === targetId)return;
+
+        const cues = conduiteOrderedCues();
+        const from = cues.findIndex(cue => cue.id === sourceId);
+        let to = cues.findIndex(cue => cue.id === targetId);
+
+        if(from < 0 || to < 0)return;
+
+        const [moved] = cues.splice(from,1);
+
+        /*
+         * L'index cible peut avoir bougé après extraction.
+         */
+        to = cues.findIndex(cue => cue.id === targetId);
+
+        if(after)to += 1;
+
+        cues.splice(to,0,moved);
+
+        $('error').textContent='ENREGISTREMENT DU NOUVEL ORDRE…';
+
+        await saveConduiteOrder(cues);
+
+        $('error').textContent='ORDRE DE CONDUITE ENREGISTRÉ';
+
+        await refresh();
+    }
+
+
+    /*
+     * On enrichit chaque ligne existante, sans modifier
+     * CAPTURE TC, postes, édition ou suppression.
+     */
+    const dragDropBaseCueLine = cueLine;
+
+    cueLine = function(cue,position){
+        const row = dragDropBaseCueLine(cue,position);
+
+        if(
+            !cue ||
+            cue.status !== 'official' ||
+            cue.mode === 'library'
+        ){
+            return row;
+        }
+
+        row.draggable = true;
+        row.classList.add('conduite-draggable');
+
+        row.ondragstart = event => {
+            /*
+             * Éviter qu'un clic sur un contrôle démarre un drag.
+             */
+            if(event.target.closest(
+                'button,input,textarea,select,a'
+            )){
+                event.preventDefault();
+                return;
+            }
+
+            draggedConduiteCueId = cue.id;
+            row.classList.add('conduite-dragging');
+
+            event.dataTransfer.effectAllowed='move';
+            event.dataTransfer.setData(
+                'application/x-showcue-cue-id',
+                cue.id
+            );
+            event.dataTransfer.setData(
+                'text/plain',
+                cue.id
+            );
+        };
+
+        row.ondragend = () => {
+            draggedConduiteCueId = null;
+
+            document
+                .querySelectorAll(
+                    '#timed-sequence .conduite-dragging,'+
+                    '#timed-sequence .conduite-drop-before,'+
+                    '#timed-sequence .conduite-drop-after'
+                )
+                .forEach(element=>{
+                    element.classList.remove(
+                        'conduite-dragging',
+                        'conduite-drop-before',
+                        'conduite-drop-after'
+                    );
+                });
+        };
+
+        row.ondragover = event => {
+            const sourceId =
+                draggedConduiteCueId ||
+                event.dataTransfer.getData(
+                    'application/x-showcue-cue-id'
+                );
+
+            if(!sourceId || sourceId === cue.id)return;
+
+            event.preventDefault();
+            event.dataTransfer.dropEffect='move';
+
+            const rect=row.getBoundingClientRect();
+            const after=event.clientY > rect.top + rect.height/2;
+
+            row.classList.toggle(
+                'conduite-drop-before',
+                !after
+            );
+            row.classList.toggle(
+                'conduite-drop-after',
+                after
+            );
+        };
+
+        row.ondragleave = () => {
+            row.classList.remove(
+                'conduite-drop-before',
+                'conduite-drop-after'
+            );
+        };
+
+        row.ondrop = async event => {
+            event.preventDefault();
+
+            const sourceId =
+                draggedConduiteCueId ||
+                event.dataTransfer.getData(
+                    'application/x-showcue-cue-id'
+                ) ||
+                event.dataTransfer.getData('text/plain');
+
+            const rect=row.getBoundingClientRect();
+            const after=event.clientY > rect.top + rect.height/2;
+
+            row.classList.remove(
+                'conduite-drop-before',
+                'conduite-drop-after'
+            );
+
+            if(!sourceId || sourceId === cue.id)return;
+
+            try{
+                await moveConduiteCue(
+                    sourceId,
+                    cue.id,
+                    after
+                );
+            }catch(error){
+                $('error').textContent=error.message;
+                await refresh();
+            }
+        };
+
+        return row;
+    };
+
+
+    /*
+     * Dépôt en toute fin de conduite.
+     */
+    const sequence = $('timed-sequence');
+
+    sequence.addEventListener('dragover',event=>{
+        if(!draggedConduiteCueId)return;
+
+        const row=event.target.closest('.cue-line');
+        if(row)return;
+
+        event.preventDefault();
+        sequence.classList.add('conduite-drop-end');
+    });
+
+    sequence.addEventListener('dragleave',event=>{
+        if(!sequence.contains(event.relatedTarget)){
+            sequence.classList.remove('conduite-drop-end');
+        }
+    });
+
+    sequence.addEventListener('drop',async event=>{
+        const row=event.target.closest('.cue-line');
+
+        if(row)return;
+
+        sequence.classList.remove('conduite-drop-end');
+
+        if(!draggedConduiteCueId)return;
+
+        event.preventDefault();
+
+        try{
+            const cues=conduiteOrderedCues();
+            const index=cues.findIndex(
+                cue=>cue.id===draggedConduiteCueId
+            );
+
+            if(index<0)return;
+
+            const [moved]=cues.splice(index,1);
+            cues.push(moved);
+
+            await saveConduiteOrder(cues);
+            await refresh();
+
+        }catch(error){
+            $('error').textContent=error.message;
+        }
+    });
+
+})();
+</script>
+
+<style id="showcue-persistent-conduite-dragdrop-style">
+
+#timed-sequence .conduite-draggable{
+    cursor:grab;
+}
+
+#timed-sequence .conduite-draggable:active{
+    cursor:grabbing;
+}
+
+#timed-sequence .conduite-dragging{
+    opacity:.40;
+}
+
+#timed-sequence .conduite-drop-before{
+    box-shadow:
+        inset 0 3px 0 #d7a653,
+        inset 0 0 0 1px rgba(215,166,83,.18) !important;
+}
+
+#timed-sequence .conduite-drop-after{
+    box-shadow:
+        inset 0 -3px 0 #d7a653,
+        inset 0 0 0 1px rgba(215,166,83,.18) !important;
+}
+
+#timed-sequence.conduite-drop-end{
+    box-shadow:inset 0 -3px 0 #d7a653;
+}
+
+</style>
+
+
+<script id="showcue-live-untimed-checklist">
+(function(){
+
+    /* =========================================================
+       ÉTAT LOCAL DES VALIDATIONS
+       ========================================================= */
+
+    function liveChecklistStorageKey(currentCue){
+        return [
+            'cl-showcue-live-checklist',
+            snapshot.active_session_id || 'session',
+            postEl.value || 'poste',
+            currentCue ? currentCue.id : 'none'
+        ].join(':');
+    }
+
+    function loadLiveChecklistState(currentCue){
+        try{
+            return JSON.parse(
+                localStorage.getItem(
+                    liveChecklistStorageKey(currentCue)
+                ) || '{}'
+            );
+        }catch(_error){
+            return {};
+        }
+    }
+
+    function saveLiveChecklistState(currentCue,state){
+        localStorage.setItem(
+            liveChecklistStorageKey(currentCue),
+            JSON.stringify(state)
+        );
+    }
+
+
+    /* =========================================================
+       TROUVER LA PLAGE ENTRE LE TC COURANT ET LE PROCHAIN TC
+       ========================================================= */
+
+    function liveIntervalData(){
+
+        const conduite =
+            typeof conduiteOrderedCues === 'function'
+                ? conduiteOrderedCues()
+                : [
+                    ...((snapshot.conduite||{}).timed||[]),
+                    ...((snapshot.conduite||{}).manual||[])
+                ];
+
+        const currentId = snapshot.conduite_current_id;
+
+        if(!currentId){
+            return null;
+        }
+
+        const currentIndex =
+            conduite.findIndex(cue=>cue.id===currentId);
+
+        if(currentIndex < 0){
+            return null;
+        }
+
+        const current = conduite[currentIndex];
+
+        let nextTimed = null;
+        let nextTimedIndex = conduite.length;
+
+        for(
+            let index=currentIndex+1;
+            index<conduite.length;
+            index++
+        ){
+            const cue=conduite[index];
+
+            if(
+                cue.mode==='timed' &&
+                isTimecode(cue.timecode)
+            ){
+                nextTimed=cue;
+                nextTimedIndex=index;
+                break;
+            }
+        }
+
+        const untimed = conduite
+            .slice(currentIndex+1,nextTimedIndex)
+            .filter(cue=>
+                cue.status==='official' &&
+                (
+                    cue.mode!=='timed' ||
+                    !isTimecode(cue.timecode)
+                )
+            )
+            .filter(cue=>cue.posts.includes(postEl.value));
+
+        return {
+            current,
+            nextTimed,
+            untimed
+        };
+    }
+
+
+    /* =========================================================
+       CRÉATION DU PANNEAU
+       ========================================================= */
+
+    const liveView=$('view-live');
+
+    const checklistPanel=document.createElement('article');
+    checklistPanel.id='live-untimed-checklist';
+    checklistPanel.className=
+        'panel live-untimed-checklist-panel';
+
+    /*
+     * On le place juste après le cue courant.
+     */
+    const currentPanel=
+        liveView.querySelector('.live-current');
+
+    if(currentPanel){
+        currentPanel.insertAdjacentElement(
+            'afterend',
+            checklistPanel
+        );
+    }else{
+        liveView.append(checklistPanel);
+    }
+
+
+    /* =========================================================
+       RENDU
+       ========================================================= */
+
+    function renderLiveUntimedChecklist(){
+
+        const interval=liveIntervalData();
+
+        if(
+            !interval ||
+            !interval.untimed.length
+        ){
+            checklistPanel.hidden=true;
+            checklistPanel.innerHTML='';
+            return;
+        }
+
+        checklistPanel.hidden=false;
+
+        const {
+            current,
+            nextTimed,
+            untimed
+        }=interval;
+
+        const state=
+            loadLiveChecklistState(current);
+
+        const doneCount=
+            untimed.filter(cue=>state[cue.id]===true).length;
+
+        const allDone=
+            doneCount===untimed.length;
+
+
+        checklistPanel.innerHTML='';
+
+
+        /* ---------- HEADER ---------- */
+
+        const head=document.createElement('div');
+        head.className='live-checklist-head';
+
+        const left=document.createElement('div');
+
+        const kicker=document.createElement('div');
+        kicker.className='live-checklist-kicker';
+        kicker.textContent=
+            allDone
+                ? 'PRÉPARATION TERMINÉE'
+                : 'À FAIRE AVANT LE PROCHAIN TC';
+
+        const progress=document.createElement('div');
+        progress.className='live-checklist-progress';
+        progress.textContent=
+            doneCount+
+            ' / '+
+            untimed.length;
+
+        left.append(kicker,progress);
+
+
+        const reset=document.createElement('button');
+        reset.type='button';
+        reset.className='quiet live-checklist-reset';
+        reset.textContent='RÉINITIALISER';
+
+        reset.onclick=()=>{
+            if(
+                !window.confirm(
+                    'Réinitialiser les validations de cette plage ?'
+                )
+            ){
+                return;
+            }
+
+            localStorage.removeItem(
+                liveChecklistStorageKey(current)
+            );
+
+            renderLiveUntimedChecklist();
+        };
+
+        head.append(left,reset);
+
+
+        /* ---------- LISTE ---------- */
+
+        const list=document.createElement('div');
+        list.className='live-checklist-list';
+
+        untimed.forEach((cue,index)=>{
+
+            const row=document.createElement('button');
+            row.type='button';
+            row.className=
+                'live-checklist-item'+
+                (state[cue.id]
+                    ? ' done'
+                    : '');
+
+            const check=document.createElement('span');
+            check.className='live-checklist-check';
+            check.textContent=
+                state[cue.id]
+                    ? '✓'
+                    : '';
+
+            const number=document.createElement('span');
+            number.className='live-checklist-number';
+            number.textContent=
+                String(index+1).padStart(2,'0');
+
+            const label=document.createElement('span');
+            label.className='live-checklist-text';
+            label.textContent=cue.text;
+
+            row.append(check,number,label);
+
+            row.onclick=()=>{
+                const nextState=
+                    loadLiveChecklistState(current);
+
+                nextState[cue.id]=
+                    !nextState[cue.id];
+
+                saveLiveChecklistState(
+                    current,
+                    nextState
+                );
+
+                renderLiveUntimedChecklist();
+            };
+
+            list.append(row);
+        });
+
+
+        /* ---------- PROCHAIN TC ---------- */
+
+        const footer=document.createElement('div');
+        footer.className='live-checklist-next';
+
+        const caption=document.createElement('span');
+        caption.textContent='PROCHAIN TC';
+
+        const value=document.createElement('strong');
+
+        value.textContent=
+            nextTimed
+                ? nextTimed.timecode+
+                  ' — '+
+                  nextTimed.text
+                : 'FIN DE CONDUITE';
+
+        footer.append(caption,value);
+
+
+        checklistPanel.classList.toggle(
+            'complete',
+            allDone
+        );
+
+        checklistPanel.append(
+            head,
+            list,
+            footer
+        );
+    }
+
+
+    /* =========================================================
+       BRANCHEMENT AU RENDER EXISTANT
+       ========================================================= */
+
+    const liveChecklistBaseRender=render;
+
+    render=function(data){
+        liveChecklistBaseRender(data);
+        renderLiveUntimedChecklist();
+    };
+
+
+    /*
+     * Premier rendu si le snapshot est déjà disponible.
+     */
+    if(snapshot && snapshot.conduite){
+        renderLiveUntimedChecklist();
+    }
+
+})();
+</script>
+
+
+<style id="showcue-live-untimed-checklist-style">
+
+/* ==========================================================
+   PANNEAU
+   ========================================================== */
+
+.live-untimed-checklist-panel{
+    margin-top:10px !important;
+    padding:14px 16px !important;
+
+    border:
+        1px solid rgba(214,166,84,.35) !important;
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(39,31,19,.96),
+            rgba(20,17,13,.98)
+        ) !important;
+}
+
+
+/* ==========================================================
+   HEADER
+   ========================================================== */
+
+.live-checklist-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:16px;
+
+    margin-bottom:10px;
+}
+
+.live-checklist-kicker{
+    color:#e9bd73;
+    font-size:.82rem;
+    font-weight:1000;
+    letter-spacing:.08em;
+}
+
+.live-checklist-progress{
+    margin-top:3px;
+
+    color:var(--muted);
+    font-size:.68rem;
+    font-weight:900;
+}
+
+.live-checklist-reset{
+    font-size:.62rem !important;
+}
+
+
+/* ==========================================================
+   LISTE
+   ========================================================== */
+
+.live-checklist-list{
+    display:grid;
+    gap:4px;
+}
+
+.live-checklist-item{
+    display:grid !important;
+
+    grid-template-columns:
+        28px
+        30px
+        minmax(0,1fr);
+
+    align-items:center;
+
+    width:100%;
+
+    min-height:38px;
+
+    padding:5px 8px !important;
+
+    border:
+        1px solid rgba(255,255,255,.06) !important;
+
+    border-radius:6px !important;
+
+    background:
+        rgba(255,255,255,.025) !important;
+
+    color:#f5eee4 !important;
+
+    text-align:left !important;
+
+    cursor:pointer;
+}
+
+.live-checklist-item:hover{
+    background:
+        rgba(215,166,83,.10) !important;
+}
+
+
+/* CASE */
+
+.live-checklist-check{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+
+    width:22px;
+    height:22px;
+
+    border:
+        1px solid #55705d;
+
+    border-radius:5px;
+
+    color:#9df0bb;
+
+    font-weight:1000;
+}
+
+
+/* NUMÉRO */
+
+.live-checklist-number{
+    color:#867b6c;
+
+    font-family:monospace;
+    font-size:.66rem;
+}
+
+
+/* TEXTE */
+
+.live-checklist-text{
+    font-size:.94rem;
+    font-weight:900;
+    line-height:1.15;
+}
+
+
+/* ==========================================================
+   ACTION VALIDÉE
+   ========================================================== */
+
+.live-checklist-item.done{
+    opacity:.45;
+
+    background:
+        rgba(70,120,83,.09) !important;
+}
+
+.live-checklist-item.done
+.live-checklist-check{
+    border-color:#4f9a6a;
+    background:#183822;
+}
+
+.live-checklist-item.done
+.live-checklist-text{
+    text-decoration:line-through;
+}
+
+
+/* ==========================================================
+   TOUT TERMINÉ
+   ========================================================== */
+
+.live-untimed-checklist-panel.complete{
+    border-color:
+        rgba(73,153,96,.45) !important;
+}
+
+.live-untimed-checklist-panel.complete
+.live-checklist-kicker{
+    color:#6de39a;
+}
+
+
+/* ==========================================================
+   PROCHAIN TC
+   ========================================================== */
+
+.live-checklist-next{
+    display:flex;
+    align-items:baseline;
+
+    gap:10px;
+
+    margin-top:12px;
+    padding-top:10px;
+
+    border-top:
+        1px solid rgba(255,255,255,.08);
+}
+
+.live-checklist-next span{
+    color:var(--muted);
+
+    font-size:.62rem;
+    font-weight:1000;
+    letter-spacing:.08em;
+}
+
+.live-checklist-next strong{
+    color:#6fe2a0;
+
+    font-family:monospace;
+    font-size:.86rem;
+}
+
+
+/* ==========================================================
+   PETIT ÉCRAN
+   ========================================================== */
+
+@media(max-width:760px){
+
+    .live-checklist-item{
+        grid-template-columns:
+            28px
+            minmax(0,1fr);
+    }
+
+    .live-checklist-number{
+        display:none;
+    }
+
+    .live-checklist-next{
+        flex-direction:column;
+        gap:4px;
+    }
+}
+
+</style>
+
+
+<script id="showcue-conduite-multiselect-scrollguard">
+(function(){
+
+    /* ========================================================
+       AUTO-FOLLOW : NE PLUS LUTTER CONTRE L'UTILISATEUR
+       ======================================================== */
+
+    let conduiteFollowPausedUntil = 0;
+    let conduiteFollowPauseTimer = null;
+
+    const FOLLOW_PAUSE_MS = 8000;
+
+
+    function conduiteFollowButton(){
+        return document.getElementById('conduite-follow-live');
+    }
+
+
+    function updateConduiteFollowButton(){
+        const button = conduiteFollowButton();
+        if(!button)return;
+
+        const paused = performance.now() < conduiteFollowPausedUntil;
+
+        button.classList.toggle('paused',paused);
+
+        button.textContent = paused
+            ? '↳ SUIVI PAUSÉ'
+            : '↳ SUIVRE LIVE';
+
+        button.title = paused
+            ? 'Le suivi automatique reprendra après quelques secondes'
+            : 'Revenir immédiatement au cue actuellement lu';
+    }
+
+
+    function pauseConduiteFollow(){
+        if(!$('view-conduite').classList.contains('active')){
+            return;
+        }
+
+        conduiteFollowPausedUntil =
+            performance.now() + FOLLOW_PAUSE_MS;
+
+        updateConduiteFollowButton();
+
+        clearTimeout(conduiteFollowPauseTimer);
+
+        conduiteFollowPauseTimer = setTimeout(()=>{
+            updateConduiteFollowButton();
+        },FOLLOW_PAUSE_MS + 50);
+    }
+
+
+    /*
+     * Remplace la fonction existante.
+     * Le refresh serveur peut continuer toutes les 2 secondes :
+     * il ne reprend plus le scroll pendant une navigation manuelle.
+     */
+    followConduiteActive = function(force=false){
+
+        if(
+            !force &&
+            performance.now() < conduiteFollowPausedUntil
+        ){
+            return;
+        }
+
+        const id = snapshot.conduite_current_id;
+
+        if(
+            !id ||
+            (
+                !force &&
+                id === lastConduiteActiveId
+            ) ||
+            !$('view-conduite').classList.contains('active')
+        ){
+            return;
+        }
+
+        const selection = window.getSelection();
+        const control = document.activeElement;
+
+        if(
+            !force &&
+            (
+                (selection && !selection.isCollapsed) ||
+                (
+                    control &&
+                    control !== document.body &&
+                    /^(INPUT|TEXTAREA|SELECT|BUTTON|SUMMARY)$/.test(
+                        control.tagName
+                    )
+                )
+            )
+        ){
+            return;
+        }
+
+        const row = $('timed-sequence').querySelector(
+            '[data-cue-id="'+CSS.escape(id)+'"]'
+        );
+
+        if(row){
+            lastConduiteActiveId=id;
+
+            row.scrollIntoView({
+                behavior:'smooth',
+                block:'center'
+            });
+        }
+    };
+
+
+    const conduiteView = $('view-conduite');
+
+    conduiteView.addEventListener(
+        'wheel',
+        pauseConduiteFollow,
+        {passive:true}
+    );
+
+    conduiteView.addEventListener(
+        'touchmove',
+        pauseConduiteFollow,
+        {passive:true}
+    );
+
+
+    /* bouton de retour volontaire au LIVE */
+
+    const tools =
+        document.querySelector(
+            '#view-conduite .conduite-workbar .tools'
+        );
+
+    const followButton=document.createElement('button');
+
+    followButton.id='conduite-follow-live';
+    followButton.type='button';
+    followButton.className='quiet';
+    followButton.textContent='↳ SUIVRE LIVE';
+    followButton.title='Revenir au cue actuellement lu';
+
+    followButton.onclick=()=>{
+        conduiteFollowPausedUntil=0;
+        lastConduiteActiveId=null;
+
+        updateConduiteFollowButton();
+        followConduiteActive(true);
+    };
+
+    if(tools){
+        tools.prepend(followButton);
+    }
+
+
+    /* ========================================================
+       SÉLECTION MULTIPLE
+       ======================================================== */
+
+    const selectedConduiteCueIds =
+        window.showCueSelectedConduiteCueIds ||
+        (window.showCueSelectedConduiteCueIds = new Set());
+    let conduiteSelectionAnchorId = null;
+
+
+    function displayedConduiteRows(){
+        return [
+            ...document.querySelectorAll(
+                '#timed-sequence .cue-line[data-cue-id]'
+            )
+        ];
+    }
+
+
+    function selectedConduiteCues(){
+        const all =
+            typeof conduiteOrderedCues === 'function'
+                ? conduiteOrderedCues()
+                : [
+                    ...((snapshot.conduite||{}).timed||[]),
+                    ...((snapshot.conduite||{}).manual||[])
+                ];
+
+        return all.filter(
+            cue=>selectedConduiteCueIds.has(cue.id)
+        );
+    }
+
+
+    function paintConduiteSelection(){
+        displayedConduiteRows().forEach(row=>{
+
+            /*
+             * Supprime l'ancien état mono-sélection,
+             * qui servait au bouton CAPTURE TC global.
+             */
+            row.classList.remove('conduite-selected');
+
+            row.classList.toggle(
+                'conduite-multi-selected',
+                selectedConduiteCueIds.has(
+                    row.dataset.cueId
+                )
+            );
+        });
+
+        updateBulkToolbar();
+    }
+
+
+    function selectConduiteRange(fromId,toId){
+        const ids = displayedConduiteRows()
+            .map(row=>row.dataset.cueId);
+
+        const from = ids.indexOf(fromId);
+        const to = ids.indexOf(toId);
+
+        if(from < 0 || to < 0){
+            selectedConduiteCueIds.add(toId);
+            return;
+        }
+
+        const start=Math.min(from,to);
+        const end=Math.max(from,to);
+
+        for(let index=start;index<=end;index++){
+            selectedConduiteCueIds.add(ids[index]);
+        }
+    }
+
+
+    function handleConduiteSelection(event,cue){
+
+        if(
+            event.target.closest(
+                'button,input,textarea,select,a,summary'
+            )
+        ){
+            return;
+        }
+
+        /*
+         * Capture phase :
+         * empêche l'ancien listener mono-sélection
+         * de reprendre la main.
+         */
+        event.stopImmediatePropagation();
+
+        const additive =
+            event.metaKey ||
+            event.ctrlKey;
+
+        if(
+            event.shiftKey &&
+            conduiteSelectionAnchorId
+        ){
+            if(!additive){
+                selectedConduiteCueIds.clear();
+            }
+
+            selectConduiteRange(
+                conduiteSelectionAnchorId,
+                cue.id
+            );
+
+        }else if(additive){
+
+            if(selectedConduiteCueIds.has(cue.id)){
+                selectedConduiteCueIds.delete(cue.id);
+            }else{
+                selectedConduiteCueIds.add(cue.id);
+            }
+
+            conduiteSelectionAnchorId=cue.id;
+
+        }else{
+
+            selectedConduiteCueIds.clear();
+            selectedConduiteCueIds.add(cue.id);
+
+            conduiteSelectionAnchorId=cue.id;
+        }
+
+        paintConduiteSelection();
+    }
+
+
+    /*
+     * Dernier wrapper de cueLine :
+     * fonctionne aussi après refresh.
+     */
+    const multiSelectBaseCueLine = cueLine;
+
+    cueLine = function(cue,position){
+
+        const row =
+            multiSelectBaseCueLine(cue,position);
+
+        row.classList.remove('conduite-selected');
+
+        if(
+            cue &&
+            cue.status==='official' &&
+            cue.mode!=='library'
+        ){
+            if(selectedConduiteCueIds.has(cue.id)){
+                row.classList.add(
+                    'conduite-multi-selected'
+                );
+            }
+
+            row.addEventListener(
+                'click',
+                event=>handleConduiteSelection(
+                    event,
+                    cue
+                ),
+                true
+            );
+        }
+
+        return row;
+    };
+
+
+    /* ========================================================
+       BARRE ACTIONS GROUPÉES
+       ======================================================== */
+
+    const bulk=document.createElement('div');
+
+    bulk.id='conduite-bulk-actions';
+    bulk.className='conduite-bulk-actions';
+    bulk.hidden=true;
+
+    const bulkCount=document.createElement('strong');
+    bulkCount.className='bulk-count';
+
+    const bulkClear=document.createElement('button');
+    bulkClear.type='button';
+    bulkClear.className='quiet';
+    bulkClear.textContent='ANNULER';
+
+    bulkClear.onclick=()=>{
+        selectedConduiteCueIds.clear();
+        conduiteSelectionAnchorId=null;
+        paintConduiteSelection();
+    };
+
+    bulk.append(bulkCount);
+
+
+    const bulkButtons={};
+
+    Object.entries(destinationLabels)
+        .forEach(([post,label])=>{
+
+            const button=document.createElement('button');
+
+            button.type='button';
+            button.className='bulk-destination';
+            button.dataset.post=post;
+            button.textContent=label;
+
+            button.onclick=async()=>{
+
+                const cues=selectedConduiteCues();
+
+                if(!cues.length)return;
+
+                /*
+                 * Si toutes les fiches possèdent déjà le poste :
+                 * clic = retrait.
+                 *
+                 * Sinon :
+                 * clic = ajout à toute la sélection.
+                 */
+                const enabled = !cues.every(
+                    cue=>cue.posts.includes(post)
+                );
+
+                button.disabled=true;
+
+                try{
+                    await api(
+                        '/show-info/cues/bulk-post',
+                        {
+                            method:'POST',
+                            body:JSON.stringify(
+                                scoped({
+                                    cue_ids:cues.map(
+                                        cue=>cue.id
+                                    ),
+                                    post,
+                                    enabled
+                                })
+                            )
+                        }
+                    );
+
+                    await refresh();
+                    paintConduiteSelection();
+
+                }catch(error){
+                    $('error').textContent=
+                        error.message;
+
+                }finally{
+                    button.disabled=false;
+                }
+            };
+
+            bulkButtons[post]=button;
+            bulk.append(button);
+        });
+
+    bulk.append(bulkClear);
+
+
+    const workbar =
+        document.querySelector(
+            '#view-conduite .conduite-workbar'
+        );
+
+    if(workbar){
+        workbar.insertAdjacentElement(
+            'afterend',
+            bulk
+        );
+    }
+
+
+    function updateBulkToolbar(){
+
+        const cues=selectedConduiteCues();
+        const count=cues.length;
+
+        bulk.hidden=count===0;
+
+        bulkCount.textContent=
+            count+
+            ' FICHE'+
+            (count>1?'S':'')+
+            ' SÉLECTIONNÉE'+
+            (count>1?'S':'');
+
+        Object.entries(bulkButtons)
+            .forEach(([post,button])=>{
+
+                const active =
+                    count>0 &&
+                    cues.every(
+                        cue=>cue.posts.includes(post)
+                    );
+
+                const mixed =
+                    count>0 &&
+                    !active &&
+                    cues.some(
+                        cue=>cue.posts.includes(post)
+                    );
+
+                button.classList.toggle(
+                    'active',
+                    active
+                );
+
+                button.classList.toggle(
+                    'mixed',
+                    mixed
+                );
+
+                button.title = active
+                    ? 'Retirer '+post+' de toute la sélection'
+                    : 'Ajouter '+post+' à toute la sélection';
+            });
+    }
+
+
+    /*
+     * Après chaque refresh :
+     * - retirer de la sélection les fiches disparues
+     * - réafficher la sélection.
+     */
+    const multiSelectBaseRender=render;
+
+    render=function(data){
+
+        multiSelectBaseRender(data);
+
+        const existing=new Set(
+            [
+                ...((data.conduite||{}).timed||[]),
+                ...((data.conduite||{}).manual||[])
+            ].map(cue=>cue.id)
+        );
+
+        [...selectedConduiteCueIds]
+            .forEach(id=>{
+                if(!existing.has(id)){
+                    selectedConduiteCueIds.delete(id);
+                }
+            });
+
+        paintConduiteSelection();
+    };
+
+})();
+</script>
+
+
+<style id="showcue-conduite-multiselect-scrollguard-style">
+
+/* ==========================================================
+   SUIVI LIVE
+   ========================================================== */
+
+#conduite-follow-live.paused{
+    border-color:#8b6b35 !important;
+    color:#d5a85e !important;
+}
+
+
+/* ==========================================================
+   SÉLECTION
+   ========================================================== */
+
+#timed-sequence .conduite-multi-selected{
+    background:
+        rgba(74,116,151,.18) !important;
+
+    box-shadow:
+        inset 4px 0 0 #6b9fc3,
+        inset 0 0 0 1px rgba(107,159,195,.28)
+        !important;
+}
+
+#timed-sequence
+.conduite-multi-selected
+.line-text{
+    color:#eaf6ff !important;
+}
+
+
+/* ==========================================================
+   BARRE ACTIONS GROUPÉES
+   ========================================================== */
+
+.conduite-bulk-actions{
+    position:sticky;
+
+    /*
+     * juste sous la workbar sticky
+     */
+    top:57px;
+
+    z-index:79;
+
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+
+    gap:5px;
+
+    margin:-2px 0 7px;
+    padding:6px 9px;
+
+    border:
+        1px solid rgba(106,154,189,.28);
+
+    border-radius:7px;
+
+    background:
+        rgba(18,25,30,.96);
+
+    box-shadow:
+        0 5px 14px rgba(0,0,0,.30);
+}
+
+.conduite-bulk-actions[hidden]{
+    display:none !important;
+}
+
+.conduite-bulk-actions
+.bulk-count{
+    margin-right:auto;
+
+    color:#9bc9e8;
+
+    font-size:.65rem;
+    letter-spacing:.05em;
+}
+
+.conduite-bulk-actions
+.bulk-destination{
+    min-width:37px;
+}
+
+.conduite-bulk-actions
+.bulk-destination.active{
+    border-color:#d1a557 !important;
+    background:#55401d !important;
+    color:#fff0cc !important;
+}
+
+.conduite-bulk-actions
+.bulk-destination.mixed{
+    border-color:#647a87 !important;
+
+    background:
+        linear-gradient(
+            135deg,
+            #49391d 0 50%,
+            #222c32 50% 100%
+        ) !important;
+}
+
+
+/* instructions discrètes au survol */
+.conduite-bulk-actions::after{
+    content:'Maj + clic : plage   ·   ⌘ + clic : ajouter / retirer';
+
+    margin-left:8px;
+
+    color:#746e65;
+
+    font-size:.55rem;
+    white-space:nowrap;
+}
+
+
+@media(max-width:950px){
+
+    .conduite-bulk-actions{
+        flex-wrap:wrap;
+        top:92px;
+    }
+
+    .conduite-bulk-actions::after{
+        display:none;
+    }
+
+    .conduite-bulk-actions
+    .bulk-count{
+        width:100%;
+    }
+}
+
+</style>
+
+
+<script id="showcue-conduite-selection-delegated-fix">
+(function(){
+
+    const box = document.getElementById('timed-sequence');
+    if(!box)return;
+
+    const selected =
+        window.showCueSelectedConduiteCueIds ||
+        (window.showCueSelectedConduiteCueIds = new Set());
+
+    let anchorId = null;
+
+
+    function rows(){
+        return [
+            ...box.querySelectorAll(
+                '.cue-line[data-cue-id]'
+            )
+        ];
+    }
+
+
+    function cues(){
+        const data = snapshot.conduite || {};
+
+        return [
+            ...(data.timed || []),
+            ...(data.manual || [])
+        ];
+    }
+
+
+    function paint(){
+
+        rows().forEach(row=>{
+            row.classList.toggle(
+                'conduite-multi-selected',
+                selected.has(row.dataset.cueId)
+            );
+        });
+
+        const toolbar =
+            document.getElementById(
+                'conduite-bulk-actions'
+            );
+
+        if(!toolbar)return;
+
+        const selectedCues =
+            cues().filter(cue=>selected.has(cue.id));
+
+        toolbar.hidden = selectedCues.length === 0;
+
+        const count =
+            toolbar.querySelector('.bulk-count');
+
+        if(count){
+            count.textContent =
+                selectedCues.length +
+                ' FICHE' +
+                (selectedCues.length > 1 ? 'S' : '') +
+                ' SÉLECTIONNÉE' +
+                (selectedCues.length > 1 ? 'S' : '');
+        }
+
+        toolbar
+            .querySelectorAll(
+                '.bulk-destination[data-post]'
+            )
+            .forEach(button=>{
+
+                const post=button.dataset.post;
+
+                const all =
+                    selectedCues.length > 0 &&
+                    selectedCues.every(
+                        cue=>cue.posts.includes(post)
+                    );
+
+                const some =
+                    selectedCues.length > 0 &&
+                    selectedCues.some(
+                        cue=>cue.posts.includes(post)
+                    );
+
+                button.classList.toggle(
+                    'active',
+                    all
+                );
+
+                button.classList.toggle(
+                    'mixed',
+                    some && !all
+                );
+            });
+    }
+
+
+    box.addEventListener(
+        'click',
+        event=>{
+
+            const row =
+                event.target.closest(
+                    '.cue-line[data-cue-id]'
+                );
+
+            if(!row || !box.contains(row)){
+                return;
+            }
+
+            /*
+             * Les contrôles de la ligne gardent leur
+             * fonctionnement normal.
+             */
+            if(
+                event.target.closest(
+                    'button,input,textarea,select,a,summary'
+                )
+            ){
+                return;
+            }
+
+            const id=row.dataset.cueId;
+
+            if(!id)return;
+
+            /*
+             * On prend la priorité sur les anciens
+             * listeners de sélection.
+             */
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+
+            const additive =
+                event.metaKey ||
+                event.ctrlKey;
+
+            if(event.shiftKey && anchorId){
+
+                const ids=rows().map(
+                    item=>item.dataset.cueId
+                );
+
+                const a=ids.indexOf(anchorId);
+                const b=ids.indexOf(id);
+
+                if(a >= 0 && b >= 0){
+
+                    if(!additive){
+                        selected.clear();
+                    }
+
+                    const start=Math.min(a,b);
+                    const end=Math.max(a,b);
+
+                    for(
+                        let index=start;
+                        index<=end;
+                        index++
+                    ){
+                        selected.add(ids[index]);
+                    }
+
+                }else{
+                    selected.add(id);
+                }
+
+            }else if(additive){
+
+                if(selected.has(id)){
+                    selected.delete(id);
+                }else{
+                    selected.add(id);
+                }
+
+                anchorId=id;
+
+            }else{
+
+                selected.clear();
+                selected.add(id);
+                anchorId=id;
+            }
+
+            paint();
+        },
+        true
+    );
+
+
+    /*
+     * Après un refresh DOM, les classes visuelles
+     * sont remises automatiquement.
+     */
+    const observer =
+        new MutationObserver(()=>{
+            paint();
+        });
+
+    observer.observe(
+        box,
+        {
+            childList:true,
+            subtree:true
+        }
+    );
+
+    paint();
+
+})();
+</script>
+
+
+<script id="showcue-multiselect-inline-destinations">
+(function(){
+
+    const box=document.getElementById('timed-sequence');
+
+    if(!box)return;
+
+
+    function selectedSet(){
+        return (
+            window.showCueSelectedConduiteCueIds ||
+            (window.showCueSelectedConduiteCueIds=new Set())
+        );
+    }
+
+
+    function allConduiteCues(){
+        const data=snapshot.conduite||{};
+
+        return [
+            ...(data.timed||[]),
+            ...(data.manual||[])
+        ];
+    }
+
+
+    function selectedCues(){
+        const selected=selectedSet();
+
+        return allConduiteCues().filter(
+            cue=>selected.has(cue.id)
+        );
+    }
+
+
+    function postFromButton(button){
+
+        const label=
+            String(button.textContent||'')
+            .trim()
+            .toUpperCase();
+
+        const entry=
+            Object.entries(destinationLabels)
+            .find(([_post,short])=>
+                String(short).toUpperCase()===label
+            );
+
+        return entry
+            ? entry[0]
+            : null;
+    }
+
+
+    /*
+     * Clic sur FOH / RET / PLT / LUM dans une ligne.
+     *
+     * - 0/1 fiche sélectionnée :
+     *   fonctionnement normal existant.
+     *
+     * - plusieurs fiches sélectionnées :
+     *   applique la destination à toute la sélection.
+     */
+    box.addEventListener(
+        'click',
+        async event=>{
+
+            const button=
+                event.target.closest(
+                    'button.destination'
+                );
+
+            if(!button || !box.contains(button)){
+                return;
+            }
+
+            const row=
+                button.closest(
+                    '.cue-line[data-cue-id]'
+                );
+
+            if(!row)return;
+
+            const selected=selectedSet();
+
+            /*
+             * Le bulk ne s'active que si :
+             *
+             * - au moins 2 fiches sont sélectionnées
+             * - la ligne sur laquelle on clique appartient
+             *   elle-même à cette sélection.
+             */
+            if(
+                selected.size < 2 ||
+                !selected.has(row.dataset.cueId)
+            ){
+                return;
+            }
+
+            const post=postFromButton(button);
+
+            if(!post)return;
+
+            const cues=selectedCues();
+
+            if(cues.length < 2)return;
+
+
+            /*
+             * Très important :
+             * empêcher le onclick normal du bouton
+             * de modifier uniquement la ligne cliquée.
+             */
+            event.preventDefault();
+            event.stopPropagation();
+            event.stopImmediatePropagation();
+
+
+            /*
+             * Si TOUTES les fiches ont déjà FOH :
+             * => on enlève FOH de toutes.
+             *
+             * Sinon :
+             * => on ajoute FOH à toutes.
+             */
+            const enabled=
+                !cues.every(
+                    cue=>cue.posts.includes(post)
+                );
+
+
+            button.disabled=true;
+
+            try{
+
+                await api(
+                    '/show-info/cues/bulk-post',
+                    {
+                        method:'POST',
+                        body:JSON.stringify(
+                            scoped({
+                                cue_ids:
+                                    cues.map(
+                                        cue=>cue.id
+                                    ),
+                                post,
+                                enabled
+                            })
+                        )
+                    }
+                );
+
+                await refresh();
+
+            }catch(error){
+
+                $('error').textContent=
+                    error.message;
+
+            }finally{
+
+                button.disabled=false;
+            }
+
+        },
+        true
+    );
+
+})();
+</script>
+
+
+<style id="showcue-multiselect-inline-destinations-style">
+
+/* ==========================================================
+   PAS DE SÉLECTION NATIVE DU TEXTE
+   ========================================================== */
+
+#timed-sequence .cue-line{
+    user-select:none;
+    -webkit-user-select:none;
+}
+
+
+/* les champs éditables restent évidemment sélectionnables */
+
+#timed-sequence input,
+#timed-sequence textarea{
+    user-select:text;
+    -webkit-user-select:text;
+}
+
+
+/* ==========================================================
+   ON SUPPRIME LA BARRE BULK DU HAUT
+   ========================================================== */
+
+#conduite-bulk-actions{
+    display:none !important;
+}
+
+
+/* ==========================================================
+   SÉLECTION = VRAIS BLOCS DE LIGNES
+   ========================================================== */
+
+#timed-sequence .cue-line.conduite-multi-selected{
+    position:relative;
+
+    background:
+        rgba(67,118,149,.22) !important;
+
+    box-shadow:
+        inset 4px 0 0 #69a8d0,
+        inset 0 1px 0 rgba(105,168,208,.20),
+        inset 0 -1px 0 rgba(105,168,208,.20)
+        !important;
+}
+
+#timed-sequence
+.cue-line.conduite-multi-selected
+.line-text{
+    color:#f3f8fb !important;
+}
+
+
+/* ==========================================================
+   BOUTONS DESTINATION D'UNE LIGNE SÉLECTIONNÉE
+   => indiquent qu'ils agissent sur le groupe
+   ========================================================== */
+
+#timed-sequence
+.cue-line.conduite-multi-selected
+.destination{
+    cursor:pointer;
+
+    box-shadow:
+        0 0 0 1px rgba(105,168,208,.12);
+}
+
+#timed-sequence
+.cue-line.conduite-multi-selected
+.destination:hover{
+    transform:translateY(-1px);
+
+    box-shadow:
+        0 0 0 1px rgba(105,168,208,.55),
+        0 0 8px rgba(105,168,208,.18);
+}
+
+</style>
+
+
+<script id="showcue-ableton-time-smoothing">
+(function(){
+
+    let smoothSceneDuration = null;
+    let smoothElapsed = null;
+    let smoothRemaining = null;
+    let smoothPlaying = false;
+    let smoothReferenceClock = performance.now();
+
+    function syncSmoothAbletonTimes(data){
+        const duration = Number(data.scene_duration_seconds);
+        const elapsed = Number(data.elapsed_seconds);
+        const remaining = Number(data.remaining_seconds);
+
+        smoothSceneDuration =
+            Number.isFinite(duration) && duration >= 0
+                ? duration
+                : null;
+
+        smoothElapsed =
+            Number.isFinite(elapsed) && elapsed >= 0
+                ? elapsed
+                : null;
+
+        smoothRemaining =
+            Number.isFinite(remaining) && remaining >= 0
+                ? remaining
+                : null;
+
+        smoothPlaying = Boolean(data.is_playing);
+        smoothReferenceClock = performance.now();
+
+        renderSmoothAbletonTimes();
+    }
+
+    function renderSmoothAbletonTimes(){
+        if($('ableton-duration')){
+            $('ableton-duration').textContent =
+                formatSeconds(smoothSceneDuration);
+        }
+
+        if($('ableton-elapsed')){
+            $('ableton-elapsed').textContent =
+                formatSeconds(smoothElapsed);
+        }
+
+        if($('ableton-remaining')){
+            $('ableton-remaining').textContent =
+                formatSeconds(smoothRemaining);
+        }
+
+        /*
+         * La cartouche CONDUITE utilise les mêmes infos.
+         */
+        if($('conduite-duration')){
+            $('conduite-duration').textContent =
+                formatSeconds(smoothSceneDuration);
+        }
+
+        if($('conduite-elapsed')){
+            $('conduite-elapsed').textContent =
+                formatSeconds(smoothElapsed);
+        }
+
+        if($('conduite-remaining')){
+            $('conduite-remaining').textContent =
+                formatSeconds(smoothRemaining);
+        }
+    }
+
+    /*
+     * Le render serveur reste maître.
+     * On capture simplement ses valeurs de référence.
+     */
+    const smoothBaseRender = render;
+
+    render = function(data){
+        smoothBaseRender(data);
+        syncSmoothAbletonTimes(data);
+    };
+
+    /*
+     * Interpolation locale entre deux réponses serveur.
+     * 250 ms suffit largement visuellement et reste très léger.
+     */
+    setInterval(()=>{
+        const now = performance.now();
+        const delta = Math.max(
+            0,
+            (now - smoothReferenceClock) / 1000
+        );
+
+        smoothReferenceClock = now;
+
+        if(
+            smoothPlaying &&
+            delta > 0 &&
+            delta < 2
+        ){
+            if(smoothElapsed !== null){
+                smoothElapsed += delta;
+
+                if(
+                    smoothSceneDuration !== null
+                ){
+                    smoothElapsed = Math.min(
+                        smoothElapsed,
+                        smoothSceneDuration
+                    );
+                }
+            }
+
+            if(smoothRemaining !== null){
+                smoothRemaining = Math.max(
+                    0,
+                    smoothRemaining - delta
+                );
+            }
+
+            renderSmoothAbletonTimes();
+        }
+
+    },250);
+
+})();
+</script>
+
+
+<script id="showcue-remaining-warning">
+(function(){
+
+    function updateRemainingWarning(){
+
+        const remaining = Number(
+            typeof smoothRemaining !== 'undefined'
+                ? smoothRemaining
+                : NaN
+        );
+
+        const targets = [
+            document.getElementById('ableton-remaining'),
+            document.getElementById('conduite-remaining')
+        ].filter(Boolean);
+
+        targets.forEach(element=>{
+            element.classList.remove(
+                'remaining-warning',
+                'remaining-critical',
+                'remaining-zero'
+            );
+
+            if(!Number.isFinite(remaining)){
+                return;
+            }
+
+            if(remaining <= 0){
+                element.classList.add('remaining-zero');
+            }else if(remaining <= 10){
+                element.classList.add('remaining-critical');
+            }else if(remaining <= 30){
+                element.classList.add('remaining-warning');
+            }
+        });
+    }
+
+    /*
+     * On se recale sur le lissage déjà présent.
+     */
+    setInterval(updateRemainingWarning,250);
+
+    updateRemainingWarning();
+
+})();
+</script>
+
+<style id="showcue-remaining-warning-style">
+
+/* 30 secondes */
+#ableton-remaining.remaining-warning,
+#conduite-remaining.remaining-warning{
+    color:#f0a94f !important;
+    font-size:1.34rem !important;
+    font-weight:1000 !important;
+    text-shadow:
+        0 0 10px rgba(240,169,79,.16);
+}
+
+/* 10 secondes */
+#ableton-remaining.remaining-critical,
+#conduite-remaining.remaining-critical{
+    color:#e36e5f !important;
+    font-size:1.48rem !important;
+    font-weight:1000 !important;
+    text-shadow:
+        0 0 12px rgba(227,110,95,.18);
+}
+
+/* zéro */
+#ableton-remaining.remaining-zero,
+#conduite-remaining.remaining-zero{
+    color:#a98f86 !important;
+    font-size:1.34rem !important;
+    font-weight:1000 !important;
+}
+
+</style>
+
+
+<script id="showcue-conduite-export-buttons">
+(function(){
+
+    const tools=document.querySelector(
+        '#view-conduite .conduite-workbar .tools'
+    );
+
+    if(!tools)return;
+
+    const group=document.createElement('div');
+    group.className='conduite-export-group';
+
+    function makeExport(label,format){
+
+        const link=document.createElement('a');
+
+        link.className='conduite-export-button';
+        link.textContent=label;
+        link.href='/show-info/builder/export.'+format;
+
+        link.title=
+            'Exporter la conduite actuelle en '+
+            format.toUpperCase();
+
+        return link;
+    }
+
+    group.append(
+        makeExport('XLSX','xlsx'),
+        makeExport('CSV','csv')
+    );
+
+    tools.append(group);
+
+})();
+</script>
+
+<style id="showcue-conduite-export-buttons-style">
+
+.conduite-export-group{
+    display:flex;
+    gap:4px;
+    margin-left:4px;
+}
+
+.conduite-export-button{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+
+    min-height:30px;
+    padding:5px 8px;
+
+    border:1px solid #7c653d;
+    border-radius:6px;
+
+    background:#332817;
+    color:#e6bd76;
+
+    font-size:.62rem;
+    font-weight:950;
+
+    text-decoration:none;
+}
+
+.conduite-export-button:hover{
+    border-color:#c69a50;
+    background:#49391f;
+    color:#fff0ce;
+}
+
+</style>
+
+
+<style id="showcue-live-on-air">
+
+#view-live .live-current{position:relative;}
+
+#live-on-air{
+    display:none;
+    position:absolute;
+    top:8px;
+    right:10px;
+
+    padding:4px 8px;
+    border:1px solid #d94c4c;
+    border-radius:999px;
+
+    background:#5a1619;
+    color:#ffdede;
+
+    font-size:.62rem;
+    font-weight:950;
+    letter-spacing:.12em;
+
+    box-shadow:
+        0 0 0 1px rgba(255,80,80,.12),
+        0 0 12px rgba(220,40,40,.28);
+}
+
+#live-on-air.active{
+    display:inline-flex;
+    align-items:center;
+    gap:5px;
+}
+
+#live-on-air::before{
+    content:"";
+    width:7px;
+    height:7px;
+    border-radius:50%;
+    background:#ff4d4d;
+    box-shadow:0 0 8px rgba(255,60,60,.65);
+}
+
+</style>
+
+<script id="showcue-live-on-air-script">
+(function(){
+
+    const currentCard=document.querySelector('#view-live .live-current');
+    if(!currentCard)return;
+
+    let badge=document.getElementById('live-on-air');
+
+    if(!badge){
+        badge=document.createElement('div');
+        badge.id='live-on-air';
+        badge.textContent='ON AIR';
+        currentCard.append(badge);
+    }
+
+    function updateOnAir(){
+
+        const playing=Boolean(
+            typeof snapshot !== 'undefined' &&
+            snapshot &&
+            snapshot.is_playing
+        );
+
+        const titleNode=
+            document.getElementById('ableton-scene') ||
+            document.getElementById('title') ||
+            document.querySelector('#view-live .ableton-scene');
+
+        const title=String(
+            titleNode ? titleNode.textContent : ''
+        ).trim();
+
+        const hasTitle=
+            title &&
+            title !== '—' &&
+            title !== '-' &&
+            title !== 'AUCUNE SCÈNE';
+
+        badge.classList.toggle(
+            'active',
+            playing && hasTitle
+        );
+    }
+
+    const observer=new MutationObserver(updateOnAir);
+
+    observer.observe(currentCard,{
+        subtree:true,
+        childList:true,
+        characterData:true
+    });
+
+    setInterval(updateOnAir,500);
+    updateOnAir();
+
+})();
+</script>
+
+
+<style id="showcue-live-on-air-v2">
+
+/* Ancien indicateur EN COURS supprimé */
+/* On ne masque plus le petit état EN COURS sous le cue.
+   Seul l'ancien badge visuel concurrent est neutralisé. */
+#view-live .live-current .current-state,
+#view-live .live-current .status-current{
+    display:none !important;
+}
+
+/* Cartouche courant = support du badge */
+#view-live .live-current{
+    position:relative !important;
+}
+
+/* Nouveau ON AIR */
+#live-on-air{
+    display:none;
+    position:absolute;
+
+    top:14px;
+    right:16px;
+
+    align-items:center;
+    justify-content:center;
+    gap:8px;
+
+    min-width:108px;
+    padding:8px 14px;
+
+    border:1px solid #e14b50;
+    border-radius:8px;
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(128,24,28,.98),
+            rgba(79,13,16,.98)
+        );
+
+    color:#fff4f4;
+
+    font-size:.82rem;
+    font-weight:1000;
+    letter-spacing:.14em;
+
+    box-shadow:
+        0 0 0 1px rgba(255,255,255,.04) inset,
+        0 4px 14px rgba(0,0,0,.35),
+        0 0 18px rgba(213,45,51,.20);
+}
+
+#live-on-air.active{
+    display:flex;
+}
+
+#live-on-air::before{
+    content:"";
+    width:9px;
+    height:9px;
+
+    border-radius:50%;
+    background:#ff5b61;
+
+    box-shadow:
+        0 0 6px rgba(255,91,97,.7),
+        0 0 12px rgba(255,91,97,.35);
+}
+
+</style>
+
+
+<style id="showcue-live-current-status-bottom-right">
+
+#view-live .live-current{
+    position:relative !important;
+}
+
+/* Petit EN COURS déplacé en bas à droite */
+#view-live .live-current .live-current-state{
+    position:absolute !important;
+    right:16px !important;
+    bottom:12px !important;
+    top:auto !important;
+    left:auto !important;
+
+    margin:0 !important;
+    z-index:3 !important;
+
+    font-size:.62rem !important;
+    opacity:.78;
+}
+
+/* Si l'état historique est généré via pseudo-élément */
+#view-live .live-current::after{
+    top:auto !important;
+    right:16px !important;
+    bottom:12px !important;
+    left:auto !important;
+}
+
+</style>
+
+
+<style id="showcue-live-current-before-bottom-right">
+
+/* Le vrai petit EN COURS est généré par ::before */
+#view-live .live-current::before{
+    top:auto !important;
+    left:auto !important;
+    right:16px !important;
+    bottom:14px !important;
+
+    z-index:4 !important;
+
+    opacity:.82 !important;
+}
+
+</style>
+
+
+<style id="showcue-header-network-address-style">
+
+#showcue-network-address{
+    display:inline-flex;
+    align-items:center;
+    gap:5px;
+
+    margin-left:6px;
+    padding:4px 7px;
+
+    border:1px solid #413b34;
+    border-radius:6px;
+
+    background:#181512;
+    color:#aaa196;
+
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+    font-size:.64rem;
+    font-weight:800;
+
+    cursor:pointer;
+    user-select:none;
+}
+
+#showcue-network-address strong{
+    color:#e2b567;
+    font-weight:950;
+}
+
+#showcue-network-address:hover{
+    border-color:#826b43;
+    color:#ddd3c6;
+}
+
+#showcue-network-address.copied{
+    border-color:#4f9b6c;
+    color:#78d99b;
+}
+
+</style>
+
+<script id="showcue-header-network-address">
+(function(){
+
+    async function installNetworkAddress(){
+
+        try{
+            const response=await fetch(
+                '/show-info/network',
+                {cache:'no-store'}
+            );
+
+            const data=await response.json();
+
+            if(!data.ok)return;
+
+            let badge=document.getElementById(
+                'showcue-network-address'
+            );
+
+            if(!badge){
+                badge=document.createElement('span');
+                badge.id='showcue-network-address';
+
+                const post=document.getElementById('post');
+
+                if(post){
+                    const anchor=post.parentElement || post;
+                    anchor.insertAdjacentElement(
+                        'afterend',
+                        badge
+                    );
+                }else{
+                    return;
+                }
+            }
+
+            badge.innerHTML=
+                'SHOWCUE <strong>'+
+                data.ip+
+                ':'+
+                data.port+
+                '/show-info</strong>';
+
+            badge.title=
+                data.url+
+                ' — cliquer pour copier';
+
+            badge.onclick=async()=>{
+                try{
+                    await navigator.clipboard.writeText(
+                        data.url
+                    );
+
+                    badge.classList.add('copied');
+
+                    const previous=badge.innerHTML;
+
+                    badge.textContent='ADRESSE COPIÉE';
+
+                    setTimeout(()=>{
+                        badge.innerHTML=previous;
+                        badge.classList.remove('copied');
+                    },1200);
+
+                }catch(error){
+                    console.error(error);
+                }
+            };
+
+        }catch(error){
+            console.error(
+                'Adresse réseau ShowCue indisponible',
+                error
+            );
+        }
+    }
+
+    installNetworkAddress();
+
+})();
+</script>
+
+
+<script id="showcue-network-relocate-v3">
+(function(){
+
+    let attempts=0;
+
+    const timer=setInterval(()=>{
+
+        attempts++;
+
+        const badge=document.getElementById(
+            'showcue-network-address'
+        );
+
+        const target=document.querySelector(
+            '.sc-network-zone'
+        );
+
+        if(badge && target){
+
+            target.append(badge);
+
+            clearInterval(timer);
+
+            return;
+        }
+
+        if(attempts>40){
+            clearInterval(timer);
+        }
+
+    },100);
+
+})();
+</script>
+
+
+<script id="showcue-network-relocate-v6">
+(function(){
+
+    let attempts=0;
+
+    const timer=setInterval(()=>{
+
+        attempts++;
+
+        const badge=document.getElementById(
+            'showcue-network-address'
+        );
+
+        const target=document.querySelector(
+            '.v6-network-slot'
+        );
+
+        if(badge && target){
+
+            target.append(badge);
+
+            clearInterval(timer);
+
+            return;
+        }
+
+        if(attempts>50){
+            clearInterval(timer);
+        }
+
+    },100);
+
+})();
+</script>
+
 </body></html>

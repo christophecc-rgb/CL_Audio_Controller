@@ -145,6 +145,43 @@ class ShowCueBuilderTests(unittest.TestCase):
         self.assertEqual((timed["mode"], timed["timecode"]), ("timed", "01:02:03:04"))
         self.assertEqual(timed["posts"], ["FOH", "RETOURS", "PLATEAU"])
 
+    def test_role_alias_preshow_punk_resolves_plain_punk_without_rewriting_labels(self):
+        distribution = [{
+            "role": "Preshow Punk",
+            "artist": "Mathilde",
+            "active": True,
+            "equipment_slots": [
+                {"type": "MICRO", "value": "Main 4"},
+                {"type": "IEM", "value": "IEM 4"},
+            ],
+            "notes": "",
+        }]
+
+        cue = {
+            "role": "PUNK",
+            "text": "Donner HF M Punk",
+        }
+
+        resolved = resolve_builder_cue(cue, distribution)
+
+        self.assertEqual(resolved["role"], "PUNK")
+        self.assertEqual(resolved["artist"], "Mathilde")
+        self.assertEqual(resolved["microphone"], "Main 4")
+        self.assertEqual(resolved["iem"], "IEM 4")
+        self.assertEqual(resolved["distribution_status"], "active")
+
+        validation = validate_builder_document({
+            "cues": [{
+                "id": "builder_punk",
+                "role": "PUNK",
+                "text": "Donner HF M Punk",
+            }],
+            "distribution": distribution,
+        })
+
+        self.assertNotIn("PUNK", validation["unknown_roles"])
+        self.assertNotIn("PUNK", validation["roles_without_active_artist"])
+
     def test_distribution_resolution_and_all_explicit_overrides(self):
         distribution = sample_document()["distribution"]
         base = {"role": "ROXY", "text": "Entrée"}
