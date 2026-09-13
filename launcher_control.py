@@ -2211,6 +2211,10 @@ def quit_launcher():
 
 
 if __name__ == "__main__":
+    if "--check-showcue-runtime" in sys.argv:
+        from showcue_runtime_check import run
+        run()
+        raise SystemExit(0)
     if "--serve" in sys.argv:
         run_embedded_server()
         raise SystemExit(0)

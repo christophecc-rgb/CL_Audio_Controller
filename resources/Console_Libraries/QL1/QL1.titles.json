@@ -1,0 +1,652 @@
+{
+  "console": "QL1",
+  "entries": [
+    {
+      "console": "QL1",
+      "memory": 9,
+      "midi_program": 8,
+      "title": "PRESHOW CHECK"
+    },
+    {
+      "console": "QL1",
+      "memory": 10,
+      "midi_program": 9,
+      "title": "PRESHOW CHECK"
+    },
+    {
+      "console": "QL1",
+      "memory": 11,
+      "midi_program": 10,
+      "title": "TOXIC"
+    },
+    {
+      "console": "QL1",
+      "memory": 12,
+      "midi_program": 11,
+      "title": "QUE RESTE IL"
+    },
+    {
+      "console": "QL1",
+      "memory": 13,
+      "midi_program": 12,
+      "title": "FALLIN`"
+    },
+    {
+      "console": "QL1",
+      "memory": 14,
+      "midi_program": 13,
+      "title": "FEVER"
+    },
+    {
+      "console": "QL1",
+      "memory": 15,
+      "midi_program": 14,
+      "title": "WHAT ABOUT US"
+    },
+    {
+      "console": "QL1",
+      "memory": 16,
+      "midi_program": 15,
+      "title": "BATTEZ VOUS"
+    },
+    {
+      "console": "QL1",
+      "memory": 17,
+      "midi_program": 16,
+      "title": "FLOWER"
+    },
+    {
+      "console": "QL1",
+      "memory": 18,
+      "midi_program": 17,
+      "title": "EMPORTE PAR FOUL"
+    },
+    {
+      "console": "QL1",
+      "memory": 19,
+      "midi_program": 18,
+      "title": "CELLO SOLO"
+    },
+    {
+      "console": "QL1",
+      "memory": 20,
+      "midi_program": 19,
+      "title": "let s dance"
+    },
+    {
+      "console": "QL1",
+      "memory": 21,
+      "midi_program": 20,
+      "title": "JARDIN D HIVER"
+    },
+    {
+      "console": "QL1",
+      "memory": 22,
+      "midi_program": 21,
+      "title": "VIENS VOIR"
+    },
+    {
+      "console": "QL1",
+      "memory": 23,
+      "midi_program": 22,
+      "title": "HOLLOWBACK GIRL"
+    },
+    {
+      "console": "QL1",
+      "memory": 24,
+      "midi_program": 23,
+      "title": "NE ME QUITTE PAS"
+    },
+    {
+      "console": "QL1",
+      "memory": 25,
+      "midi_program": 24,
+      "title": "BANG BANG"
+    },
+    {
+      "console": "QL1",
+      "memory": 26,
+      "midi_program": 25,
+      "title": "CRAZY"
+    },
+    {
+      "console": "QL1",
+      "memory": 27,
+      "midi_program": 26,
+      "title": "VALSE A 1000 TPS"
+    },
+    {
+      "console": "QL1",
+      "memory": 28,
+      "midi_program": 27,
+      "title": "ENTREE DIRECTRIC"
+    },
+    {
+      "console": "QL1",
+      "memory": 29,
+      "midi_program": 28,
+      "title": "ALL SO QUIET"
+    },
+    {
+      "console": "QL1",
+      "memory": 30,
+      "midi_program": 29,
+      "title": "WINNER TAKES IT"
+    },
+    {
+      "console": "QL1",
+      "memory": 31,
+      "midi_program": 30,
+      "title": "MARCIA BAILA"
+    },
+    {
+      "console": "QL1",
+      "memory": 32,
+      "midi_program": 31,
+      "title": "MARCIA BAILA"
+    },
+    {
+      "console": "QL1",
+      "memory": 39,
+      "midi_program": 38,
+      "title": "ENTRACTE CHECK"
+    },
+    {
+      "console": "QL1",
+      "memory": 40,
+      "midi_program": 39,
+      "title": "ENTRACTE CHECK"
+    },
+    {
+      "console": "QL1",
+      "memory": 41,
+      "midi_program": 40,
+      "title": "NAPOLEON Visavis"
+    },
+    {
+      "console": "QL1",
+      "memory": 42,
+      "midi_program": 41,
+      "title": "ENTREE DIRECTRIC"
+    },
+    {
+      "console": "QL1",
+      "memory": 43,
+      "midi_program": 42,
+      "title": "SUPREM"
+    },
+    {
+      "console": "QL1",
+      "memory": 44,
+      "midi_program": 43,
+      "title": "TALK MENEUSE DIR"
+    },
+    {
+      "console": "QL1",
+      "memory": 45,
+      "midi_program": 44,
+      "title": "NEVER ENOUGH"
+    },
+    {
+      "console": "QL1",
+      "memory": 46,
+      "midi_program": 45,
+      "title": "TALK MARCEL DIR"
+    },
+    {
+      "console": "QL1",
+      "memory": 47,
+      "midi_program": 46,
+      "title": "AVA lustre"
+    },
+    {
+      "console": "QL1",
+      "memory": 48,
+      "midi_program": 47,
+      "title": "DISCO not use"
+    },
+    {
+      "console": "QL1",
+      "memory": 49,
+      "midi_program": 48,
+      "title": "PARADISCO"
+    },
+    {
+      "console": "QL1",
+      "memory": 50,
+      "midi_program": 49,
+      "title": "GLORIA MARCEL"
+    },
+    {
+      "console": "QL1",
+      "memory": 51,
+      "midi_program": 50,
+      "title": "LOVE TO LOVE"
+    },
+    {
+      "console": "QL1",
+      "memory": 52,
+      "midi_program": 51,
+      "title": "DANCIN QUEEN"
+    },
+    {
+      "console": "QL1",
+      "memory": 53,
+      "midi_program": 52,
+      "title": "DQ acapella"
+    },
+    {
+      "console": "QL1",
+      "memory": 54,
+      "midi_program": 53,
+      "title": "OBJET DESIR"
+    },
+    {
+      "console": "QL1",
+      "memory": 55,
+      "midi_program": 54,
+      "title": "ROCKY/MARSEILLAI"
+    },
+    {
+      "console": "QL1",
+      "memory": 56,
+      "midi_program": 55,
+      "title": "H2O + BAIGNOIRE"
+    },
+    {
+      "console": "QL1",
+      "memory": 57,
+      "midi_program": 56,
+      "title": "VOYACH VOYACH"
+    },
+    {
+      "console": "QL1",
+      "memory": 58,
+      "midi_program": 57,
+      "title": "BETE DE SEXE"
+    },
+    {
+      "console": "QL1",
+      "memory": 59,
+      "midi_program": 58,
+      "title": "AVA UKU OUT"
+    },
+    {
+      "console": "QL1",
+      "memory": 60,
+      "midi_program": 59,
+      "title": "MAPPING"
+    },
+    {
+      "console": "QL1",
+      "memory": 61,
+      "midi_program": 60,
+      "title": "CANCAN"
+    },
+    {
+      "console": "QL1",
+      "memory": 62,
+      "midi_program": 61,
+      "title": "AVA LINGE"
+    },
+    {
+      "console": "QL1",
+      "memory": 63,
+      "midi_program": 62,
+      "title": "AVA LINGE SORTIE"
+    },
+    {
+      "console": "QL1",
+      "memory": 64,
+      "midi_program": 63,
+      "title": "DUA LIPA"
+    },
+    {
+      "console": "QL1",
+      "memory": 65,
+      "midi_program": 64,
+      "title": "DESIRE"
+    },
+    {
+      "console": "QL1",
+      "memory": 66,
+      "midi_program": 65,
+      "title": "PROUD MARY"
+    },
+    {
+      "console": "QL1",
+      "memory": 67,
+      "midi_program": 66,
+      "title": "CAN^T STOP FEELI"
+    },
+    {
+      "console": "QL1",
+      "memory": 68,
+      "midi_program": 67,
+      "title": "AVA CADABRA"
+    },
+    {
+      "console": "QL1",
+      "memory": 69,
+      "midi_program": 68,
+      "title": "TALK MARCEL DIR"
+    },
+    {
+      "console": "QL1",
+      "memory": 70,
+      "midi_program": 69,
+      "title": "FINAL - PEGASE"
+    },
+    {
+      "console": "QL1",
+      "memory": 71,
+      "midi_program": 70,
+      "title": "PEGAZ MENEUSE"
+    },
+    {
+      "console": "QL1",
+      "memory": 72,
+      "midi_program": 71,
+      "title": "P MENEUSE+MARCEL"
+    },
+    {
+      "console": "QL1",
+      "memory": 73,
+      "midi_program": 72,
+      "title": "PEGAZ DIR"
+    },
+    {
+      "console": "QL1",
+      "memory": 77,
+      "midi_program": 76,
+      "title": "Test MPC"
+    },
+    {
+      "console": "QL1",
+      "memory": 78,
+      "midi_program": 77,
+      "title": "Test MPC"
+    },
+    {
+      "console": "QL1",
+      "memory": 79,
+      "midi_program": 78,
+      "title": "Entree E&M"
+    },
+    {
+      "console": "QL1",
+      "memory": 80,
+      "midi_program": 79,
+      "title": "WELCOME CABARET"
+    },
+    {
+      "console": "QL1",
+      "memory": 81,
+      "midi_program": 80,
+      "title": "LADY GAGA"
+    },
+    {
+      "console": "QL1",
+      "memory": 82,
+      "midi_program": 81,
+      "title": "GAGA TALK"
+    },
+    {
+      "console": "QL1",
+      "memory": 83,
+      "midi_program": 82,
+      "title": "A STAR IS BORN"
+    },
+    {
+      "console": "QL1",
+      "memory": 84,
+      "midi_program": 83,
+      "title": "TALK R E&M"
+    },
+    {
+      "console": "QL1",
+      "memory": 85,
+      "midi_program": 84,
+      "title": "BIM BAM \\ COEUR"
+    },
+    {
+      "console": "QL1",
+      "memory": 86,
+      "midi_program": 85,
+      "title": "TALK TOUS"
+    },
+    {
+      "console": "QL1",
+      "memory": 87,
+      "midi_program": 86,
+      "title": "E&M"
+    },
+    {
+      "console": "QL1",
+      "memory": 88,
+      "midi_program": 87,
+      "title": "BONNIE TYLER"
+    },
+    {
+      "console": "QL1",
+      "memory": 89,
+      "midi_program": 88,
+      "title": "TALK RLP"
+    },
+    {
+      "console": "QL1",
+      "memory": 90,
+      "midi_program": 89,
+      "title": "L^ENVOLE"
+    },
+    {
+      "console": "QL1",
+      "memory": 91,
+      "midi_program": 90,
+      "title": "OMBRE CHINOISE"
+    },
+    {
+      "console": "QL1",
+      "memory": 92,
+      "midi_program": 91,
+      "title": "J`ENVOI VALSER"
+    },
+    {
+      "console": "QL1",
+      "memory": 93,
+      "midi_program": 92,
+      "title": "TALK E&M ROXY"
+    },
+    {
+      "console": "QL1",
+      "memory": 94,
+      "midi_program": 93,
+      "title": "ALADIN"
+    },
+    {
+      "console": "QL1",
+      "memory": 95,
+      "midi_program": 94,
+      "title": "MONDE TOURNETTE"
+    },
+    {
+      "console": "QL1",
+      "memory": 96,
+      "midi_program": 95,
+      "title": "TALK ROXY LEO"
+    },
+    {
+      "console": "QL1",
+      "memory": 97,
+      "midi_program": 96,
+      "title": "E&M Pouces lumin"
+    },
+    {
+      "console": "QL1",
+      "memory": 98,
+      "midi_program": 97,
+      "title": "JUST DANSE ROXY"
+    },
+    {
+      "console": "QL1",
+      "memory": 99,
+      "midi_program": 98,
+      "title": "ANNIVERSAIRE"
+    },
+    {
+      "console": "QL1",
+      "memory": 100,
+      "midi_program": 99,
+      "title": "LAC DES CYGNES"
+    },
+    {
+      "console": "QL1",
+      "memory": 101,
+      "midi_program": 100,
+      "title": "SUPER HEROS"
+    },
+    {
+      "console": "QL1",
+      "memory": 102,
+      "midi_program": 101,
+      "title": "SUPER HEROS TALK"
+    },
+    {
+      "console": "QL1",
+      "memory": 103,
+      "midi_program": 102,
+      "title": "ANNE FOLLES PARA"
+    },
+    {
+      "console": "QL1",
+      "memory": 104,
+      "midi_program": 103,
+      "title": "ANNE FOLLE LEO"
+    },
+    {
+      "console": "QL1",
+      "memory": 105,
+      "midi_program": 104,
+      "title": "ANNE FOLLES ROXY"
+    },
+    {
+      "console": "QL1",
+      "memory": 106,
+      "midi_program": 105,
+      "title": "ANNE FOLLES TOUS"
+    },
+    {
+      "console": "QL1",
+      "memory": 107,
+      "midi_program": 106,
+      "title": "IN papaout"
+    },
+    {
+      "console": "QL1",
+      "memory": 108,
+      "midi_program": 107,
+      "title": "hymne \\ papaout"
+    },
+    {
+      "console": "QL1",
+      "memory": 109,
+      "midi_program": 108,
+      "title": "E&M"
+    },
+    {
+      "console": "QL1",
+      "memory": 111,
+      "midi_program": 110,
+      "title": "FINAL PARADIS"
+    },
+    {
+      "console": "QL1",
+      "memory": 112,
+      "midi_program": 111,
+      "title": "FINAL PARADIS"
+    },
+    {
+      "console": "QL1",
+      "memory": 113,
+      "midi_program": 112,
+      "title": "FINAL LEO"
+    },
+    {
+      "console": "QL1",
+      "memory": 114,
+      "midi_program": 113,
+      "title": "FINAL PONT"
+    },
+    {
+      "console": "QL1",
+      "memory": 115,
+      "midi_program": 114,
+      "title": "FINAL TOUS"
+    },
+    {
+      "console": "QL1",
+      "memory": 117,
+      "midi_program": 116,
+      "title": "DUA LIPA OPC"
+    },
+    {
+      "console": "QL1",
+      "memory": 118,
+      "midi_program": 117,
+      "title": "DUA LIPA OPC"
+    },
+    {
+      "console": "QL1",
+      "memory": 119,
+      "midi_program": 118,
+      "title": "DESIRE OPC"
+    },
+    {
+      "console": "QL1",
+      "memory": 120,
+      "midi_program": 119,
+      "title": "PROUD MARY OPC"
+    },
+    {
+      "console": "QL1",
+      "memory": 121,
+      "midi_program": 120,
+      "title": "CAN`T STOP OPC"
+    },
+    {
+      "console": "QL1",
+      "memory": 122,
+      "midi_program": 121,
+      "title": "HOLLOWBACK OPC"
+    },
+    {
+      "console": "QL1",
+      "memory": 123,
+      "midi_program": 122,
+      "title": "SUPREM lea corum"
+    },
+    {
+      "console": "QL1",
+      "memory": 124,
+      "midi_program": 123,
+      "title": "TOXIC"
+    },
+    {
+      "console": "QL1",
+      "memory": 125,
+      "midi_program": 124,
+      "title": "I NEED A HERO"
+    },
+    {
+      "console": "QL1",
+      "memory": 126,
+      "midi_program": 125,
+      "title": "I NEED A HERO"
+    }
+  ],
+  "imported_at": "2026-08-29T11:15:21.493242+00:00",
+  "schema_version": 1,
+  "source_format": "CLF",
+  "source_name": "QL1 mem.CLF",
+  "warnings": []
+}

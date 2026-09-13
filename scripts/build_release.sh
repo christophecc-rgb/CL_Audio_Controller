@@ -3,6 +3,7 @@ set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION="${1:-2.2.0}"
+CL_PYTHON="${CL_PYTHON:-$PROJECT_ROOT/.venv/bin/python}"
 STAMP="$(date +"%Y-%m-%d_%H-%M-%S")"
 RELEASE_ROOT="${CL_RELEASE_OUTPUT_ROOT:-$PROJECT_ROOT/Releases}"
 RELEASE_DIR="$RELEASE_ROOT/CL_Audio_Controller_${VERSION}_${STAMP}"
@@ -150,8 +151,9 @@ mkdir -p "$RELEASE_DIR"
 cd "$PROJECT_ROOT"
 
 echo "========== BUILD $VERSION =========="
-python3 "$PROJECT_ROOT/scripts/generate_app_icon_variants.py"
-python3 -m PyInstaller \
+"$CL_PYTHON" -c "import pypdf, PyInstaller"
+"$CL_PYTHON" "$PROJECT_ROOT/scripts/generate_app_icon_variants.py"
+"$CL_PYTHON" -m PyInstaller \
   --noconfirm \
   --workpath "$BUILD_ROOT/build" \
   --distpath "$BUILD_ROOT/dist" \
@@ -172,6 +174,8 @@ if [[ ! -f "$MIDI_DEVICE_SOURCE/CL MIDI Console Monitor.amxd" ]]; then
 fi
 
 echo
+"$APP_PATH/Contents/MacOS/CL Audio Controller" --check-showcue-runtime
+
 echo "========== KIT D'INSTALLATION =========="
 mkdir -p \
   "$KIT_ROOT/AbletonOSC CL/AbletonOSC" \

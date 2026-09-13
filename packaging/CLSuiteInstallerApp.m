@@ -182,16 +182,20 @@ static void CLInstallApplicationMenu(void) {
     NSArray<NSArray<NSString *> *> *components = self.uninstaller ? @[
         @[@"autoscene", @"Paradis Latin AutoScene — Live 11/12", @"Périphérique Max for Live AutoScene.", @"ParadisLatin.jpg"],
         @[@"autoscene-live10", @"Paradis Latin AutoScene — Live 10", @"Variante dédiée à Ableton Live 10.", @"ParadisLatin.jpg"],
-        @[@"controller", @"Mac Télécommande — RTP émetteur-récepteur", @"Show Control, découverte Bonjour et liaison RTP-MIDI bidirectionnelle avec retours consoles.", @"Controller.png"],
+        @[@"controller", @"Mac Télécommande — RTP émetteur-récepteur", @"Show Control, ShowCue et ShowCue Builder, ressources CL, découverte Bonjour et liaison RTP-MIDI bidirectionnelle avec retours consoles.", @"Controller.png"],
         @[@"ableton-reader", @"Mac Ableton Lecteur — RTP émetteur-récepteur", @"AbletonOSC, LTC, X-Fader et agent RTP-MIDI bidirectionnel à démarrage automatique.", @"Controller.png"],
         @[@"builder", @"CL Arrangement Builder Live", @"Application Builder et Remote Script Ableton.", @"Builder.png"],
+        @[@"showcue", @"CL ShowCue + Builder", @"Serveur Show Control, sessions transportables et bibliothèques CL5 / QL1.", @"Controller.png"],
+        @[@"show-audio-builder", @"CL Show Audio Builder", @"Export audio WAV/MP3 par scène et medleys.", @"Builder.png"],
         @[@"midi-console", @"CL MIDI Network Manager + simulateur", @"Diagnostic MIDI, retours consoles et simulateur intégré IAC/RTP.", @"MIDIConsole.png"],
         @[@"diagnostic-tools", @"Outils de diagnostic CL", @"MIDI & RTP Diagnostic, MIDI Analyzer et Performance Monitor.", @"Diagnostic.png"]
     ] : @[
         @[@"autoscene", @"Paradis Latin AutoScene", @"Périphérique Max for Live pour Ableton Live 11 et 12.", @"ParadisLatin.jpg"],
-        @[@"controller", @"Mac Télécommande", @"Show Control, serveur web et télécommandes distantes.", @"Controller.png"],
+        @[@"controller", @"Mac Télécommande", @"Show Control, ShowCue et ShowCue Builder, ressources CL et serveur web.", @"Controller.png"],
         @[@"ableton-reader", @"Mac Ableton Lecteur", @"AbletonOSC, LTC, X-Fader et agent RTP léger.", @"Controller.png"],
         @[@"builder", @"CL Arrangement Builder Live", @"Application Builder et Remote Script Ableton.", @"Builder.png"],
+        @[@"showcue", @"CL ShowCue + Builder", @"Serveur Show Control, sessions transportables et bibliothèques CL5 / QL1.", @"Controller.png"],
+        @[@"show-audio-builder", @"CL Show Audio Builder", @"Export audio WAV/MP3 par scène et medleys.", @"Builder.png"],
         @[@"midi-console", @"CL MIDI Network Manager + simulateur", @"Diagnostic, retours consoles et tests IAC/RTP dans une seule application.", @"MIDIConsole.png"],
         @[@"diagnostic-tools", @"Outils de diagnostic CL", @"MIDI & RTP Diagnostic, MIDI Analyzer et Performance Monitor.", @"Diagnostic.png"]
     ];

@@ -217,7 +217,8 @@ class MidiNetworkToolsTests(unittest.TestCase):
         mode_changed = source.split('- (void)simulatorModeChanged:', 1)[1].split('- (NSTask *)launchSimulatorDevice:', 1)[0]
         refresh = source.split('- (void)refreshEndpoints', 1)[1].split('- (NSString *)toolPath:', 1)[0]
 
-        self.assertIn('if (self.localReturnMode)', run_test)
+        self.assertIn('CL MIDI Return Test', source)
+        self.assertIn('self.returnMonitorSourceName ?: (preferred ?: @"aucune")', source)
         self.assertLess(run_test.index('if (self.localReturnMode)'), run_test.index('CLMIDIRoundTripTester'))
         self.assertIn('[self updateRoundTripPanelForCurrentMode]', mode_changed)
         self.assertIn('[self updateRoundTripPanelForCurrentMode]', refresh)
@@ -603,7 +604,8 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('[self requestOperatingMode:self.returnModeMenu.indexOfSelectedItem == 0 ? @"local" : @"remote"]', changed)
         self.assertIn('self.localReturnMode = local', changed)
         self.assertIn('[self simulatorModeChanged:nil]', changed)
-        self.assertIn('self.returnMonitorStatus = self.localReturnDestination ? noErr', simulator_changed)
+        self.assertIn('self.returnMonitorStatus =', simulator_changed)
+        self.assertIn('self.localReturnDestination ? noErr : kMIDIUnknownEndpoint;', simulator_changed)
         self.assertIn('CLPreferredConsoleReturnEndpoint(EndpointNames(YES))', simulator_changed)
         self.assertIn('[self selectPassiveReturnSourceNamed:preferred]', simulator_changed)
         self.assertIn('if (self.localReturnMode)', run_test)
@@ -846,8 +848,8 @@ class MidiNetworkToolsTests(unittest.TestCase):
         mode = source.split('- (void)simulatorModeChanged:', 1)[1].split('- (NSTask *)launchSimulatorDevice:', 1)[0]
         transport = source.split('- (BOOL)simulatorTransport:', 1)[1].split('- (void)startSimulatorDevice:', 1)[0]
         self.assertIn('selectPassiveExpectedSourceNamed:CLExpectedEndpointName', refresh)
-        self.assertIn('if (!self.localReturnMode &&', refresh)
         self.assertIn('[self selectPassiveReturnSourceNamed:preferred]', refresh)
+        self.assertNotIn('if (!self.localReturnMode &&', refresh)
         self.assertNotIn('expectedMonitorSource = 0', mode)
         self.assertNotIn('expectedCL5Program = -1', mode)
         self.assertNotIn('expectedQL1Program = -1', mode)
@@ -1289,6 +1291,45 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('@"clVisualRecallTimerKey"', method)
         self.assertIn('4.0 - elapsedSinceExpected', method)
         self.assertNotIn("date.timeIntervalSinceNow", method)
+
+    def test_network_manager_prefers_canonical_device_states_from_status(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        method = source.split("- (void)refreshAbletonSceneTitle {", 1)[1].split(
+            "- (void)rebuildConsoleLibraryRows", 1
+        )[0]
+
+        self.assertIn('payload[@"device_states"]', method)
+        self.assertIn('deviceStates[@"console_a"]', method)
+        self.assertIn('deviceStates[@"console_b"]', method)
+        self.assertIn('NSDictionary *cl5 = consoleA ?:', method)
+        self.assertIn('NSDictionary *ql1 = consoleB ?:', method)
+
+        # Le vieux midi_console reste volontairement un fallback seulement.
+        self.assertIn('payload[@"midi_console"]', method)
+        self.assertLess(
+            method.index('deviceStates[@"console_a"]'),
+            method.index('midiConsole[@"cl5"]'),
+        )
+
+    def test_local_mode_keeps_physical_return_monitor_canonical(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+
+        setup = source.split("- (void)setupPassiveReturnMonitor {", 1)[1].split(
+            "- (void)recordIsolatedDeviceTestProgram:", 1
+        )[0]
+
+        self.assertIn(
+            "[self selectPassiveReturnSourceNamed:preferredReturnSource]",
+            setup,
+        )
+        self.assertNotIn(
+            "if (self.localReturnMode) self.returnMonitorStatus = localStatus",
+            setup,
+        )
+        self.assertIn(
+            "self.returnMonitorSourceName ?: (preferred ?: @\"aucune\")",
+            source,
+        )
 
     def test_yamaha_simulator_dashboard_supports_independent_consoles(self):
         source = (TOOLS / "CLYamahaSimulatorDashboard.m").read_text()

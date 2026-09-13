@@ -840,21 +840,6 @@
       }
     }
 
-
-    .osc-meter {
-      margin: -3px 0 9px;
-      color: #8f98a6;
-      text-align: center;
-      font: 700 10px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace;
-      letter-spacing: .015em;
-      opacity: .88;
-      white-space: nowrap;
-    }
-
-    .osc-meter[data-active="1"] {
-      color: #aeb8c5;
-    }
-
 </style>
   <link rel="stylesheet" href="/static/cl-skins.css?v=20260829-ql1-cyan-pulse">
 </head>
@@ -862,9 +847,6 @@
 <body>
   <main class="wrap">
     <div class="status disconnected" id="status">Connexion…</div>
-    <div class="osc-meter" id="oscMeter" data-active="0">
-      OSC · ↓ 0/s · ↑ 0/s
-    </div>
 
     <nav class="topnav">
       <a href="/" class="active">Session</a>
@@ -918,7 +900,6 @@
   <script src="/static/midi-return-visual.js?v=20260829-visual-recall-4s"></script>
   <script>
     const statusEl = document.getElementById('status');
-    const oscMeterEl = document.getElementById('oscMeter');
     const currentEl = document.getElementById('current');
     const currentTimerEl = document.getElementById('currentTimer');
     const currentCardEl = document.getElementById('currentCard');
@@ -1312,37 +1293,6 @@
       const connected = Boolean(state && state.connected);
       const message = state && state.message ? state.message : (connected ? 'Connecté' : 'Interface non connectée');
       setStatusText((connected ? '● ' : '○ ') + message, connected);
-
-      if (oscMeterEl) {
-        const traffic = state
-          && state.osc_transport
-          && state.osc_transport.traffic;
-
-        if (traffic) {
-          const rxMsg = Number(traffic.rx_msg_s || 0);
-          const txMsg = Number(traffic.tx_msg_s || 0);
-          const rxKbit = Number(traffic.rx_kbit_s || 0);
-          const txKbit = Number(traffic.tx_kbit_s || 0);
-          const peak = Number(traffic.peak_msg_s || 0);
-          const latency = Number(
-            state.osc_transport.last_latency_ms || 0
-          );
-
-          oscMeterEl.textContent =
-            'OSC  ↓ ' + rxMsg.toFixed(0) + '/s · ' +
-            rxKbit.toFixed(1) + ' kb/s   ↑ ' +
-            txMsg.toFixed(0) + '/s · ' +
-            txKbit.toFixed(1) + ' kb/s   ' +
-            'PIC ' + peak.toFixed(0) + '/s' +
-            (latency > 0 ? '   ' + latency.toFixed(1) + ' ms' : '');
-
-          oscMeterEl.dataset.active =
-            (rxMsg > 0 || txMsg > 0) ? '1' : '0';
-        } else {
-          oscMeterEl.textContent = 'OSC · aucune mesure';
-          oscMeterEl.dataset.active = '0';
-        }
-      }
 
       const sessionMode = Boolean(state && state.play_mode === 'session');
       if (!sessionMode) {

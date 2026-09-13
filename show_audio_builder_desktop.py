@@ -1407,10 +1407,61 @@ class ShowAudioBuilderDesktop(tk.Tk):
             self._start_single_scene_export(items=items)
             return
 
+        if len(selected_scenes) > 1:
+            items = []
+
+            for item in (
+                (self.prepared_export_job or {}).get("batch_items")
+                or []
+            ):
+                if item.get("type") not in {"scene", "medley_part"}:
+                    continue
+
+                source_item = item.get("source_item") or {}
+
+                try:
+                    scene_index = int(
+                        source_item.get("scene_index")
+                    )
+                except (TypeError, ValueError):
+                    continue
+
+                if scene_index in selected_scenes:
+                    items.append(item)
+
+            resolved_indices = []
+
+            for item in items:
+                try:
+                    resolved_indices.append(
+                        int(
+                            (item.get("source_item") or {}).get(
+                                "scene_index"
+                            )
+                        )
+                    )
+                except (TypeError, ValueError):
+                    pass
+
+            if (
+                set(resolved_indices) != selected_scenes
+                or len(resolved_indices) != len(selected_scenes)
+            ):
+                messagebox.showerror(
+                    "Export",
+                    "Sélection de scènes non résolvable. "
+                    "Relancer PRÉPARER EXPORT.",
+                )
+                return
+
+            self._start_single_scene_export(
+                items=items
+            )
+            return
+
         if len(selected_scenes) != 1:
             self.info_var.set(
-                "Export de sélection multiple non connecté dans cette version. "
-                "Sélectionner une seule scène."
+                "Aucune scène sélectionnée pour l'export."
             )
             return
 

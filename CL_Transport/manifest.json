@@ -1,0 +1,8 @@
+{
+  "format": "CL_Transport",
+  "version": 1,
+  "files": {
+    "Console_Libraries/CL5/CL5.titles.json": "9233f1c757d2a3e395717a0bddc0db7cad10af02b99ef506fcd25cca501e7db0",
+    "Console_Libraries/QL1/QL1.titles.json": "eed53ea0c374b2679d97b51a8fd618d311de96d3bccf740ebbc68e01dba24e4c"
+  }
+}

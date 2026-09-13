@@ -475,7 +475,7 @@ def test_export_selection_single_scene_uses_real_scene_path():
     assert calls == [True]
 
 
-def test_export_selection_multiple_scenes_does_not_start_engine():
+def test_export_selection_multiple_scenes_starts_prepared_batch_in_order():
     app = desktop_fixture()
 
     app.export_preparation_valid = True
@@ -483,20 +483,36 @@ def test_export_selection_multiple_scenes_does_not_start_engine():
     app.export_selected_scene_indices = {29, 30}
     app.export_selected_medley_ids = set()
 
+    second = {
+        "id": "scene_030",
+        "type": "scene",
+        "source_item": {
+            "scene_index": 29,
+            "scene_name": "ANNONCE",
+        },
+    }
+    first = {
+        "id": "scene_031",
+        "type": "scene",
+        "source_item": {
+            "scene_index": 30,
+            "scene_name": "TOXIC",
+        },
+    }
+
+    app.prepared_export_job = {
+        "batch_items": [second, first],
+    }
+
     calls = []
 
-    app.request_export_ui = lambda scene_only=False: calls.append(
-        scene_only
+    app._start_single_scene_export = (
+        lambda items=None: calls.append(items)
     )
 
     app.request_export_selection_ui()
 
-    assert calls == []
-
-    assert (
-        "sélection multiple"
-        in app.info_var.get().casefold()
-    )
+    assert calls == [[second, first]]
 
 
 def test_export_selection_full_medley_starts_batch_once():

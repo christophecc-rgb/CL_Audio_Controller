@@ -34,6 +34,8 @@ from show_audio_print_engine import PrintEngineError, capture_clean
 from build_identity import BUILD_ID, IDENTITY_PROTOCOL_VERSION, SERVICE_NAME
 from ableton_targets import DEFAULT_CONFIG_PATH, load_target
 from server_ownership import OwnershipRecordError, write_record
+from cl_transport import available_sessions, session_file, load_library
+from showcue_session_archive import export_session, import_session, MAX_ARCHIVE_BYTES
 from console_title_library import ConsoleLibraryStore, LibraryImportError, MAX_FILE_SIZE, parse_import
 from device_profiles import DeviceProfile, device_ui_snapshots, load_device_configuration_result
 
@@ -728,7 +730,7 @@ def configured_console_library_ids() -> tuple[str, ...]:
 
 def load_console_scene_libraries() -> Dict[str, Dict[int, str]]:
     return {
-        name: CONSOLE_LIBRARY_STORE.load(name).get("library", {})
+        name: load_library(name, CONSOLE_LIBRARY_STORE).get("library", {})
         for name in configured_console_library_ids()
     }
 
@@ -1348,7 +1350,8 @@ def state_snapshot_locked() -> Dict[str, Any]:
     snapshot["console_title_offsets"] = dict(state.get("console_title_offsets") or {"cl5": 0, "ql1": 0})
     snapshot["console_title_offset_range"] = {"min": CONSOLE_TITLE_OFFSET_MIN, "max": CONSOLE_TITLE_OFFSET_MAX}
     snapshot["console_scene_library_status"] = {}
-    for name, metadata in CONSOLE_LIBRARY_STORE.status(configured_console_library_ids()).items():
+    for name in configured_console_library_ids():
+        metadata = load_library(name, CONSOLE_LIBRARY_STORE)
         snapshot["console_scene_library_status"][name] = {
             key: value for key, value in metadata.items() if key != "library"
         }
@@ -3678,6 +3681,46 @@ def protect_local_builder_routes():
     if not request_is_loopback():
         return jsonify({"ok": False, "message": "CL ShowCue Builder est disponible uniquement en local"}), 403
     return None
+
+
+@app.route("/show-info/builder/resources")
+def showcue_transport_resources():
+    libraries = {}
+    for console in ("cl5", "ql1"):
+        value = load_library(console, CONSOLE_LIBRARY_STORE)
+        libraries[console] = {"count": len(value.get("library", {})),
+                              "source": value["source"], "path": value["path"]}
+    return jsonify({"ok": True, "sessions": available_sessions(), "libraries": libraries})
+
+
+@app.route("/show-info/builder/sessions/export")
+def showcue_session_export():
+    import io
+    from flask import send_file
+    with SHOW_CUES_LOCK:
+        registry, _, _ = ensure_show_cue_storage()
+        data = export_session(SHOW_CUES_DATA_DIRECTORY, registry, registry["active_session_id"])
+    return send_file(io.BytesIO(data), mimetype="application/zip", as_attachment=True,
+                     download_name=registry["active_session_id"] + ".showcue.zip")
+
+
+@app.route("/show-info/builder/sessions/import", methods=["POST"])
+def showcue_session_import():
+    try:
+        upload = request.files.get("file")
+        if upload:
+            data = upload.stream.read(MAX_ARCHIVE_BYTES + 1)
+        else:
+            values = request.get_json(silent=True) or {}
+            path = session_file(values.get("source"), values.get("name"))
+            with path.open("rb") as stream:
+                data = stream.read(MAX_ARCHIVE_BYTES + 1)
+        with SHOW_CUES_LOCK:
+            registry, _, _ = ensure_show_cue_storage()
+            registry = import_session(data, SHOW_CUES_DATA_DIRECTORY, registry)
+        return jsonify({"ok": True, **registry, "imported_session": registry["sessions"][-1]}), 201
+    except (OSError, ValueError) as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
 
 
 @app.route("/show-info/builder")

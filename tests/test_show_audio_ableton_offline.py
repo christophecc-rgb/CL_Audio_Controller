@@ -716,3 +716,70 @@ def test_restore_after_render_validation(monkeypatch, tmp_path, outcome):
     assert not lock.held
     assert result["status"] == (OFFLINE_SUCCESS if outcome == "success" else OFFLINE_FAILED)
     assert target.exists() is (outcome == "success")
+
+
+@pytest.mark.parametrize("destination", ["desktop", "parent", "direct"])
+def test_render_outside_expected_directory_is_published_without_timeout(monkeypatch, tmp_path, destination):
+    import re
+    from pathlib import Path
+    import show_audio_ableton_offline as offline
+
+    home = tmp_path / "home"
+    desktop = home / "Desktop"
+    desktop.mkdir(parents=True)
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: home))
+    target = tmp_path / "exports" / ".cl_show_audio_masters" / "ANNONCE.wav"
+    clock = [0.0]
+    monkeypatch.setattr(offline.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(offline.time, "sleep", lambda seconds: clock.__setitem__(0, clock[0] + seconds))
+    # Un ancien WAV portant le nom final ne doit jamais être sélectionné.
+    stale = desktop / target.name
+    stale.write_bytes(b"ancien rendu")
+    produced = []
+
+    def render(command):
+        spec = json.loads(re.search(r"const spec = (\{.*?\});", command).group(1))
+        directory = {"desktop": desktop, "parent": target.parent.parent,
+                     "direct": target.parent}[destination]
+        produced.append(directory / spec["filename"])
+        write_wav(produced[0], seconds=1)
+
+    result = offline.execute_offline_wav(
+        zone={"start_beats": 4, "duration_beats": 2, "expected_duration_seconds": 1},
+        settings=settings(), output_path=target, tempo=120, automation=render, timeout=300,
+    )
+    assert result["status"] == OFFLINE_SUCCESS
+    assert result["render_source"] == str(produced[0])
+    assert result["file"]["path"] == str(target)
+    assert 1.5 <= clock[0] < 3
+    assert target.is_file() and not produced[0].exists()
+    assert stale.read_bytes() == b"ancien rendu"
+    assert list(target.parent.iterdir()) == [target]
+    assert offline.validate_wav_file(target, expected_duration=1, expected_sample_rate=48000)
+
+
+def test_ambiguous_render_fails_immediately_without_replacing_master(monkeypatch, tmp_path):
+    import re
+    from pathlib import Path
+    import show_audio_ableton_offline as offline
+
+    desktop = tmp_path / "Desktop"
+    desktop.mkdir()
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
+    target = tmp_path / "exports" / "ANNONCE.wav"
+    target.parent.mkdir()
+    target.write_bytes(b"master precedent")
+    monkeypatch.setattr(offline.time, "sleep", lambda seconds: pytest.fail("ambiguite doit echouer immediatement"))
+
+    def render(command):
+        spec = json.loads(re.search(r"const spec = (\{.*?\});", command).group(1))
+        for directory in (desktop, target.parent):
+            write_wav(directory / spec["filename"])
+
+    result = offline.execute_offline_wav(
+        zone={"start_beats": 4, "duration_beats": 2}, settings=settings(),
+        output_path=target, tempo=120, automation=render,
+    )
+    assert result["status"] == offline.OFFLINE_FAILED
+    assert "ambigu" in result["error"]
+    assert target.read_bytes() == b"master precedent"

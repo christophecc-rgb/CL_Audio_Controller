@@ -1316,7 +1316,7 @@ def execute_offline_wav(
 
         # Ableton peut mémoriser le dernier dossier du Save Panel.
         # On lui donne donc un nom unique, puis on retrouve ce fichier
-        # après le rendu indépendamment du dossier réellement utilisé.
+        # après le rendu dans les destinations explicites surveillées ci-dessous.
         render_token = uuid.uuid4().hex[:12]
         render_name = (
             f"{target.stem}.__clrender_{render_token}{target.suffix or '.wav'}"
@@ -1391,69 +1391,32 @@ def execute_offline_wav(
                 stable_size: int | None = None
                 stable_count = 0
 
+                # Liste fixe, sans parcours du disque : dossier technique,
+                # dossier final, Bureau (destination macOS mémorisée), racine tmp.
+                # Le nom contient le jeton propre à cette transaction ; ne jamais
+                # récupérer un ancien WAV portant seulement le nom final.
+                candidates = tuple(dict.fromkeys(
+                    (directory / render_name).resolve()
+                    for directory in (
+                        target.parent, target.parent.parent,
+                        Path.home() / "Desktop", Path("/private/tmp"),
+                    )
+                ))
                 print(
                     "[OFFLINE_RENDER_LOOKUP]",
                     f"target={target}",
-                    f"render_name={render_name}",
-                    f"direct={target.parent / render_name}",
-                    f"parent={target.parent.parent / render_name}",
+                    f"candidates={list(map(str, candidates))}",
                     flush=True,
                 )
 
                 def find_render_candidate() -> Path | None:
-                    direct = target.parent / render_name
-                    if direct.is_file():
-                        return direct
-
-                    # Le Save Panel Ableton peut mémoriser le dossier d'export final
-                    # au lieu du sous-dossier technique .cl_show_audio_masters.
-                    # Dans ce cas le __clrender est créé juste un niveau au-dessus.
-                    parent_candidate = target.parent.parent / render_name
-                    if parent_candidate.is_file():
-                        return parent_candidate
-
-                    # Le Save Panel peut conserver un dossier direct sous
-                    # /private/tmp malgré output_path.
-                    #
-                    # Ne jamais faire de rglob() récursif ici : cette fonction est
-                    # appelée plusieurs fois par seconde pendant le rendu.
-                    tmp_root = Path("/private/tmp")
-
-                    if not tmp_root.is_dir():
-                        return None
-
-                    matches: list[Path] = []
-
-                    try:
-                        root_candidate = tmp_root / render_name
-
-                        if root_candidate.is_file():
-                            matches.append(root_candidate)
-
-                        for child in tmp_root.iterdir():
-                            try:
-                                if not child.is_dir():
-                                    continue
-
-                                candidate = child / render_name
-
-                                if candidate.is_file():
-                                    matches.append(candidate)
-                            except OSError:
-                                continue
-                    except OSError:
-                        return None
-
-                    if not matches:
-                        return None
-
-                    def candidate_mtime(candidate: Path) -> float:
-                        try:
-                            return candidate.stat().st_mtime
-                        except OSError:
-                            return 0.0
-
-                    return max(matches, key=candidate_mtime)
+                    matches = [path for path in candidates if path.is_file()]
+                    if len(matches) > 1:
+                        raise OfflineExportError(
+                            "WAV Ableton ambigu : plusieurs fichiers pour le rendu "
+                            + render_name
+                        )
+                    return matches[0] if matches else None
 
                 while time.monotonic() < deadline:
                     if (
@@ -1488,7 +1451,7 @@ def execute_offline_wav(
                         time.sleep(0.20)
                         continue
 
-                    if size == stable_size:
+                    if candidate == render_candidate and size == stable_size:
                         stable_count += 1
                     else:
                         stable_size = size

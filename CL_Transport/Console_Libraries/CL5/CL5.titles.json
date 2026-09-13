@@ -1,0 +1,748 @@
+{
+  "console": "CL5",
+  "entries": [
+    {
+      "console": "CL5",
+      "memory": 1,
+      "midi_program": 0,
+      "title": "base Show 2023"
+    },
+    {
+      "console": "CL5",
+      "memory": 3,
+      "midi_program": 2,
+      "title": "CORUM JADE"
+    },
+    {
+      "console": "CL5",
+      "memory": 4,
+      "midi_program": 3,
+      "title": "CORUM JADE"
+    },
+    {
+      "console": "CL5",
+      "memory": 5,
+      "midi_program": 4,
+      "title": "FOH2026"
+    },
+    {
+      "console": "CL5",
+      "memory": 6,
+      "midi_program": 5,
+      "title": "CORUM MATHILDE"
+    },
+    {
+      "console": "CL5",
+      "memory": 7,
+      "midi_program": 6,
+      "title": "DYNAMO"
+    },
+    {
+      "console": "CL5",
+      "memory": 8,
+      "midi_program": 7,
+      "title": "MUSIC AMBIANCE"
+    },
+    {
+      "console": "CL5",
+      "memory": 9,
+      "midi_program": 8,
+      "title": "MUSIC AMBIANCE"
+    },
+    {
+      "console": "CL5",
+      "memory": 10,
+      "midi_program": 9,
+      "title": "base preshow"
+    },
+    {
+      "console": "CL5",
+      "memory": 11,
+      "midi_program": 10,
+      "title": "TOXIC"
+    },
+    {
+      "console": "CL5",
+      "memory": 12,
+      "midi_program": 11,
+      "title": "QUE RESTE IL"
+    },
+    {
+      "console": "CL5",
+      "memory": 13,
+      "midi_program": 12,
+      "title": "FALLING"
+    },
+    {
+      "console": "CL5",
+      "memory": 14,
+      "midi_program": 13,
+      "title": "FEVER"
+    },
+    {
+      "console": "CL5",
+      "memory": 15,
+      "midi_program": 14,
+      "title": "WHAT ABOUT US"
+    },
+    {
+      "console": "CL5",
+      "memory": 16,
+      "midi_program": 15,
+      "title": "BATTEZ VOUS"
+    },
+    {
+      "console": "CL5",
+      "memory": 17,
+      "midi_program": 16,
+      "title": "FLOWERS"
+    },
+    {
+      "console": "CL5",
+      "memory": 18,
+      "midi_program": 17,
+      "title": "LA FOULE"
+    },
+    {
+      "console": "CL5",
+      "memory": 19,
+      "midi_program": 18,
+      "title": "VIOLON SOLO"
+    },
+    {
+      "console": "CL5",
+      "memory": 20,
+      "midi_program": 19,
+      "title": "LET S DANCE"
+    },
+    {
+      "console": "CL5",
+      "memory": 21,
+      "midi_program": 20,
+      "title": "JARDIN D HIVER"
+    },
+    {
+      "console": "CL5",
+      "memory": 22,
+      "midi_program": 21,
+      "title": "VIENS VOIR"
+    },
+    {
+      "console": "CL5",
+      "memory": 23,
+      "midi_program": 22,
+      "title": "HOLLOWBACK GIRL"
+    },
+    {
+      "console": "CL5",
+      "memory": 24,
+      "midi_program": 23,
+      "title": "NE ME QUITTE PAS"
+    },
+    {
+      "console": "CL5",
+      "memory": 25,
+      "midi_program": 24,
+      "title": "BANG BANG"
+    },
+    {
+      "console": "CL5",
+      "memory": 26,
+      "midi_program": 25,
+      "title": "CRAZY"
+    },
+    {
+      "console": "CL5",
+      "memory": 27,
+      "midi_program": 26,
+      "title": "VALSE A 1000 Tem"
+    },
+    {
+      "console": "CL5",
+      "memory": 28,
+      "midi_program": 27,
+      "title": "entree DIRECTRIC"
+    },
+    {
+      "console": "CL5",
+      "memory": 29,
+      "midi_program": 28,
+      "title": "entracte"
+    },
+    {
+      "console": "CL5",
+      "memory": 30,
+      "midi_program": 29,
+      "title": "THE WINNER"
+    },
+    {
+      "console": "CL5",
+      "memory": 31,
+      "midi_program": 30,
+      "title": "VIDEO"
+    },
+    {
+      "console": "CL5",
+      "memory": 32,
+      "midi_program": 31,
+      "title": "VIDEO"
+    },
+    {
+      "console": "CL5",
+      "memory": 34,
+      "midi_program": 33,
+      "title": "QUE JE T'AIME"
+    },
+    {
+      "console": "CL5",
+      "memory": 35,
+      "midi_program": 34,
+      "title": "QUE JE T'AIME"
+    },
+    {
+      "console": "CL5",
+      "memory": 39,
+      "midi_program": 38,
+      "title": "base Show 2025"
+    },
+    {
+      "console": "CL5",
+      "memory": 40,
+      "midi_program": 39,
+      "title": "base Show 2025"
+    },
+    {
+      "console": "CL5",
+      "memory": 41,
+      "midi_program": 40,
+      "title": "En ROUTE ...."
+    },
+    {
+      "console": "CL5",
+      "memory": 42,
+      "midi_program": 41,
+      "title": "VIS A VIS"
+    },
+    {
+      "console": "CL5",
+      "memory": 43,
+      "midi_program": 42,
+      "title": "ENTREE DIRECTRIC"
+    },
+    {
+      "console": "CL5",
+      "memory": 44,
+      "midi_program": 43,
+      "title": "SUPREME"
+    },
+    {
+      "console": "CL5",
+      "memory": 45,
+      "midi_program": 44,
+      "title": "TALK IRIS DIR"
+    },
+    {
+      "console": "CL5",
+      "memory": 46,
+      "midi_program": 45,
+      "title": "NEVER ENOUGH"
+    },
+    {
+      "console": "CL5",
+      "memory": 47,
+      "midi_program": 46,
+      "title": "TALK MARCEL DIR"
+    },
+    {
+      "console": "CL5",
+      "memory": 48,
+      "midi_program": 47,
+      "title": "AVA"
+    },
+    {
+      "console": "CL5",
+      "memory": 49,
+      "midi_program": 48,
+      "title": "paris mon amour"
+    },
+    {
+      "console": "CL5",
+      "memory": 50,
+      "midi_program": 49,
+      "title": "HYPNOTIQUE"
+    },
+    {
+      "console": "CL5",
+      "memory": 51,
+      "midi_program": 50,
+      "title": "AVA fakir"
+    },
+    {
+      "console": "CL5",
+      "memory": 52,
+      "midi_program": 51,
+      "title": "DISCO GIGI"
+    },
+    {
+      "console": "CL5",
+      "memory": 53,
+      "midi_program": 52,
+      "title": "GLORIA MARCEL"
+    },
+    {
+      "console": "CL5",
+      "memory": 54,
+      "midi_program": 53,
+      "title": "LOVE TO  LOVE"
+    },
+    {
+      "console": "CL5",
+      "memory": 55,
+      "midi_program": 54,
+      "title": "DANCING QUEEN"
+    },
+    {
+      "console": "CL5",
+      "memory": 56,
+      "midi_program": 55,
+      "title": "A CAPPELA"
+    },
+    {
+      "console": "CL5",
+      "memory": 57,
+      "midi_program": 56,
+      "title": "OBJET DESIR"
+    },
+    {
+      "console": "CL5",
+      "memory": 58,
+      "midi_program": 57,
+      "title": "ROCKY"
+    },
+    {
+      "console": "CL5",
+      "memory": 59,
+      "midi_program": 58,
+      "title": "MARSEILLAISE"
+    },
+    {
+      "console": "CL5",
+      "memory": 60,
+      "midi_program": 59,
+      "title": "H2O"
+    },
+    {
+      "console": "CL5",
+      "memory": 61,
+      "midi_program": 60,
+      "title": "BRUITAGES"
+    },
+    {
+      "console": "CL5",
+      "memory": 62,
+      "midi_program": 61,
+      "title": "ROMANE ET CECILE"
+    },
+    {
+      "console": "CL5",
+      "memory": 63,
+      "midi_program": 62,
+      "title": "UN AUTRE MONDE"
+    },
+    {
+      "console": "CL5",
+      "memory": 64,
+      "midi_program": 63,
+      "title": "BETE 2 SEXE"
+    },
+    {
+      "console": "CL5",
+      "memory": 65,
+      "midi_program": 64,
+      "title": "UKULELE IN"
+    },
+    {
+      "console": "CL5",
+      "memory": 66,
+      "midi_program": 65,
+      "title": "IN  MAR/DIREC"
+    },
+    {
+      "console": "CL5",
+      "memory": 67,
+      "midi_program": 66,
+      "title": "METAMORPHOSE"
+    },
+    {
+      "console": "CL5",
+      "memory": 68,
+      "midi_program": 67,
+      "title": "OUT DIRECTRICE"
+    },
+    {
+      "console": "CL5",
+      "memory": 69,
+      "midi_program": 68,
+      "title": "CANCAN"
+    },
+    {
+      "console": "CL5",
+      "memory": 70,
+      "midi_program": 69,
+      "title": "CANCAN TECHNO"
+    },
+    {
+      "console": "CL5",
+      "memory": 71,
+      "midi_program": 70,
+      "title": "CECILE TRAPEZE"
+    },
+    {
+      "console": "CL5",
+      "memory": 72,
+      "midi_program": 71,
+      "title": "DUA LIPA"
+    },
+    {
+      "console": "CL5",
+      "memory": 73,
+      "midi_program": 72,
+      "title": "FREE FROM DESIRE"
+    },
+    {
+      "console": "CL5",
+      "memory": 74,
+      "midi_program": 73,
+      "title": "PROUD MARY"
+    },
+    {
+      "console": "CL5",
+      "memory": 75,
+      "midi_program": 74,
+      "title": "CANT STOP THE FE"
+    },
+    {
+      "console": "CL5",
+      "memory": 76,
+      "midi_program": 75,
+      "title": "A CAPPELLA"
+    },
+    {
+      "console": "CL5",
+      "memory": 77,
+      "midi_program": 76,
+      "title": "in cannes"
+    },
+    {
+      "console": "CL5",
+      "memory": 78,
+      "midi_program": 77,
+      "title": "OUT CANNES"
+    },
+    {
+      "console": "CL5",
+      "memory": 79,
+      "midi_program": 78,
+      "title": "TALK MARCEL DIR"
+    },
+    {
+      "console": "CL5",
+      "memory": 80,
+      "midi_program": 79,
+      "title": "FINAL - PEGASE"
+    },
+    {
+      "console": "CL5",
+      "memory": 81,
+      "midi_program": 80,
+      "title": "1er Cabaret NEW"
+    },
+    {
+      "console": "CL5",
+      "memory": 82,
+      "midi_program": 81,
+      "title": "RIRES"
+    },
+    {
+      "console": "CL5",
+      "memory": 83,
+      "midi_program": 82,
+      "title": "WOUCH"
+    },
+    {
+      "console": "CL5",
+      "memory": 84,
+      "midi_program": 83,
+      "title": "WELCOME"
+    },
+    {
+      "console": "CL5",
+      "memory": 85,
+      "midi_program": 84,
+      "title": "GAGA 1"
+    },
+    {
+      "console": "CL5",
+      "memory": 86,
+      "midi_program": 85,
+      "title": "COMEDIE"
+    },
+    {
+      "console": "CL5",
+      "memory": 87,
+      "midi_program": 86,
+      "title": "GAGA 2"
+    },
+    {
+      "console": "CL5",
+      "memory": 88,
+      "midi_program": 87,
+      "title": "STAR IS BORN"
+    },
+    {
+      "console": "CL5",
+      "memory": 89,
+      "midi_program": 88,
+      "title": "COMEDIE 3"
+    },
+    {
+      "console": "CL5",
+      "memory": 90,
+      "midi_program": 89,
+      "title": "IN ROXY"
+    },
+    {
+      "console": "CL5",
+      "memory": 91,
+      "midi_program": 90,
+      "title": "ZOE CHOEUR"
+    },
+    {
+      "console": "CL5",
+      "memory": 92,
+      "midi_program": 91,
+      "title": "Comedie"
+    },
+    {
+      "console": "CL5",
+      "memory": 93,
+      "midi_program": 92,
+      "title": "quick change"
+    },
+    {
+      "console": "CL5",
+      "memory": 94,
+      "midi_program": 93,
+      "title": "BONNIE TYLER"
+    },
+    {
+      "console": "CL5",
+      "memory": 95,
+      "midi_program": 94,
+      "title": "COMEDIE 4"
+    },
+    {
+      "console": "CL5",
+      "memory": 96,
+      "midi_program": 95,
+      "title": "circassien"
+    },
+    {
+      "console": "CL5",
+      "memory": 97,
+      "midi_program": 96,
+      "title": "ombre chinoises"
+    },
+    {
+      "console": "CL5",
+      "memory": 98,
+      "midi_program": 97,
+      "title": "zazie"
+    },
+    {
+      "console": "CL5",
+      "memory": 99,
+      "midi_program": 98,
+      "title": "comedie"
+    },
+    {
+      "console": "CL5",
+      "memory": 100,
+      "midi_program": 99,
+      "title": "reve bleu"
+    },
+    {
+      "console": "CL5",
+      "memory": 101,
+      "midi_program": 100,
+      "title": "tournette"
+    },
+    {
+      "console": "CL5",
+      "memory": 102,
+      "midi_program": 101,
+      "title": "comedie 5"
+    },
+    {
+      "console": "CL5",
+      "memory": 103,
+      "midi_program": 102,
+      "title": "TULLE"
+    },
+    {
+      "console": "CL5",
+      "memory": 104,
+      "midi_program": 103,
+      "title": "PING PONG"
+    },
+    {
+      "console": "CL5",
+      "memory": 105,
+      "midi_program": 104,
+      "title": "JUST DANCE"
+    },
+    {
+      "console": "CL5",
+      "memory": 106,
+      "midi_program": 105,
+      "title": "ENTREE ROXY #"
+    },
+    {
+      "console": "CL5",
+      "memory": 107,
+      "midi_program": 106,
+      "title": "IN EDDY MICH"
+    },
+    {
+      "console": "CL5",
+      "memory": 108,
+      "midi_program": 107,
+      "title": "CATAPULE"
+    },
+    {
+      "console": "CL5",
+      "memory": 109,
+      "midi_program": 108,
+      "title": "LAC DES CYGNES"
+    },
+    {
+      "console": "CL5",
+      "memory": 110,
+      "midi_program": 109,
+      "title": "SUPER HEROS"
+    },
+    {
+      "console": "CL5",
+      "memory": 111,
+      "midi_program": 110,
+      "title": "IN ZOE LEO"
+    },
+    {
+      "console": "CL5",
+      "memory": 112,
+      "midi_program": 111,
+      "title": "ANNEES FOLLES"
+    },
+    {
+      "console": "CL5",
+      "memory": 113,
+      "midi_program": 112,
+      "title": "shake it up"
+    },
+    {
+      "console": "CL5",
+      "memory": 114,
+      "midi_program": 113,
+      "title": "BTS"
+    },
+    {
+      "console": "CL5",
+      "memory": 115,
+      "midi_program": 114,
+      "title": "PARTY"
+    },
+    {
+      "console": "CL5",
+      "memory": 116,
+      "midi_program": 115,
+      "title": "THIS IS ME"
+    },
+    {
+      "console": "CL5",
+      "memory": 117,
+      "midi_program": 116,
+      "title": "IN  LEO"
+    },
+    {
+      "console": "CL5",
+      "memory": 118,
+      "midi_program": 117,
+      "title": "papaoute"
+    },
+    {
+      "console": "CL5",
+      "memory": 119,
+      "midi_program": 118,
+      "title": "BOITE MAGIQUE"
+    },
+    {
+      "console": "CL5",
+      "memory": 120,
+      "midi_program": 119,
+      "title": "CANCAN"
+    },
+    {
+      "console": "CL5",
+      "memory": 121,
+      "midi_program": 120,
+      "title": "MALE & FILS"
+    },
+    {
+      "console": "CL5",
+      "memory": 122,
+      "midi_program": 121,
+      "title": "BOOWLING"
+    },
+    {
+      "console": "CL5",
+      "memory": 123,
+      "midi_program": 122,
+      "title": "34 FINAL"
+    },
+    {
+      "console": "CL5",
+      "memory": 124,
+      "midi_program": 123,
+      "title": "34 FINAL STEF"
+    },
+    {
+      "console": "CL5",
+      "memory": 125,
+      "midi_program": 124,
+      "title": "34 FINAL LEO"
+    },
+    {
+      "console": "CL5",
+      "memory": 126,
+      "midi_program": 125,
+      "title": "34 CABARET JADE"
+    },
+    {
+      "console": "CL5",
+      "memory": 127,
+      "midi_program": 126,
+      "title": "34 CABARET ALL"
+    },
+    {
+      "console": "CL5",
+      "memory": 128,
+      "midi_program": 127,
+      "title": "REC JADE"
+    }
+  ],
+  "imported_at": "2026-08-29T11:15:06.820988+00:00",
+  "schema_version": 1,
+  "source_format": "CLF",
+  "source_name": "cl5 memoires.CLF",
+  "warnings": []
+}

@@ -21,6 +21,7 @@ UNINSTALL_REMOTE=0
 UNINSTALL_CONTROLLER=0
 UNINSTALL_ABLETON_READER=0
 UNINSTALL_BUILDER=0
+UNINSTALL_SHOW_AUDIO_BUILDER=0
 UNINSTALL_AUTOSCENE=0
 UNINSTALL_LIVE10=0
 UNINSTALL_MIDI_CONSOLE=0
@@ -49,9 +50,11 @@ fi
 
 case "$CHOICE" in
   1|all|complete)
-    UNINSTALL_REMOTE=1; UNINSTALL_BUILDER=1; UNINSTALL_AUTOSCENE=1; UNINSTALL_LIVE10=1; UNINSTALL_MIDI_CONSOLE=1; UNINSTALL_MIDI_RECEIVER=1; UNINSTALL_DIAGNOSTIC_TOOLS=1 ;;
+    UNINSTALL_REMOTE=1; UNINSTALL_BUILDER=1; UNINSTALL_SHOW_AUDIO_BUILDER=1; UNINSTALL_AUTOSCENE=1; UNINSTALL_LIVE10=1; UNINSTALL_MIDI_CONSOLE=1; UNINSTALL_MIDI_RECEIVER=1; UNINSTALL_DIAGNOSTIC_TOOLS=1 ;;
   2|remote) UNINSTALL_REMOTE=1 ;;
   3|builder) UNINSTALL_BUILDER=1 ;;
+  show-audio-builder) UNINSTALL_SHOW_AUDIO_BUILDER=1 ;;
+  showcue) UNINSTALL_CONTROLLER=1 ;;
   4|autoscene) UNINSTALL_AUTOSCENE=1 ;;
   5|autoscene-live10|live10) UNINSTALL_LIVE10=1 ;;
   6|midi-console) UNINSTALL_MIDI_CONSOLE=1 ;;
@@ -63,6 +66,8 @@ case "$CHOICE" in
     [[ "$answer" =~ ^([oOyY]|oui|OUI|yes|YES)$ ]] && UNINSTALL_REMOTE=1
     read -r -p "Retirer Arrangement Builder ? (o/n) " answer
     [[ "$answer" =~ ^([oOyY]|oui|OUI|yes|YES)$ ]] && UNINSTALL_BUILDER=1
+    read -r -p "Retirer CL Show Audio Builder ? (o/n) " answer
+    [[ "$answer" =~ ^([oOyY]|oui|OUI|yes|YES)$ ]] && UNINSTALL_SHOW_AUDIO_BUILDER=1
     read -r -p "Retirer AutoScene Live 11/12 ? (o/n) " answer
     [[ "$answer" =~ ^([oOyY]|oui|OUI|yes|YES)$ ]] && UNINSTALL_AUTOSCENE=1
     read -r -p "Retirer AutoScene Live 10 ? (o/n) " answer
@@ -74,15 +79,17 @@ case "$CHOICE" in
     normalized=",${CHOICE},"
     [[ "$normalized" == *,remote,* ]] && UNINSTALL_REMOTE=1
     [[ "$normalized" == *,controller,* ]] && UNINSTALL_CONTROLLER=1
+    [[ "$normalized" == *,showcue,* ]] && UNINSTALL_CONTROLLER=1
     [[ "$normalized" == *,ableton-reader,* ]] && UNINSTALL_ABLETON_READER=1
     [[ "$normalized" == *,builder,* ]] && UNINSTALL_BUILDER=1
+    [[ "$normalized" == *,show-audio-builder,* ]] && UNINSTALL_SHOW_AUDIO_BUILDER=1
     [[ "$normalized" == *,autoscene,* ]] && UNINSTALL_AUTOSCENE=1
     [[ "$normalized" == *,autoscene-live10,* ]] && UNINSTALL_LIVE10=1
     [[ "$normalized" == *,midi-console,* ]] && UNINSTALL_MIDI_CONSOLE=1
     [[ "$normalized" == *,midi-receiver,* ]] && UNINSTALL_MIDI_RECEIVER=1
     [[ "$normalized" == *,simulator,* ]] && UNINSTALL_MIDI_RECEIVER=1
     [[ "$normalized" == *,diagnostic-tools,* ]] && UNINSTALL_DIAGNOSTIC_TOOLS=1
-    if [[ "$UNINSTALL_REMOTE$UNINSTALL_CONTROLLER$UNINSTALL_ABLETON_READER$UNINSTALL_BUILDER$UNINSTALL_AUTOSCENE$UNINSTALL_LIVE10$UNINSTALL_MIDI_CONSOLE$UNINSTALL_MIDI_RECEIVER$UNINSTALL_DIAGNOSTIC_TOOLS" == "000000000" ]]; then
+    if [[ "$UNINSTALL_REMOTE$UNINSTALL_CONTROLLER$UNINSTALL_ABLETON_READER$UNINSTALL_BUILDER$UNINSTALL_SHOW_AUDIO_BUILDER$UNINSTALL_AUTOSCENE$UNINSTALL_LIVE10$UNINSTALL_MIDI_CONSOLE$UNINSTALL_MIDI_RECEIVER$UNINSTALL_DIAGNOSTIC_TOOLS" == "0000000000" ]]; then
       echo "Désinstallation annulée."
       exit 0
     fi
@@ -95,6 +102,7 @@ is_selected() {
     controller) [[ "$UNINSTALL_REMOTE" == "1" || "$UNINSTALL_CONTROLLER" == "1" ]] ;;
     ableton-reader) [[ "$UNINSTALL_REMOTE" == "1" || "$UNINSTALL_ABLETON_READER" == "1" ]] ;;
     builder) [[ "$UNINSTALL_BUILDER" == "1" ]] ;;
+    show-audio-builder) [[ "$UNINSTALL_SHOW_AUDIO_BUILDER" == "1" ]] ;;
     autoscene) [[ "$UNINSTALL_AUTOSCENE" == "1" ]] ;;
     autoscene-live10) [[ "$UNINSTALL_LIVE10" == "1" ]] ;;
     midi-console) [[ "$UNINSTALL_MIDI_CONSOLE" == "1" ]] ;;
@@ -108,10 +116,13 @@ is_allowed_target() {
   case "$1" in
     "$INSTALL_HOME/Applications/CL Audio Show Control.app"|\
     "$INSTALL_HOME/Applications/CL Audio Controller.app"|\
+    "$INSTALL_HOME/Applications/CL ShowCue.app"|\
+    "$INSTALL_HOME/Applications/CL ShowCue Builder.app"|\
     "$INSTALL_HOME/Applications/CL MIDI & RTP Diagnostic.app"|\
     "$INSTALL_HOME/Applications/CL MIDI Analyzer.app"|\
     "$INSTALL_HOME/Applications/CL MIDI Performance Monitor.app"|\
     "$INSTALL_HOME/Applications/Arrangement Builder Live.app"|\
+    "$INSTALL_HOME/Applications/CL Show Audio Builder.app"|\
     "$INSTALL_HOME/Music/Ableton/User Library/Remote Scripts/AbletonOSC"|\
     "$INSTALL_HOME/Music/Ableton/User Library/Remote Scripts/CL_Arrangement_Builder_Live"|\
     "$INSTALL_HOME/Music/Ableton/User Library/Presets/Audio Effects/Max Audio Effect/CL Audio Controller - Remote"|\
@@ -227,3 +238,5 @@ if [[ "${CL_SUITE_NONINTERACTIVE:-0}" != "1" ]]; then
   open -R "$TRASH_SESSION" >/dev/null 2>&1 || true
   read -r -p "Appuyez sur Entrée pour fermer cette fenêtre." _
 fi
+
+echo "Sessions ShowCue et ~/Applications/CL Audio/CL_Transport conservés. Suppression manuelle uniquement."

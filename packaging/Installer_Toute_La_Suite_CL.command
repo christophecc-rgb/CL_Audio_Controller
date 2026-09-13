@@ -256,11 +256,12 @@ verify_selected_components() {
   while IFS= read -r line; do
     rel="${line#*  }"
     case "$rel" in
-      "Composants/Applications/CL Audio Show Control.app/"*) [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 ]] && echo "$line" >> "$selected" ;;
+      "Composants/Applications/CL Audio Show Control.app/"*|"Composants/Applications/CL ShowCue.app/"*|"Composants/Applications/CL ShowCue Builder.app/"*|"Composants/CL_Transport/"*) [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 || "$INSTALL_SHOWCUE" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Ableton Live 11-12/Remote Scripts/AbletonOSC/"*|"Composants/Ableton Live 11-12/Max for Live/CL Audio Controller - Remote/"*) [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_ABLETON_READER" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Applications/CL MIDI RTP Agent.app/"*) [[ "$INSTALL_ABLETON_READER" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Applications/CL MIDI & RTP Diagnostic.app/"*|"Composants/Applications/CL MIDI Analyzer.app/"*|"Composants/Applications/CL MIDI Performance Monitor.app/"*) [[ "$INSTALL_DIAGNOSTIC_TOOLS" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Applications/Arrangement Builder Live.app/"*|"Composants/Ableton Live 11-12/Remote Scripts/CL_Arrangement_Builder_Live/"*) [[ "$INSTALL_BUILDER" == 1 ]] && echo "$line" >> "$selected" ;;
+      "Composants/Applications/CL Show Audio Builder.app/"*) [[ "$INSTALL_SHOW_AUDIO_BUILDER" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Ableton Live 11-12/Max for Live/Paradis Latin AutoScene/"*) [[ "$INSTALL_AUTOSCENE" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Ableton Live 10/Max for Live/Paradis Latin AutoScene - Live 10/"*) [[ "$INSTALL_AUTOSCENE_LIVE10" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Applications/CL MIDI Network Manager.app/"*|"Composants/Outils réseau MIDI/"*) [[ "$INSTALL_MIDI_CONSOLE" == 1 || "$INSTALL_CONTROLLER" == 1 ]] && echo "$line" >> "$selected" ;;
@@ -283,6 +284,7 @@ if [[ "${CL_SUITE_NONINTERACTIVE:-0}" != "1" ]]; then
 fi
 
 detect_live
+if [[ "${CL_SUITE_COMPONENTS:-}" != "showcue" ]]; then
 [[ -s "$LIVE_LIST" ]] || fail "aucune installation d'Ableton Live 10, 11 ou 12 n'a été détectée"
 say ""; say "Ableton Live détecté :"
 HAS10=0; HAS_CURRENT=0; M4L_OK=0
@@ -302,7 +304,14 @@ if [[ "$M4L_OK" != 1 ]]; then
   warn "Max for Live confirmé manuellement par l'utilisateur."
 fi
 
-ABLETON_LIBRARY="$(resolve_user_library)"
+fi
+
+if [[ "${CL_SUITE_COMPONENTS:-}" == "showcue" ]]; then
+  HAS10=0; HAS_CURRENT=0
+  ABLETON_LIBRARY="$INSTALL_HOME/Music/Ableton/User Library"
+else
+  ABLETON_LIBRARY="$(resolve_user_library)"
+fi
 REMOTE_SCRIPTS="$ABLETON_LIBRARY/Remote Scripts"
 M4L_REMOTE_TARGET="$ABLETON_LIBRARY/Presets/Audio Effects/Max Audio Effect/CL Audio Controller - Remote"
 M4L_AUTOSCENE_TARGET="$ABLETON_LIBRARY/Presets/Audio Effects/Max Audio Effect/CL Audio Controller - AutoScene"
@@ -311,18 +320,20 @@ M4L_MIDI_CONSOLE_TARGET="$ABLETON_LIBRARY/Presets/MIDI Effects/Max MIDI Effect/C
 MIDI_TOOLS_TARGET="$INSTALL_HOME/Library/Application Support/CL MIDI Console/Network Tools"
 say ""; say "User Library retenue : $ABLETON_LIBRARY"
 
-INSTALL_REMOTE=0; INSTALL_CONTROLLER=0; INSTALL_ABLETON_READER=0; INSTALL_BUILDER=0; INSTALL_AUTOSCENE=0; INSTALL_AUTOSCENE_LIVE10=0; INSTALL_MIDI_CONSOLE=0; INSTALL_MIDI_RECEIVER=0; INSTALL_DIAGNOSTIC_TOOLS=0
+INSTALL_SHOWCUE=0; INSTALL_REMOTE=0; INSTALL_CONTROLLER=0; INSTALL_ABLETON_READER=0; INSTALL_BUILDER=0; INSTALL_SHOW_AUDIO_BUILDER=0; INSTALL_AUTOSCENE=0; INSTALL_AUTOSCENE_LIVE10=0; INSTALL_MIDI_CONSOLE=0; INSTALL_MIDI_RECEIVER=0; INSTALL_DIAGNOSTIC_TOOLS=0
 CHOICE="${CL_SUITE_COMPONENTS:-}"
 if [[ -z "$CHOICE" ]]; then
   echo; echo "Rôle ou composant à installer :"; echo "  1 — Suite complète"; echo "  2 — Télécommande CL Audio uniquement"; echo "  3 — Arrangement Builder uniquement"; echo "  4 — AutoScene uniquement"; echo "  5 — CL MIDI Console uniquement"; echo "  6 — Mac Ableton Lecteur — RTP émetteur-récepteur"; echo "  7 — Simulateur de console RTP"; echo "  8 — Annuler"
   read -r -p "Votre choix : " CHOICE
 fi
 case "$CHOICE" in
-  1|all|complete) INSTALL_CONTROLLER=1; INSTALL_ABLETON_READER=1; INSTALL_BUILDER=1; INSTALL_AUTOSCENE=1; INSTALL_MIDI_CONSOLE=1; INSTALL_DIAGNOSTIC_TOOLS=1 ;;
+  1|all|complete) INSTALL_CONTROLLER=1; INSTALL_ABLETON_READER=1; INSTALL_BUILDER=1; INSTALL_SHOW_AUDIO_BUILDER=1; INSTALL_AUTOSCENE=1; INSTALL_MIDI_CONSOLE=1; INSTALL_DIAGNOSTIC_TOOLS=1 ;;
   2|remote) INSTALL_REMOTE=1 ;;
   controller|show-control) INSTALL_CONTROLLER=1 ;;
+  showcue) INSTALL_SHOWCUE=1 ;;
   6|ableton-reader|reader) INSTALL_ABLETON_READER=1; INSTALL_BUILDER=1; INSTALL_AUTOSCENE=1 ;;
   3|builder) INSTALL_BUILDER=1 ;;
+  show-audio-builder) INSTALL_SHOW_AUDIO_BUILDER=1 ;;
   4|autoscene) INSTALL_AUTOSCENE=1 ;;
   5|midi-console) INSTALL_MIDI_CONSOLE=1 ;;
   7|midi-receiver|receiver|simulator) INSTALL_MIDI_CONSOLE=1 ;;
@@ -331,8 +342,10 @@ case "$CHOICE" in
     normalized=",$CHOICE,"
     [[ "$normalized" == *,remote,* ]] && INSTALL_REMOTE=1
     [[ "$normalized" == *,controller,* ]] && INSTALL_CONTROLLER=1
+    [[ "$normalized" == *,showcue,* ]] && INSTALL_SHOWCUE=1
     [[ "$normalized" == *,ableton-reader,* ]] && INSTALL_ABLETON_READER=1
     [[ "$normalized" == *,builder,* ]] && INSTALL_BUILDER=1
+    [[ "$normalized" == *,show-audio-builder,* ]] && INSTALL_SHOW_AUDIO_BUILDER=1
     [[ "$normalized" == *,autoscene,* ]] && INSTALL_AUTOSCENE=1
     [[ "$normalized" == *,midi-console,* ]] && INSTALL_MIDI_CONSOLE=1
     [[ "$normalized" == *,diagnostic-tools,* ]] && INSTALL_DIAGNOSTIC_TOOLS=1
@@ -352,8 +365,24 @@ say ""; say "Vérification de l'intégrité du kit…"
 verify_selected_components
 mkdir -p "$USER_APPS" "$REMOTE_SCRIPTS" "$ABLETON_LIBRARY/Presets"
 
-[[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 ]] && prepare_controller_replacement
-[[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 ]] && install_item "$APPLICATIONS_SOURCE/CL Audio Show Control.app" "$USER_APPS/CL Audio Show Control.app" "Centre de contrôle — CL Audio Show Control" "controller"
+[[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 || "$INSTALL_SHOWCUE" == 1 ]] && prepare_controller_replacement
+[[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 || "$INSTALL_SHOWCUE" == 1 ]] && install_item "$APPLICATIONS_SOURCE/CL Audio Show Control.app" "$USER_APPS/CL Audio Show Control.app" "Centre de contrôle — CL Audio Show Control" "controller"
+if [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 || "$INSTALL_SHOWCUE" == 1 ]]; then
+  install_item "$APPLICATIONS_SOURCE/CL ShowCue.app" "$USER_APPS/CL ShowCue.app" "ShowCue — Application" "controller"
+  install_item "$APPLICATIONS_SOURCE/CL ShowCue Builder.app" "$USER_APPS/CL ShowCue Builder.app" "ShowCue — Builder" "controller"
+  TRANSPORT_SOURCE="$SCRIPT_DIR/Composants/CL_Transport"
+  TRANSPORT_TARGET="$USER_APPS/CL Audio/CL_Transport"
+  [[ -d "$TRANSPORT_SOURCE" ]] || fail "CL_Transport absent du kit"
+  # Ressources persistantes : ne jamais remplacer le dossier existant.
+  if [[ -e "$TRANSPORT_TARGET" ]]; then
+    say "CL_Transport existant conservé : $TRANSPORT_TARGET"
+    say "Ressources du nouveau kit disponibles dans : $TRANSPORT_SOURCE"
+  else
+    mkdir -p "$(dirname "$TRANSPORT_TARGET")"
+    ditto "$TRANSPORT_SOURCE" "$TRANSPORT_TARGET"
+    say "CL_Transport installé : $TRANSPORT_TARGET"
+  fi
+fi
 if [[ "$INSTALL_DIAGNOSTIC_TOOLS" == 1 ]]; then
   install_item "$APPLICATIONS_SOURCE/CL MIDI & RTP Diagnostic.app" "$USER_APPS/CL MIDI & RTP Diagnostic.app" "Diagnostic — MIDI & RTP" "diagnostic-tools"
   install_item "$APPLICATIONS_SOURCE/CL MIDI Analyzer.app" "$USER_APPS/CL MIDI Analyzer.app" "Diagnostic — MIDI Analyzer" "diagnostic-tools"
@@ -390,6 +419,9 @@ fi
 if [[ "$INSTALL_BUILDER" == 1 ]]; then
   install_item "$APPLICATIONS_SOURCE/Arrangement Builder Live.app" "$USER_APPS/Arrangement Builder Live.app" "Builder — Application" "builder"
   install_item "$LIVE_CURRENT_SOURCE/Remote Scripts/CL_Arrangement_Builder_Live" "$REMOTE_SCRIPTS/CL_Arrangement_Builder_Live" "Builder — Remote Script" "builder"
+fi
+if [[ "$INSTALL_SHOW_AUDIO_BUILDER" == 1 ]]; then
+  install_item "$APPLICATIONS_SOURCE/CL Show Audio Builder.app" "$USER_APPS/CL Show Audio Builder.app" "Show Audio Builder — Application" "show-audio-builder"
 fi
 [[ "$INSTALL_AUTOSCENE" == 1 ]] && install_item "$LIVE_CURRENT_SOURCE/Max for Live/Paradis Latin AutoScene" "$M4L_AUTOSCENE_TARGET" "AutoScene — Version Live 11/12" "autoscene"
 [[ "$INSTALL_AUTOSCENE_LIVE10" == 1 ]] && install_item "$LIVE10_SOURCE_ROOT/Max for Live/Paradis Latin AutoScene - Live 10" "$M4L_LIVE10_TARGET" "AutoScene — Version Live 10" "autoscene-live10"

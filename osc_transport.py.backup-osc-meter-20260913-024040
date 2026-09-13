@@ -5,11 +5,10 @@ from __future__ import annotations
 import socket
 import threading
 import time
-from collections import deque
 from contextlib import contextmanager
 from typing import Any, Callable, Dict, Optional, Tuple
 
-from pythonosc import dispatcher, osc_message_builder, osc_server, udp_client
+from pythonosc import dispatcher, osc_server, udp_client
 
 
 LOCAL_ABLETON_HOST = "127.0.0.1"
@@ -82,75 +81,6 @@ class OSCTransport:
         self.last_latency_ms: Optional[float] = None
         self.timeout_count = 0
 
-        # Mesure légère du trafic AbletonOSC principal 11000 ↔ 11001.
-        # Les octets comptés correspondent au payload OSC, hors en-têtes
-        # UDP/IP et hors LTC 63123.
-        self._traffic_tx_events = deque()
-        self._traffic_rx_events = deque()
-        self._traffic_tx_messages_total = 0
-        self._traffic_rx_messages_total = 0
-        self._traffic_tx_bytes_total = 0
-        self._traffic_rx_bytes_total = 0
-        self._traffic_peak_msg_s = 0
-
-    @staticmethod
-    def _osc_payload_size(address: str, args: Tuple[Any, ...]) -> int:
-        """Reconstruit le message pour mesurer son payload OSC en octets."""
-        try:
-            builder = osc_message_builder.OscMessageBuilder(address=address)
-            for arg in args:
-                builder.add_arg(arg)
-            return len(builder.build().dgram)
-        except Exception:
-            # La mesure ne doit jamais perturber l'exploitation OSC.
-            return 0
-
-    def _prune_traffic_locked(self, now: float) -> None:
-        cutoff = now - 1.0
-        while self._traffic_tx_events and self._traffic_tx_events[0][0] < cutoff:
-            self._traffic_tx_events.popleft()
-        while self._traffic_rx_events and self._traffic_rx_events[0][0] < cutoff:
-            self._traffic_rx_events.popleft()
-
-    def _record_traffic(self, direction: str, payload_bytes: int) -> None:
-        now = time.monotonic()
-        size = max(0, int(payload_bytes or 0))
-        with self._state_lock:
-            self._prune_traffic_locked(now)
-            if direction == "tx":
-                self._traffic_tx_events.append((now, size))
-                self._traffic_tx_messages_total += 1
-                self._traffic_tx_bytes_total += size
-            else:
-                self._traffic_rx_events.append((now, size))
-                self._traffic_rx_messages_total += 1
-                self._traffic_rx_bytes_total += size
-
-            current_msg_s = len(self._traffic_tx_events) + len(self._traffic_rx_events)
-            self._traffic_peak_msg_s = max(
-                self._traffic_peak_msg_s,
-                current_msg_s,
-            )
-
-    def _traffic_snapshot_locked(self) -> Dict[str, Any]:
-        now = time.monotonic()
-        self._prune_traffic_locked(now)
-
-        tx_bytes_s = sum(size for _, size in self._traffic_tx_events)
-        rx_bytes_s = sum(size for _, size in self._traffic_rx_events)
-
-        return {
-            "tx_msg_s": len(self._traffic_tx_events),
-            "rx_msg_s": len(self._traffic_rx_events),
-            "tx_kbit_s": round(tx_bytes_s * 8.0 / 1000.0, 3),
-            "rx_kbit_s": round(rx_bytes_s * 8.0 / 1000.0, 3),
-            "peak_msg_s": int(self._traffic_peak_msg_s),
-            "tx_messages_total": int(self._traffic_tx_messages_total),
-            "rx_messages_total": int(self._traffic_rx_messages_total),
-            "tx_bytes_total": int(self._traffic_tx_bytes_total),
-            "rx_bytes_total": int(self._traffic_rx_bytes_total),
-        }
-
     @staticmethod
     def _default_response_matcher(
         address: str,
@@ -205,7 +135,6 @@ class OSCTransport:
 
         try:
             self._client.send_message(address, list(args))
-            self._record_traffic("tx", self._osc_payload_size(address, tuple(args)))
             return True
         except OSError as exc:
             with self._state_lock:
@@ -249,7 +178,6 @@ class OSCTransport:
         self, client_address: Tuple[str, int], address: str, *args: Any,
     ) -> None:
         """Conserve l'hôte UDP pour les diagnostics des messages spontanés."""
-        self._record_traffic("rx", self._osc_payload_size(address, tuple(args)))
         self._receive(address, *args, source_host=str(client_address[0]))
 
     def serve_forever(self, bind_host: str = "0.0.0.0") -> None:
@@ -339,5 +267,4 @@ class OSCTransport:
                 "last_response_at": self.last_response_at,
                 "last_latency_ms": self.last_latency_ms,
                 "timeout_count": int(self.timeout_count),
-                "traffic": self._traffic_snapshot_locked(),
             }

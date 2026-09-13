@@ -1989,9 +1989,28 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
         if (error || !data.length) return;
         NSDictionary *payload = [NSJSONSerialization JSONObjectWithData:data options:0 error:nil];
         NSString *title = [payload[@"playing_scene_name"] isKindOfClass:NSString.class] ? payload[@"playing_scene_name"] : nil;
-        NSDictionary *midiConsole = [payload[@"midi_console"] isKindOfClass:NSDictionary.class] ? payload[@"midi_console"] : @{};
-        NSDictionary *cl5 = [midiConsole[@"cl5"] isKindOfClass:NSDictionary.class] ? midiConsole[@"cl5"] : @{};
-        NSDictionary *ql1 = [midiConsole[@"ql1"] isKindOfClass:NSDictionary.class] ? midiConsole[@"ql1"] : @{};
+        // Même source canonique que la télécommande Ableton :
+        // device_states est la vue métier déjà résolue par le backend
+        // (EXPECTED / RETURNED / titres / validation / fraîcheur).
+        // midi_console reste uniquement un fallback de compatibilité.
+        NSDictionary *deviceStates = [payload[@"device_states"] isKindOfClass:NSDictionary.class]
+            ? payload[@"device_states"] : @{};
+        NSDictionary *midiConsole = [payload[@"midi_console"] isKindOfClass:NSDictionary.class]
+            ? payload[@"midi_console"] : @{};
+
+        NSDictionary *consoleA = [deviceStates[@"console_a"] isKindOfClass:NSDictionary.class]
+            ? deviceStates[@"console_a"] : nil;
+        NSDictionary *consoleB = [deviceStates[@"console_b"] isKindOfClass:NSDictionary.class]
+            ? deviceStates[@"console_b"] : nil;
+
+        NSDictionary *cl5 = consoleA ?: (
+            [midiConsole[@"cl5"] isKindOfClass:NSDictionary.class]
+                ? midiConsole[@"cl5"] : @{}
+        );
+        NSDictionary *ql1 = consoleB ?: (
+            [midiConsole[@"ql1"] isKindOfClass:NSDictionary.class]
+                ? midiConsole[@"ql1"] : @{}
+        );
         dispatch_async(dispatch_get_main_queue(), ^{
             if (title.length && ![title isEqualToString:@"—"]) self.currentAbletonSceneTitle = title;
             self.expectedCL5State = cl5;
@@ -2313,9 +2332,24 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     [self selectPassiveExpectedSourceNamed:CLExpectedEndpointName];
     self.localReturnMode = self.returnModeMenu.indexOfSelectedItem == 0;
     self.returnMonitorStatus = localStatus;
-    if (!self.localReturnMode) {
-        [self selectPassiveReturnSourceNamed:CLPreferredConsoleReturnEndpoint(EndpointNames(YES))];
+
+    // Le mode Local conserve son endpoint RETURNED dédié, mais le retour
+    // physique RTP reste observé passivement en parallèle.
+    NSString *preferredReturnSource =
+        CLPreferredConsoleReturnEndpoint(EndpointNames(YES));
+    if (preferredReturnSource.length) {
+        [self selectPassiveReturnSourceNamed:preferredReturnSource];
     }
+
+    // Le retour de production reste le vrai source monitorée,
+    // y compris quand Ableton fonctionne en local.
+    // CL MIDI Return Test reste uniquement disponible pour le simulateur/test.
+    if (!preferredReturnSource.length && self.localReturnMode) {
+        self.returnMonitorStatus =
+            self.localReturnDestination ? noErr : kMIDIUnknownEndpoint;
+    }
+
+    [self writeConsoleReturnState];
     [self updateRoundTripPanelForCurrentMode];
 }
 
@@ -2825,7 +2859,8 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
 
     if (endpoint.length && ![endpoint hasPrefix:@"Aucun"]) {
         [NSUserDefaults.standardUserDefaults setObject:endpoint forKey:CLConsoleReturnEndpointPreference];
-        if (!self.localReturnMode) [self selectPassiveReturnSourceNamed:endpoint];
+        [self selectPassiveReturnSourceNamed:endpoint];
+        [self writeConsoleReturnState];
     }
 
     if (
@@ -3293,9 +3328,10 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
             ![sources containsObject:CLExpectedEndpointName]) {
             [self selectPassiveExpectedSourceNamed:CLExpectedEndpointName];
         }
-        if (!self.localReturnMode &&
+        if (preferred.length &&
             (![self.returnMonitorSourceName isEqualToString:preferred] || ![sources containsObject:preferred])) {
             [self selectPassiveReturnSourceNamed:preferred];
+            [self writeConsoleReturnState];
         }
     }
     BOOL hasSource = [sources containsObject:endpoint];
@@ -3312,9 +3348,8 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     self.technicalSelection.stringValue = [NSString stringWithFormat:
         @"Source expected Ableton (indépendante du RTP) : %@ · %@\nSource console / retour RTP : %@ · %@",
         CLExpectedEndpointName, self.expectedMonitorSource ? @"connectée" : @"indisponible (sans effet sur la liaison RTP)",
-        self.localReturnMode ? CLLocalReturnEndpointName : (preferred ?: @"aucune"),
-        self.localReturnMode ? ([self localReturnIsAvailable] ? @"connectée" : @"indisponible") :
-            (self.returnMonitorSource ? @"connectée" : @"indisponible")];
+        self.returnMonitorSourceName ?: (preferred ?: @"aucune"),
+        self.returnMonitorSource ? @"connectée" : @"indisponible"];
     if (self.showModeEnabled) [self updateCompactSummary];
 
     [self updateRoundTripPanelForCurrentMode];
@@ -4393,13 +4428,22 @@ static const NSUInteger CLSimulatorJournalLimit = 500;
     if (self.returnMonitorSource && self.returnMonitorInputPort) {
         MIDIPortDisconnectSource(self.returnMonitorInputPort, self.returnMonitorSource);
         self.returnMonitorSource = 0;
+        self.returnMonitorSourceName = nil;
     }
-    if (self.localReturnMode) self.returnMonitorStatus = self.localReturnDestination ? noErr : kMIDIUnknownEndpoint;
-    else {
-        NSString *preferred = CLPreferredConsoleReturnEndpoint(EndpointNames(YES));
-        if (preferred.length) [self.endpointMenu selectItemWithTitle:preferred];
+
+    NSString *preferred =
+        CLPreferredConsoleReturnEndpoint(EndpointNames(YES));
+    if (preferred.length) {
+        [self.endpointMenu selectItemWithTitle:preferred];
         [self selectPassiveReturnSourceNamed:preferred];
     }
+
+    if (self.localReturnMode && !preferred.length) {
+        self.returnMonitorStatus =
+            self.localReturnDestination ? noErr : kMIDIUnknownEndpoint;
+    }
+    [self writeConsoleReturnState];
+
     [self refreshEndpoints];
 }
 

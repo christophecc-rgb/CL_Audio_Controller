@@ -1,6 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
+export CL_BUILD_ARCH="arm64"
+
 # Le fichier du Bureau est un lien symbolique. Résoudre sa cible avant de
 # calculer les chemins du dépôt afin que le script fonctionne depuis Finder.
 SCRIPT_PATH="${BASH_SOURCE[0]}"
@@ -16,6 +18,7 @@ done
 SCRIPT_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 GITHUB_DIR="$(cd "$PROJECT_DIR/.." && pwd)"
+export CL_PYTHON="${CL_PYTHON:-$PROJECT_DIR/.venv/bin/python}"
 BUILDER_DIR="$GITHUB_DIR/CL_Arrangement_Builder_Live"
 ABLETONOSC_DIR="$GITHUB_DIR/AbletonOSC"
 RELEASES_DIR="$PROJECT_DIR/Releases"
@@ -65,6 +68,10 @@ require_file "$BUILDER_DIR/Arrangement Builder Live.spec"
 require_dir "$BUILDER_DIR/RemoteScript"
 require_dir "$PROJECT_DIR/M4L/Install"
 require_file "$PROJECT_DIR/scripts/build_release.sh"
+require_file "$PROJECT_DIR/CL Show Audio Builder.spec"
+require_file "$PROJECT_DIR/show_audio_builder_desktop.py"
+require_file "$PROJECT_DIR/show_audio.json"
+require_file "$PROJECT_DIR/vendor/ffmpeg/macos/ffmpeg"
 require_file "$PROJECT_DIR/packaging/CLSuiteInstallerApp.m"
 require_file "$PROJECT_DIR/assets/cl_audio_show_control_icon_1024.png"
 require_file "$PROJECT_DIR/assets/cl_midi_network_assistant_icon_1024.png"
@@ -109,7 +116,7 @@ BUILDER_BUILD="$BUILD_ROOT/arrangement-builder"
 mkdir -p "$BUILDER_BUILD"
 (
   cd "$BUILDER_DIR"
-  python3 -m PyInstaller \
+  "$CL_PYTHON" -m PyInstaller \
     --noconfirm \
     --workpath "$BUILDER_BUILD/work" \
     --distpath "$BUILDER_BUILD/dist" \
@@ -121,6 +128,46 @@ ditto "$PROJECT_DIR/assets/app_icons/CL_Ableton.icns" "$BUILDER_APP/Contents/Res
 /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile CL_Ableton.icns" "$BUILDER_APP/Contents/Info.plist"
 xattr -cr "$BUILDER_APP"
 codesign --force --deep --sign - "$BUILDER_APP"
+
+echo
+echo "Construction de CL Show Audio Builder ARM64 depuis les sources actuelles…"
+SHOW_AUDIO_BUILD="$BUILD_ROOT/show-audio-builder"
+mkdir -p "$SHOW_AUDIO_BUILD"
+
+(
+  cd "$PROJECT_DIR"
+  "$CL_PYTHON" -m PyInstaller     --clean     --noconfirm     --workpath "$SHOW_AUDIO_BUILD/work"     --distpath "$SHOW_AUDIO_BUILD/dist"     "CL Show Audio Builder.spec"
+)
+
+SHOW_AUDIO_APP="$SHOW_AUDIO_BUILD/dist/CL Show Audio Builder.app"
+[[ -d "$SHOW_AUDIO_APP" ]] || fail "la nouvelle application CL Show Audio Builder est introuvable"
+
+SHOW_AUDIO_EXE="$SHOW_AUDIO_APP/Contents/MacOS/CL Show Audio Builder"
+SHOW_AUDIO_FFMPEG="$SHOW_AUDIO_APP/Contents/Frameworks/ffmpeg"
+
+require_file "$SHOW_AUDIO_EXE"
+require_file "$SHOW_AUDIO_FFMPEG"
+
+SHOW_AUDIO_ARCHS="$(lipo -archs "$SHOW_AUDIO_EXE" 2>/dev/null || true)"
+[[ "$SHOW_AUDIO_ARCHS" == *arm64* ]] ||   fail "CL Show Audio Builder n'est pas ARM64 : $SHOW_AUDIO_ARCHS"
+
+SHOW_AUDIO_FFMPEG_ARCHS="$(lipo -archs "$SHOW_AUDIO_FFMPEG" 2>/dev/null || true)"
+[[ "$SHOW_AUDIO_FFMPEG_ARCHS" == *arm64* ]] ||   fail "FFmpeg embarqué dans CL Show Audio Builder n'est pas ARM64 : $SHOW_AUDIO_FFMPEG_ARCHS"
+
+codesign --verify --deep --strict "$SHOW_AUDIO_APP" ||   fail "signature de CL Show Audio Builder invalide"
+
+echo "CL Show Audio Builder : $SHOW_AUDIO_ARCHS"
+echo "FFmpeg embarqué       : $SHOW_AUDIO_FFMPEG_ARCHS"
+
+echo "Construction des fenêtres ShowCue depuis le working tree courant…"
+for showcue_name in "CL ShowCue" "CL ShowCue Builder"; do
+  "${CL_PYTHON:-$PROJECT_DIR/.venv/bin/python}" -m PyInstaller --noconfirm \
+    --workpath "$BUILD_ROOT/showcue-work/$showcue_name" \
+    --distpath "$BUILD_ROOT/showcue-dist" "$PROJECT_DIR/$showcue_name.spec"
+  codesign --verify --deep --strict "$BUILD_ROOT/showcue-dist/$showcue_name.app"
+done
+"$PROJECT_DIR/scripts/build_cl_transport.command" "$SUITE_ROOT/CL_Transport" \
+  --sessions "$PROJECT_DIR/CL_Transport/ShowCue_Sessions"
 
 INSTALLER_APP="$SUITE_ROOT/Installer la Suite CL.app"
 UNINSTALLER_APP="$SUITE_ROOT/Désinstaller la Suite CL.app"
@@ -143,6 +190,12 @@ mkdir -p \
 echo
 echo "Assemblage des applications et composants…"
 ditto "$CONTROLLER_ROOT/CL Audio Show Control.app" "$COMPONENTS_ROOT/Applications/CL Audio Show Control.app"
+ditto "$SHOW_AUDIO_APP" "$COMPONENTS_ROOT/Applications/CL Show Audio Builder.app"
+for showcue_name in "CL ShowCue" "CL ShowCue Builder"; do
+  ditto "$BUILD_ROOT/showcue-dist/$showcue_name.app" "$COMPONENTS_ROOT/Applications/$showcue_name.app"
+done
+ditto "$SUITE_ROOT/CL_Transport" "$COMPONENTS_ROOT/CL_Transport"
+
 ditto "$CONTROLLER_ROOT/CL MIDI Network Manager.app" "$COMPONENTS_ROOT/Applications/CL MIDI Network Manager.app"
 ditto "$CONTROLLER_ROOT/CL MIDI RTP Agent.app" "$COMPONENTS_ROOT/Applications/CL MIDI RTP Agent.app"
 ditto "$CONTROLLER_ROOT/CL MIDI & RTP Diagnostic.app" "$COMPONENTS_ROOT/Applications/CL MIDI & RTP Diagnostic.app"
@@ -187,13 +240,8 @@ mkdir -p "$NATIVE_BUILD/cache"
 CLANG_MODULE_CACHE_PATH="$NATIVE_BUILD/cache" clang -fobjc-arc -target arm64-apple-macosx10.15 \
   -framework Cocoa "$PROJECT_DIR/packaging/CLSuiteInstallerApp.m" \
   -o "$NATIVE_BUILD/installer-arm64"
-CLANG_MODULE_CACHE_PATH="$NATIVE_BUILD/cache" clang -fobjc-arc -target x86_64-apple-macosx10.15 \
-  -framework Cocoa "$PROJECT_DIR/packaging/CLSuiteInstallerApp.m" \
-  -o "$NATIVE_BUILD/installer-x86_64"
-lipo -create "$NATIVE_BUILD/installer-arm64" "$NATIVE_BUILD/installer-x86_64" \
-  -output "$NATIVE_BUILD/installer-universal"
-ditto "$NATIVE_BUILD/installer-universal" "$INSTALLER_APP/Contents/MacOS/Installer la Suite CL"
-ditto "$NATIVE_BUILD/installer-universal" "$UNINSTALLER_APP/Contents/MacOS/Désinstaller la Suite CL"
+ditto "$NATIVE_BUILD/installer-arm64" "$INSTALLER_APP/Contents/MacOS/Installer la Suite CL"
+ditto "$NATIVE_BUILD/installer-arm64" "$UNINSTALLER_APP/Contents/MacOS/CLSuiteUninstaller"
 
 for resources_dir in "$INSTALLER_RESOURCES" "$UNINSTALLER_APP/Contents/Resources"; do
   ditto "$PROJECT_DIR/assets/app_icons/CL_Audio_Show_Control.png" "$resources_dir/Controller.png"
@@ -206,27 +254,29 @@ chmod +x \
   "$INSTALLER_RESOURCES/Installer_Toute_La_Suite_CL.command" \
   "$INSTALLER_APP/Contents/MacOS/Installer la Suite CL" \
   "$UNINSTALLER_APP/Contents/Resources/Desinstaller_La_Suite_CL.command" \
-  "$UNINSTALLER_APP/Contents/MacOS/Désinstaller la Suite CL"
+  "$UNINSTALLER_APP/Contents/MacOS/CLSuiteUninstaller"
 
 for app_kind in installer uninstaller; do
   if [[ "$app_kind" == installer ]]; then
     plist="$INSTALLER_APP/Contents/Info.plist"
+    display_name="Installer la Suite CL"
     executable="Installer la Suite CL"
     identifier="com.claudio.suite-installer"
   else
     plist="$UNINSTALLER_APP/Contents/Info.plist"
-    executable="Désinstaller la Suite CL"
+    display_name="Désinstaller la Suite CL"
+    executable="CLSuiteUninstaller"
     identifier="com.claudio.suite-uninstaller"
   fi
   cat > "$plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-<key>CFBundleDisplayName</key><string>$executable</string>
+<key>CFBundleDisplayName</key><string>$display_name</string>
 <key>CFBundleExecutable</key><string>$executable</string>
 <key>CFBundleIconFile</key><string>CL_AUDIO.icns</string>
 <key>CFBundleIdentifier</key><string>$identifier</string>
-<key>CFBundleName</key><string>$executable</string>
+<key>CFBundleName</key><string>$display_name</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>$VERSION</string>
 <key>LSMinimumSystemVersion</key><string>10.15</string>
@@ -239,6 +289,17 @@ done
   cd "$INSTALLER_RESOURCES"
   find Composants -type f -print0 | sort -z | xargs -0 shasum -a 256 > COMPONENTS_SHA256.txt
 )
+
+# clang ajoute une signature ad hoc au seul exécutable. Une fois celui-ci placé
+# dans le bundle, macOS attend toutefois une signature couvrant aussi le
+# Info.plist et les ressources. Sans cette étape, Gatekeeper peut présenter
+# l'application reçue par AirDrop comme « endommagée ».
+for app_path in "$INSTALLER_APP" "$UNINSTALLER_APP"; do
+  xattr -cr "$app_path"
+  codesign --force --sign - "$app_path"
+  codesign --verify --deep --strict "$app_path" || \
+    fail "signature locale invalide : $app_path"
+done
 
 cat > "$SUITE_ROOT/LISEZ_MOI_EN_PREMIER.txt" <<EOF
 SUITE CL TRANSPORTABLE — ${TIMESTAMP}
@@ -257,8 +318,8 @@ n'est à ouvrir manuellement.
 INSTALLATION AUTOMATIQUE
 
 Double-cliquer sur « Installer la Suite CL.app » puis choisir :
-- Ableton Live 12 pour sélectionner librement CL Audio Controller, le Builder,
-  AutoScene et CL MIDI Console Monitor ;
+- Ableton Live 12 pour sélectionner librement CL Audio Controller,
+  CL Show Audio Builder, Arrangement Builder, AutoScene et CL MIDI Console Monitor ;
 - Ableton Live 10 pour installer uniquement la variante AutoScene compatible.
 
 Les installations existantes et leurs anciennes sauvegardes sont déplacées dans
@@ -282,6 +343,10 @@ IMPORTANT
 - Les fichiers .adv personnels ne sont pas inclus. Les .amxd portables validés
   et leurs dépendances nécessaires sont intégrés à l'installateur.
 - Cette distribution n'est pas encore notarisée par Apple.
+- Au premier lancement sur un autre Mac, faire un clic droit sur
+  « Installer la Suite CL.app », choisir « Ouvrir », puis confirmer « Ouvrir ».
+- Si macOS bloque encore l'application, utiliser « Ouvrir quand même » dans
+  Réglages Système > Confidentialité et sécurité.
 EOF
 
 (
@@ -305,6 +370,8 @@ for expected in \
   "Installer la Suite CL.app/" \
   "Désinstaller la Suite CL.app/" \
   "Installer la Suite CL.app/Contents/Resources/Composants/Applications/CL Audio Show Control.app/" \
+  "Installer la Suite CL.app/Contents/Resources/Composants/Applications/CL Show Audio Builder.app/" \
+  "Installer la Suite CL.app/Contents/Resources/Composants/Applications/CL Show Audio Builder.app/Contents/Frameworks/ffmpeg" \
   "Installer la Suite CL.app/Contents/Resources/Composants/Applications/CL MIDI & RTP Diagnostic.app/" \
   "Installer la Suite CL.app/Contents/Resources/Composants/Applications/CL MIDI Analyzer.app/" \
   "Installer la Suite CL.app/Contents/Resources/Composants/Applications/CL MIDI Performance Monitor.app/" \
