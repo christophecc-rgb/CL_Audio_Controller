@@ -304,3 +304,220 @@
   };
   renderCalls(snapshot.calls || {});
 })();
+
+/* ShowCue mobile conduite: data-driven rows, one dock, no DOM repair polling. */
+(() => {
+  const mobile = window.matchMedia('(max-width:760px)');
+  const view = document.getElementById('view-conduite');
+  const sequence = document.getElementById('timed-sequence');
+  const nav = document.querySelector('.stage-navigation');
+  if (!view || !sequence || !nav) return;
+  const posts = Object.keys(destinationLabels);
+  const node = (tag, className, text) => {
+    const el = document.createElement(tag);
+    el.className = className;
+    if (text !== undefined) el.textContent = text;
+    return el;
+  };
+  const button = (className, text, action) => {
+    const el = node('button', className, text);
+    el.type = 'button';
+    el.onclick = action;
+    return el;
+  };
+  const knownPosts = cue => Array.isArray(cue.posts) && cue.posts.length > 0 &&
+    cue.posts.every(post => posts.includes(post));
+  const roleLabel = cue => !knownPosts(cue) ? 'POSTES ?' :
+    posts.every(post => cue.posts.includes(post)) ? 'TOUT' :
+      posts.filter(post => cue.posts.includes(post)).map(post => destinationLabels[post]).join(' · ');
+
+  const filter = node('label', 'stage-conduite-filter');
+  const filterSelect = node('select', '');
+  filterSelect.id = 'stage-conduite-filter-select';
+  filterSelect.setAttribute('aria-label', 'Filtrer la conduite par poste');
+  filterSelect.append(new Option('AUTO', 'auto'), new Option('TOUT', 'all'));
+  filter.append(node('span', '', 'AFFICHER'), filterSelect);
+  document.getElementById('section-filters').after(filter);
+
+  const roleEditor = node('dialog', 'stage-role-editor');
+  roleEditor.id = 'stage-role-editor';
+  roleEditor.setAttribute('aria-labelledby', 'stage-role-heading');
+  const heading = node('h2', '', 'Affecter ce cue');
+  heading.id = 'stage-role-heading';
+  const cueTitle = node('p', 'stage-role-cue-title');
+  const options = node('div', 'stage-role-options');
+  const error = node('p', 'error');
+  error.setAttribute('role', 'alert');
+  const actions = node('div', 'actions');
+  let editState = null;
+  let saving = false;
+  const close = () => { if (!saving) roleEditor.close(); };
+  const cancel = button('', 'ANNULER', close);
+  const modify = button('quiet', 'TEXTE / TC', () => {
+    const cue = editState?.cue;
+    close();
+    if (cue) openEditor(cue);
+  });
+  const save = button('primary', 'TERMINER', async () => {
+    if (!editState || saving) return;
+    const state = editState;
+    if (!state.selected.size) { error.textContent = 'Choisissez au moins un poste.'; return; }
+    const nextPosts = posts.filter(post => state.selected.has(post));
+    saving = true;
+    [...actions.children, ...options.children].forEach(el => el.disabled = true);
+    try {
+      if (!knownPosts(state.cue) || JSON.stringify([...state.cue.posts].sort()) !== JSON.stringify([...nextPosts].sort())) {
+        await api('/show-info/cues/' + encodeURIComponent(state.cue.id), {
+          method: 'PUT', body: JSON.stringify(scoped({posts: nextPosts}, state.sessionId))
+        });
+      }
+      roleEditor.close();
+      await refresh();
+    } catch (failure) { error.textContent = failure.message; }
+    finally {
+      saving = false;
+      [...actions.children, ...options.children].forEach(el => el.disabled = false);
+    }
+  });
+  actions.append(modify, cancel, save);
+  roleEditor.append(heading, cueTitle, options, error, actions);
+  document.body.append(roleEditor);
+  roleEditor.addEventListener('cancel', event => { if (saving) event.preventDefault(); });
+  roleEditor.addEventListener('close', () => { editState = null; });
+  function paintOptions() {
+    [...options.children].forEach(el => {
+      const active = el.dataset.post === 'all' ? posts.every(post => editState.selected.has(post)) : editState.selected.has(el.dataset.post);
+      el.classList.toggle('active', active);
+      el.setAttribute('aria-pressed', String(active));
+    });
+  }
+  function openRoles(cue) {
+    editState = {cue, sessionId: snapshot.active_session_id, selected: new Set(Array.isArray(cue.posts) ? cue.posts.filter(post => posts.includes(post)) : [])};
+    cueTitle.textContent = cue.text;
+    error.textContent = knownPosts(cue) ? '' : 'Affectation inconnue : choisissez les postes à enregistrer.';
+    options.replaceChildren();
+    [['all', 'TOUT'], ...Object.entries(destinationLabels)].forEach(([post, label]) => {
+      const option = button('', label, () => {
+        if (post === 'all') editState.selected = new Set(posts);
+        else if (editState.selected.has(post)) editState.selected.delete(post);
+        else editState.selected.add(post);
+        paintOptions();
+      });
+      option.dataset.post = post;
+      options.append(option);
+    });
+    paintOptions();
+    roleEditor.showModal();
+  }
+
+  // Decorate before attachment. Keep the existing row and its native drag handlers.
+  const baseCueLine = cueLine;
+  cueLine = function(cue, position) {
+    const source = mobile.matches && !Array.isArray(cue.posts) ? {...cue, posts: []} : cue;
+    const row = baseCueLine(source, position);
+    if (!mobile.matches || cue.status !== 'official' || cue.mode === 'library') return row;
+    row.classList.add('stage-mobile-cue');
+    row.hidden = filterSelect.value !== 'all' && knownPosts(cue) && posts.includes(postEl.value) && !cue.posts.includes(postEl.value);
+    const time = node('span', 'stage-cue-time', isTimecode(cue.timecode) ? cue.timecode : '—');
+    const title = node('span', 'stage-cue-title', cue.text);
+    title.title = cue.text;
+    const summary = button('stage-cue-roles', roleLabel(cue), () => openRoles(cue));
+    summary.setAttribute('aria-label', 'Affecter ' + cue.text + ' : ' + roleLabel(cue));
+    row.replaceChildren(time, title, summary);
+    return row;
+  };
+
+  let gesture = null;
+  let dragging = false;
+  let suppressClick = false;
+  const active = () => mobile.matches && view.classList.contains('active');
+  sequence.addEventListener('pointerdown', event => {
+    if (!active() || !event.isPrimary || event.button !== 0) return;
+    const row = event.target.closest('.stage-mobile-cue');
+    if (!row) return;
+    suppressClick = false;
+    gesture = {row, id: event.pointerId, x: event.clientX, y: event.clientY, started: performance.now(), moved: false};
+  }, {passive: true});
+  sequence.addEventListener('pointermove', event => {
+    if (gesture && event.pointerId === gesture.id && Math.hypot(event.clientX - gesture.x, event.clientY - gesture.y) > 10) gesture.moved = true;
+  }, {passive: true});
+  window.addEventListener('pointercancel', () => { gesture = null; suppressClick = true; });
+  sequence.addEventListener('dragstart', () => { dragging = true; gesture = null; suppressClick = true; });
+  sequence.addEventListener('dragend', () => { dragging = false; });
+  window.addEventListener('pointerup', event => {
+    if (!gesture || event.pointerId !== gesture.id) return;
+    suppressClick = gesture.moved || performance.now() - gesture.started > 400 || dragging;
+    gesture = null;
+  }, {passive: true});
+  // Capture before the older desktop selection listeners; never cancel drag events.
+  view.addEventListener('click', event => {
+    if (!active()) return;
+    const row = event.target.closest('.stage-mobile-cue');
+    if (!row) return;
+    event.stopImmediatePropagation();
+    if (suppressClick || dragging) { event.preventDefault(); return; }
+    const cue = conduiteOrderedCues().find(item => item.id === row.dataset.cueId);
+    if (cue) openRoles(cue);
+  }, true);
+  const baseInteractionActive = interactionActive;
+  interactionActive = function() {
+    return baseInteractionActive() || roleEditor.open || (mobile.matches && (Boolean(gesture) || dragging));
+  };
+
+  const baseSequence = renderSequence;
+  renderSequence = function(...args) {
+    // The desktop section selection remains intact when returning to desktop.
+    const previousSection = sectionFilter;
+    if (mobile.matches) sectionFilter = 'TOUT';
+    try { return baseSequence(...args); }
+    finally { sectionFilter = previousSection; }
+  };
+  const updateFilter = () => {
+    filterSelect.options[0].textContent = 'AUTO · ' + (destinationLabels[postEl.value] || 'POSTE') + ' + TOUT';
+    renderSequence();
+  };
+  filterSelect.addEventListener('change', updateFilter);
+  postEl.addEventListener('change', updateFilter);
+
+  const dock = node('div', 'stage-conduite-dock');
+  dock.id = 'stage-conduite-dock';
+  const dockTitle = node('strong', 'stage-dock-title');
+  const dockTimes = node('span', 'stage-dock-times');
+  dock.append(dockTitle, dockTimes, button('stage-dock-add', '+ CUE', () => document.getElementById('add-cue').click()));
+  document.body.append(dock);
+  function updateDock(data) {
+    dockTitle.textContent = data.title || 'SCÈNE —';
+    dockTitle.title = data.title || 'Scène Ableton';
+    dockTimes.textContent = `${formatSeconds(data.elapsed_seconds)} / ${formatSeconds(data.scene_duration_seconds)} · R ${formatSeconds(data.remaining_seconds)}`;
+  }
+  const baseRender = render;
+  render = function(data) { baseRender(data); updateDock(data); };
+
+  let lastY = window.scrollY;
+  function updateVisibility() {
+    dock.hidden = !active();
+    nav.classList.remove('stage-nav-hidden');
+    lastY = window.scrollY;
+    if (!active() && roleEditor.open) close();
+  }
+  const baseSetView = setView;
+  setView = function(...args) { baseSetView(...args); updateVisibility(); };
+  window.addEventListener('scroll', () => {
+    const y = Math.max(0, Math.min(window.scrollY, document.documentElement.scrollHeight - window.innerHeight));
+    const delta = y - lastY;
+    if (active()) {
+      if (delta > 0 && y > 80) nav.classList.add('stage-nav-hidden');
+      else if (delta < 0 || y <= 0) nav.classList.remove('stage-nav-hidden');
+    }
+    lastY = y;
+  }, {passive: true});
+  // Measure the real navigation, including Safari's safe area, only on resize.
+  const measureNav = () => dock.style.setProperty('--stage-nav-height', nav.getBoundingClientRect().height + 'px');
+  const navSize = new ResizeObserver(measureNav);
+  navSize.observe(nav);
+  mobile.addEventListener('change', () => { gesture = null; dragging = false; updateFilter(); updateVisibility(); measureNav(); });
+  updateFilter();
+  updateDock(snapshot);
+  updateVisibility();
+  measureNav();
+})();
