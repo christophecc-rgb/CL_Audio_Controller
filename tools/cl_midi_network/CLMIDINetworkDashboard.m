@@ -425,6 +425,7 @@ static NSPasteboardType const CLSimulatorRowPasteboardType = @"com.cl-audio-cont
 
 static NSString *const CLExpectedEndpointName = @"Gestionnaire IAC Bus 1";
 static NSString *const CLLocalReturnEndpointName = @"CL MIDI Return Test";
+// CL_LOCAL_RETURN_ENDPOINT_ALLOW_V1
 static NSString *const CLRTPReturnEndpointName = @"Réseau RTP MB Chris";
 static NSString *const CLConsoleReturnEndpointPreference = @"consoleReturnEndpoint";
 static NSString *const CLLocalSimulatorDestinationPreference = @"simulatorMidiDestination";
@@ -3283,13 +3284,17 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
 
     if (self.simulatorEndpointMenu && self.localReturnMode) {
         NSMutableArray<NSString *> *localDestinations = [NSMutableArray array];
-        for (NSString *name in destinations) {
-            if (!CLIsProtectedDeviceTestEndpoint(name)) [localDestinations addObject:name];
+
+        // En mode local, le RETURNED de production simulé doit aller
+        // exclusivement vers le port virtuel dédié créé par cette application.
+        if ([destinations containsObject:CLLocalReturnEndpointName]) {
+            [localDestinations addObject:CLLocalReturnEndpointName];
         }
-        NSString *current = self.simulatorEndpointMenu.titleOfSelectedItem;
-        NSString *saved = [NSUserDefaults.standardUserDefaults stringForKey:CLLocalSimulatorDestinationPreference];
-        NSString *preferred = [localDestinations containsObject:current] ? current :
-            ([localDestinations containsObject:saved] ? saved : CLPreferredLocalSimulatorDestination(localDestinations));
+
+        NSString *preferred = localDestinations.count
+            ? CLLocalReturnEndpointName
+            : nil;
+
         [self.simulatorEndpointMenu removeAllItems];
         [self.simulatorEndpointMenu addItemsWithTitles:localDestinations.count
             ? localDestinations : @[@"Aucune destination MIDI locale détectée"]];
@@ -4293,8 +4298,9 @@ static const NSUInteger CLSimulatorJournalLimit = 500;
         return;
     }
     NSString *endpoint = self.simulatorEndpointMenu.titleOfSelectedItem ?: @"";
-    if (self.localReturnMode && (CLIsProtectedDeviceTestEndpoint(endpoint) ||
-        ![EndpointNames(NO) containsObject:endpoint])) {
+    if (self.localReturnMode &&
+        (![endpoint isEqualToString:CLLocalReturnEndpointName] ||
+         ![EndpointNames(NO) containsObject:endpoint])) {
         [self showSimulatorOperatorMessage:[NSString stringWithFormat:@"%@ · ÉCHEC D’ENVOI MIDI", operatorName] error:YES];
         [self appendSimulatorJournalKind:@"TX" message:[NSString stringWithFormat:@"%@  Ch.%ld  → %@  ERREUR destination", deviceName, (long)channel, endpoint]];
         return;
@@ -4541,8 +4547,9 @@ static const NSUInteger CLSimulatorJournalLimit = 500;
         self.simulatorStatusLabel.textColor = NSColor.systemRedColor;
         return NO;
     }
-    if (local && (CLIsProtectedDeviceTestEndpoint(requiredEndpoint) ||
-        ![EndpointNames(NO) containsObject:requiredEndpoint])) {
+    if (local &&
+        (![requiredEndpoint isEqualToString:CLLocalReturnEndpointName] ||
+         ![EndpointNames(NO) containsObject:requiredEndpoint])) {
         self.simulatorStatusLabel.stringValue = @"Destination MIDI locale indisponible";
         self.simulatorStatusLabel.textColor = NSColor.systemRedColor;
         return NO;

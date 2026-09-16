@@ -860,23 +860,57 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertNotIn('self.localReturnDestination', transport)
         self.assertIn('Destination MIDI locale indisponible', transport)
 
-    def test_local_simulator_destination_uses_available_coremidi_outputs_and_persistence(self):
+    def test_local_simulator_destination_uses_dedicated_return_endpoint(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
         snapshot = source.split('- (void)applyEndpointSnapshotWithSources:', 1)[1].split(
             '- (NSString *)toolPath:', 1
         )[0]
-        changed = source.split('- (void)simulatorEndpointChanged:', 1)[1].split(
-            '- (void)simulatorInputEndpointChanged:', 1
+        send = source.split('- (void)sendSimulatorMemory:', 1)[1].split(
+            '- (void)simulatorModeChanged:', 1
         )[0]
-        self.assertIn('for (NSString *name in destinations)', snapshot)
-        self.assertIn('!CLIsProtectedDeviceTestEndpoint(name)', snapshot)
-        self.assertIn('CLPreferredLocalSimulatorDestination(localDestinations)', snapshot)
-        self.assertIn('rangeOfString:@"IAC"', source)
-        self.assertNotIn('@"Bus 2"', source)
-        self.assertIn('CLLocalSimulatorDestinationPreference', snapshot)
-        self.assertIn('self.simulatorEndpointMenu.enabled = localDestinations.count > 0', snapshot)
-        self.assertIn('CLLocalSimulatorDestinationPreference', changed)
-        self.assertNotIn('CLLocalReturnEndpointName', changed)
+        transport = source.split('- (BOOL)simulatorTransport:', 1)[1].split(
+            '- (void)startSimulatorDevice:', 1
+        )[0]
+
+        self.assertIn(
+            'if ([destinations containsObject:CLLocalReturnEndpointName])',
+            snapshot,
+        )
+        self.assertIn(
+            '[localDestinations addObject:CLLocalReturnEndpointName]',
+            snapshot,
+        )
+        self.assertIn(
+            '? CLLocalReturnEndpointName',
+            snapshot,
+        )
+        self.assertIn(
+            'self.simulatorEndpointMenu.enabled = localDestinations.count > 0',
+            snapshot,
+        )
+
+        self.assertIn(
+            '![endpoint isEqualToString:CLLocalReturnEndpointName]',
+            send,
+        )
+        self.assertIn(
+            '![EndpointNames(NO) containsObject:endpoint]',
+            send,
+        )
+
+        self.assertIn(
+            '![requiredEndpoint isEqualToString:CLLocalReturnEndpointName]',
+            transport,
+        )
+        self.assertIn(
+            '![EndpointNames(NO) containsObject:requiredEndpoint]',
+            transport,
+        )
+
+        self.assertNotIn(
+            '!CLIsProtectedDeviceTestEndpoint(name)',
+            snapshot,
+        )
 
     def test_return_monitor_handles_missing_source_and_has_single_publisher(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
