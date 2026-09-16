@@ -34,11 +34,11 @@ class TransportTests(unittest.TestCase):
         sessions = self.transport / 'ShowCue_Sessions'
         sessions.mkdir(parents=True)
         self.assertEqual(cl_transport.available_sessions(), [])
-        for name in ['OP.showcue.zip','MPC.showcue.zip','ignore.zip']:
+        for name in ['OP.showcue','MPC.showcue.zip','ignore.zip']:
             (sessions / name).touch()
         self.assertEqual(len(cl_transport.available_sessions()), 2)
         with self.assertRaises(ValueError):
-            cl_transport.session_file(str(self.transport), '../OP.showcue.zip')
+            cl_transport.session_file(str(self.transport), '../OP.showcue')
 
     def test_libraries_and_legacy_priority(self):
         for console in ('cl5','ql1'):
@@ -91,12 +91,75 @@ class TransportTests(unittest.TestCase):
         root=self.root/'data';registry=initialize_show_cue_sessions(root)
         data=export_session(root,registry,registry['active_session_id'])
         sessions=self.transport/'ShowCue_Sessions';sessions.mkdir(parents=True)
-        (sessions/'OP.showcue.zip').write_bytes(data)
+        (sessions/'OP.showcue').write_bytes(data)
         with patch.object(app,'SHOW_CUES_DATA_DIRECTORY',root):
             client=app.app.test_client()
-            response=client.post('/show-info/builder/sessions/import',json={'source':str(self.transport),'name':'OP.showcue.zip'})
+            response=client.post('/show-info/builder/sessions/import',json={'source':str(self.transport),'name':'OP.showcue'})
             self.assertEqual(response.status_code,201,response.data)
             self.assertEqual(response.json['imported_session']['name'],'Session actuelle (2)')
             self.assertEqual(client.get('/show-info/builder/resources').status_code,200)
             self.assertEqual(client.get('/show-info/builder/resources',environ_base={'REMOTE_ADDR':'192.168.1.2'}).status_code,403)
             self.assertEqual(client.get('/show-info/builder/sessions/export').status_code,200)
+
+    def test_save_transport_route_creates_portable_showcue(self):
+        import app
+
+        root = self.root / 'data'
+        registry = initialize_show_cue_sessions(root)
+        cue_path, _ = active_session_paths(root, registry)
+
+        save_builder_document(
+            cue_path.parent / 'showcue_builder.json',
+            {
+                'version': 1,
+                'cues': [],
+                'distribution': [],
+            },
+        )
+
+        with (
+            patch.object(app, 'SHOW_CUES_DATA_DIRECTORY', root),
+            patch.object(app, 'transport_roots', return_value=[self.transport]),
+        ):
+            client = app.app.test_client()
+
+            response = client.post(
+                '/show-info/builder/sessions/save-transport'
+            )
+
+            self.assertEqual(response.status_code, 200, response.data)
+            self.assertTrue(response.json['ok'])
+            self.assertEqual(
+                response.json['name'],
+                'Session actuelle.showcue',
+            )
+
+            target = (
+                self.transport
+                / 'ShowCue_Sessions'
+                / 'Session actuelle.showcue'
+            )
+
+            self.assertTrue(target.is_file())
+
+            with zipfile.ZipFile(target, 'r') as archive:
+                names = set(archive.namelist())
+
+                self.assertIn('manifest.json', names)
+                self.assertIn('show_cues.json', names)
+                self.assertIn('showcue_builder.json', names)
+
+                manifest = json.loads(
+                    archive.read('manifest.json').decode('utf-8')
+                )
+
+            self.assertEqual(manifest['format'], 'CL ShowCue')
+            self.assertEqual(manifest['version'], 1)
+            self.assertEqual(manifest['name'], 'Session actuelle')
+
+            remote = client.post(
+                '/show-info/builder/sessions/save-transport',
+                environ_base={'REMOTE_ADDR': '192.168.1.2'},
+            )
+
+            self.assertEqual(remote.status_code, 403)

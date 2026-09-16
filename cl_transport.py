@@ -24,7 +24,7 @@ def available_sessions():
     for root in transport_roots():
         directory = root / 'ShowCue_Sessions'
         if directory.is_dir():
-            for path in sorted(directory.glob('*.showcue.zip')):
+            for path in sorted([*directory.glob('*.showcue'), *directory.glob('*.showcue.zip')]):
                 if path.is_file() and not path.is_symlink():
                     result.append({'name': path.name, 'source': str(root)})
     return result

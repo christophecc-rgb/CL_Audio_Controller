@@ -521,3 +521,53 @@
   updateVisibility();
   measureNav();
 })();
+
+/* CL_SHOWCUE_SAVE_PORTABLE_V1 */
+(() => {
+  const button = document.getElementById('save-showcue');
+  if (!button) return;
+
+  let saving = false;
+
+  button.addEventListener('click', async () => {
+    if (saving) return;
+
+    saving = true;
+    button.disabled = true;
+
+    const previous = button.textContent;
+    button.textContent = 'ENREGISTREMENT…';
+
+    try {
+      const result = await api(
+        '/show-info/builder/sessions/save-transport',
+        {method: 'POST'}
+      );
+
+      button.textContent = '✓ ENREGISTRÉ';
+
+      window.alert(
+        'ShowCue enregistré :\n' +
+        (result.path || result.name || 'fichier créé')
+      );
+
+      window.setTimeout(() => {
+        button.textContent = previous;
+      }, 1800);
+    } catch (error) {
+      button.textContent = 'ERREUR';
+
+      window.alert(
+        'Impossible d’enregistrer le ShowCue :\n' +
+        (error?.message || error)
+      );
+
+      window.setTimeout(() => {
+        button.textContent = previous;
+      }, 2200);
+    } finally {
+      saving = false;
+      button.disabled = false;
+    }
+  });
+})();

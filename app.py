@@ -34,7 +34,7 @@ from show_audio_print_engine import PrintEngineError, capture_clean
 from build_identity import BUILD_ID, IDENTITY_PROTOCOL_VERSION, SERVICE_NAME
 from ableton_targets import DEFAULT_CONFIG_PATH, load_target
 from server_ownership import OwnershipRecordError, write_record
-from cl_transport import available_sessions, session_file, load_library
+from cl_transport import available_sessions, session_file, load_library, transport_roots
 from showcue_session_archive import export_session, import_session, MAX_ARCHIVE_BYTES
 from console_title_library import ConsoleLibraryStore, LibraryImportError, MAX_FILE_SIZE, parse_import
 from device_profiles import DeviceProfile, device_ui_snapshots, load_device_configuration_result
@@ -3700,8 +3700,73 @@ def showcue_session_export():
     with SHOW_CUES_LOCK:
         registry, _, _ = ensure_show_cue_storage()
         data = export_session(SHOW_CUES_DATA_DIRECTORY, registry, registry["active_session_id"])
-    return send_file(io.BytesIO(data), mimetype="application/zip", as_attachment=True,
-                     download_name=registry["active_session_id"] + ".showcue.zip")
+    active_id = registry["active_session_id"]
+    active = next(
+        (item for item in registry["sessions"] if item["id"] == active_id),
+        None,
+    )
+    export_name = (active or {}).get("name") or active_id
+    export_name = "".join(
+        char if char not in '/\\:*?"<>|' else "_"
+        for char in export_name
+    ).strip() or active_id
+
+    return send_file(
+        io.BytesIO(data),
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=export_name + ".showcue",
+    )
+
+
+
+@app.route("/show-info/builder/sessions/save-transport", methods=["POST"])
+def showcue_session_save_transport():
+    try:
+        with SHOW_CUES_LOCK:
+            registry, _, _ = ensure_show_cue_storage()
+            active_id = registry["active_session_id"]
+            active = next(
+                (item for item in registry["sessions"] if item["id"] == active_id),
+                None,
+            )
+            if active is None:
+                raise ValueError("session active ShowCue introuvable")
+
+            data = export_session(
+                SHOW_CUES_DATA_DIRECTORY,
+                registry,
+                active_id,
+            )
+
+        export_name = active["name"]
+        export_name = "".join(
+            char if char not in '/\\:*?"<>|' else "_"
+            for char in export_name
+        ).strip() or active_id
+
+        roots = transport_roots()
+
+        if not roots:
+            raise ValueError("Aucun CL Transport disponible")
+
+        root = Path(roots[0])
+        destination_directory = root / "ShowCue_Sessions"
+        destination_directory.mkdir(parents=True, exist_ok=True)
+
+        destination = destination_directory / f"{export_name}.showcue"
+        temporary = destination.with_name(destination.name + ".tmp")
+
+        temporary.write_bytes(data)
+        temporary.replace(destination)
+
+        return jsonify({
+            "ok": True,
+            "path": str(destination),
+            "name": destination.name,
+        })
+    except (OSError, ValueError) as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
 
 
 @app.route("/show-info/builder/sessions/import", methods=["POST"])
