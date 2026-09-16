@@ -285,7 +285,6 @@ class MidiNetworkToolsTests(unittest.TestCase):
         cards = source.split('- (void)updateConsoleReturnCards {', 1)[1].split('- (void)refreshAbletonSceneTitle', 1)[0]
         self.assertIn('@"CL5   PC — → —   …"', setup)
         self.assertIn('@"QL1   PC — → —   …"', setup)
-        self.assertNotIn('ReturnTitle', setup)
         self.assertIn('monospacedDigitSystemFontOfSize:28.0', source)
         self.assertIn('titleLabel.stringValue', cards)
         self.assertIn('titleLabel.hidden = !titleLabel.stringValue.length', cards)
@@ -300,6 +299,14 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('@"Retour ancien · %@"', cards)
         self.assertIn('expected[@"expected_title"]', cards)
         self.assertIn('expected[@"returned_title"]', cards)
+
+        # La carte compacte doit conserver le titre RETURNED visible ;
+        # la fraîcheur devient une information secondaire.
+        self.assertIn('NSString *compactReturnTitle', source)
+        self.assertIn('returnedTitle.length', source)
+        self.assertIn('compactReturnTitle,', source)
+        self.assertIn('@"✓ frais"', source)
+        self.assertIn('@"! ancien"', source)
 
     def test_console_libraries_are_configured_by_the_network_manager_via_backend(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
@@ -912,6 +919,30 @@ class MidiNetworkToolsTests(unittest.TestCase):
             snapshot,
         )
 
+    def test_dashboard_keeps_backend_health_and_returned_title_visible(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+
+        self.assertIn('@"● BACKEND ACTIF · %lu/%lu"', source)
+        self.assertIn('@"⚠ BACKEND PARTIEL · %lu/%lu"', source)
+        self.assertIn('@"● BACKEND INACTIF · titres Ableton"', source)
+
+        self.assertIn('NSString *compactReturnTitle', source)
+        self.assertIn('returnedTitle.length', source)
+        self.assertIn('compactReturnTitle,', source)
+        self.assertIn('runtimeState]', source)
+
+        # L'état de fraîcheur reste une information secondaire :
+        # il ne doit plus remplacer le titre de la scène retournée.
+        compact = source.split(
+            'if (card == self.programChangeReturnViews[console[@"id"]][@"card"])',
+            1,
+        )[1].split('continue;', 1)[0]
+
+        self.assertIn('compactReturnTitle', compact)
+        self.assertIn('@"! ancien"', compact)
+        self.assertIn('@"✓ frais"', compact)
+        self.assertNotIn('stateLabel.stringValue = !hasReturn', compact)
+
     def test_return_monitor_handles_missing_source_and_has_single_publisher(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
         selector = source.split('- (void)selectPassiveReturnSourceNamed:', 1)[1].split(
@@ -930,6 +961,21 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('if (!self.ownsPassiveReturnMonitor) return;', writer)
         self.assertIn('if (!self.ownsPassiveReturnMonitor) return;', setup)
         self.assertIn('flock(CLBackgroundMonitorLock, LOCK_EX | LOCK_NB)', source)
+
+    def test_simulator_auto_state_is_persisted_and_reported_separately(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+
+        self.assertIn('CLSimulatorAutoDeviceIDsV1', source)
+        self.assertIn('restorePersistedSimulatorAutoDevices', source)
+        self.assertIn('updateSimulatorCompactStatus', source)
+        self.assertIn('@"● RETOURS AUTO %lu/%lu"', source)
+        self.assertIn('CLPersistSimulatorAutoDeviceID(device[@"id"], YES)', source)
+        self.assertIn('CLPersistSimulatorAutoDeviceID(deviceID, NO)', source)
+        self.assertIn('if (sender != nil)', source)
+        self.assertIn('CLClearPersistedSimulatorAutoDeviceIDs()', source)
+        self.assertIn('endpoint:CLLocalReturnEndpointName', source)
+        self.assertIn('AUTO LOCAL PAR DÉFAUT', source)
+        self.assertIn('[wanted addObject:deviceID]', source)
 
     def test_remote_simulator_selects_and_validates_a_local_rtp_endpoint(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
@@ -1623,8 +1669,8 @@ class MidiNetworkToolsTests(unittest.TestCase):
 
     def test_dashboard_clarifies_mode_devices_connection_and_simulator_actions(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
-        self.assertIn('@"Mode appliqué par CL Audio Show Control"', source)
-        self.assertIn('@"CL Audio Show Control indisponible · mode affiché conservé localement"', source)
+        self.assertIn('@"Mode appliqué par CL Show Control"', source)
+        self.assertIn('@"CL Show Control indisponible · mode affiché conservé localement"', source)
         self.assertIn('@"CIBLE ABLETON DISTANTE (RTP)"', source)
         self.assertIn('self.connectButton.title = local ? @"Non requis" : @"Connecter"', source)
         self.assertIn('self.connectButton.title = self.localReturnMode ? @"Non requis" : @"Connecter"', source)
@@ -1686,9 +1732,11 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('palette[@"accent"]', return_cards)
         self.assertIn('programLabel.stringValue = hasReturn', source)
         self.assertIn('@"Aucun retour"', source)
-        self.assertIn('@"Retour frais"', source)
-        self.assertIn('@"Retour ancien"', source)
-        self.assertIn('@"Mismatch"', source)
+        self.assertIn('@"✓ frais"', source)
+        self.assertIn('@"! ancien"', source)
+        self.assertIn('@"✕ mismatch"', source)
+        self.assertIn('compactView[@"titleLabel"]', source)
+        self.assertIn('@"● BACKEND %lu/%lu"', source)
         self.assertIn('@"RTP non requis"', source)
         self.assertIn('@"Retour MIDI local via port dédié."', source)
         self.assertIn('self.remoteTargetTitleLabel.hidden = self.localReturnMode', presentation)
