@@ -66,7 +66,27 @@ static NSString *CLArgument(NSString *command, NSString *name) {
         else if ([process[@"development_build"] boolValue]) [items addObject:CLItem(CLCheckLevelWarning, @"Processus", @"Build de développement active", @"Application installée", path, @"Cette instance provient d’un dossier de développement ou de distribution.", @"Fermer cette instance puis lancer l’application installée.")];
         if (![executable isEqualToString:@"CLYamahaConsoleSimulator"]) continue; foundSimulator = YES;
         NSString *label = CLArgument(command, @"--label"), *endpoint = CLArgument(command, @"--endpoint"), *transport = CLArgument(command, @"--transport"), *channel = CLArgument(command, @"--channel"), *delay = CLArgument(command, @"--delay-ms");
-        NSString *expectedChannel = [label caseInsensitiveCompare:@"CL5"] == NSOrderedSame ? [midi[@"cl5_channel"] stringValue] : [midi[@"ql1_channel"] stringValue];
+        NSString *expectedChannel = nil;
+        if ([label caseInsensitiveCompare:@"CL5"] == NSOrderedSame) {
+            expectedChannel = [midi[@"cl5_channel"] stringValue];
+        } else if ([label caseInsensitiveCompare:@"QL1"] == NSOrderedSame) {
+            expectedChannel = [midi[@"ql1_channel"] stringValue];
+        } else {
+            NSRegularExpression *channelLabel = [
+                NSRegularExpression regularExpressionWithPattern:@"^Canal\\s+([1-9]|1[0-6])$"
+                options:NSRegularExpressionCaseInsensitive
+                error:nil
+            ];
+            NSTextCheckingResult *match = [
+                channelLabel firstMatchInString:label
+                options:0
+                range:NSMakeRange(0, label.length)
+            ];
+            if (match.numberOfRanges >= 2) {
+                expectedChannel = [label substringWithRange:[match rangeAtIndex:1]];
+            }
+        }
+        if (!expectedChannel.length) expectedChannel = channel;
         NSString *simulatorEndpoint = simulatorProfile[@"endpoint"] ?: @"";
         BOOL endpointPresent = [sourceNames containsObject:endpoint] || [destinationNames containsObject:endpoint];
         BOOL endpointMatches = simulatorEndpoint.length && [endpoint isEqualToString:simulatorEndpoint] && (rtpScenario ? ([sourceNames containsObject:endpoint] && [destinationNames containsObject:endpoint]) : endpointPresent);

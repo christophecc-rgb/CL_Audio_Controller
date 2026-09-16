@@ -98,6 +98,13 @@ class ConfigurationCheckerTests(unittest.TestCase):
         ):
             self.assertIn(expected, source)
 
+    def test_generic_simulator_channels_follow_canal_label(self):
+        source = (TOOLS / "CLConfigurationValidator.m").read_text()
+        self.assertIn('caseInsensitiveCompare:@"CL5"', source)
+        self.assertIn('caseInsensitiveCompare:@"QL1"', source)
+        self.assertIn('^Canal\\\\s+([1-9]|1[0-6])$', source)
+        self.assertIn('expectedChannel = [label substringWithRange:[match rangeAtIndex:1]]', source)
+
     def test_simulator_argument_parser_preserves_unquoted_values_with_spaces(self):
         source = (TOOLS / "CLConfigurationValidator.m").read_text()
         self.assertIn('regularExpressionWithPattern:@"\\\\s--[[:alnum:]][[:alnum:]-]*', source)
