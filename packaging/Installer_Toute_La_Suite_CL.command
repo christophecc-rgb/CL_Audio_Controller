@@ -440,24 +440,68 @@ if [[ "$INSTALL_ABLETON_READER" == 1 ]]; then
     # LaunchServices peut retourner -1712 alors que l’agent a bien démarré :
     # l’état réel (processus + LaunchAgent) fait foi.
     RTP_AGENT_EXEC="$MIDI_NETWORK_APPS/CL MIDI RTP Agent.app/Contents/MacOS/CL MIDI RTP Agent"
+    RTP_AGENT_PLIST="$INSTALL_HOME/Library/LaunchAgents/com.claudio.midi-rtp-agent.plist"
+    RTP_AGENT_DOMAIN="gui/$(id -u)"
+    RTP_AGENT_SERVICE="$RTP_AGENT_DOMAIN/com.claudio.midi-rtp-agent"
 
-    # Agent de fond : lancement direct du binaire.
-    # Évite les délais/cache LaunchServices juste après remplacement du bundle.
+    # Premier lancement direct uniquement pour permettre à l'agent
+    # de créer / mettre à jour son LaunchAgent.
     "$RTP_AGENT_EXEC" >/dev/null 2>&1 &
-    # L'agent peut enregistrer son LaunchAgent puis être relancé par launchd.
-    # On laisse jusqu'à 15 secondes avant de conclure à un échec.
-    for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
-      if [[ -f "$INSTALL_HOME/Library/LaunchAgents/com.claudio.midi-rtp-agent.plist" ]] \
-        && /usr/bin/pgrep -f -x "$MIDI_NETWORK_APPS/CL MIDI RTP Agent.app/Contents/MacOS/CL MIDI RTP Agent" >/dev/null 2>&1; then
+    RTP_BOOTSTRAP_PID=$!
+
+    # Attend jusqu'à 10 secondes la création du plist.
+    for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+      [[ -f "$RTP_AGENT_PLIST" ]] && break
+      sleep 0.5
+    done
+
+    [[ -f "$RTP_AGENT_PLIST" ]] \
+      || fail "CL MIDI RTP Agent n’a pas enregistré son démarrage automatique"
+
+    # L'instance lancée directement n'est qu'une instance d'amorçage.
+    # On l'arrête avant de confier définitivement le processus à launchd.
+    kill -TERM "$RTP_BOOTSTRAP_PID" >/dev/null 2>&1 || true
+
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+      kill -0 "$RTP_BOOTSTRAP_PID" >/dev/null 2>&1 || break
+      sleep 0.25
+    done
+
+    kill -KILL "$RTP_BOOTSTRAP_PID" >/dev/null 2>&1 || true
+
+    # Une instance peut avoir été relancée automatiquement entre-temps.
+    # On nettoie toutes les instances RTP avant le bootstrap launchd final.
+    /usr/bin/pkill -f 'CL MIDI RTP Agent\.app/Contents/MacOS/CL MIDI RTP Agent' >/dev/null 2>&1 || true
+    sleep 1
+
+    # launchd devient l'unique propriétaire du processus.
+    launchctl bootout "$RTP_AGENT_SERVICE" >/dev/null 2>&1 || true
+    launchctl bootout "$RTP_AGENT_DOMAIN" "$RTP_AGENT_PLIST" >/dev/null 2>&1 || true
+
+    launchctl bootstrap "$RTP_AGENT_DOMAIN" "$RTP_AGENT_PLIST" \
+      || fail "Impossible de charger le LaunchAgent CL MIDI RTP Agent"
+
+    launchctl kickstart -k "$RTP_AGENT_SERVICE" \
+      || fail "Impossible de démarrer CL MIDI RTP Agent via launchd"
+
+    RTP_READY=0
+    for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+      if launchctl print "$RTP_AGENT_SERVICE" 2>/dev/null | grep -q 'state = running'; then
+        RTP_READY=1
         break
       fi
-      sleep 1
+      sleep 0.5
     done
-    [[ -f "$INSTALL_HOME/Library/LaunchAgents/com.claudio.midi-rtp-agent.plist" ]] \
-      || fail "CL MIDI RTP Agent n’a pas enregistré son démarrage automatique"
-    /usr/bin/pgrep -f -x "$MIDI_NETWORK_APPS/CL MIDI RTP Agent.app/Contents/MacOS/CL MIDI RTP Agent" >/dev/null 2>&1 \
-      || fail "CL MIDI RTP Agent ne fonctionne pas après son lancement"
-    say "  ✓ Agent RTP actif et enregistré pour les prochaines ouvertures de session"
+
+    [[ "$RTP_READY" == 1 ]] \
+      || fail "CL MIDI RTP Agent n’est pas actif via launchd"
+
+    RTP_COUNT="$(/usr/bin/pgrep -f 'CL MIDI RTP Agent\.app/Contents/MacOS/CL MIDI RTP Agent' 2>/dev/null | wc -l | tr -d ' ')"
+
+    [[ "$RTP_COUNT" == 1 ]] \
+      || fail "CL MIDI RTP Agent : $RTP_COUNT instances détectées au lieu d’une"
+
+    say "  ✓ Agent RTP actif via launchd — 1 seule instance"
   fi
 fi
 if [[ "$INSTALL_BUILDER" == 1 ]]; then
