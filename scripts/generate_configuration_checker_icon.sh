@@ -3,16 +3,18 @@ set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 OUTPUT_DIR="${1:-$PROJECT_ROOT/dist/configuration-checker/icon}"
-BASE_ICON="$PROJECT_ROOT/assets/cl_midi_network_assistant_icon_1024.png"
-GENERATOR="$PROJECT_ROOT/packaging/configuration_checker/generate_icon.swift"
+BASE_ICON="$PROJECT_ROOT/assets/app_icons/CL_MIDI_RTP_Diagnostic.png"
+GENERATOR="$PROJECT_ROOT/scripts/generate_app_icon_variants.py"
 ICONSET="$OUTPUT_DIR/CLAudioConfigurationChecker.iconset"
+
+"${CL_PYTHON:-$PROJECT_ROOT/.venv/bin/python}" "$GENERATOR"
 
 [[ -f "$BASE_ICON" ]] || { echo "Icône CL AUDIO source absente: $BASE_ICON" >&2; exit 1; }
 [[ -f "$GENERATOR" ]] || { echo "Générateur absent: $GENERATOR" >&2; exit 1; }
 
 mkdir -p "$OUTPUT_DIR"
 MASTER="$OUTPUT_DIR/CLAudioConfigurationChecker-1024.png"
-/usr/bin/xcrun swift "$GENERATOR" "$BASE_ICON" "$MASTER"
+/usr/bin/ditto "$BASE_ICON" "$MASTER"
 rm -rf "$ICONSET"
 mkdir -p "$ICONSET"
 

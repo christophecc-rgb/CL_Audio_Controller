@@ -1,7 +1,11 @@
 #!/bin/bash
 set -euo pipefail
 
-export CL_BUILD_ARCH="arm64"
+export CL_BUILD_ARCH="${CL_BUILD_ARCH:-universal2}"
+case "$CL_BUILD_ARCH" in
+  arm64|x86_64|universal2) ;;
+  *) echo "Architecture invalide : $CL_BUILD_ARCH" >&2; exit 2 ;;
+esac
 
 # Le fichier du Bureau est un lien symbolique. Résoudre sa cible avant de
 # calculer les chemins du dépôt afin que le script fonctionne depuis Finder.
@@ -26,7 +30,7 @@ DESKTOP_DIR="${CL_SUITE_EXPORT_DIR:-$HOME/Desktop}"
 ICLOUD_DRIVE_DIR="$HOME/Library/Mobile Documents/com~apple~CloudDocs"
 VERSION="${CL_AUDIO_VERSION:-2.2.0}"
 TIMESTAMP="$(date '+%Y-%m-%d_%H%M%S')"
-SUITE_NAME="CL_Suite_Transport_${TIMESTAMP}"
+SUITE_NAME="CL_Suite_Transport_${TIMESTAMP}_${CL_BUILD_ARCH}"
 BUILD_ROOT="$(mktemp -d "/private/tmp/${SUITE_NAME}_XXXXXX")"
 SUITE_ROOT="$BUILD_ROOT/$SUITE_NAME"
 DEST_ZIP="$DESKTOP_DIR/${SUITE_NAME}.zip"
@@ -111,7 +115,7 @@ CONTROLLER_ROOT="$(find "$CONTROLLER_EXTRACT" -maxdepth 1 -type d -name 'CL Audi
 [[ -n "$CONTROLLER_ROOT" ]] || fail "contenu du kit CL Audio Controller introuvable"
 
 echo
-echo "Construction d’Arrangement Builder Live depuis les sources actuelles…"
+echo "Construction d’CL Arrangement Builder depuis les sources actuelles…"
 BUILDER_BUILD="$BUILD_ROOT/arrangement-builder"
 mkdir -p "$BUILDER_BUILD"
 (
@@ -122,15 +126,15 @@ mkdir -p "$BUILDER_BUILD"
     --distpath "$BUILDER_BUILD/dist" \
     "Arrangement Builder Live.spec"
 )
-BUILDER_APP="$BUILDER_BUILD/dist/Arrangement Builder Live.app"
-[[ -d "$BUILDER_APP" ]] || fail "la nouvelle application Arrangement Builder Live est introuvable"
+BUILDER_APP="$BUILDER_BUILD/dist/CL Arrangement Builder.app"
+[[ -d "$BUILDER_APP" ]] || fail "la nouvelle application CL Arrangement Builder est introuvable"
 ditto "$PROJECT_DIR/assets/app_icons/CL_Ableton.icns" "$BUILDER_APP/Contents/Resources/CL_Ableton.icns"
 /usr/libexec/PlistBuddy -c "Set :CFBundleIconFile CL_Ableton.icns" "$BUILDER_APP/Contents/Info.plist"
 xattr -cr "$BUILDER_APP"
 codesign --force --deep --sign - "$BUILDER_APP"
 
 echo
-echo "Construction de CL Show Audio Builder ARM64 depuis les sources actuelles…"
+echo "Construction de CL Audio Export ($CL_BUILD_ARCH) depuis les sources actuelles…"
 SHOW_AUDIO_BUILD="$BUILD_ROOT/show-audio-builder"
 mkdir -p "$SHOW_AUDIO_BUILD"
 
@@ -139,8 +143,8 @@ mkdir -p "$SHOW_AUDIO_BUILD"
   "$CL_PYTHON" -m PyInstaller     --clean     --noconfirm     --workpath "$SHOW_AUDIO_BUILD/work"     --distpath "$SHOW_AUDIO_BUILD/dist"     "CL Show Audio Builder.spec"
 )
 
-SHOW_AUDIO_APP="$SHOW_AUDIO_BUILD/dist/CL Show Audio Builder.app"
-[[ -d "$SHOW_AUDIO_APP" ]] || fail "la nouvelle application CL Show Audio Builder est introuvable"
+SHOW_AUDIO_APP="$SHOW_AUDIO_BUILD/dist/CL Audio Export.app"
+[[ -d "$SHOW_AUDIO_APP" ]] || fail "la nouvelle application CL Audio Export est introuvable"
 
 SHOW_AUDIO_EXE="$SHOW_AUDIO_APP/Contents/MacOS/CL Show Audio Builder"
 SHOW_AUDIO_FFMPEG="$SHOW_AUDIO_APP/Contents/Frameworks/ffmpeg"
@@ -148,22 +152,16 @@ SHOW_AUDIO_FFMPEG="$SHOW_AUDIO_APP/Contents/Frameworks/ffmpeg"
 require_file "$SHOW_AUDIO_EXE"
 require_file "$SHOW_AUDIO_FFMPEG"
 
-SHOW_AUDIO_ARCHS="$(lipo -archs "$SHOW_AUDIO_EXE" 2>/dev/null || true)"
-[[ "$SHOW_AUDIO_ARCHS" == *arm64* ]] ||   fail "CL Show Audio Builder n'est pas ARM64 : $SHOW_AUDIO_ARCHS"
-
-SHOW_AUDIO_FFMPEG_ARCHS="$(lipo -archs "$SHOW_AUDIO_FFMPEG" 2>/dev/null || true)"
-[[ "$SHOW_AUDIO_FFMPEG_ARCHS" == *arm64* ]] ||   fail "FFmpeg embarqué dans CL Show Audio Builder n'est pas ARM64 : $SHOW_AUDIO_FFMPEG_ARCHS"
-
-codesign --verify --deep --strict "$SHOW_AUDIO_APP" ||   fail "signature de CL Show Audio Builder invalide"
-
-echo "CL Show Audio Builder : $SHOW_AUDIO_ARCHS"
-echo "FFmpeg embarqué       : $SHOW_AUDIO_FFMPEG_ARCHS"
+"$CL_PYTHON" "$PROJECT_DIR/scripts/verify_macos_architectures.py" "$SHOW_AUDIO_APP" --target "$CL_BUILD_ARCH"
+codesign --verify --deep --strict "$SHOW_AUDIO_APP" || fail "signature de CL Audio Export invalide"
 
 echo "Construction des fenêtres ShowCue depuis le working tree courant…"
-for showcue_name in "CL ShowCue" "CL ShowCue Builder"; do
+for showcue_name in "CL ShowCue" "CL Cue Editor"; do
+  showcue_spec="$showcue_name"
+  [[ "$showcue_name" != "CL Cue Editor" ]] || showcue_spec="CL ShowCue Builder"
   "${CL_PYTHON:-$PROJECT_DIR/.venv/bin/python}" -m PyInstaller --noconfirm \
     --workpath "$BUILD_ROOT/showcue-work/$showcue_name" \
-    --distpath "$BUILD_ROOT/showcue-dist" "$PROJECT_DIR/$showcue_name.spec"
+    --distpath "$BUILD_ROOT/showcue-dist" "$PROJECT_DIR/$showcue_spec.spec"
   codesign --verify --deep --strict "$BUILD_ROOT/showcue-dist/$showcue_name.app"
 done
 "$PROJECT_DIR/scripts/build_cl_transport.command" "$SUITE_ROOT/CL_Transport" \
@@ -189,9 +187,9 @@ mkdir -p \
 
 echo
 echo "Assemblage des applications et composants…"
-ditto "$CONTROLLER_ROOT/CL Audio Show Control.app" "$COMPONENTS_ROOT/Applications/CL Audio Show Control.app"
-ditto "$SHOW_AUDIO_APP" "$COMPONENTS_ROOT/Applications/CL Show Audio Builder.app"
-for showcue_name in "CL ShowCue" "CL ShowCue Builder"; do
+ditto "$CONTROLLER_ROOT/CL Show Control.app" "$COMPONENTS_ROOT/Applications/CL Show Control.app"
+ditto "$SHOW_AUDIO_APP" "$COMPONENTS_ROOT/Applications/CL Audio Export.app"
+for showcue_name in "CL ShowCue" "CL Cue Editor"; do
   ditto "$BUILD_ROOT/showcue-dist/$showcue_name.app" "$COMPONENTS_ROOT/Applications/$showcue_name.app"
 done
 ditto "$SUITE_ROOT/CL_Transport" "$COMPONENTS_ROOT/CL_Transport"
@@ -201,7 +199,7 @@ ditto "$CONTROLLER_ROOT/CL MIDI RTP Agent.app" "$COMPONENTS_ROOT/Applications/CL
 ditto "$CONTROLLER_ROOT/CL MIDI & RTP Diagnostic.app" "$COMPONENTS_ROOT/Applications/CL MIDI & RTP Diagnostic.app"
 ditto "$CONTROLLER_ROOT/CL MIDI Analyzer.app" "$COMPONENTS_ROOT/Applications/CL MIDI Analyzer.app"
 ditto "$CONTROLLER_ROOT/CL MIDI Performance Monitor.app" "$COMPONENTS_ROOT/Applications/CL MIDI Performance Monitor.app"
-ditto "$BUILDER_APP" "$COMPONENTS_ROOT/Applications/Arrangement Builder Live.app"
+ditto "$BUILDER_APP" "$COMPONENTS_ROOT/Applications/CL Arrangement Builder.app"
 
 ditto "$CONTROLLER_ROOT/AbletonOSC CL/AbletonOSC" "$COMPONENTS_ROOT/Ableton Live 11-12/Remote Scripts/AbletonOSC"
 ditto "$BUILDER_DIR/RemoteScript" "$COMPONENTS_ROOT/Ableton Live 11-12/Remote Scripts/CL_Arrangement_Builder_Live"
@@ -225,14 +223,28 @@ ditto "$CONTROLLER_ROOT/CL MIDI Network Tools" "$COMPONENTS_ROOT/Outils réseau 
 find "$COMPONENTS_ROOT" -type d -name '__pycache__' -prune -exec rm -r {} +
 find "$COMPONENTS_ROOT" -type f \( -name '*.pyc' -o -name '.DS_Store' -o -name '._*' \) -delete
 
+# Le nettoyage ci-dessus peut retirer des ressources qui étaient présentes au
+# moment de la signature initiale d'une application (par exemple les .pyc du
+# RemoteScript d'Arrangement Builder). Re-signer les applications distribuées
+# après le nettoyage afin que leur sceau corresponde exactement au contenu final.
+echo "Re-signature des applications après nettoyage…"
+while IFS= read -r -d '' app_path; do
+  xattr -cr "$app_path"
+  codesign --force --deep --sign - "$app_path" || \
+    fail "re-signature impossible : $app_path"
+  codesign --verify --deep --strict "$app_path" || \
+    fail "signature invalide après nettoyage : $app_path"
+done < <(find "$COMPONENTS_ROOT/Applications" -type d -name '*.app' -print0)
+
+cp "$PROJECT_DIR/packaging/BUILD_UNIVERSAL2.md" "$INSTALLER_RESOURCES/Documentation/BUILD_UNIVERSAL2.md"
 cp "$PROJECT_DIR/README.md" "$INSTALLER_RESOURCES/Documentation/README_CL_Audio_Controller.md"
 cp "$PROJECT_DIR/packaging/INSTALLATION_NOUVEAU_MAC.txt" "$INSTALLER_RESOURCES/Documentation/INSTALLATION_NOUVEAU_MAC.txt"
 cp "$PROJECT_DIR/packaging/INSTALLATION_AUTOSCENE_LIVE_10.txt" "$INSTALLER_RESOURCES/Documentation/INSTALLATION_AUTOSCENE_LIVE_10.txt"
 cp "$PROJECT_DIR/packaging/Installer_Toute_La_Suite_CL.command" "$INSTALLER_RESOURCES/Installer_Toute_La_Suite_CL.command"
-cp "$PROJECT_DIR/CL_AUDIO.icns" "$INSTALLER_RESOURCES/CL_AUDIO.icns"
+cp "$PROJECT_DIR/assets/app_icons/CL_Install.icns" "$INSTALLER_RESOURCES/CL_AUDIO.icns"
 
 cp "$PROJECT_DIR/packaging/Desinstaller_La_Suite_CL.command" "$UNINSTALLER_APP/Contents/Resources/Desinstaller_La_Suite_CL.command"
-cp "$PROJECT_DIR/CL_AUDIO.icns" "$UNINSTALLER_APP/Contents/Resources/CL_AUDIO.icns"
+cp "$PROJECT_DIR/assets/app_icons/CL_Uninstall.icns" "$UNINSTALLER_APP/Contents/Resources/CL_AUDIO.icns"
 
 echo "Compilation de l’interface native de l’installateur…"
 NATIVE_BUILD="$BUILD_ROOT/native-installer"
@@ -240,11 +252,19 @@ mkdir -p "$NATIVE_BUILD/cache"
 CLANG_MODULE_CACHE_PATH="$NATIVE_BUILD/cache" clang -fobjc-arc -target arm64-apple-macosx10.15 \
   -framework Cocoa "$PROJECT_DIR/packaging/CLSuiteInstallerApp.m" \
   -o "$NATIVE_BUILD/installer-arm64"
-ditto "$NATIVE_BUILD/installer-arm64" "$INSTALLER_APP/Contents/MacOS/Installer la Suite CL"
-ditto "$NATIVE_BUILD/installer-arm64" "$UNINSTALLER_APP/Contents/MacOS/CLSuiteUninstaller"
+CLANG_MODULE_CACHE_PATH="$NATIVE_BUILD/cache" clang -fobjc-arc -target x86_64-apple-macosx10.15 \
+  -framework Cocoa "$PROJECT_DIR/packaging/CLSuiteInstallerApp.m" \
+  -o "$NATIVE_BUILD/installer-x86_64"
+lipo -create "$NATIVE_BUILD/installer-arm64" "$NATIVE_BUILD/installer-x86_64" \
+  -output "$NATIVE_BUILD/installer-universal"
+ditto "$NATIVE_BUILD/installer-universal" "$INSTALLER_APP/Contents/MacOS/Installer la Suite CL"
+ditto "$NATIVE_BUILD/installer-universal" "$UNINSTALLER_APP/Contents/MacOS/CLSuiteUninstaller"
 
 for resources_dir in "$INSTALLER_RESOURCES" "$UNINSTALLER_APP/Contents/Resources"; do
   ditto "$PROJECT_DIR/assets/app_icons/CL_Audio_Show_Control.png" "$resources_dir/Controller.png"
+  ditto "$PROJECT_DIR/assets/app_icons/CL_Audio_Export.png" "$resources_dir/AudioExport.png"
+  ditto "$PROJECT_DIR/assets/app_icons/CL_ShowCue.png" "$resources_dir/ShowCue.png"
+  ditto "$PROJECT_DIR/assets/app_icons/CL_Cue_Editor.png" "$resources_dir/CueEditor.png"
   ditto "$PROJECT_DIR/assets/app_icons/CL_Ableton.png" "$resources_dir/Builder.png"
   ditto "$PROJECT_DIR/assets/paradis latin.jpg" "$resources_dir/ParadisLatin.jpg"
   ditto "$PROJECT_DIR/assets/app_icons/CL_MIDI_Network.png" "$resources_dir/MIDIConsole.png"
@@ -305,6 +325,12 @@ cat > "$SUITE_ROOT/LISEZ_MOI_EN_PREMIER.txt" <<EOF
 SUITE CL TRANSPORTABLE — ${TIMESTAMP}
 ====================================
 
+COMPATIBILITÉ
+
+Architecture : $CL_BUILD_ARCH
+Suite complète : macOS 12 Monterey ou ultérieur (FFmpeg embarqué).
+Aucune installation Python ou Homebrew sur le Mac cible.
+
 CONTENU VISIBLE
 
 - Installer la Suite CL.app
@@ -319,7 +345,7 @@ INSTALLATION AUTOMATIQUE
 
 Double-cliquer sur « Installer la Suite CL.app » puis choisir :
 - Ableton Live 12 pour sélectionner librement CL Audio Controller,
-  CL Show Audio Builder, Arrangement Builder, AutoScene et CL MIDI Console Monitor ;
+  CL Audio Export, Arrangement Builder, AutoScene et CL MIDI Console Monitor ;
 - Ableton Live 10 pour installer uniquement la variante AutoScene compatible.
 
 Les installations existantes et leurs anciennes sauvegardes sont déplacées dans
@@ -334,7 +360,7 @@ par l'installateur dans la Corbeille. Il ne touche jamais aux Live Sets.
 COMMITS
 
 CL Audio Controller : $(git -C "$PROJECT_DIR" rev-parse HEAD)
-CL Arrangement Builder Live : $(git -C "$BUILDER_DIR" rev-parse HEAD)
+CL Arrangement Builder : $(git -C "$BUILDER_DIR" rev-parse HEAD)
 AbletonOSC CL : $(git -C "$ABLETONOSC_DIR" rev-parse HEAD)
 
 IMPORTANT
@@ -357,25 +383,30 @@ EOF
 )
 
 echo
+"$CL_PYTHON" "$PROJECT_DIR/scripts/verify_app_identity.py" "$SUITE_ROOT" --suite
+"$CL_PYTHON" "$PROJECT_DIR/scripts/verify_macos_architectures.py" "$SUITE_ROOT" \
+  --target "$CL_BUILD_ARCH" --report "$SUITE_ROOT/ARCHITECTURES.json"
+# Include the architecture report in the checksum manifest as well.
+(cd "$SUITE_ROOT"; shasum -a 256 ARCHITECTURES.json >> SHA256SUMS.txt)
 echo "Création du ZIP sur le Bureau…"
-ditto -c -k --norsrc --keepParent "$SUITE_ROOT" "$DEST_ZIP"
+ditto -c -k --norsrc --keepParent "$SUITE_ROOT" "$BUILD_ROOT/final-kit.zip"
 
-ZIP_SHA="$(shasum -a 256 "$DEST_ZIP" | awk '{print $1}')"
-printf '%s  %s\n' "$ZIP_SHA" "$(basename "$DEST_ZIP")" > "$DEST_SHA"
+ZIP_SHA="$(shasum -a 256 "$BUILD_ROOT/final-kit.zip" | awk '{print $1}')"
+printf '%s  %s\n' "$ZIP_SHA" "$(basename "$DEST_ZIP")" > "$BUILD_ROOT/final-kit-sha.txt"
 
 # Contrôle final : le ZIP doit contenir tous les éléments essentiels.
 ZIP_LIST="$BUILD_ROOT/zip_contents.txt"
-unzip -Z1 "$DEST_ZIP" > "$ZIP_LIST"
+unzip -Z1 "$BUILD_ROOT/final-kit.zip" > "$ZIP_LIST"
 for expected in \
   "Installer la Suite CL.app/" \
   "Désinstaller la Suite CL.app/" \
-  "Installer la Suite CL.app/Contents/Resources/Composants/Applications/CL Audio Show Control.app/" \
-  "Installer la Suite CL.app/Contents/Resources/Composants/Applications/CL Show Audio Builder.app/" \
-  "Installer la Suite CL.app/Contents/Resources/Composants/Applications/CL Show Audio Builder.app/Contents/Frameworks/ffmpeg" \
+  "Installer la Suite CL.app/Contents/Resources/Composants/Applications/CL Show Control.app/" \
+  "Installer la Suite CL.app/Contents/Resources/Composants/Applications/CL Audio Export.app/" \
+  "Installer la Suite CL.app/Contents/Resources/Composants/Applications/CL Audio Export.app/Contents/Frameworks/ffmpeg" \
   "Installer la Suite CL.app/Contents/Resources/Composants/Applications/CL MIDI & RTP Diagnostic.app/" \
   "Installer la Suite CL.app/Contents/Resources/Composants/Applications/CL MIDI Analyzer.app/" \
   "Installer la Suite CL.app/Contents/Resources/Composants/Applications/CL MIDI Performance Monitor.app/" \
-  "Installer la Suite CL.app/Contents/Resources/Composants/Applications/Arrangement Builder Live.app/" \
+  "Installer la Suite CL.app/Contents/Resources/Composants/Applications/CL Arrangement Builder.app/" \
   "Installer la Suite CL.app/Contents/Resources/Composants/Ableton Live 11-12/Remote Scripts/AbletonOSC/" \
   "Installer la Suite CL.app/Contents/Resources/Composants/Ableton Live 11-12/Remote Scripts/CL_Arrangement_Builder_Live/" \
   "XFADER OSC BRIDGE v8.amxd" \
@@ -394,6 +425,11 @@ for unwanted in '.DS_Store' '__pycache__' '.pyc' '.dmg' '_Max_for_Live.zip' '_Ki
     fail "fichier inutile détecté dans le kit final : $unwanted"
   fi
 done
+
+[[ ! -e "$DEST_ZIP" && ! -e "$DEST_SHA" ]] || fail "destination déjà existante : $DEST_ZIP"
+mkdir -p "$DESKTOP_DIR"
+ditto "$BUILD_ROOT/final-kit.zip" "$DEST_ZIP"
+ditto "$BUILD_ROOT/final-kit-sha.txt" "$DEST_SHA"
 
 if [[ "$SKIP_ICLOUD" != "1" ]]; then
   [[ -d "$ICLOUD_DRIVE_DIR" ]] || fail_cloud "iCloud Drive n'est pas disponible sur ce Mac"

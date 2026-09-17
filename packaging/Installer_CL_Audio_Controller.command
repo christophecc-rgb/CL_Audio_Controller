@@ -2,12 +2,12 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-APP_SOURCE="$SCRIPT_DIR/CL Audio Show Control.app"
+APP_SOURCE="$SCRIPT_DIR/CL Show Control.app"
 ABLETONOSC_SOURCE="$SCRIPT_DIR/AbletonOSC CL/AbletonOSC"
 M4L_SOURCE="$SCRIPT_DIR/Max for Live à installer"
 
 USER_APPS="$HOME/Applications"
-APP_TARGET="$USER_APPS/CL Audio Show Control.app"
+APP_TARGET="$USER_APPS/CL Show Control.app"
 REMOTE_SCRIPTS="$HOME/Music/Ableton/User Library/Remote Scripts"
 ABLETONOSC_TARGET="$REMOTE_SCRIPTS/AbletonOSC"
 M4L_TARGET="$HOME/Music/Ableton/User Library/Presets/Audio Effects/Max Audio Effect/CL Audio Controller"
@@ -56,6 +56,8 @@ echo
 echo "1/3 — Application"
 backup_existing "$APP_TARGET"
 ditto "$APP_SOURCE" "$APP_TARGET"
+backup_existing "$USER_APPS/CL Audio Show Control.app"
+backup_existing "$USER_APPS/CL Audio Controller.app"
 
 echo
 echo "2/3 — AbletonOSC CL"

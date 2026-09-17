@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-"""CL Show Audio Builder Desktop V1.
+"""CL Audio Export Desktop V1.
 
 Interface locale uniquement.
 
@@ -294,7 +294,7 @@ class ShowAudioBuilderDesktop(tk.Tk):
     def __init__(self) -> None:
         super().__init__()
 
-        self.title("CL Show Audio Builder")
+        self.title("CL Audio Export")
         self.geometry("1180x780")
         self.minsize(980, 680)
 
@@ -2048,7 +2048,7 @@ class ShowAudioBuilderDesktop(tk.Tk):
         except Exception as exc:
             traceback.print_exc()
             self.info_var.set(f"Erreur de lecture : {exc}")
-            messagebox.showerror("CL Show Audio Builder", str(exc))
+            messagebox.showerror("CL Audio Export", str(exc))
         finally:
             self._loading = False
             self.reload_button.configure(state="normal")
@@ -2938,7 +2938,7 @@ class ShowAudioBuilderDesktop(tk.Tk):
     def save_variant(self) -> None:
         if not self.current_item:
             messagebox.showwarning(
-                "CL Show Audio Builder",
+                "CL Audio Export",
                 "Sélectionne d'abord une scène.",
             )
             return
@@ -3003,7 +3003,7 @@ class ShowAudioBuilderDesktop(tk.Tk):
 
         except Exception as exc:
             messagebox.showerror(
-                "CL Show Audio Builder",
+                "CL Audio Export",
                 str(exc),
             )
 

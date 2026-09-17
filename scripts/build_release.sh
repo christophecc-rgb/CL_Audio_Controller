@@ -4,11 +4,12 @@ set -euo pipefail
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 VERSION="${1:-2.2.0}"
 CL_PYTHON="${CL_PYTHON:-$PROJECT_ROOT/.venv/bin/python}"
+export CL_BUILD_ARCH="${CL_BUILD_ARCH:-universal2}"
 STAMP="$(date +"%Y-%m-%d_%H-%M-%S")"
 RELEASE_ROOT="${CL_RELEASE_OUTPUT_ROOT:-$PROJECT_ROOT/Releases}"
 RELEASE_DIR="$RELEASE_ROOT/CL_Audio_Controller_${VERSION}_${STAMP}"
 BUILD_ROOT="$(mktemp -d "/private/tmp/CL_Audio_Controller_release_${VERSION}_XXXXXX")"
-APP_PATH="$BUILD_ROOT/dist/CL Audio Show Control.app"
+APP_PATH="$BUILD_ROOT/dist/CL Show Control.app"
 KIT_ROOT="$BUILD_ROOT/kit/CL Audio Controller $VERSION"
 M4L_SOURCE="$PROJECT_ROOT/M4L/Install"
 MIDI_DEVICE_SOURCE="$PROJECT_ROOT/M4L/Devices/CL MIDI Console Monitor"
@@ -181,7 +182,7 @@ mkdir -p \
   "$KIT_ROOT/AbletonOSC CL/AbletonOSC" \
   "$KIT_ROOT/Documentation"
 
-ditto "$APP_PATH" "$KIT_ROOT/CL Audio Show Control.app"
+ditto "$APP_PATH" "$KIT_ROOT/CL Show Control.app"
 ditto "$M4L_SOURCE" "$KIT_ROOT/Max for Live à installer"
 ditto "$MIDI_DEVICE_SOURCE" "$KIT_ROOT/Max for Live à installer/CL MIDI Console Monitor"
 
@@ -206,11 +207,11 @@ clang \
 
 make_native_app \
   "$REMOTE_BUILD_DIR/RemoteAbleton" \
-  "$KIT_ROOT/RemoteAbleton.app" \
+  "$KIT_ROOT/CL Ableton Remote.app" \
   "RemoteAbleton" \
-  "Télécommande Ableton" \
+  "CL Ableton Remote" \
   "com.claudio.ableton-remote" \
-  "$PROJECT_ROOT/assets/app_icons/CL_Ableton.icns"
+  "$PROJECT_ROOT/assets/app_icons/CL_Remote.icns"
 
 make_native_app \
   "$BUILD_ROOT/midi-tools/CLMIDIAnalyzer" \
@@ -239,7 +240,7 @@ make_native_app \
   "$PROJECT_ROOT/M4L/Devices/CL MIDI Console Monitor/paradis_latin_logo.jpg"
 
 for binary in \
-  "$KIT_ROOT/RemoteAbleton.app/Contents/MacOS/RemoteAbleton" \
+  "$KIT_ROOT/CL Ableton Remote.app/Contents/MacOS/RemoteAbleton" \
   "$KIT_ROOT/CL MIDI Analyzer.app/Contents/MacOS/CLMIDIAnalyzer" \
   "$KIT_ROOT/CL MIDI Performance Monitor.app/Contents/MacOS/CLMIDIPerformanceMonitor" \
   "$KIT_ROOT/CL MIDI & RTP Diagnostic.app/Contents/MacOS/CLAudioConfigurationChecker"
@@ -339,7 +340,7 @@ EOF
 (
   cd "$KIT_ROOT"
   shasum -a 256 \
-    "CL Audio Show Control.app/Contents/MacOS/CL Audio Controller" \
+    "CL Show Control.app/Contents/MacOS/CL Audio Controller" \
     "AbletonOSC CL/AbletonOSC/abletonosc/song.py" \
     "Max for Live à installer/XFADER OSC BRIDGE v8.amxd" \
     "Max for Live à installer/LTC Display v2.0 Remote Config.amxd" \
@@ -350,6 +351,8 @@ EOF
     "CL MIDI Network Tools/CLMIDIRoundTripTester" \
     > CONTENU_SHA256.txt
 )
+
+"$CL_PYTHON" "$PROJECT_ROOT/scripts/verify_macos_architectures.py" "$KIT_ROOT" --target "$CL_BUILD_ARCH" --report "$KIT_ROOT/ARCHITECTURES.json"
 
 if [[ "$SKIP_DMG" != "1" ]]; then
   echo
@@ -387,7 +390,8 @@ CL Audio Controller $VERSION
 Git commit: $(git rev-parse HEAD)
 Built at: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
 Build workspace: $BUILD_ROOT
-Architecture: $(uname -m)
+Build host architecture: $(uname -m)
+Target architecture: $CL_BUILD_ARCH
 AbletonOSC commit: $(git -C "$ABLETONOSC_ROOT" rev-parse HEAD)
 Contenu: application autonome + AbletonOSC CL + Max for Live + CL MIDI Console + documentation
 Python requis sur le Mac cible: non

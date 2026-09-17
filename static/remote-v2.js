@@ -180,3 +180,172 @@
   syncEnergyState();
   syncState();
 })();
+
+
+/* CL_REMOTE_ADVANCED_TOOLS_V1
+ *
+ * Organisation iPhone :
+ * - diagnostic OSC/réseau retiré de la zone principale ;
+ * - diagnostic déplacé dans Options avancées ;
+ * - menu d'accès aux applications CL ;
+ * - aucune logique Ableton/MIDI/OSC n'est modifiée.
+ */
+(() => {
+  'use strict';
+
+  function initAdvancedTools() {
+    const advanced = document.querySelector('.advanced-options');
+    if (!advanced) return;
+
+    if (advanced.dataset.clAdvancedReady === '1') return;
+    advanced.dataset.clAdvancedReady = '1';
+
+    let content = advanced.querySelector('.advanced-options__content');
+
+    if (!content) {
+      content = document.createElement('div');
+      content.className = 'advanced-options__content';
+      advanced.appendChild(content);
+    }
+
+    const tools = document.createElement('div');
+    tools.className = 'cl-advanced-tools';
+
+    /*
+     * ----------------------------------------------------------
+     * APPLICATIONS CL
+     * ----------------------------------------------------------
+     *
+     * Toutes les URL sont relatives :
+     * si le Mac change de 192.168.x.x à une autre IP,
+     * les liens continuent de fonctionner.
+     */
+    const appSection = document.createElement('section');
+    appSection.className = 'cl-advanced-section';
+
+    const appTitle = document.createElement('div');
+    appTitle.className = 'cl-advanced-title';
+    appTitle.textContent = 'Applications CL';
+
+    const launcher = document.createElement('div');
+    launcher.className = 'cl-app-launcher';
+
+    const select = document.createElement('select');
+    select.setAttribute('aria-label', 'Application CL');
+
+    [
+      ['', 'Choisir une application…'],
+      ['/', 'Télécommande Session'],
+      ['/ab', 'Télécommande A/B'],
+      ['/arrangement', 'Arrangement'],
+      ['/show-info', 'CL ShowCue']
+    ].forEach(([value, label]) => {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = label;
+
+      if (
+        value &&
+        window.location.pathname === value
+      ) {
+        option.selected = true;
+      }
+
+      select.appendChild(option);
+    });
+
+    const openButton = document.createElement('button');
+    openButton.type = 'button';
+    openButton.textContent = 'Ouvrir';
+
+    const openSelected = () => {
+      if (!select.value) return;
+      window.location.href = select.value;
+    };
+
+    openButton.addEventListener('click', openSelected);
+
+    select.addEventListener('change', () => {
+      /*
+       * Pas de navigation automatique :
+       * évite de quitter l'exploitation par une fausse manipulation.
+       */
+    });
+
+    launcher.append(select, openButton);
+    appSection.append(appTitle, launcher);
+    tools.append(appSection);
+
+    /*
+     * ----------------------------------------------------------
+     * DIAGNOSTIC
+     * ----------------------------------------------------------
+     */
+    const diagnosticSection = document.createElement('section');
+    diagnosticSection.className = 'cl-advanced-section';
+
+    const diagnosticTitle = document.createElement('div');
+    diagnosticTitle.className = 'cl-advanced-title';
+    diagnosticTitle.textContent = 'Diagnostic réseau / OSC';
+
+    const diagnosticSlot = document.createElement('div');
+    diagnosticSlot.className = 'cl-diagnostic-slot';
+
+    diagnosticSection.append(
+      diagnosticTitle,
+      diagnosticSlot
+    );
+
+    tools.append(diagnosticSection);
+
+    /*
+     * Le compteur existant garde son ID et donc tous ses handlers JS.
+     * On ne le recrée pas : on déplace simplement son nœud DOM.
+     */
+    const oscMeter = document.getElementById('oscMeter');
+
+    if (oscMeter) {
+      diagnosticSlot.appendChild(oscMeter);
+    } else {
+      diagnosticSlot.textContent =
+        'Diagnostic OSC indisponible sur cette vue.';
+    }
+
+    content.prepend(tools);
+
+    /*
+     * Si le compteur est ajouté un peu plus tard par un autre script,
+     * on le récupère sans polling permanent.
+     */
+    if (!oscMeter) {
+      const observer = new MutationObserver(() => {
+        const meter = document.getElementById('oscMeter');
+
+        if (!meter) return;
+
+        diagnosticSlot.replaceChildren(meter);
+        observer.disconnect();
+      });
+
+      observer.observe(document.body, {
+        childList: true,
+        subtree: true
+      });
+
+      window.setTimeout(
+        () => observer.disconnect(),
+        5000
+      );
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener(
+      'DOMContentLoaded',
+      initAdvancedTools,
+      {once:true}
+    );
+  } else {
+    initAdvancedTools();
+  }
+})();

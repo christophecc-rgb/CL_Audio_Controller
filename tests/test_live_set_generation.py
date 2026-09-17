@@ -1347,7 +1347,9 @@ class LiveSetGenerationTests(unittest.TestCase):
             )
 
         self.assertEqual(response.status_code, 200)
-        query.assert_not_called()
+        # Explicit intent skips is_playing; marker preloading is independent.
+        self.assertFalse(any(call.args[0] == "/live/song/get/is_playing"
+                             for call in query.call_args_list))
         self.assertIn(("/live/song/continue_playing", ()), sent)
         self.assertNotIn(("/live/song/stop_playing", ()), sent)
 

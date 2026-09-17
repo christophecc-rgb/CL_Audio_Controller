@@ -11,7 +11,9 @@ import uuid
 from pathlib import Path
 
 SHOW_POSTS = ("FOH", "RETOURS", "PLATEAU", "LUMIERE")
-SHOW_MODES = ("timed", "manual", "library")
+# CL_SHOWCUE_REALTIME_CUE_V1
+SHOW_MODES = ("timed", "manual", "realtime", "library")
+CLOCK_TIME_PATTERN = re.compile(r"^(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d$")
 SHOW_STATUSES = ("official", "draft")
 SHOW_SECTIONS = ("SHOW", "INTERMÈDE", "PRÉPARATION", "MUSIQUE", "LIGHT", "MICROS",
                  "IEM", "ARTISTES", "COSTUMES", "TECHNIQUE")
@@ -337,6 +339,36 @@ def _normalize_cue(raw, index, used_ids):
                    "resolved_iem", "resolved_equipment")
         cue["builder"] = {key: str(builder.get(key) or "").strip()
                           for key in allowed if str(builder.get(key) or "").strip()}
+
+        # CL_SHOWCUE_ROLE_ASSIGNMENTS_STORAGE_V1
+        role_assignments = builder.get("role_assignments")
+        if role_assignments is not None:
+            if not isinstance(role_assignments, dict):
+                raise ValueError(
+                    f"cue {cue_id} : role_assignments invalide"
+                )
+
+            clean_assignments = {}
+
+            for role, values in role_assignments.items():
+                role = str(role or "").strip()
+
+                if not role or not isinstance(values, dict):
+                    continue
+
+                clean = {}
+
+                for key in ("microphone", "iem", "equipment"):
+                    value = str(values.get(key) or "").strip()
+                    if value:
+                        clean[key] = value
+
+                if clean:
+                    clean_assignments[role] = clean
+
+            if clean_assignments:
+                cue["builder"]["role_assignments"] = clean_assignments
+
         slots = builder.get("resolved_equipment_slots")
         if slots is not None:
             if not isinstance(slots, list) or len(slots) > 3 or any(
@@ -360,6 +392,15 @@ def _normalize_cue(raw, index, used_ids):
     if mode == "timed":
         cue["timecode"] = str(raw.get("timecode") or "").strip()
         cue["_position"] = timecode_to_units(cue["timecode"])
+    elif mode == "realtime":
+        cue["clock_time"] = str(raw.get("clock_time") or "").strip()
+        if not CLOCK_TIME_PATTERN.fullmatch(cue["clock_time"]):
+            raise ValueError(
+                f"cue {cue_id} : heure réelle invalide "
+                "(format HH:MM:SS attendu)"
+            )
+        hh, mm, ss = map(int, cue["clock_time"].split(":"))
+        cue["_position"] = hh * 3600 + mm * 60 + ss
     elif mode == "manual":
         cue["section"] = str(raw.get("section") or "SANS SECTION").strip() or "SANS SECTION"
         try:
@@ -456,7 +497,7 @@ def update_show_cue(document, cue_id, values):
         if current["id"] != cue_id:
             continue
         updated = _public_cue(current)
-        for key in ("mode", "text", "posts", "status", "timecode", "section", "order",
+        for key in ("mode", "text", "posts", "status", "timecode", "clock_time", "section", "order",
                     "anchor_after", "audio", "builder", "conduite_order"):
             if key in values:
                 updated[key] = values[key]
@@ -534,6 +575,9 @@ def show_cues_for_conduite(cues, mode):
     if mode == "timed":
         filtered.sort(key=lambda cue: (
             cue.get("_position", timecode_to_units(cue["timecode"])), cue["id"]))
+    elif mode == "realtime":
+        filtered.sort(key=lambda cue: (
+            cue.get("_position", 0), cue["id"]))
     elif mode == "manual":
         filtered.sort(key=lambda cue: (
             cue.get("section", "").casefold(), cue["order"], cue["id"]))

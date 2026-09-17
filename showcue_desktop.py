@@ -1,6 +1,6 @@
 """Fenêtre desktop dédiée à CL ShowCue.
 
-L'interface est servie par le backend existant CL Audio Show Control.
+L'interface est servie par le backend existant CL Show Control.
 Aucune logique ShowCue n'est dupliquée ici.
 """
 
@@ -41,7 +41,7 @@ def main():
               <div style="max-width:560px;padding:40px;text-align:center">
                 <h2 style="margin-bottom:18px">CL ShowCue</h2>
                 <p style="color:#a9b0bb;line-height:1.5">
-                  CL Audio Show Control n’est pas démarré.
+                  CL Show Control n’est pas démarré.
                 </p>
                 <p style="color:#a9b0bb;line-height:1.5">
                   Démarrez l’application principale puis relancez CL ShowCue.

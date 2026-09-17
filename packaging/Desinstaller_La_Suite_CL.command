@@ -66,7 +66,7 @@ case "$CHOICE" in
     [[ "$answer" =~ ^([oOyY]|oui|OUI|yes|YES)$ ]] && UNINSTALL_REMOTE=1
     read -r -p "Retirer Arrangement Builder ? (o/n) " answer
     [[ "$answer" =~ ^([oOyY]|oui|OUI|yes|YES)$ ]] && UNINSTALL_BUILDER=1
-    read -r -p "Retirer CL Show Audio Builder ? (o/n) " answer
+    read -r -p "Retirer CL Audio Export ? (o/n) " answer
     [[ "$answer" =~ ^([oOyY]|oui|OUI|yes|YES)$ ]] && UNINSTALL_SHOW_AUDIO_BUILDER=1
     read -r -p "Retirer AutoScene Live 11/12 ? (o/n) " answer
     [[ "$answer" =~ ^([oOyY]|oui|OUI|yes|YES)$ ]] && UNINSTALL_AUTOSCENE=1
@@ -115,14 +115,19 @@ is_selected() {
 is_allowed_target() {
   case "$1" in
     "$INSTALL_HOME/Applications/CL Audio Show Control.app"|\
+    "$INSTALL_HOME/Applications/CL Show Audio Builder.app"|\
+    "$INSTALL_HOME/Applications/CL ShowCue Builder.app"|\
+    "$INSTALL_HOME/Applications/Arrangement Builder Live.app"|\
+    "$INSTALL_HOME/Applications/CL Show Control.app"|\
     "$INSTALL_HOME/Applications/CL Audio Controller.app"|\
     "$INSTALL_HOME/Applications/CL ShowCue.app"|\
-    "$INSTALL_HOME/Applications/CL ShowCue Builder.app"|\
+    "$INSTALL_HOME/Applications/CL Cue Editor.app"|\
     "$INSTALL_HOME/Applications/CL MIDI & RTP Diagnostic.app"|\
     "$INSTALL_HOME/Applications/CL MIDI Analyzer.app"|\
     "$INSTALL_HOME/Applications/CL MIDI Performance Monitor.app"|\
-    "$INSTALL_HOME/Applications/Arrangement Builder Live.app"|\
-    "$INSTALL_HOME/Applications/CL Show Audio Builder.app"|\
+    "$INSTALL_HOME/Applications/CL Arrangement Builder.app"|\
+    "$INSTALL_HOME/Applications/CL Audio Export.app"|\
+    "$INSTALL_HOME/Applications/CL Audio Configuration Checker.app"|\
     "$INSTALL_HOME/Music/Ableton/User Library/Remote Scripts/AbletonOSC"|\
     "$INSTALL_HOME/Music/Ableton/User Library/Remote Scripts/CL_Arrangement_Builder_Live"|\
     "$INSTALL_HOME/Music/Ableton/User Library/Presets/Audio Effects/Max Audio Effect/CL Audio Controller - Remote"|\

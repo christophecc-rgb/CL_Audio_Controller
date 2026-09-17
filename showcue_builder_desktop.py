@@ -21,14 +21,14 @@ def backend_available():
 def main():
     if not backend_available():
         webview.create_window(
-            "CL ShowCue Builder",
-            html="<h2>CL Audio Show Control n’est pas démarré.</h2>"
+            "CL Cue Editor",
+            html="<h2>CL Show Control n’est pas démarré.</h2>"
                  "<p>Démarrez l’application principale, puis relancez le Builder.</p>",
             width=640,
             height=300,
         )
     else:
-        webview.create_window("CL ShowCue Builder — Préparation locale", BUILDER_URL,
+        webview.create_window("CL Cue Editor — Préparation locale", BUILDER_URL,
                               width=1500, height=900, min_size=(900, 600))
     webview.start()
     return 0

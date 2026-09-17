@@ -17,7 +17,7 @@ CE KIT CONTIENT
 3. AbletonOSC CL — Live 11 et Live 12
    Version validée avec les routes utilisées par CL Audio Controller.
 
-4. CL Arrangement Builder Live et CL MIDI Console Monitor
+4. CL Arrangement Builder et CL MIDI Console Monitor
    Proposés séparément dans l'écran de sélection de l'installateur.
 
 
@@ -55,7 +55,7 @@ Macs sont découverts sur le réseau par Bonjour.
 EMPLACEMENTS UTILISÉS
 
 Application :
-~/Applications/CL Audio Show Control.app
+~/Applications/CL Show Control.app
 
 AbletonOSC :
 ~/Music/Ableton/User Library/Remote Scripts/AbletonOSC
@@ -107,5 +107,5 @@ Ne désactivez pas globalement les protections de macOS.
 
 CL ARRANGEMENT BUILDER LIVE
 
-CL Arrangement Builder Live reste une application indépendante. L'installateur
+CL Arrangement Builder reste une application indépendante. L'installateur
 graphique permet de l'installer seule ou avec le reste de la suite.

@@ -117,13 +117,26 @@
 
   const lane = node('div', 'stage-lane');
   const side = node('aside', 'stage-side');
-  const heading = node('div', 'stage-live-heading');
-  heading.innerHTML = '<strong>LIVE</strong><span>Suivi des cues en temps réel</span>';
+  const heading = null;
   const past = live.querySelector('.live-past');
   const current = live.querySelector('.live-current');
   const checklist = document.getElementById('live-untimed-checklist');
-  lane.append(heading, live.querySelector('.ableton-strip'), past, current);
-  if (checklist) lane.append(checklist);
+  const abletonStrip = live.querySelector('.ableton-strip');
+
+  /*
+   * Mobile / scène :
+   * le bandeau Ableton appartient au bloc timing.
+   * Il doit donc précéder la conduite courante.
+   */
+  if (abletonStrip) {
+    lane.append(abletonStrip);
+  }
+
+  lane.append(past, current);
+
+  if (checklist) {
+    lane.append(checklist);
+  }
   side.append(live.querySelector('.live-ahead'));
   const orderPanel = node('article', 'panel stage-order');
   const orderHead = node('div', 'stage-order-head');
@@ -223,9 +236,355 @@
     current.classList.toggle('stage-has-current', Boolean(cue));
     sync.textContent = data.ltc_connected ? '● LTC · Synchronisé' : '○ LTC · Signal absent';
     sync.classList.toggle('connected', Boolean(data.ltc_connected));
-    role.replaceChildren(node('small', '', 'Rôle / poste'), node('span', '', cue?.resolved?.role || cue?.builder?.role || data.post || '—'));
-    notes.replaceChildren(node('small', '', 'Notes'), node('span', '', cue?.builder?.notes || 'Aucune note pour ce cue'));
-    details.hidden = !cue;
+    {
+      const resolved = cue?.resolved || {};
+
+      /* CL_SHOWCUE_CASTING_DISPLAY_V1
+       * TYPE CASTING = fiche LIVE volontairement épurée.
+       * Les rôles restent dans les données pour résoudre les artistes.
+       */
+      const isCastingCue =
+        String(cue?.builder?.type || '')
+          .trim()
+          .toLocaleUpperCase('fr') === 'CASTING';
+
+      const roleName = String(
+        resolved.role ||
+        cue?.builder?.role ||
+        cue?.role ||
+        ''
+      ).trim();
+
+      const artistName = String(
+        resolved.artist ||
+        resolved.resolved_artist ||
+        cue?.builder?.resolved_artist ||
+        cue?.builder?.artist_override ||
+        cue?.artist ||
+        ''
+      ).trim();
+
+      const equipment = [];
+
+      const addEquipment = value => {
+        value = String(value || '').trim();
+
+        if(
+          value &&
+          !equipment.some(item =>
+            item.toLocaleLowerCase('fr') ===
+            value.toLocaleLowerCase('fr')
+          )
+        ){
+          equipment.push(value);
+        }
+      };
+
+      const explicitMic = String(
+        cue?.builder?.microphone_override ||
+        cue?.microphone ||
+        ''
+      ).trim();
+
+      const resolvedMic = String(
+        resolved.microphone ||
+        resolved.resolved_microphone ||
+        cue?.builder?.resolved_microphone ||
+        ''
+      ).trim();
+
+      const explicitIem = String(
+        cue?.builder?.iem_override ||
+        cue?.iem ||
+        ''
+      ).trim();
+
+      const resolvedIem = String(
+        resolved.iem ||
+        resolved.resolved_iem ||
+        cue?.builder?.resolved_iem ||
+        ''
+      ).trim();
+
+      const explicitEquipment = String(
+        cue?.builder?.equipment_override ||
+        cue?.equipment ||
+        ''
+      ).trim();
+
+      const resolvedEquipment = String(
+        resolved.equipment ||
+        resolved.resolved_equipment ||
+        cue?.builder?.resolved_equipment ||
+        ''
+      ).trim();
+
+      addEquipment(explicitMic || resolvedMic);
+      addEquipment(explicitIem || resolvedIem);
+      addEquipment(explicitEquipment || resolvedEquipment);
+
+      const participants =
+        resolved.participants ||
+        resolved.resolved_participants ||
+        cue?.builder?.resolved_participants ||
+        [];
+
+      const lines = [];
+
+      if (Array.isArray(participants) && participants.length > 1) {
+
+        participants.forEach(participant => {
+
+          const participantRole = String(
+            participant?.role || ''
+          ).trim();
+
+          const participantArtist = String(
+            participant?.artist || ''
+          ).trim();
+
+          const participantEquipment = [];
+
+          const addParticipantEquipment = value => {
+            value = String(value || '').trim();
+
+            if(
+              value &&
+              !participantEquipment.some(item =>
+                item.toLocaleLowerCase('fr') ===
+                value.toLocaleLowerCase('fr')
+              )
+            ){
+              participantEquipment.push(value);
+            }
+          };
+
+          addParticipantEquipment(
+            participant?.microphone
+          );
+
+          addParticipantEquipment(
+            participant?.iem
+          );
+
+          addParticipantEquipment(
+            participant?.equipment
+          );
+
+          /*
+           * Si plusieurs micros existent et aucun n'est encore choisi,
+           * on ne les affiche PAS arbitrairement.
+           */
+          if(!participantEquipment.length){
+
+            const slots =
+              participant?.equipment_slots || [];
+
+            slots
+              .filter(slot =>
+                String(slot?.type || '')
+                  .toLocaleUpperCase('fr') !== 'MICRO'
+              )
+              .forEach(slot =>
+                addParticipantEquipment(slot?.value)
+              );
+          }
+
+          /* CL_SHOWCUE_LIVE_DISPLAY_CLEANUP_V1
+           * Dans le bloc matériel : rôle uniquement.
+           * Les artistes seront affichés une seule fois en haut.
+           */
+          const title = participantRole;
+
+          if(title){
+            lines.push(title);
+          }
+
+          if(participantEquipment.length){
+            lines.push(
+              participantEquipment.join(' · ')
+            );
+          }
+
+          lines.push('');
+        });
+
+        while(lines.length && lines.at(-1)===''){
+          lines.pop();
+        }
+
+      } else {
+
+        const identity = roleName;
+
+        if (identity) {
+          lines.push(identity);
+        }
+
+        if (equipment.length) {
+          lines.push(equipment.join(' · '));
+        }
+      }
+
+      if (data.post) {
+        lines.push('POSTE : ' + data.post);
+      }
+
+      /*
+       * Ligne compacte sous le titre du cue :
+       *
+       *   21:01:26:13 | Vénus · Mika · Justine
+       *
+       * Pas de rôle ici, pas de matériel ici.
+       */
+      const stageArtists = [];
+
+      const addStageArtist = value => {
+        value = String(value || '').trim();
+
+        if(
+          value &&
+          !stageArtists.some(item =>
+            item.toLocaleLowerCase('fr') ===
+            value.toLocaleLowerCase('fr')
+          )
+        ){
+          stageArtists.push(value);
+        }
+      };
+
+      if(Array.isArray(participants) && participants.length){
+        participants.forEach(participant =>
+          addStageArtist(participant?.artist)
+        );
+      } else if(artistName) {
+        /*
+         * resolved.artist peut déjà contenir plusieurs artistes
+         * séparés par "/".
+         */
+        String(artistName)
+          .split('/')
+          .map(value => value.trim())
+          .filter(Boolean)
+          .forEach(addStageArtist);
+      }
+
+      const currentCopy =
+        current.querySelector('.current-copy');
+
+      if(currentCopy){
+
+        /*
+         * Le rendu historique possède déjà une ligne de méta sous
+         * le titre. On la repère par son contenu plutôt que
+         * d'introduire une dépendance supplémentaire au HTML.
+         */
+        const candidates = [
+          ...currentCopy.children
+        ].filter(element =>
+          element !== details &&
+          !element.classList.contains('stage-details')
+        );
+
+        const cueTimecode =
+          String(cue?.timecode || '').trim();
+
+        const meta = candidates.find(element => {
+          const value =
+            String(element.textContent || '').trim();
+
+          if(!value)return false;
+
+          return (
+            (cueTimecode && value.includes(cueTimecode)) ||
+            value.includes('MICRO À DÉFINIR') ||
+            (roleName && value.includes(roleName))
+          );
+        });
+
+        if(meta){
+
+          const compactMeta = [];
+
+          if(cueTimecode){
+            compactMeta.push(cueTimecode);
+          }
+
+          if(stageArtists.length){
+            compactMeta.push(
+              stageArtists.join(' · ')
+            );
+          }
+
+          /* CL_SHOWCUE_LIVE_ARTIST_NAMES_V1 */
+          meta.replaceChildren();
+
+          if(cueTimecode){
+            meta.append(
+              node(
+                'span',
+                'stage-live-meta-timecode',
+                cueTimecode
+              )
+            );
+          }
+
+          if(
+            cueTimecode &&
+            stageArtists.length
+          ){
+            meta.append(
+              node(
+                'span',
+                'stage-live-meta-separator',
+                '|'
+              )
+            );
+          }
+
+          if(stageArtists.length){
+            meta.append(
+              node(
+                'span',
+                'stage-live-meta-artists',
+                stageArtists.join(' · ')
+              )
+            );
+          }
+
+          if(
+            !cueTimecode &&
+            !stageArtists.length
+          ){
+            meta.textContent='—';
+          }
+        }
+      }
+
+      role.replaceChildren(
+        node('small', '', 'Rôle / matériel'),
+        node('span', 'stage-current-assignment', lines.join('\n') || '—')
+      );
+
+      /*
+       * CASTING :
+       * on conserve toutes les infos en mémoire,
+       * mais on ne montre ni rôles ni matériel dans le LIVE.
+       */
+      role.hidden = isCastingCue;
+      notes.hidden = isCastingCue;
+    }
+
+    notes.replaceChildren(
+      node('small', '', 'Notes'),
+      node('span', '', cue?.builder?.notes || 'Aucune note pour ce cue')
+    );
+
+    details.hidden =
+      !cue ||
+      String(cue?.builder?.type || '')
+        .trim()
+        .toLocaleUpperCase('fr') === 'CASTING';
     const index = cues.findIndex(c => c.id === (data.conduite_current_id || cue?.id));
     const start = Math.max(0, index - 2);
     order.replaceChildren();
@@ -418,12 +777,112 @@
     if (!mobile.matches || cue.status !== 'official' || cue.mode === 'library') return row;
     row.classList.add('stage-mobile-cue');
     row.hidden = filterSelect.value !== 'all' && knownPosts(cue) && posts.includes(postEl.value) && !cue.posts.includes(postEl.value);
-    const time = node('span', 'stage-cue-time', isTimecode(cue.timecode) ? cue.timecode : '—');
-    const title = node('span', 'stage-cue-title', cue.text);
+    const time = node(
+      'span',
+      'stage-cue-time',
+      cue.mode === 'realtime'
+        ? (cue.clock_time || '--:--:--')
+        : isTimecode(cue.timecode)
+          ? cue.timecode
+          : '—'
+    );
+
+    const title = node(
+      'span',
+      'stage-cue-title',
+      cue.text
+    );
+
     title.title = cue.text;
-    const summary = button('stage-cue-roles', roleLabel(cue), () => openRoles(cue));
-    summary.setAttribute('aria-label', 'Affecter ' + cue.text + ' : ' + roleLabel(cue));
-    row.replaceChildren(time, title, summary);
+
+    /* CL_SHOWCUE_CASTING_VIGNETTE_V1 */
+    const isCasting =
+      String(cue?.builder?.type || '')
+        .trim()
+        .toLocaleUpperCase('fr') === 'CASTING';
+
+    if(isCasting){
+
+      const artists = [];
+
+      const addArtist = value => {
+        value = String(value || '').trim();
+
+        if(
+          value &&
+          !artists.some(item =>
+            item.toLocaleLowerCase('fr') ===
+            value.toLocaleLowerCase('fr')
+          )
+        ){
+          artists.push(value);
+        }
+      };
+
+      const participants =
+        cue?.resolved?.participants ||
+        cue?.resolved?.resolved_participants ||
+        [];
+
+      if(
+        Array.isArray(participants) &&
+        participants.length
+      ){
+        participants.forEach(participant =>
+          addArtist(participant?.artist)
+        );
+      }
+
+      if(!artists.length){
+
+        String(
+          cue?.resolved?.artist ||
+          cue?.resolved?.resolved_artist ||
+          ''
+        )
+          .split('/')
+          .map(value => value.trim())
+          .filter(Boolean)
+          .forEach(addArtist);
+      }
+
+      const castingNames = node(
+        'span',
+        'stage-cue-casting-artists',
+        artists.join(' · ') || 'CASTING À DÉFINIR'
+      );
+
+      /*
+       * Pas de bouton POSTE / TOUT / FOH sur une fiche casting.
+       */
+      row.classList.add('stage-casting-cue');
+
+      row.replaceChildren(
+        time,
+        title,
+        castingNames
+      );
+
+      return row;
+    }
+
+    const summary = button(
+      'stage-cue-roles',
+      roleLabel(cue),
+      () => openRoles(cue)
+    );
+
+    summary.setAttribute(
+      'aria-label',
+      'Affecter ' + cue.text + ' : ' + roleLabel(cue)
+    );
+
+    row.replaceChildren(
+      time,
+      title,
+      summary
+    );
+
     return row;
   };
 
@@ -522,6 +981,99 @@
   measureNav();
 })();
 
+
+/* =========================================================
+   CL_SHOWCUE_CONDUITE_INTERNAL_SCROLL_V1
+   Calcule automatiquement la hauteur disponible pour
+   "Déroulement complet".
+   ========================================================= */
+(function(){
+
+    const view=document.getElementById('view-conduite');
+
+    if(!view)return;
+
+    const grid=view.querySelector('.conduite-grid');
+    const sequence=document.getElementById('timed-sequence');
+
+    if(!grid || !sequence)return;
+
+    function syncConduiteViewport(){
+
+        const active=view.classList.contains('active');
+
+        document.documentElement.classList.toggle(
+            'showcue-conduite-lock',
+            active
+        );
+
+        document.body.classList.toggle(
+            'showcue-conduite-lock',
+            active
+        );
+
+        if(!active){
+            grid.style.removeProperty(
+                '--conduite-viewport-height'
+            );
+            return;
+        }
+
+        /*
+         * On mesure réellement où commence la liste.
+         * Tout ce qui est au-dessus reste donc visible,
+         * quelle que soit la hauteur de l'en-tête.
+         */
+        const top=grid.getBoundingClientRect().top;
+
+        const available=Math.max(
+            220,
+            Math.floor(window.innerHeight-top-10)
+        );
+
+        grid.style.setProperty(
+            '--conduite-viewport-height',
+            available+'px'
+        );
+    }
+
+    new MutationObserver(
+        syncConduiteViewport
+    ).observe(
+        view,
+        {
+            attributes:true,
+            attributeFilter:['class']
+        }
+    );
+
+    window.addEventListener(
+        'resize',
+        syncConduiteViewport,
+        {passive:true}
+    );
+
+    if(typeof ResizeObserver!=='undefined'){
+
+        const observer=new ResizeObserver(
+            syncConduiteViewport
+        );
+
+        [
+            document.querySelector('.stage-header'),
+            view.querySelector('.conduite-workbar'),
+            view.querySelector('#section-filters')
+        ]
+        .filter(Boolean)
+        .forEach(node=>observer.observe(node));
+    }
+
+    requestAnimationFrame(
+        syncConduiteViewport
+    );
+
+})();
+
 /* CL_SHOWCUE_SAVE_PORTABLE_V1 */
 (() => {
   const button = document.getElementById('save-showcue');
@@ -571,3 +1123,4 @@
     }
   });
 })();
+

@@ -9,7 +9,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['markupsafe._speedups', 'PIL'],
     noarchive=False,
     optimize=0,
 )
@@ -29,10 +29,10 @@ exe = EXE(
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
-    target_arch='arm64',
+    target_arch=__import__('os').environ.get('CL_BUILD_ARCH', 'universal2'),
     codesign_identity=None,
     entitlements_file=None,
-    icon=['CL_AUDIO.icns'],
+    icon=['assets/app_icons/CL_ShowCue.icns'],
 )
 
 coll = COLLECT(
@@ -48,12 +48,12 @@ coll = COLLECT(
 app = BUNDLE(
     coll,
     name='CL ShowCue.app',
-    icon='CL_AUDIO.icns',
+    icon='assets/app_icons/CL_ShowCue.icns',
     bundle_identifier='com.claudio.showcue',
     info_plist={
         'CFBundleDisplayName': 'CL ShowCue',
         'CFBundleShortVersionString': '1.0.0',
         'CFBundleVersion': '1',
-        'NSHighResolutionCapable': True,
+        'LSMinimumSystemVersion': '11.0', 'NSHighResolutionCapable': True,
     },
 )

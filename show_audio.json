@@ -29,35 +29,7 @@
       "notes": ""
     }
   ],
-  "medleys": [
-    {
-      "id": "medley_gigi_never_love_dancing_queen",
-      "title": "GIGI / NEVER / LOVE / DANCING QUEEN",
-      "scene_numbers": [
-        41,
-        42,
-        43,
-        44
-      ],
-      "export_parts": true,
-      "export_full": true,
-      "play_mode": "follow"
-    },
-    {
-      "id": "medley_dua_free_proud_cant_stop",
-      "title": "meddley SING SING",
-      "scene_numbers": [
-        64,
-        65,
-        66,
-        67
-      ],
-      "numbering": "live",
-      "export_parts": true,
-      "export_full": true,
-      "play_mode": "follow"
-    }
-  ],
+  "medleys": [],
   "playback_tracks": [
     "1 VIDEO CABARET(AUDIO)",
     "3 BOUNCE PBC Beny/Stef/Jade",

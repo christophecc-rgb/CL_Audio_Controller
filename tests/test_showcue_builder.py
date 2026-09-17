@@ -489,7 +489,7 @@ class ShowCueBuilderRouteTests(unittest.TestCase):
         spec = (root / "CL ShowCue Builder.spec").read_text(encoding="utf-8")
         page = self.client.get("/show-info/builder").get_data(as_text=True)
         self.assertIn("127.0.0.1:5050/show-info/builder", launcher)
-        self.assertIn("CL ShowCue Builder.app", spec)
+        self.assertIn("CL Cue Editor.app", spec)
         self.assertIn("IMPORT ALS — À VENIR", page)
         self.assertIn("+ ÉQUIPEMENT", page)
         self.assertIn("equipment_slots", page)

@@ -5,13 +5,25 @@ import sys
 
 
 def configuration_path() -> Path:
+    # CL_AUDIO_EXPORT_CONFIG_PATH_V1
     source = Path(__file__).resolve().with_name("show_audio.json")
+
     if not getattr(sys, "frozen", False):
         return source
-    target = Path.home() / "Library/Application Support/CL Show Audio Builder/show_audio.json"
+
+    support = Path.home() / "Library/Application Support"
+
+    target = support / "CL Audio Export/show_audio.json"
+    legacy = support / "CL Show Audio Builder/show_audio.json"
+
     target.parent.mkdir(parents=True, exist_ok=True)
+
     if not target.exists():
-        shutil.copy2(source, target)
+        if legacy.exists():
+            shutil.copy2(legacy, target)
+        else:
+            shutil.copy2(source, target)
+
     return target
 
 

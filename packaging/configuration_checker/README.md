@@ -1,3 +1,7 @@
+> Identité actuelle : le script de génération utilise la variante canonique
+> `assets/app_icons/CL_MIDI_RTP_Diagnostic.png`. Le générateur Swift ci-dessous
+> est conservé comme source historique et ne pilote plus l’icône distribuée.
+
 # CL MIDI & RTP Diagnostic — packaging macOS
 
 Le bundle est reconstruit sans installation avec :

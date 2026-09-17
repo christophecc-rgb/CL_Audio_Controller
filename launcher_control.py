@@ -87,7 +87,7 @@ REMOTE_ROOT_URL = f"http://127.0.0.1:{WEB_PORT}/"
 REMOTE_AB_URL = f"http://127.0.0.1:{WEB_PORT}/ab"
 REMOTE_ARRANGEMENT_URL = f"http://127.0.0.1:{WEB_PORT}/arrangement"
 REMOTE_ROOT_LAN_URL = lambda: f"http://{get_lan_ip()}:{WEB_PORT}/"
-REMOTE_APP_NAME = "Télécommande Ableton.app"
+REMOTE_APP_NAME = "CL Ableton Remote.app"
 REMOTE_APP_INTERNAL_NAME = "RemoteAbleton.app"
 server_ownership_lock = threading.RLock()
 server_lifecycle_lock = threading.RLock()
@@ -593,7 +593,7 @@ HTML = r'''
 <html>
 <head>
 <meta charset="utf-8">
-<title>CL Audio Show Control</title>
+<title>CL Show Control</title>
 <style>
 *{box-sizing:border-box}
 body{
@@ -2192,7 +2192,7 @@ def remote_window():
 def open_midi_network_assistant():
     assistant = find_midi_network_assistant()
     if assistant is None:
-        return jsonify(error="CL MIDI Network Manager est introuvable. CL Audio Show Control reste disponible."), 404
+        return jsonify(error="CL MIDI Network Manager est introuvable. CL Show Control reste disponible."), 404
     subprocess.Popen(["/usr/bin/open", str(assistant)])
     event("CL MIDI Network Manager ouvert depuis Show Control")
     return jsonify(message="CL MIDI Network Manager ouvert")
@@ -2248,7 +2248,7 @@ if __name__ == "__main__":
     print("Ouverture du panneau de contrôle en fenêtre autonome :", CONTROL_URL, flush=True)
     panel_api = ControlPanelWindowApi()
     panel_window = webview.create_window(
-        "CL AUDIO SHOW CONTROL",
+        "CL Show Control",
         CONTROL_URL,
         width=500,
         height=900,

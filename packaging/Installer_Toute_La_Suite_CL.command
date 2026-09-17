@@ -160,11 +160,12 @@ port_listening() {
 }
 
 prepare_controller_replacement() {
-  local quit_requested=0 controller_app="$USER_APPS/CL Audio Show Control.app"
+  local quit_requested=0 controller_app="$USER_APPS/CL Show Control.app"
   [[ "$INSTALL_HOME" == "$HOME" ]] || return 0
+  [[ -e "$controller_app" ]] || controller_app="$USER_APPS/CL Audio Show Control.app"
   [[ -e "$controller_app" ]] || controller_app="$USER_APPS/CL Audio Controller.app"
   [[ -e "$controller_app" ]] || return 0
-  say ""; say "Préparation de CL Audio Show Control"
+  say ""; say "Préparation de CL Show Control"
   if port_listening 5050 && ! port_listening 5055; then
     say "  Serveur orphelin détecté : réouverture temporaire du panneau pour reprise sécurisée"
     /usr/bin/open -gj "$controller_app" >/dev/null 2>&1 || true
@@ -190,7 +191,7 @@ prepare_controller_replacement() {
     fi
     sleep 0.5
   done
-  fail "CL Audio Show Control fonctionne encore sur 5050 ou 5055 après la demande d’arrêt propre. Quittez-le complètement (ou redémarrez le Mac), puis relancez l’installation. Rien n’a été remplacé."
+  fail "CL Show Control fonctionne encore sur 5050 ou 5055 après la demande d’arrêt propre. Quittez-le complètement (ou redémarrez le Mac), puis relancez l’installation. Rien n’a été remplacé."
 }
 
 prepare_rtp_agent_replacement() {
@@ -224,6 +225,20 @@ verify_copy() {
   [[ "$sd" == "$td" ]]
 }
 
+retire_legacy_app_names() {
+  # Called only after the replacement has been copied and verified.
+  # Existing data folders and bundle identifiers intentionally stay unchanged.
+  case "$1" in
+    "$USER_APPS/CL Show Control.app")
+      trash_existing "$USER_APPS/CL Audio Show Control.app"
+      trash_existing "$USER_APPS/CL Audio Controller.app" ;;
+    "$USER_APPS/CL Audio Export.app") trash_existing "$USER_APPS/CL Show Audio Builder.app" ;;
+    "$USER_APPS/CL Cue Editor.app") trash_existing "$USER_APPS/CL ShowCue Builder.app" ;;
+    "$USER_APPS/CL Arrangement Builder.app") trash_existing "$USER_APPS/Arrangement Builder Live.app" ;;
+  esac
+  return 0
+}
+
 install_item() {
   local source="$1" target="$2" label="$3" component="$4"
   require_source "$source"
@@ -232,6 +247,7 @@ install_item() {
   mkdir -p "$(dirname "$target")"
   ditto "$source" "$target"
   if verify_copy "$source" "$target"; then
+    retire_legacy_app_names "$target"
     say "  ✓ Installé et vérifié : $target"
     printf '%s\t%s\tOK\n' "$label" "$target" >> "$INSTALLED_LIST"
   else
@@ -256,12 +272,12 @@ verify_selected_components() {
   while IFS= read -r line; do
     rel="${line#*  }"
     case "$rel" in
-      "Composants/Applications/CL Audio Show Control.app/"*|"Composants/Applications/CL ShowCue.app/"*|"Composants/Applications/CL ShowCue Builder.app/"*|"Composants/CL_Transport/"*) [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 || "$INSTALL_SHOWCUE" == 1 ]] && echo "$line" >> "$selected" ;;
+      "Composants/Applications/CL Show Control.app/"*|"Composants/Applications/CL ShowCue.app/"*|"Composants/Applications/CL Cue Editor.app/"*|"Composants/CL_Transport/"*) [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 || "$INSTALL_SHOWCUE" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Ableton Live 11-12/Remote Scripts/AbletonOSC/"*|"Composants/Ableton Live 11-12/Max for Live/CL Audio Controller - Remote/"*) [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_ABLETON_READER" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Applications/CL MIDI RTP Agent.app/"*) [[ "$INSTALL_ABLETON_READER" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Applications/CL MIDI & RTP Diagnostic.app/"*|"Composants/Applications/CL MIDI Analyzer.app/"*|"Composants/Applications/CL MIDI Performance Monitor.app/"*) [[ "$INSTALL_DIAGNOSTIC_TOOLS" == 1 ]] && echo "$line" >> "$selected" ;;
-      "Composants/Applications/Arrangement Builder Live.app/"*|"Composants/Ableton Live 11-12/Remote Scripts/CL_Arrangement_Builder_Live/"*) [[ "$INSTALL_BUILDER" == 1 ]] && echo "$line" >> "$selected" ;;
-      "Composants/Applications/CL Show Audio Builder.app/"*) [[ "$INSTALL_SHOW_AUDIO_BUILDER" == 1 ]] && echo "$line" >> "$selected" ;;
+      "Composants/Applications/CL Arrangement Builder.app/"*|"Composants/Ableton Live 11-12/Remote Scripts/CL_Arrangement_Builder_Live/"*) [[ "$INSTALL_BUILDER" == 1 ]] && echo "$line" >> "$selected" ;;
+      "Composants/Applications/CL Audio Export.app/"*) [[ "$INSTALL_SHOW_AUDIO_BUILDER" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Ableton Live 11-12/Max for Live/Paradis Latin AutoScene/"*) [[ "$INSTALL_AUTOSCENE" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Ableton Live 10/Max for Live/Paradis Latin AutoScene - Live 10/"*) [[ "$INSTALL_AUTOSCENE_LIVE10" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Applications/CL MIDI Network Manager.app/"*|"Composants/Outils réseau MIDI/"*) [[ "$INSTALL_MIDI_CONSOLE" == 1 || "$INSTALL_CONTROLLER" == 1 ]] && echo "$line" >> "$selected" ;;
@@ -366,10 +382,10 @@ verify_selected_components
 mkdir -p "$USER_APPS" "$REMOTE_SCRIPTS" "$ABLETON_LIBRARY/Presets"
 
 [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 || "$INSTALL_SHOWCUE" == 1 ]] && prepare_controller_replacement
-[[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 || "$INSTALL_SHOWCUE" == 1 ]] && install_item "$APPLICATIONS_SOURCE/CL Audio Show Control.app" "$USER_APPS/CL Audio Show Control.app" "Centre de contrôle — CL Audio Show Control" "controller"
+[[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 || "$INSTALL_SHOWCUE" == 1 ]] && install_item "$APPLICATIONS_SOURCE/CL Show Control.app" "$USER_APPS/CL Show Control.app" "Centre de contrôle — CL Show Control" "controller"
 if [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 || "$INSTALL_SHOWCUE" == 1 ]]; then
   install_item "$APPLICATIONS_SOURCE/CL ShowCue.app" "$USER_APPS/CL ShowCue.app" "ShowCue — Application" "controller"
-  install_item "$APPLICATIONS_SOURCE/CL ShowCue Builder.app" "$USER_APPS/CL ShowCue Builder.app" "ShowCue — Builder" "controller"
+  install_item "$APPLICATIONS_SOURCE/CL Cue Editor.app" "$USER_APPS/CL Cue Editor.app" "ShowCue — Builder" "controller"
   TRANSPORT_SOURCE="$SCRIPT_DIR/Composants/CL_Transport"
   TRANSPORT_TARGET="$USER_APPS/CL Audio/CL_Transport"
   [[ -d "$TRANSPORT_SOURCE" ]] || fail "CL_Transport absent du kit"
@@ -399,29 +415,31 @@ fi
 if [[ "$INSTALL_ABLETON_READER" == 1 ]]; then
   prepare_rtp_agent_replacement
   install_item "$APPLICATIONS_SOURCE/CL MIDI RTP Agent.app" "$USER_APPS/CL MIDI RTP Agent.app" "Ableton Lecteur — Agent RTP léger" "ableton-reader"
-  say ""; say "Ableton Lecteur — Activation du démarrage automatique RTP"
-  # LaunchServices peut retourner -1712 alors que l’agent a bien démarré :
-  # l’état réel (processus + LaunchAgent) fait foi.
-  /usr/bin/open -gj "$USER_APPS/CL MIDI RTP Agent.app" >/dev/null 2>&1 || true
-  for _ in 1 2 3 4 5; do
-    if [[ -f "$INSTALL_HOME/Library/LaunchAgents/com.claudio.midi-rtp-agent.plist" ]] \
-      && /usr/bin/pgrep -f -x "$USER_APPS/CL MIDI RTP Agent.app/Contents/MacOS/CL MIDI RTP Agent" >/dev/null 2>&1; then
-      break
-    fi
-    sleep 1
-  done
-  [[ -f "$INSTALL_HOME/Library/LaunchAgents/com.claudio.midi-rtp-agent.plist" ]] \
-    || fail "CL MIDI RTP Agent n’a pas enregistré son démarrage automatique"
-  /usr/bin/pgrep -f -x "$USER_APPS/CL MIDI RTP Agent.app/Contents/MacOS/CL MIDI RTP Agent" >/dev/null 2>&1 \
-    || fail "CL MIDI RTP Agent ne fonctionne pas après son lancement"
-  say "  ✓ Agent RTP actif et enregistré pour les prochaines ouvertures de session"
+  if [[ "$INSTALL_HOME" == "$HOME" && "${CL_SUITE_SKIP_POSTINSTALL:-0}" != "1" ]]; then
+    say ""; say "Ableton Lecteur — Activation du démarrage automatique RTP"
+    # LaunchServices peut retourner -1712 alors que l’agent a bien démarré :
+    # l’état réel (processus + LaunchAgent) fait foi.
+    /usr/bin/open -gj "$USER_APPS/CL MIDI RTP Agent.app" >/dev/null 2>&1 || true
+    for _ in 1 2 3 4 5; do
+      if [[ -f "$INSTALL_HOME/Library/LaunchAgents/com.claudio.midi-rtp-agent.plist" ]] \
+        && /usr/bin/pgrep -f -x "$USER_APPS/CL MIDI RTP Agent.app/Contents/MacOS/CL MIDI RTP Agent" >/dev/null 2>&1; then
+        break
+      fi
+      sleep 1
+    done
+    [[ -f "$INSTALL_HOME/Library/LaunchAgents/com.claudio.midi-rtp-agent.plist" ]] \
+      || fail "CL MIDI RTP Agent n’a pas enregistré son démarrage automatique"
+    /usr/bin/pgrep -f -x "$USER_APPS/CL MIDI RTP Agent.app/Contents/MacOS/CL MIDI RTP Agent" >/dev/null 2>&1 \
+      || fail "CL MIDI RTP Agent ne fonctionne pas après son lancement"
+    say "  ✓ Agent RTP actif et enregistré pour les prochaines ouvertures de session"
+  fi
 fi
 if [[ "$INSTALL_BUILDER" == 1 ]]; then
-  install_item "$APPLICATIONS_SOURCE/Arrangement Builder Live.app" "$USER_APPS/Arrangement Builder Live.app" "Builder — Application" "builder"
+  install_item "$APPLICATIONS_SOURCE/CL Arrangement Builder.app" "$USER_APPS/CL Arrangement Builder.app" "Builder — Application" "builder"
   install_item "$LIVE_CURRENT_SOURCE/Remote Scripts/CL_Arrangement_Builder_Live" "$REMOTE_SCRIPTS/CL_Arrangement_Builder_Live" "Builder — Remote Script" "builder"
 fi
 if [[ "$INSTALL_SHOW_AUDIO_BUILDER" == 1 ]]; then
-  install_item "$APPLICATIONS_SOURCE/CL Show Audio Builder.app" "$USER_APPS/CL Show Audio Builder.app" "Show Audio Builder — Application" "show-audio-builder"
+  install_item "$APPLICATIONS_SOURCE/CL Audio Export.app" "$USER_APPS/CL Audio Export.app" "Show Audio Builder — Application" "show-audio-builder"
 fi
 [[ "$INSTALL_AUTOSCENE" == 1 ]] && install_item "$LIVE_CURRENT_SOURCE/Max for Live/Paradis Latin AutoScene" "$M4L_AUTOSCENE_TARGET" "AutoScene — Version Live 11/12" "autoscene"
 [[ "$INSTALL_AUTOSCENE_LIVE10" == 1 ]] && install_item "$LIVE10_SOURCE_ROOT/Max for Live/Paradis Latin AutoScene - Live 10" "$M4L_LIVE10_TARGET" "AutoScene — Version Live 10" "autoscene-live10"

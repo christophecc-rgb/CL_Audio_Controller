@@ -919,6 +919,344 @@ html body.stage-ui .stage-header .stage-clocks #ltc {
   }
 }
 
+/* CL_SHOWCUE_MOBILE_TIMING_FIX_START */
+
+@media (max-width:760px){
+
+  /* --------------------------------------------------------
+     HORLOGE — vraie horloge de régie / studio
+     -------------------------------------------------------- */
+
+  .stage-wall-clock{
+    display:flex !important;
+    flex-direction:column !important;
+    align-items:center !important;
+    justify-content:center !important;
+
+    min-width:92px !important;
+
+    padding:5px 9px !important;
+
+    border:1px solid rgba(205,188,164,.28) !important;
+    border-radius:8px !important;
+
+    background:
+      linear-gradient(
+        180deg,
+        rgba(26,27,28,.98),
+        rgba(8,9,10,.98)
+      ) !important;
+
+    box-shadow:
+      inset 0 1px rgba(255,255,255,.06),
+      inset 0 0 12px rgba(0,0,0,.55) !important;
+  }
+
+  .stage-wall-clock small{
+    margin:0 0 3px !important;
+
+    color:rgba(235,219,194,.55) !important;
+
+    font-size:7px !important;
+    font-weight:850 !important;
+    line-height:1 !important;
+    letter-spacing:.20em !important;
+  }
+
+  .stage-wall-clock #server-clock{
+    display:block !important;
+
+    color:#f4ead9 !important;
+
+    font-family:
+      "SF Mono",
+      SFMono-Regular,
+      Menlo,
+      Monaco,
+      monospace !important;
+
+    font-size:25px !important;
+    font-weight:900 !important;
+
+    line-height:1 !important;
+    letter-spacing:-.045em !important;
+
+    font-variant-numeric:tabular-nums !important;
+
+    text-shadow:
+      0 0 7px rgba(255,235,200,.10) !important;
+  }
+
+
+  /* --------------------------------------------------------
+     ABLETON — timing juste sous le header
+     -------------------------------------------------------- */
+
+  .stage-lane > .ableton-strip{
+    margin:
+      5px
+      0
+      10px !important;
+
+    min-height:58px !important;
+
+    padding:
+      8px
+      10px !important;
+
+    border:
+      1px solid
+      rgba(137,154,177,.45) !important;
+
+    border-radius:9px !important;
+
+    background:
+      linear-gradient(
+        180deg,
+        rgba(45,51,62,.98),
+        rgba(29,34,42,.98)
+      ) !important;
+
+    box-shadow:
+      inset 0 1px rgba(255,255,255,.055),
+      0 3px 10px rgba(0,0,0,.25) !important;
+
+    display:grid !important;
+
+    grid-template-columns:
+      minmax(0,2.2fr)
+      auto
+      auto
+      auto !important;
+
+    gap:9px !important;
+
+    align-items:center !important;
+  }
+
+  .stage-lane > .ableton-strip .label{
+    margin:0 0 3px !important;
+
+    color:rgba(217,224,234,.67) !important;
+
+    font-family:
+      -apple-system,
+      BlinkMacSystemFont,
+      "SF Pro Text",
+      sans-serif !important;
+
+    font-size:7px !important;
+    font-weight:800 !important;
+    line-height:1 !important;
+    letter-spacing:.11em !important;
+  }
+
+  .stage-lane #ableton-scene{
+    color:#f2d49c !important;
+
+    font-family:
+      -apple-system,
+      BlinkMacSystemFont,
+      "SF Pro Display",
+      sans-serif !important;
+
+    font-size:15px !important;
+    font-weight:750 !important;
+
+    line-height:1.05 !important;
+    letter-spacing:0 !important;
+  }
+
+  .stage-lane .ableton-value{
+    color:#f0c66e !important;
+
+    font-family:
+      "SF Mono",
+      SFMono-Regular,
+      Menlo,
+      monospace !important;
+
+    font-size:15px !important;
+    font-weight:850 !important;
+
+    line-height:1 !important;
+
+    font-variant-numeric:tabular-nums !important;
+  }
+
+
+  /* Un peu d'air avant la conduite */
+  .stage-lane > .live-current{
+    margin-top:0 !important;
+  }
+
+}
+
+/* CL_SHOWCUE_MOBILE_TIMING_FIX_END */
+
+
+/* CL SHOWCUE — affinage horloge mobile */
+@media (max-width:760px){
+
+  .stage-wall-clock{
+    min-width:110px !important;
+    padding:6px 11px !important;
+  }
+
+  .stage-wall-clock #server-clock{
+    font-size:30px !important;
+    font-weight:950 !important;
+    letter-spacing:-.05em !important;
+    color:#fff4df !important;
+  }
+
+  .stage-wall-clock small{
+    font-size:6px !important;
+    opacity:.65 !important;
+    margin-bottom:3px !important;
+  }
+
+}
+
+/* CL SHOWCUE — horloge mobile rouge */
+@media (max-width:760px){
+
+  .stage-wall-clock #server-clock{
+    color:#ff4d4d !important;
+    text-shadow:
+      0 0 6px rgba(255,77,77,.35),
+      0 0 14px rgba(255,77,77,.18) !important;
+  }
+
+}
+
+
+/* CL_SHOWCUE_RED_CLOCK_START */
+@media (max-width:760px){
+
+    .stage-wall-clock #server-clock,
+    #server-clock{
+        color:#ff2b2b !important;
+
+        font-size:30px !important;
+        font-weight:950 !important;
+
+        text-shadow:
+            0 0 4px rgba(255,43,43,.90),
+            0 0 10px rgba(255,43,43,.55),
+            0 0 18px rgba(255,43,43,.25) !important;
+    }
+
+}
+/* CL_SHOWCUE_RED_CLOCK_END */
+
+
+
+
+
+
+
+
+/* CL_SHOWCUE_MOBILE_SPACING_V3_START */
+
+@media (max-width:760px){
+
+    /* ======================================================
+       TIMING : sous le header, sans chevauchement
+       ====================================================== */
+
+    body.stage-ui #view-live{
+        margin-top:0 !important;
+        padding-top:8px !important;
+    }
+
+    body.stage-ui .stage-lane{
+        margin-top:0 !important;
+        padding-top:0 !important;
+    }
+
+    body.stage-ui .stage-lane > .ableton-strip{
+        margin-top:0 !important;
+        margin-bottom:16px !important;
+    }
+
+
+    /* ======================================================
+       CUE ACTUEL
+       ====================================================== */
+
+    body.stage-ui .stage-lane > .live-current{
+        margin-top:0 !important;
+        margin-bottom:0 !important;
+    }
+
+
+    /* ======================================================
+       PROCHAIN : un peu d'air après le cue principal
+       ====================================================== */
+
+    body.stage-ui .stage-side{
+        margin-top:14px !important;
+        padding-top:0 !important;
+    }
+
+    body.stage-ui .stage-side > .live-ahead{
+        margin-top:0 !important;
+    }
+
+
+    /* ======================================================
+       MOBILE LIVE :
+       on ne montre pas les panneaux secondaires en dessous
+       ====================================================== */
+
+    body.stage-ui .stage-side > .stage-order{
+        display:none !important;
+    }
+
+    body.stage-ui .stage-quick{
+        display:none !important;
+    }
+
+}
+
+/* CL_SHOWCUE_MOBILE_SPACING_V3_END */
+
+
+
+
+
+/* CL_SHOWCUE_HIDE_AUDIO_MOBILE_START */
+
+@media (max-width:760px){
+
+  /*
+   * Capture audio désactivée sur iPhone/mobile.
+   * Desktop inchangé.
+   */
+
+  body.stage-ui
+  #view-conduite
+  #capture-audio,
+
+  body.stage-ui
+  #view-conduite
+  [data-action="capture-audio"],
+
+  body.stage-ui
+  #view-conduite
+  .capture-audio,
+
+  body.stage-ui
+  #view-conduite
+  button[title*="audio" i]{
+    display:none !important;
+  }
+
+}
+
+/* CL_SHOWCUE_HIDE_AUDIO_MOBILE_END */
+
 /* Mobile CONDUITE. The breakpoint is the only override of desktop cue controls. */
 .stage-conduite-filter,
 .stage-conduite-dock { display:none; }
@@ -968,4 +1306,134 @@ html body.stage-ui .stage-header .stage-clocks #ltc {
 }
 @media (prefers-reduced-motion:reduce) {
   .stage-navigation { transition:none; }
+}
+
+
+
+/* =========================================================
+   CL_SHOWCUE_CONDUITE_INTERNAL_SCROLL_V1
+
+   Desktop :
+   - l'en-tête ShowCue reste visible
+   - la barre CONDUITE reste visible
+   - les filtres restent visibles
+   - SEULE la liste des cues défile
+   ========================================================= */
+
+@media (min-width:761px){
+
+    html.showcue-conduite-lock,
+    body.showcue-conduite-lock{
+        overflow:hidden !important;
+        height:100% !important;
+    }
+
+    body.stage-ui.showcue-conduite-lock
+    #view-conduite.active{
+        min-height:0 !important;
+    }
+
+    body.stage-ui.showcue-conduite-lock
+    #view-conduite.active
+    .conduite-grid{
+        height:var(--conduite-viewport-height, 500px) !important;
+        min-height:220px !important;
+        overflow:hidden !important;
+    }
+
+    body.stage-ui.showcue-conduite-lock
+    #view-conduite.active
+    .conduite-grid
+    .content-panel{
+        height:100% !important;
+        min-height:0 !important;
+
+        display:flex !important;
+        flex-direction:column !important;
+
+        overflow:hidden !important;
+    }
+
+    body.stage-ui.showcue-conduite-lock
+    #view-conduite.active
+    .conduite-grid
+    .content-panel > h3{
+        flex:0 0 auto !important;
+    }
+
+    body.stage-ui.showcue-conduite-lock
+    #view-conduite.active
+    #timed-sequence{
+        flex:1 1 auto !important;
+
+        min-height:0 !important;
+
+        overflow-y:auto !important;
+        overflow-x:hidden !important;
+
+        overscroll-behavior:contain;
+
+        scrollbar-gutter:stable;
+    }
+
+}
+
+
+/* CL_SHOWCUE_LIVE_ARTIST_NAMES_V1 */
+
+.stage-live-meta-timecode{
+    font-size:0.95rem;
+    font-weight:700;
+    opacity:.78;
+}
+
+.stage-live-meta-separator{
+    margin:0 .45rem;
+    opacity:.45;
+}
+
+.stage-live-meta-artists{
+    font-size:1.55rem;
+    line-height:1.1;
+    font-weight:950;
+    letter-spacing:.01em;
+}
+
+@media(max-width:760px){
+    .stage-live-meta-artists{
+        font-size:1.35rem;
+    }
+}
+
+
+/* CL_SHOWCUE_CASTING_VIGNETTE_V1 */
+
+.stage-casting-cue{
+    align-items:center;
+}
+
+.stage-cue-casting-artists{
+    display:block;
+
+    font-size:1.35rem;
+    line-height:1.1;
+    font-weight:950;
+
+    white-space:normal;
+    overflow-wrap:anywhere;
+}
+
+@media(max-width:760px){
+
+    .stage-casting-cue{
+        grid-template-columns:auto minmax(0,1fr) !important;
+    }
+
+    .stage-casting-cue .stage-cue-casting-artists{
+        grid-column:1/-1;
+
+        padding-top:.25rem;
+
+        font-size:1.45rem;
+    }
 }

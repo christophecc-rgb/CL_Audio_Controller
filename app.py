@@ -473,8 +473,8 @@ def decorate_remote_page_html(response):
         )
         for key, href, label in (
             ("session", "/", "Session"),
-            ("ab", "/ab", "A/B"),
             ("arrangement", "/arrangement", "Arrangement"),
+            ("showcue", "/show-info", "ShowCue"),
         )
     )
     header_html = f"""
@@ -483,7 +483,7 @@ def decorate_remote_page_html(response):
       <div class="v2-brand">
         <img src="/assets/paradis%20latin.jpg" alt="Paradis Latin Cabaret">
         <div class="v2-brand-copy">
-          <div class="v2-brand-title">CL Audio Show Control</div>
+          <div class="v2-brand-title">CL Show Control</div>
           <div class="v2-brand-subtitle">Remote professionnelle · {module_label}</div>
         </div>
       </div>
@@ -3679,7 +3679,7 @@ def protect_local_builder_routes():
     if not request.path.startswith("/show-info/builder"):
         return None
     if not request_is_loopback():
-        return jsonify({"ok": False, "message": "CL ShowCue Builder est disponible uniquement en local"}), 403
+        return jsonify({"ok": False, "message": "CL Cue Editor est disponible uniquement en local"}), 403
     return None
 
 
@@ -3833,11 +3833,16 @@ def resolve_showcue_builder_metadata(cues, distribution):
         if not metadata or not metadata.get("role"):
             resolved_cues.append(cue)
             continue
-        builder_cue = {"role": metadata.get("role"), "text": cue.get("text", ""),
-                       "artist": metadata.get("artist_override", ""),
-                       "microphone": metadata.get("microphone_override", ""),
-                       "iem": metadata.get("iem_override", ""),
-                       "equipment": metadata.get("equipment_override", "")}
+        # CL_SHOWCUE_ROLE_ASSIGNMENTS_RESOLVE_V1
+        builder_cue = {
+            "role": metadata.get("role"),
+            "text": cue.get("text", ""),
+            "artist": metadata.get("artist_override", ""),
+            "microphone": metadata.get("microphone_override", ""),
+            "iem": metadata.get("iem_override", ""),
+            "equipment": metadata.get("equipment_override", ""),
+            "role_assignments": metadata.get("role_assignments") or {},
+        }
         resolved_cues.append({**cue, "resolved": resolve_builder_cue(builder_cue, distribution)})
     return resolved_cues
 
@@ -3937,6 +3942,91 @@ def show_info_preview_builder_import():
     return jsonify({"ok": True, "document": resolved_builder_document(document), "unknown_columns": unknown,
                     "validation": validate_builder_document(document), "saved": False})
 
+
+
+
+@app.route("/show-info/builder/import-distribution", methods=["POST"])
+def show_info_preview_builder_distribution_import():
+    """
+    Prévisualise UNIQUEMENT la distribution d'un CSV/XLSX.
+
+    Les cues du fichier importé sont volontairement ignorées.
+    La conduite courante du Builder reste donc intacte.
+    """
+    upload = request.files.get("file")
+
+    if upload is None:
+        return jsonify({
+            "ok": False,
+            "message": "Fichier manquant",
+        }), 400
+
+    payload = upload.read()
+
+    if len(payload) > 10 * 1024 * 1024:
+        return jsonify({
+            "ok": False,
+            "message": "Fichier trop volumineux",
+        }), 413
+
+    try:
+        filename = str(upload.filename or "").lower()
+
+        if filename.endswith(".xlsx"):
+            imported, unknown = import_xlsx(payload)
+        elif filename.endswith(".csv"):
+            imported, unknown = import_csv(payload)
+        else:
+            raise ValueError("Format attendu : XLSX ou CSV")
+
+        imported_distribution = imported.get("distribution") or []
+
+        if not imported_distribution:
+            raise ValueError(
+                "Aucune ligne de distribution trouvée dans ce fichier."
+            )
+
+        with SHOW_CUES_LOCK:
+            _, current_path = active_builder_path()
+
+            current = load_builder_document(current_path)
+
+            # CRITIQUE :
+            # les cues viennent EXCLUSIVEMENT du Builder courant.
+            # Celles présentes dans le CSV/XLSX sont ignorées.
+            document = {
+                **current,
+                "cues": current.get("cues", []),
+                "distribution": imported_distribution,
+                "revision": current["revision"],
+            }
+
+            document = normalize_builder_document(document)
+
+        return jsonify({
+            "ok": True,
+            "document": resolved_builder_document(document),
+            "unknown_columns": unknown,
+            "validation": validate_builder_document(document),
+            "saved": False,
+            "import_mode": "distribution_only",
+            "preserved_cues": len(document.get("cues", [])),
+            "imported_distribution": len(
+                document.get("distribution", [])
+            ),
+        })
+
+    except (
+        ValueError,
+        UnicodeError,
+        zipfile.BadZipFile,
+        KeyError,
+        ET.ParseError,
+    ) as exc:
+        return jsonify({
+            "ok": False,
+            "message": str(exc),
+        }), 400
 
 
 @app.route("/show-info/builder/import.pdf", methods=["POST"])
@@ -4087,67 +4177,236 @@ def builder_collision_keys(values):
              item["text"].casefold(), tuple(item["posts"])) for item in values}
 
 
+def builder_official_by_builder_id(document):
+    """Indexe sans ambiguïté les cues ShowCue issus du Cue Editor."""
+    result = {}
+    duplicates = []
+
+    for cue in document.get("cues", []):
+        builder_meta = cue.get("builder") or {}
+        builder_id = str(builder_meta.get("builder_id") or "").strip()
+
+        if not builder_id:
+            continue
+
+        if builder_id in result:
+            duplicates.append(builder_id)
+            continue
+
+        result[builder_id] = cue
+
+    if duplicates:
+        raise ValueError(
+            "builder_id dupliqué dans la conduite officielle : "
+            + ", ".join(sorted(set(duplicates)))
+        )
+
+    return result
+
+
+def builder_sync_plan(mapped, official):
+    """
+    Prépare une synchronisation non destructive :
+
+    - même builder_id : mise à jour du cue ShowCue existant ;
+    - builder_id absent : ajout ;
+    - cue ShowCue absent du Builder : conservé ;
+    - collision exacte sans builder_id : blocage de sécurité.
+    """
+    official_by_builder_id = builder_official_by_builder_id(official)
+
+    existing_keys = builder_collision_keys(official.get("cues", []))
+    planned_keys = set(existing_keys)
+
+    additions = []
+    replacements = []
+    collisions = []
+
+    for item in mapped:
+        builder_meta = item.get("builder") or {}
+        builder_id = str(builder_meta.get("builder_id") or "").strip()
+
+        if not builder_id:
+            raise ValueError("cue Builder sans builder_id")
+
+        current = official_by_builder_id.get(builder_id)
+
+        if current is not None:
+            replacements.append((current, item))
+            continue
+
+        item_keys = builder_collision_keys([item])
+
+        if not item_keys:
+            raise ValueError(f"clé de collision impossible pour {builder_id}")
+
+        item_key = next(iter(item_keys))
+
+        if item_key in planned_keys:
+            collisions.append(builder_id)
+            continue
+
+        additions.append(item)
+        planned_keys.add(item_key)
+
+    return {
+        "additions": additions,
+        "replacements": replacements,
+        "collisions": collisions,
+    }
+
+
 @app.route("/show-info/builder/showcue-preview", methods=["POST"])
 def show_info_builder_showcue_preview():
     values = request.get_json(silent=True) or {}
+
     try:
         with SHOW_CUES_LOCK:
             registry, builder_path = active_builder_path(values)
             builder = load_builder_document(builder_path)
             mapped = builder_import_values(builder)
+
             _, cue_path, _ = ensure_show_cue_storage()
             official = load_show_document(cue_path)
-            existing_keys = builder_collision_keys(official["cues"])
-            collisions = [item["builder"]["builder_id"] for item in mapped
-                          if next(iter(builder_collision_keys([item]))) in existing_keys]
+
+            plan = builder_sync_plan(mapped, official)
+
             for old_token, old_preview in list(SHOW_BUILDER_IMPORTS.items()):
                 if time.time() - old_preview["created_at"] > 900:
                     SHOW_BUILDER_IMPORTS.pop(old_token, None)
+
             token = secrets.token_urlsafe(24)
-            serialized = json.dumps(builder, ensure_ascii=False, sort_keys=True)
-            SHOW_BUILDER_IMPORTS[token] = {"session_id": registry["active_session_id"],
-                                           "builder": serialized, "created_at": time.time()}
+
+            serialized = json.dumps(
+                builder,
+                ensure_ascii=False,
+                sort_keys=True,
+            )
+
+            SHOW_BUILDER_IMPORTS[token] = {
+                "session_id": registry["active_session_id"],
+                "builder": serialized,
+                "created_at": time.time(),
+            }
+
     except RuntimeError as exc:
-        return jsonify({"ok": False, "message": str(exc)}), 409
+        return jsonify({
+            "ok": False,
+            "message": str(exc),
+        }), 409
+
     except (OSError, ValueError, json.JSONDecodeError) as exc:
-        return jsonify({"ok": False, "message": str(exc)}), 400
+        return jsonify({
+            "ok": False,
+            "message": str(exc),
+        }), 400
+
     validation = validate_builder_document(builder)
-    return jsonify({"ok": True, "token": token, "summary": validation,
-                    "collisions": collisions, "ready": validation["ready"] and not collisions,
-                    "will_add": len(mapped), "will_replace": 0, "information_lost": []})
+
+    collisions = plan["collisions"]
+
+    return jsonify({
+        "ok": True,
+        "token": token,
+        "summary": validation,
+        "collisions": collisions,
+        "ready": validation["ready"] and not collisions,
+        "will_add": len(plan["additions"]),
+        "will_replace": len(plan["replacements"]),
+        "information_lost": [],
+    })
 
 
 @app.route("/show-info/builder/showcue-import", methods=["POST"])
 def show_info_builder_showcue_import():
     values = request.get_json(silent=True) or {}
+
     token = str(values.get("token") or "")
     preview = SHOW_BUILDER_IMPORTS.pop(token, None)
+
     if not preview or values.get("confirm") is not True:
-        return jsonify({"ok": False, "message": "Prévisualisation ou confirmation manquante"}), 400
+        return jsonify({
+            "ok": False,
+            "message": "Prévisualisation ou confirmation manquante",
+        }), 400
+
     try:
         with SHOW_CUES_LOCK:
-            registry, builder_path = active_builder_path({"session_id": preview["session_id"]})
+            registry, builder_path = active_builder_path({
+                "session_id": preview["session_id"]
+            })
+
             if registry["active_session_id"] != preview["session_id"]:
-                raise RuntimeError("La session active a changé. Nouvelle prévisualisation requise.")
+                raise RuntimeError(
+                    "La session active a changé. "
+                    "Nouvelle prévisualisation requise."
+                )
+
             builder = load_builder_document(builder_path)
-            if json.dumps(builder, ensure_ascii=False, sort_keys=True) != preview["builder"]:
-                raise RuntimeError("Le Builder a changé. Nouvelle prévisualisation requise.")
+
+            if (
+                json.dumps(
+                    builder,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                )
+                != preview["builder"]
+            ):
+                raise RuntimeError(
+                    "Le Builder a changé. "
+                    "Nouvelle prévisualisation requise."
+                )
+
             mapped = builder_import_values(builder)
+
             _, cue_path, _ = ensure_show_cue_storage()
             document = load_show_document(cue_path)
-            existing_keys = builder_collision_keys(document["cues"])
-            if any(next(iter(builder_collision_keys([item]))) in existing_keys for item in mapped):
-                raise ValueError("collision avec la conduite existante")
+
+            plan = builder_sync_plan(mapped, document)
+
+            if plan["collisions"]:
+                raise ValueError(
+                    "collision avec la conduite existante : "
+                    + ", ".join(plan["collisions"])
+                )
+
+            updated = []
+
+            for current, item in plan["replacements"]:
+                document, cue = update_show_cue(
+                    document,
+                    current["id"],
+                    item,
+                )
+                updated.append(cue)
+
             created = []
-            for item in mapped:
+
+            for item in plan["additions"]:
                 document, cue = create_show_cue(document, item)
                 created.append(cue)
+
             save_show_document(cue_path, document)
+
     except RuntimeError as exc:
-        return jsonify({"ok": False, "message": str(exc)}), 409
+        return jsonify({
+            "ok": False,
+            "message": str(exc),
+        }), 409
+
     except (OSError, ValueError, json.JSONDecodeError) as exc:
-        return jsonify({"ok": False, "message": str(exc)}), 400
-    return jsonify({"ok": True, "created": created}), 201
+        return jsonify({
+            "ok": False,
+            "message": str(exc),
+        }), 400
+
+    return jsonify({
+        "ok": True,
+        "created": created,
+        "updated": updated,
+        "added": len(created),
+        "replaced": len(updated),
+    }), 200
 
 
 def cleanup_show_calls_locked(now: Optional[float] = None) -> None:
@@ -4401,13 +4660,14 @@ def show_info_status():
                     "elapsed_seconds": elapsed_seconds,
                     "remaining_seconds": remaining_seconds,
                     "manual": show_cues_for_post(cues, post, "manual"),
+                    "realtime": show_cues_for_post(cues, post, "realtime"),
                     "library": show_cues_for_post(cues, post, "library"),
-                    "drafts": [cue for mode in ("timed", "manual", "library")
+                    "drafts": [cue for mode in ("timed", "manual", "realtime", "library")
                                for cue in show_cues_for_post(cues, post, mode)
                                if cue["status"] == "draft"],
                     "conduite": {
                         mode: show_cues_for_conduite(cues, mode)
-                        for mode in ("timed", "manual", "library")
+                        for mode in ("timed", "manual", "realtime", "library")
                     },
                     "calls": calls,
                     "conduite_current_id": conduite_current["id"] if conduite_current else None,
@@ -5982,7 +6242,7 @@ def show_audio_scene_clips():
 
     Cette route est volontairement indépendante de la logique historique
     TABLEAU / durée de playback. Elle ne sélectionne aucun clip : elle publie
-    uniquement les données réelles nécessaires à CL Show Audio Builder.
+    uniquement les données réelles nécessaires à CL Audio Export.
     """
     raw_scene_index = request.args.get("scene_index")
     try:
@@ -7248,6 +7508,344 @@ def get_local_ip():
         return "127.0.0.1"
     finally:
         s.close()
+
+# CL_SHOWCUE_AUDIO_TEST_START
+
+@app.route("/show-info/audio-test")
+def show_info_audio_test():
+    return r"""
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>ShowCue Audio Test</title>
+
+<style>
+body{
+    margin:0;
+    padding:20px;
+    background:#111;
+    color:#eee;
+    font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+}
+.card{
+    max-width:520px;
+    margin:auto;
+    padding:18px;
+    border:1px solid #444;
+    border-radius:14px;
+    background:#1b1b1b;
+}
+button{
+    width:100%;
+    padding:14px;
+    margin-top:10px;
+    border:0;
+    border-radius:10px;
+    font-size:17px;
+    font-weight:700;
+}
+#start{ background:#2d7d46; color:white; }
+#stop{ background:#a62f2f; color:white; }
+#stop:disabled{ opacity:.4; }
+
+pre{
+    white-space:pre-wrap;
+    word-break:break-word;
+    background:#090909;
+    padding:12px;
+    border-radius:10px;
+    font-size:13px;
+    line-height:1.4;
+}
+
+audio{
+    width:100%;
+    margin-top:14px;
+}
+</style>
+</head>
+
+<body>
+<div class="card">
+    <h2>ShowCue — Test audio iPhone</h2>
+
+    <button id="start">DÉMARRER TEST MICRO</button>
+    <button id="stop" disabled>ARRÊTER</button>
+
+    <audio id="player" controls></audio>
+
+    <pre id="log">Prêt.</pre>
+</div>
+
+<script>
+const logEl = document.getElementById("log");
+const startBtn = document.getElementById("start");
+const stopBtn = document.getElementById("stop");
+const player = document.getElementById("player");
+
+let stream = null;
+let recorder = null;
+let chunks = [];
+
+function log(...args){
+    const line = args.map(x =>
+        typeof x === "object"
+            ? JSON.stringify(x, null, 2)
+            : String(x)
+    ).join(" ");
+
+    logEl.textContent += "\n" + line;
+}
+
+startBtn.onclick = async () => {
+    logEl.textContent = "=== AUDIO TEST ===";
+
+    try {
+        log("navigator.mediaDevices:",
+            !!navigator.mediaDevices);
+
+        log("getUserMedia:",
+            !!navigator.mediaDevices?.getUserMedia);
+
+        log("MediaRecorder:",
+            typeof MediaRecorder !== "undefined");
+
+        if (!navigator.mediaDevices?.getUserMedia) {
+            throw new Error("getUserMedia non disponible");
+        }
+
+        stream = await navigator.mediaDevices.getUserMedia({
+            audio: true
+        });
+
+        log("Micro autorisé: OUI");
+
+        const tracks = stream.getAudioTracks();
+
+        tracks.forEach((track, i) => {
+            log("TRACK", i + 1);
+            log("label:", track.label);
+            log("settings:", track.getSettings());
+        });
+
+        const devices =
+            await navigator.mediaDevices.enumerateDevices();
+
+        log("");
+        log("=== ENTRÉES AUDIO ===");
+
+        devices
+            .filter(d => d.kind === "audioinput")
+            .forEach((d, i) => {
+                log(
+                    `${i + 1}. ${d.label || "(sans nom)"}`
+                );
+            });
+
+        const candidates = [
+            "audio/mp4",
+            "audio/webm;codecs=opus",
+            "audio/webm",
+            "audio/ogg;codecs=opus"
+        ];
+
+        let mimeType = "";
+
+        for (const candidate of candidates) {
+            if (
+                typeof MediaRecorder !== "undefined" &&
+                MediaRecorder.isTypeSupported(candidate)
+            ) {
+                mimeType = candidate;
+                break;
+            }
+        }
+
+        log("");
+        log("MIME choisi:", mimeType || "(défaut navigateur)");
+
+        chunks = [];
+
+        recorder = mimeType
+            ? new MediaRecorder(stream, { mimeType })
+            : new MediaRecorder(stream);
+
+        log("Recorder MIME réel:",
+            recorder.mimeType || "(inconnu)");
+
+        recorder.ondataavailable = e => {
+            if (e.data && e.data.size > 0) {
+                chunks.push(e.data);
+            }
+        };
+
+        recorder.onstop = () => {
+            const blob = new Blob(
+                chunks,
+                {
+                    type:
+                        recorder.mimeType ||
+                        mimeType ||
+                        "application/octet-stream"
+                }
+            );
+
+            log("");
+            log("=== RÉSULTAT ===");
+            log("Blob type:", blob.type);
+            log("Taille:", blob.size, "octets");
+
+            const url = URL.createObjectURL(blob);
+            player.src = url;
+
+            if (stream) {
+                stream.getTracks().forEach(t => t.stop());
+            }
+
+            startBtn.disabled = false;
+            stopBtn.disabled = true;
+        };
+
+        recorder.start();
+
+        log("");
+        log("Enregistrement démarré.");
+
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+
+    } catch (err) {
+        log("");
+        log("ERREUR:");
+        log(err.name || "");
+        log(err.message || err);
+
+        if (stream) {
+            stream.getTracks().forEach(t => t.stop());
+        }
+    }
+};
+
+stopBtn.onclick = () => {
+    if (
+        recorder &&
+        recorder.state !== "inactive"
+    ) {
+        recorder.stop();
+    }
+};
+</script>
+</body>
+</html>
+"""
+
+# CL_SHOWCUE_AUDIO_TEST_END
+
+
+# CL_SHOWCUE_WORK_CLOCK_V1
+# Horloge existante de ShowCue conservée.
+# Ce bloc ajoute uniquement les affectations horaires.
+
+@app.route(
+    "/show-info/work-assignments",
+    methods=["GET", "PUT"]
+)
+def show_info_work_assignments():
+    from flask import jsonify, request
+    from pathlib import Path
+    import json
+
+    path = (
+        Path(__file__).resolve().parent /
+        "work_assignments.json"
+    )
+
+    if request.method == "GET":
+
+        if not path.exists():
+            return jsonify({
+                "assignments": []
+            })
+
+        try:
+            data = json.loads(
+                path.read_text(encoding="utf-8")
+            )
+        except Exception:
+            data = []
+
+        if not isinstance(data, list):
+            data = []
+
+        return jsonify({
+            "assignments": data
+        })
+
+    payload = request.get_json(
+        silent=True
+    ) or {}
+
+    assignments = payload.get(
+        "assignments",
+        []
+    )
+
+    if not isinstance(assignments, list):
+        return jsonify({
+            "error": "assignments doit être une liste"
+        }), 400
+
+    clean = []
+
+    for item in assignments:
+
+        if not isinstance(item, dict):
+            continue
+
+        time_value = str(
+            item.get("time") or ""
+        ).strip()
+
+        post = str(
+            item.get("post") or ""
+        ).strip()
+
+        text = str(
+            item.get("text") or ""
+        ).strip()
+
+        if not time_value or not text:
+            continue
+
+        clean.append({
+            "id": str(
+                item.get("id") or ""
+            ).strip(),
+            "time": time_value,
+            "post": post,
+            "text": text,
+            "enabled": (
+                item.get("enabled") is not False
+            )
+        })
+
+    path.write_text(
+        json.dumps(
+            clean,
+            ensure_ascii=False,
+            indent=2
+        ) + "\n",
+        encoding="utf-8"
+    )
+
+    return jsonify({
+        "ok": True,
+        "assignments": clean
+    })
+
 
 
 if __name__ == "__main__":

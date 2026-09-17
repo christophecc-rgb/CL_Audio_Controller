@@ -67,8 +67,8 @@ class PackagingTests(unittest.TestCase):
             PROJECT_ROOT / "packaging/Installer_Toute_La_Suite_CL.command"
         ).read_text(encoding="utf-8")
 
-        self.assertIn("CL Audio Show Control.app", script)
-        self.assertIn("Arrangement Builder Live.app", script)
+        self.assertIn("CL Show Control.app", script)
+        self.assertIn("CL Arrangement Builder.app", script)
         self.assertIn("CL_Arrangement_Builder_Live", script)
         self.assertIn("AbletonOSC", script)
         self.assertIn("Max Audio Effect/CL Audio Controller", script)
@@ -128,7 +128,7 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("Désinstaller la Suite CL.app", script)
         self.assertIn("Paradis Latin AutoScene - Live 10.amxd", script)
         self.assertIn("Paradis Latin AutoScene - Live 10.maxpat", script)
-        self.assertIn("Arrangement Builder Live.app/", script)
+        self.assertIn("CL Arrangement Builder.app/", script)
         self.assertIn('"CL MIDI RTP Agent.app/"', script)
         self.assertNotIn('"CL MIDI RTP Simulator.app/"', script)
         self.assertIn("CFBundleIconFile", script)
@@ -139,7 +139,7 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("installer-universal", script)
         self.assertIn("x86_64-apple-macosx10.15", script)
         self.assertIn("arm64-apple-macosx10.15", script)
-        self.assertIn('python3 -m PyInstaller', script)
+        self.assertIn('"$CL_PYTHON" -m PyInstaller', script)
         self.assertIn('"Arrangement Builder Live.spec"', script)
         self.assertIn('ditto "$BUILDER_APP"', script)
         self.assertIn('ditto "$BUILDER_DIR/RemoteScript"', script)
@@ -179,7 +179,7 @@ class PackagingTests(unittest.TestCase):
     def test_native_installer_has_branded_component_cards_and_keeps_the_existing_engines(self):
         source = (PROJECT_ROOT / "packaging" / "CLSuiteInstallerApp.m").read_text(encoding="utf-8")
         self.assertIn("Mac Télécommande", source)
-        self.assertIn("CL Arrangement Builder Live", source)
+        self.assertIn("CL Arrangement Builder", source)
         self.assertIn("Paradis Latin AutoScene", source)
         self.assertIn("CL MIDI Network Manager + simulateur", source)
         self.assertIn("Mac Ableton Lecteur", source)
@@ -199,8 +199,8 @@ class PackagingTests(unittest.TestCase):
         self.assertIn('@"ERREUR : "', source)
         installer_section = source.split("] : @[", 1)[1]
         self.assertLess(installer_section.index("Paradis Latin AutoScene"), installer_section.index("Mac Télécommande"))
-        self.assertLess(installer_section.index("Mac Télécommande"), installer_section.index("CL Arrangement Builder Live"))
-        self.assertLess(installer_section.index("CL Arrangement Builder Live"), installer_section.index("CL MIDI Network Manager + simulateur"))
+        self.assertLess(installer_section.index("Mac Télécommande"), installer_section.index("CL Arrangement Builder"))
+        self.assertLess(installer_section.index("CL Arrangement Builder"), installer_section.index("CL MIDI Network Manager + simulateur"))
         self.assertIn('@selector(terminate:)', source)
         self.assertIn('keyEquivalent:@"q"', source)
 
@@ -249,8 +249,11 @@ class PackagingTests(unittest.TestCase):
 
             components = kit / "Composants"
             required_directories = (
-                "Applications/CL Audio Show Control.app",
-                "Applications/Arrangement Builder Live.app",
+                "Applications/CL Show Control.app",
+                "Applications/CL ShowCue.app",
+                "Applications/CL Cue Editor.app",
+                "CL_Transport",
+                "Applications/CL Arrangement Builder.app",
                 "Applications/CL MIDI Network Manager.app",
                 "Ableton Live 11-12/Remote Scripts/AbletonOSC",
                 "Ableton Live 11-12/Remote Scripts/CL_Arrangement_Builder_Live",
@@ -288,24 +291,24 @@ class PackagingTests(unittest.TestCase):
             )
             subprocess.run([str(engine)], check=True, env=environment, capture_output=True)
 
-            self.assertTrue((home / "Applications/CL Audio Show Control.app").is_dir())
-            self.assertTrue((home / "Applications/Arrangement Builder Live.app").is_dir())
+            self.assertTrue((home / "Applications/CL Show Control.app").is_dir())
+            self.assertTrue((home / "Applications/CL Arrangement Builder.app").is_dir())
             self.assertTrue((home / "Applications/CL MIDI Network Manager.app").is_dir())
 
-            legacy = home / "Applications/CL Audio Show Control.app.sauvegarde_ancienne"
+            legacy = home / "Applications/CL Show Control.app.sauvegarde_ancienne"
             legacy.mkdir()
             subprocess.run([str(engine)], check=True, env=environment, capture_output=True)
             trash_sessions = list((home / ".Trash").glob("CL Suite remplacée *"))
             self.assertTrue(trash_sessions)
             trashed_names = {item.name for session in trash_sessions for item in session.iterdir()}
-            self.assertTrue(any(name.endswith("CL Audio Show Control.app") for name in trashed_names))
+            self.assertTrue(any(name.endswith("CL Show Control.app") for name in trashed_names))
             self.assertTrue(any("sauvegarde_ancienne" in name for name in trashed_names))
             self.assertTrue(
                 (home / "Music/Ableton/User Library/Remote Scripts/AbletonOSC").is_dir()
             )
             manifest = home / "Library/Application Support/CL Audio Controller/CL_Suite_install_manifest.tsv"
             self.assertTrue(manifest.is_file())
-            self.assertEqual(len(manifest.read_text().splitlines()), 9)
+            self.assertEqual(len(manifest.read_text().splitlines()), 11)
 
 
 if __name__ == "__main__":

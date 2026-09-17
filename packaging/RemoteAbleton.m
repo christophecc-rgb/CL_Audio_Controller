@@ -22,7 +22,7 @@
                     backing:NSBackingStoreBuffered
                       defer:NO];
 
-    self.window.title = @"Télécommande Ableton";
+    self.window.title = @"CL Ableton Remote";
     self.window.minSize = NSMakeSize(460, 700);
 
     WKWebViewConfiguration *config = [[WKWebViewConfiguration alloc] init];

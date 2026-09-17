@@ -13,7 +13,7 @@ fi
 
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources"
 ditto "$PROJECT_ROOT/packaging/Creer_Le_Kit_CL.app.sh" "$CONTENTS/MacOS/Créer le Kit CL"
-ditto "$PROJECT_ROOT/CL_AUDIO.icns" "$CONTENTS/Resources/CL_AUDIO.icns"
+ditto "$PROJECT_ROOT/assets/app_icons/CL_Kit.icns" "$CONTENTS/Resources/CL_AUDIO.icns"
 printf '%s\n' "$PROJECT_ROOT" > "$CONTENTS/Resources/PROJECT_ROOT.txt"
 chmod +x "$CONTENTS/MacOS/Créer le Kit CL"
 

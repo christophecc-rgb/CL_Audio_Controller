@@ -25,7 +25,7 @@ class ConfigurationCheckerPackagingTests(unittest.TestCase):
     def test_icon_is_reproducible_and_distinct(self):
         script = (ROOT / "scripts" / "generate_configuration_checker_icon.sh").read_text()
         generator = (ROOT / "packaging" / "configuration_checker" / "generate_icon.swift").read_text()
-        self.assertIn('cl_midi_network_assistant_icon_1024.png', script)
+        self.assertIn('CL_MIDI_RTP_Diagnostic.png', script)
         self.assertIn('iconutil -c icns', script)
         self.assertIn('CONFIG CHECK', generator)
         self.assertIn('verification badge', generator)

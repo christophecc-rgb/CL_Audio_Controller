@@ -2,6 +2,7 @@
 """Generate the unified, color-coded CL application icon family."""
 
 from pathlib import Path
+import json
 
 from PIL import Image, ImageColor, ImageDraw, ImageFilter, ImageFont
 
@@ -11,15 +12,9 @@ OUTPUT = ROOT / "assets" / "app_icons"
 FONT_BOLD = Path("/System/Library/Fonts/SFNS.ttf")
 FONT_ROUNDED = Path("/System/Library/Fonts/SFNSRounded.ttf")
 
-VARIANTS = {
-    "CL_Audio_Show_Control": ("SHOW CONTROL", "#D84A4A"),
-    "CL_Ableton": ("BUILDER", "#E58A3A"),
-    "CL_MIDI_RTP_Diagnostic": ("MIDI RTP DIAG", "#D5A735"),
-    "CL_MIDI_Network": ("MIDI NETWORK", "#32B89C"),
-    "CL_MIDI_Analyzer": ("MIDI ANALYZER", "#3E9ED6"),
-    "CL_MIDI_Performance": ("MIDI PERFORMANCE", "#3974D8"),
-    "CL_MIDI_RTP": ("MIDI RTP", "#6557C8"),
-}
+IDENTITIES = json.loads((ROOT / "resources/app_identity.json").read_text())
+VARIANTS = {app["icon"]: (app["label"], app["color"]) for app in IDENTITIES}
+
 
 
 def fitted_font(text: str, maximum_width: int, start_size: int) -> ImageFont.FreeTypeFont:
@@ -60,12 +55,24 @@ def render_variant(label: str, color: str) -> Image.Image:
     draw.text((512, 430), "CL", font=cl_font, anchor="mm", fill=(*accent, 255),
               stroke_width=2, stroke_fill=(255, 255, 255, 90))
 
-    bars = (18, 34, 58, 88, 54, 30, 48, 72, 44, 24)
-    start_x = 326
-    for index, height in enumerate(bars):
-        x = start_x + index * 31
-        draw.rounded_rectangle((x, 692 - height // 2, x + 12, 692 + height // 2),
-                               radius=6, fill=(*accent, 235))
+    if label in {"KIT", "INSTALL", "UNINSTALL"}:
+        # Role symbols remain recognizable when the caption is small in the Dock.
+        if label == "KIT":
+            draw.rounded_rectangle((451, 647, 573, 733), radius=10, outline=accent, width=10)
+            draw.line((480, 647, 480, 630, 544, 630, 544, 647), fill=accent, width=9)
+        elif label == "INSTALL":
+            draw.line((512, 626, 512, 697), fill=accent, width=12)
+            draw.line((481, 670, 512, 704, 543, 670), fill=accent, width=12)
+            draw.line((451, 695, 451, 736, 573, 736, 573, 695), fill=accent, width=10)
+        else:
+            draw.rounded_rectangle((451, 637, 573, 733), radius=12, outline=accent, width=10)
+            draw.line((478, 685, 546, 685), fill=accent, width=12)
+    else:
+        bars = (18, 34, 58, 88, 54, 30, 48, 72, 44, 24)
+        for index, height in enumerate(bars):
+            x = 326 + index * 31
+            draw.rounded_rectangle((x, 692 - height // 2, x + 12, 692 + height // 2),
+                                   radius=6, fill=(*accent, 235))
 
     draw.rounded_rectangle((214, 792, 810, 800), radius=4, fill=(*accent, 220))
     label_font = fitted_font(label, 720, 82)
@@ -86,6 +93,15 @@ def main() -> None:
     (ROOT / "CL_AUDIO.icns").write_bytes(
         (OUTPUT / "CL_Audio_Show_Control.icns").read_bytes()
     )
+
+    # Keep legacy entry points consistent with the canonical family.
+    (ROOT / "assets/cl_audio_logo.png").write_bytes(show_control.read_bytes())
+    (ROOT / "assets/cl_midi_network_assistant_icon_1024.png").write_bytes((OUTPUT / "CL_MIDI_Network.png").read_bytes())
+    (ROOT / "assets/CL_MIDI_Network_Assistant.icns").write_bytes((OUTPUT / "CL_MIDI_Network.icns").read_bytes())
+    from build_cl_audio_icon import ICON_SIZES
+    source = Image.open(show_control)
+    for filename, pixels in ICON_SIZES.items():
+        source.resize((pixels, pixels), Image.Resampling.LANCZOS).save(ROOT / "icon.iconset" / filename)
 
 
 if __name__ == "__main__":

@@ -1,5 +1,6 @@
 <!doctype html>
-<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>CL ShowCue</title>
+<html lang="fr"><head>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><meta charset="utf-8"><title>CL ShowCue</title>
 <style>
 :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--bg:#080a0e;--panel:#12161d;--line:#303743;--muted:#939dac;--text:#f6f8fb;--green:#3bd77c;--blue:#6ea8ff}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text)}button,select,input,textarea{font:inherit}button,select{border:1px solid #4c5665;border-radius:7px;background:#202631;color:#fff;padding:8px 12px}button{cursor:pointer;font-weight:800}button:disabled{cursor:default;opacity:.4}.primary{background:#176a3b;border-color:#299a58}.record{background:#782528;border-color:#c74c52}.quiet{font-size:.75rem;padding:6px 9px;color:#c1c8d2}.shell{width:min(1280px,100%);margin:auto;padding:12px clamp(12px,2.4vw,28px) 32px}.topbar{position:sticky;top:0;z-index:5;background:rgba(8,10,14,.96);border-bottom:1px solid var(--line);padding:8px 0 0;backdrop-filter:blur(12px)}.statusbar{display:grid;grid-template-columns:auto minmax(112px,auto) 1fr auto auto;align-items:center;gap:clamp(10px,2vw,24px)}h1{font-size:clamp(1rem,2vw,1.4rem);margin:0;white-space:nowrap}.post-control{display:flex;align-items:center;gap:7px}.post-control select{font-weight:900}.eyebrow,.label,label{color:var(--muted);font-size:.68rem;font-weight:900;letter-spacing:.11em;text-transform:uppercase}.show-title{overflow:hidden;color:#c5ccd5;font-size:.88rem;font-weight:700;text-overflow:ellipsis;white-space:nowrap}.transport{display:flex;align-items:center;gap:7px;font-size:.85rem;font-weight:950}.transport::before{width:9px;height:9px;border-radius:50%;background:#7d8590;content:""}.transport.play::before{background:var(--green);box-shadow:0 0 10px #3bd77c88}.ltc{font:850 clamp(1.15rem,2.6vw,2rem)/1 ui-monospace,SFMono-Regular,monospace;letter-spacing:.02em;white-space:nowrap}.tabs{display:flex;gap:4px;margin-top:8px}.tab{border:0;border-bottom:3px solid transparent;border-radius:0;background:transparent;color:#8d96a4;padding:9px 13px 8px;font-size:.76rem;letter-spacing:.08em}.tab.active{border-color:var(--green);color:#fff}.view{display:none;padding-top:18px}.view.active{display:block}.panel{border:1px solid #252b34;border-radius:12px;background:var(--panel)}.live-current{min-height:clamp(230px,44vh,510px);display:flex;align-items:center;padding:clamp(22px,5vw,64px)}.current-copy{width:100%}.cue-kicker{display:flex;align-items:center;gap:10px;margin-bottom:16px}.draft{display:inline-block;border-radius:4px;background:#704908;color:#ffe0a2;padding:4px 7px;font-size:.65rem;font-weight:950;letter-spacing:.1em}.current-text{font-size:clamp(2.3rem,6.5vw,6rem);font-weight:900;line-height:1.02;letter-spacing:-.035em;overflow-wrap:anywhere}.current-text::before{content:"▶";color:var(--green);font-size:.45em;margin-right:.42em;vertical-align:.14em}.cue-meta{margin-top:20px;color:var(--blue);font:750 clamp(.86rem,1.8vw,1.1rem) ui-monospace,SFMono-Regular,monospace}.live-ahead{display:grid;grid-template-columns:1.35fr .65fr;gap:12px;margin-top:12px}.ahead-card{min-height:135px;padding:20px}.ahead-next .ahead-text{font-size:clamp(1.35rem,3vw,2.3rem)}.ahead-following{opacity:.72}.ahead-text{margin-top:9px;font-size:clamp(1rem,2vw,1.45rem);font-weight:850;line-height:1.18}.ahead-time{margin-top:10px;color:var(--blue);font:700 .86rem ui-monospace,monospace}.section-head{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:14px}.section-head h2{margin:0;font-size:clamp(1.2rem,2.5vw,1.7rem)}.tools{display:flex;gap:8px;flex-wrap:wrap}.conduite-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:14px}.stack{display:grid;gap:14px}.content-panel{padding:clamp(16px,2.5vw,24px)}.content-panel h3{margin:0 0 14px;font-size:.95rem}.sequence{display:grid;gap:8px}.sequence-item,.list-item,.draft-card{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:12px;border-top:1px solid var(--line);padding:13px 0}.sequence-item:first-child,.list-item:first-child,.draft-card:first-child{border-top:0}.sequence-name,.small-text{font-size:1rem;font-weight:800}.sequence-meta,.muted{color:var(--muted);font-size:.79rem}.manual-cue{min-height:110px;margin-top:14px;font-size:clamp(1.35rem,3vw,2rem);font-weight:850;line-height:1.15}.manual-nav{display:flex;gap:8px;margin-top:14px}.empty{border:1px dashed #343c48;border-radius:10px;color:var(--muted);padding:28px;text-align:center}.draft-card{padding:16px 4px}.draft-text{font-size:clamp(1.05rem,2.2vw,1.35rem);font-weight:850}.draft-meta{margin-top:7px;color:var(--muted);font-size:.75rem;text-transform:uppercase}.error{color:#ff9292;min-height:1.3em;margin-top:12px}audio{width:100%;margin:12px 0}dialog{width:min(620px,calc(100% - 24px));border:1px solid #596274;border-radius:14px;background:#141923;color:#fff;padding:24px}dialog::backdrop{background:#000c}dialog h2{margin-top:0}.field{display:block;margin:14px 0}.field input,.field textarea,.field select{display:block;width:100%;margin-top:7px;border:1px solid #596274;border-radius:8px;background:#090b10;color:#fff;padding:11px;text-transform:none;letter-spacing:normal}.posts{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin:12px 0}.posts label{text-transform:none;letter-spacing:normal}.actions{display:flex;justify-content:flex-end;gap:9px;margin-top:18px}
 /* Identité Paradis Latin : chaleur discrète, sans modifier la hiérarchie de conduite. */
@@ -20,6 +21,83 @@
 .shell{width:min(1500px,100%)}#view-conduite .conduite-workbar{position:sticky;top:106px;z-index:4;margin:-6px 0 10px;border:1px solid #3d362e;border-radius:9px;background:rgba(18,16,14,.97);box-shadow:0 7px 20px #0008;padding:7px 10px;backdrop-filter:blur(10px)}.conduite-heading{display:flex;align-items:baseline;gap:8px;min-width:0}.conduite-session-name{max-width:min(42vw,520px);overflow:hidden;color:#e2b567;font-size:.82rem;font-weight:950;text-overflow:ellipsis;white-space:nowrap}.conduite-separator{color:#756b5e}.conduite-title{font-size:.78rem;font-weight:900;letter-spacing:.1em}.conduite-workbar .tools{margin-left:auto;flex-wrap:nowrap}.conduite-workbar .tools button{padding:6px 9px;font-size:.68rem}.conduite-grid{grid-template-columns:minmax(0,1fr) minmax(210px,24%)}.manual-block summary{padding:5px 6px;font-size:.7rem}.anchor-control{grid-template-columns:auto minmax(120px,1fr);padding:3px 6px 1px}.anchor-control select{height:28px;padding:2px 6px}.manual-lines{padding:0 6px 2px}.manual-lines .cue-line{min-height:27px;padding:2px 0}.manual-section-nav{gap:4px;padding:2px 6px 5px}.manual-section-nav button{padding:3px 4px;font-size:.7rem;line-height:1}@media(max-width:760px){.view#view-conduite .conduite-workbar{top:139px;align-items:flex-start}.conduite-workbar .tools{width:auto}.conduite-workbar .tools button{padding:6px}.conduite-session-name{max-width:38vw}}@media(max-width:520px){.view#view-conduite .conduite-workbar{top:136px;display:grid;grid-template-columns:1fr}.conduite-workbar .tools{width:100%;margin-left:0}.conduite-workbar .tools button{flex:1}.conduite-session-name{max-width:65vw}}
 .conduite-grid{display:block}.section-filters{display:flex;flex-wrap:wrap;gap:4px;margin:0 0 8px}.section-filter{padding:4px 7px;border-radius:999px;font-size:.62rem}.section-filter.active{border-color:#c79b50;background:#493a24;color:#fff}.manual-block[draggable=true] summary{cursor:grab}.manual-block.dragging{opacity:.45}.cue-line.manual-drop-target{box-shadow:inset 0 -3px #d6a34f}.manual-end-drop{height:10px;border-bottom:2px dashed transparent}.manual-end-drop.drop-target{border-color:#d6a34f}.manual-section-nav{display:flex;justify-content:flex-end}.manual-section-nav button{width:34px}.preparation-grid{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(240px,.65fr);gap:12px}.preparation-grid>*{min-width:0}@media(max-width:760px){.preparation-grid{grid-template-columns:1fr}}
 </style>
+
+<style id="showcue-distribution-grid-style">
+.stage-ui .distribution-row{
+    grid-template-columns:
+        minmax(110px,.6fr)
+        minmax(170px,.9fr)
+        minmax(0,1.8fr)
+        auto !important;
+    align-items:center;
+    gap:14px !important;
+}
+
+.distribution-tech-grid{
+    display:grid;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:8px;
+    min-width:0;
+}
+
+.distribution-tech-cell{
+    min-width:0;
+    border:1px solid #343a48;
+    border-radius:7px;
+    padding:7px 9px;
+    background:#151922;
+}
+
+.distribution-tech-label{
+    color:#8f98af;
+    font-size:.58rem;
+    font-weight:900;
+    letter-spacing:.08em;
+    margin-bottom:4px;
+}
+
+.distribution-tech-value{
+    color:#e7e9f3;
+    font-size:.76rem;
+    font-weight:800;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+
+.distribution-actions{
+    display:flex;
+    gap:7px;
+    justify-content:flex-end;
+    align-items:center;
+    white-space:nowrap;
+}
+
+@media(max-width:1100px){
+    .stage-ui .distribution-row{
+        grid-template-columns:
+            minmax(100px,.6fr)
+            minmax(150px,.9fr)
+            minmax(0,1.5fr)
+            auto !important;
+    }
+
+    .distribution-tech-grid{
+        grid-template-columns:1fr;
+    }
+}
+
+@media(max-width:760px){
+    .stage-ui .distribution-row{
+        grid-template-columns:1fr !important;
+    }
+
+    .distribution-actions{
+        justify-content:flex-start;
+    }
+}
+</style>
+
 
 
 <style id="showcue-hf-quick-edit">
@@ -1463,6 +1541,373 @@ body{
 
 </style>
 
+
+<style id="showcue-full-cue-editor-v1-style">
+
+#editor{
+  width:min(920px,96vw);
+  max-height:94vh;
+}
+
+#editor #cue-form{
+  max-height:88vh;
+  overflow-y:auto;
+  padding-right:5px;
+}
+
+.full-cue-block{
+  border-top:1px solid var(--line);
+  padding-top:11px;
+  margin-top:11px;
+}
+
+.full-cue-mode-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+}
+
+.full-cue-mode-grid label{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:7px;
+  min-height:38px;
+  border:1px solid var(--line);
+  border-radius:9px;
+  padding:7px 10px;
+  font-weight:850;
+  cursor:pointer;
+}
+
+.full-cue-mode-grid label:has(input:checked){
+  border-color:#d3a455;
+  color:#e4b464;
+  background:#d3a45512;
+}
+
+.full-real-clock-row{
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+
+#form-clock-time{
+  max-width:190px;
+  font-size:1.05rem;
+  font-weight:900;
+  font-variant-numeric:tabular-nums;
+}
+
+.full-cue-section-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:8px;
+  margin-bottom:8px;
+}
+
+.full-cue-role-list{
+  display:grid;
+  gap:7px;
+}
+
+.full-cue-role-card{
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:9px 10px;
+}
+
+.full-cue-role-head{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.full-cue-role-name{
+  font-weight:950;
+}
+
+.full-cue-role-artist{
+  margin-left:auto;
+  color:var(--muted);
+  font-size:.76rem;
+}
+
+.full-cue-role-tech{
+  display:grid;
+  grid-template-columns:105px minmax(0,1fr);
+  gap:6px 9px;
+  align-items:center;
+  margin-top:9px;
+}
+
+.full-cue-tech-label{
+  color:var(--muted);
+  font-size:.67rem;
+  font-weight:900;
+}
+
+.full-cue-role-tech select{
+  width:100%;
+}
+
+.showcue-realtime-heading{
+  margin:10px 4px 4px;
+  padding:6px 4px;
+  border-top:1px solid var(--line);
+  color:#e0ad59;
+  font-size:.67rem;
+  font-weight:950;
+  letter-spacing:.08em;
+}
+
+.realtime-cue-row .line-time{
+  color:#e0ad59;
+  font-variant-numeric:tabular-nums;
+}
+
+@media(max-width:700px){
+  #editor{
+    width:97vw;
+  }
+
+  .full-cue-mode-grid{
+    grid-template-columns:1fr;
+  }
+
+  .full-real-clock-row{
+    flex-direction:column;
+    align-items:stretch;
+  }
+
+  #form-clock-time{
+    max-width:none;
+  }
+
+  .full-cue-role-head{
+    flex-wrap:wrap;
+  }
+
+  .full-cue-role-artist{
+    width:100%;
+    margin-left:27px;
+  }
+
+  .full-cue-role-tech{
+    grid-template-columns:1fr;
+  }
+}
+
+</style>
+
+
+<style id="showcue-editor-visibility-fix-v1">
+/* CL_SHOWCUE_EDITOR_VISIBILITY_FIX_V1 */
+
+/*
+ * Plusieurs anciennes règles .field utilisent display:grid/flex.
+ * On garantit que l'attribut HTML hidden reste prioritaire.
+ */
+#editor [hidden]{
+    display:none !important;
+}
+
+</style>
+
+
+<style id="showcue-realtime-live-v1-style">
+/* CL_SHOWCUE_REALTIME_LIVE_V1 */
+
+/* L'horloge serveur reste active mais n'est plus affichée en double. */
+#server-clock,
+#cl-work-clock{
+    display:none !important;
+}
+
+</style>
+
+
+<style id="showcue-compact-editor-v1">
+/* CL_SHOWCUE_COMPACT_EDITOR_V1 */
+
+#editor{
+    width:min(860px,96vw);
+    max-height:92vh;
+}
+
+#editor #cue-form{
+    max-height:86vh;
+    overflow-y:auto;
+    font-size:.88rem;
+    padding-bottom:66px;
+}
+
+#editor h2{
+    font-size:1.15rem;
+    margin:0 0 7px;
+}
+
+#editor .field{
+    margin-top:7px;
+    margin-bottom:7px;
+}
+
+#editor .label{
+    font-size:.69rem;
+    line-height:1.1;
+    margin-bottom:4px;
+}
+
+#editor input,
+#editor select,
+#editor textarea,
+#editor button{
+    font-size:.82rem;
+}
+
+#editor textarea{
+    min-height:58px;
+    max-height:110px;
+}
+
+#editor .muted{
+    font-size:.66rem;
+    line-height:1.15;
+}
+
+.full-cue-block{
+    margin-top:7px;
+    padding-top:7px;
+}
+
+.full-cue-mode-grid{
+    gap:5px;
+}
+
+.full-cue-mode-grid label{
+    min-height:30px;
+    padding:4px 7px;
+    font-size:.74rem;
+}
+
+.full-cue-section-head{
+    margin-bottom:4px;
+}
+
+.full-cue-role-list{
+    gap:4px;
+}
+
+.full-cue-role-card{
+    padding:5px 7px;
+    border-radius:7px;
+}
+
+.full-cue-role-head{
+    gap:6px;
+    min-height:22px;
+}
+
+.full-cue-role-name{
+    font-size:.78rem;
+}
+
+.full-cue-role-artist{
+    font-size:.66rem;
+}
+
+.full-cue-role-tech{
+    grid-template-columns:70px repeat(1,minmax(0,1fr));
+    gap:3px 6px;
+    margin-top:5px;
+}
+
+.full-cue-tech-label{
+    font-size:.59rem;
+}
+
+.full-cue-role-tech select{
+    min-height:27px;
+    padding-top:2px;
+    padding-bottom:2px;
+}
+
+.full-real-clock-row{
+    gap:5px;
+}
+
+#form-clock-time{
+    font-size:.9rem;
+    max-width:150px;
+}
+
+/* Destinataires plus compacts */
+#form-posts{
+    gap:5px;
+}
+
+#form-posts label{
+    font-size:.72rem;
+}
+
+/*
+ * Barre d'action toujours accessible.
+ * Plus besoin de scroller jusqu'en bas pour enregistrer.
+ */
+#editor .actions{
+    position:sticky;
+    bottom:0;
+    z-index:20;
+    margin:9px -4px -4px;
+    padding:8px 4px 4px;
+    background:linear-gradient(
+        to bottom,
+        transparent,
+        var(--panel, #111) 22%
+    );
+    backdrop-filter:blur(8px);
+}
+
+#editor .actions button{
+    min-height:32px;
+    padding:5px 10px;
+}
+
+/* On conserve les aides, mais visuellement discrètes */
+#captured-label:empty{
+    display:none;
+}
+
+@media(max-width:700px){
+
+    #editor{
+        width:97vw;
+        max-height:94vh;
+    }
+
+    #editor #cue-form{
+        max-height:89vh;
+        font-size:.82rem;
+    }
+
+    .full-cue-mode-grid{
+        grid-template-columns:repeat(3,1fr);
+    }
+
+    .full-cue-mode-grid label{
+        font-size:.65rem;
+        padding:4px 3px;
+    }
+
+    .full-cue-role-artist{
+        width:auto;
+        margin-left:auto;
+    }
+}
+
+</style>
+
 </head>
 <body><main class="shell"><header class="topbar showcue-header-v6">
 
@@ -1598,10 +2043,165 @@ body{
 </header>
 <section class="view active" id="view-live"><article class="panel ableton-strip"><div class="ableton-main"><div class="label">Scène Ableton</div><div class="ableton-scene" id="ableton-scene">—</div></div><div><div class="label">Écoulé</div><div class="ableton-value" id="ableton-elapsed">—</div></div><div><div class="label">Durée</div><div class="ableton-value" id="ableton-duration">—</div></div><div><div class="label">Reste</div><div class="ableton-value" id="ableton-remaining">—</div></div></article><div class="live-past"><div class="past-line"><span class="past-time" id="past-second-time"></span><span id="past-second"></span></div><div class="past-line near"><span class="past-time" id="past-time"></span><span id="past"></span></div></div><article class="panel live-current"><div class="current-copy"><div class="live-current-head"><div class="cue-kicker"><span class="label">Cue actuel</span></div><button class="quiet live-edit" id="live-edit" hidden title="Correction rapide" aria-label="Corriger rapidement le cue courant">✎</button></div><div class="current-text" id="current">Aucun cue atteint</div><div class="cue-meta" id="current-meta"></div></div></article><div class="live-ahead"><article class="panel ahead-card ahead-next"><div class="label">Prochain</div><div class="ahead-text" id="next">—</div><div class="ahead-time" id="next-time"></div></article><article class="panel ahead-card ahead-following"><div class="label">Suivant</div><div class="ahead-text" id="following">—</div><div class="ahead-time" id="following-time"></div></article></div></section>
 <section class="view" id="view-conduite"><div class="section-head conduite-workbar"><div class="conduite-heading"><span class="conduite-session-name" id="conduite-session-name">Session actuelle</span><span class="conduite-separator">—</span><span class="conduite-title">CONDUITE</span></div><div class="tools"><button class="primary" id="add-cue">+ CUE</button><button class="quiet capture-tc-button" id="capture-tc">⏱ CAPTURE TC</button><button class="record" id="capture-audio">● CAPTURE AUDIO</button>{% if builder_local %}<button class="quiet" id="save-showcue" type="button">💾 SHOWCUE</button>{% endif %}</div></div><div class="section-filters" id="section-filters"></div><div class="conduite-grid"><article class="panel content-panel"><h3>Déroulement complet</h3><div class="sequence" id="timed-sequence"></div></article></div></section>
-<section class="view" id="view-distribution"><div class="section-head"><div><div class="label">Affectations de la session</div><h2>Distribution du jour</h2></div></div><article class="panel content-panel"><div class="muted distribution-note" id="distribution-note"></div><div class="distribution-list" id="distribution-list"></div></article></section>
+<section class="view" id="view-distribution"><div class="section-head"><div><div class="label">Affectations de la session</div><h2>Distribution du jour</h2></div><div class="tools"><button class="primary" id="distribution-add" hidden>+ AFFECTATION</button></div></div><article class="panel content-panel"><div class="muted distribution-note" id="distribution-note"></div><div class="distribution-list" id="distribution-list"></div></article></section>
 <section class="view" id="view-captures"><div class="section-head"><div><div class="label">Création et classement</div><h2>Préparation</h2></div><div class="tools"><button class="primary" id="draft-add-cue">+ CUE</button><button class="record" id="draft-capture-audio">● CAPTURE</button><button id="add-library">+ RÉSERVE</button>{% if builder_local %}<button type="button" onclick="location.href='/show-info/builder'">BUILDER</button>{% endif %}</div></div><div class="preparation-grid"><article class="panel content-panel"><h3>À placer</h3><div class="muted capture-intro">Éléments à intégrer dans la conduite ou à conserver en réserve.</div><div id="draft-list"></div></article><article class="panel content-panel"><h3>Réserve</h3><div id="library"></div></article></div></section><div class="error" id="error"></div></main>
+
+<dialog id="distribution-editor">
+<form method="dialog" id="distribution-form">
+<h2 id="distribution-editor-title">Affectation</h2>
+
+<label class="field">Rôle
+<input id="distribution-role" maxlength="100" required>
+</label>
+
+<label class="field">Artiste
+<input id="distribution-artist" maxlength="100" required>
+</label>
+
+<label class="field" style="display:flex;align-items:center;gap:10px">
+<input type="checkbox" id="distribution-active" style="width:auto;margin:0">
+Artiste actif pour ce rôle
+</label>
+
+<div class="label" style="margin-top:18px">Équipements</div>
+<div class="muted" style="margin:5px 0 10px">
+Maximum 3 équipements par artiste.
+</div>
+
+<div id="distribution-equipment-slots"></div>
+
+<label class="field">Notes
+<textarea id="distribution-notes" rows="3" maxlength="500"></textarea>
+</label>
+
+<div class="error" id="distribution-error"></div>
+
+<div class="actions">
+<button type="button" class="danger delete-action"
+        id="distribution-delete" hidden>SUPPRIMER</button>
+<button type="button" id="distribution-cancel">ANNULER</button>
+<button class="primary" value="default">ENREGISTRER</button>
+</div>
+</form>
+</dialog>
+
 <dialog id="recorder"><h2>Capture audio</h2><div class="muted" id="record-context"></div><label class="field">Entrée audio<select id="audio-input"></select></label><div class="muted" id="record-state">Autorisation micro requise au premier usage.</div><div class="error" id="record-error"></div><div class="actions"><button id="record-cancel">ANNULER</button><button class="primary" id="record-start" disabled>DÉMARRER</button><button class="record" id="record-stop" disabled>ARRÊTER</button></div></dialog>
-<dialog id="editor"><form method="dialog" id="cue-form"><h2 id="editor-title">Nouveau cue</h2><div class="muted" id="captured-label"></div><audio id="form-audio" controls hidden></audio><div class="field" id="timecode-field"><div class="label">Timecode</div><div class="smpte-editor" id="form-smpte"></div><input type="hidden" id="form-timecode"></div><label class="field" id="section-field">Section<input id="form-section" list="manual-sections" maxlength="80"><datalist id="manual-sections"></datalist></label><label class="field" id="anchor-field">Position après<select id="form-anchor"><option value="">FIN DE CONDUITE</option></select></label><label class="field">Texte<textarea id="form-text" rows="3" maxlength="1000" required></textarea></label><div class="label">Destinataires <button type="button" class="quiet" id="destinations-all">TOUS</button></div><div class="posts" id="form-posts">{% for post in posts %}<label><input type="checkbox" value="{{ post }}"> {{ post }}</label>{% endfor %}</div><label class="field" id="status-field">État<select id="form-status"><option value="draft">À placer</option><option value="official">Dans la conduite</option></select></label><div class="error" id="form-error"></div><div class="actions"><button type="button" class="danger delete-action" id="editor-delete" hidden>SUPPRIMER LE CUE</button><button type="button" id="editor-cancel">ANNULER</button><button class="primary" value="default" id="save">ENREGISTRER</button></div></form></dialog>
+<dialog id="editor"><form method="dialog" id="cue-form"><h2 id="editor-title">Nouveau cue</h2><div class="muted" id="captured-label"></div><audio id="form-audio" controls hidden></audio>
+<!-- CL_SHOWCUE_FULL_CUE_EDITOR_V1 -->
+
+<div class="full-cue-block">
+  <div class="label">REPÈRE</div>
+
+  <div class="full-cue-mode-grid">
+    <label>
+      <input type="radio" name="full-cue-mode" value="timed">
+      LTC
+    </label>
+
+    <label>
+      <input type="radio" name="full-cue-mode" value="realtime">
+      HEURE RÉELLE
+    </label>
+
+    <label>
+      <input type="radio" name="full-cue-mode" value="manual">
+      SANS REPÈRE
+    </label>
+  </div>
+</div>
+
+<div class="field full-cue-block" id="realtime-field" hidden>
+  <div class="label">HEURE RÉELLE</div>
+
+  <div class="full-real-clock-row">
+    <input
+      id="form-clock-time"
+      type="time"
+      step="1"
+      value="00:00:00">
+
+    <button
+      type="button"
+      class="quiet"
+      id="capture-real-clock">
+      PRENDRE L’HEURE ACTUELLE
+    </button>
+  </div>
+
+  <div class="muted">
+    Horloge civile du serveur ShowCue
+  </div>
+</div>
+
+<div class="field full-cue-block">
+  <div class="full-cue-section-head">
+    <div class="label">RÔLES & MATÉRIEL</div>
+
+    <div class="full-cue-role-actions">
+      <select
+        id="full-cue-role-picker"
+        aria-label="Rôle à ajouter">
+        <option value="">— CHOISIR UN RÔLE —</option>
+      </select>
+
+      <button
+        type="button"
+        class="primary"
+        id="full-cue-add-role">
+        + AJOUTER UN RÔLE
+      </button>
+
+      <button
+        type="button"
+        class="quiet"
+        id="full-cue-clear-roles">
+        AUCUN RÔLE
+      </button>
+    </div>
+  </div>
+
+  <div
+    id="form-role-assignments"
+    class="full-cue-role-list">
+  </div>
+</div>
+
+<!-- CL_SHOWCUE_EDITOR_ROLE_ADD_CLASSIFICATION_V1 -->
+
+<div class="field full-cue-block full-cue-classification">
+  <div class="label">CLASSEMENT</div>
+
+  <div class="full-cue-classification-grid">
+
+    <label>
+      <span>SECTION</span>
+      <input
+        id="full-cue-builder-section"
+        list="manual-sections"
+        placeholder="SHOW / PRESHOW / MUSIQUE / ENTRACTE…">
+    </label>
+
+    <label>
+      <span>SOURCE / TABLEAU</span>
+      <input
+        id="full-cue-builder-source"
+        placeholder="Nom du tableau / scène">
+    </label>
+
+    <label>
+      <span>TYPE</span>
+      <input
+        id="full-cue-builder-type"
+        list="full-cue-type-options"
+        placeholder="AUTRE / TOP MUSIQUE / TECHNIQUE…">
+
+      <datalist id="full-cue-type-options"></datalist>
+    </label>
+
+  </div>
+</div>
+
+<div class="field" id="timecode-field"><div class="label">Timecode</div><div class="smpte-editor" id="form-smpte"></div><input type="hidden" id="form-timecode"></div><label class="field" id="section-field">Section<input id="form-section" list="manual-sections" maxlength="80"><datalist id="manual-sections"></datalist></label><label class="field" id="anchor-field">Position après<select id="form-anchor"><option value="">FIN DE CONDUITE</option></select></label><label class="field">Texte<textarea id="form-text" rows="3" maxlength="1000" required></textarea></label><div class="label">Destinataires <button type="button" class="quiet" id="destinations-all">TOUS</button></div><div class="posts" id="form-posts">{% for post in posts %}<label><input type="checkbox" value="{{ post }}"> {{ post }}</label>{% endfor %}</div><label class="field" id="status-field">État<select id="form-status"><option value="draft">À placer</option><option value="official">Dans la conduite</option></select></label><div class="error" id="form-error"></div><div class="actions"><button type="button" class="danger delete-action" id="editor-delete" hidden>SUPPRIMER LE CUE</button><button type="button" id="editor-cancel">ANNULER</button><button class="primary" value="default" id="save">ENREGISTRER</button></div></form></dialog>
 <dialog id="quick-editor" class="quick-dialog"><form method="dialog" id="quick-form"><h2>Correction rapide</h2><div class="field" id="quick-timecode-field"><div class="label">Timecode</div><div class="smpte-editor" id="quick-smpte"></div></div><label class="field">Texte<textarea id="quick-text" rows="4" maxlength="1000" required></textarea></label><div class="label">Destinataires</div><div class="quick-posts" id="quick-posts"></div><div class="error" id="quick-error"></div><div class="actions"><button type="button" class="danger delete-action" id="quick-delete">SUPPRIMER LE CUE</button><button type="button" id="quick-cancel">ANNULER</button><button class="primary" value="default">VALIDER</button></div></form></dialog>
 <div class="call-incoming" id="call-incoming" aria-live="assertive"></div>
 <dialog id="call-panel" class="call-panel"><h2>Appeler</h2><div class="call-targets">{% for post in posts %}<button type="button" data-call-target="{{ post }}">{{ {'FOH':'FOH','RETOURS':'RET','PLATEAU':'PLT','LUMIERE':'LUM'}[post] }}</button>{% endfor %}</div><div class="call-list" id="call-outgoing"></div><div class="error" id="call-error"></div><div class="actions"><button type="button" id="call-close">FERMER</button></div></dialog>
@@ -1614,21 +2214,660 @@ function setupSmpte(rootId,targetId=null){const root=$(rootId),limits=[99,59,59,
 const formSmpte=setupSmpte('form-smpte','form-timecode'),quickSmpte=setupSmpte('quick-smpte');function formatSeconds(value){if(value===null||value===undefined||value==='')return'—';const seconds=Number(value);if(!Number.isFinite(seconds)||seconds<0)return'—';const rounded=Math.max(0,Math.round(seconds));return String(Math.floor(rounded/60)).padStart(2,'0')+':'+String(rounded%60).padStart(2,'0')}
 function scoped(values={},sessionId=snapshot.active_session_id){return{...values,session_id:sessionId}}
 function renderSessions(data){const current=data.active_session_id;sessionEl.innerHTML='';(data.sessions||[]).forEach(item=>{const option=document.createElement('option');option.value=item.id;option.textContent=item.name;sessionEl.append(option)});sessionEl.value=current;$('conduite-session-name').textContent=data.active_session_name||'Session actuelle';$('session-delete').disabled=(data.sessions||[]).length<2}
-function cueMeta(cue){if(!cue)return'';const resolved=cue.resolved||{},equipment=(resolved.equipment_slots||[]).map(slot=>slot.value);return[cue.timecode,cue.section,resolved.role,resolved.artist,...equipment].filter(Boolean).join(' · ')}function renderLiveCue(prefix,cue){$(prefix).textContent=cue?cue.text:prefix==='current'?'Aucun cue atteint':'—';const time=$(prefix+'-time');if(time)time.textContent=cueMeta(cue)}
+function cueMeta(cue){
+    if(!cue)return'';
+
+    const resolved=cue.resolved||{};
+    const role=String(resolved.role||'').trim();
+    const artist=String(resolved.artist||resolved.resolved_artist||'').trim();
+
+    let microphone=String(
+        resolved.microphone||
+        resolved.resolved_microphone||
+        ''
+    ).trim();
+
+    const iem=String(
+        resolved.iem||
+        resolved.resolved_iem||
+        ''
+    ).trim();
+
+    const slots=Array.isArray(resolved.equipment_slots)
+        ? resolved.equipment_slots
+        : [];
+
+    const availableMics=slots.filter(
+        slot=>String(slot.type||'').toUpperCase()==='MICRO'
+    );
+
+    /*
+     * Plusieurs micros disponibles sans choix explicite :
+     * ne jamais en inventer un.
+     */
+    if(!microphone && availableMics.length>1){
+        microphone='MICRO À DÉFINIR';
+    }
+
+    /*
+     * Un seul micro disponible : le resolver devrait déjà
+     * l'avoir choisi, mais on garde ce fallback visuel sûr.
+     */
+    if(!microphone && availableMics.length===1){
+        microphone=String(availableMics[0].value||'').trim();
+    }
+
+    const identity=[role,artist]
+        .filter(Boolean)
+        .join(' · ');
+
+    const technical=[microphone,iem]
+        .filter(Boolean)
+        .join(' · ');
+
+    return [
+        cue.timecode||cue.clock_time,
+        identity,
+        technical
+    ].filter(Boolean).join('  |  ');
+}function renderLiveCue(prefix,cue){$(prefix).textContent=cue?cue.text:prefix==='current'?'Aucun cue atteint':'—';const time=$(prefix+'-time');if(time)time.textContent=cueMeta(cue)}
 const destinationLabels={FOH:'FOH',RETOURS:'RET',PLATEAU:'PLT',LUMIERE:'LUM'};
 function actionButton(cue){const button=document.createElement('button');button.className='quiet edit-icon';button.textContent='✎';button.title='Modifier le cue';button.setAttribute('aria-label','Modifier '+cue.text);button.onclick=()=>openEditor(cue);return button}function deleteActionButton(cue){const button=document.createElement('button');button.className='quiet delete-icon';button.textContent='⌫';button.title='Supprimer le cue';button.setAttribute('aria-label','Supprimer '+cue.text);button.onclick=async event=>{event.stopPropagation();await deleteCue(cue)};return button}
 function destinations(cue){const group=document.createElement('div');group.className='destinations';Object.entries(destinationLabels).forEach(([post,label])=>{const button=document.createElement('button'),active=cue.posts.includes(post);button.className='destination'+(active?' active':'');button.textContent=label;button.title=(active?'Retirer ':'Ajouter ')+post;button.setAttribute('aria-pressed',active);button.onclick=async event=>{event.stopPropagation();const posts=active?cue.posts.filter(item=>item!==post):[...cue.posts,post];if(!posts.length){$('error').textContent='Un cue doit conserver au moins un destinataire.';return}button.disabled=true;try{await api('/show-info/cues/'+encodeURIComponent(cue.id),{method:'PUT',body:JSON.stringify(scoped({posts}))});await refresh()}catch(error){$('error').textContent=error.message}finally{button.disabled=false}};group.append(button)});return group}
-function isTimecode(value){return /^\d{2}:\d{2}:\d{2}:\d{2}$/.test(String(value||''))}function cueLine(cue,position){const row=document.createElement('div'),time=document.createElement('div'),text=document.createElement('div'),targets=destinations(cue),edit=actionButton(cue),actions=document.createElement('div');actions.className='cue-actions';actions.append(edit);if(cue.status==='official'&&cue.mode!=='library')actions.append(deleteActionButton(cue));row.className='cue-line';row.dataset.cueId=cue.id;if(cue.mode==='timed'&&cue.id===snapshot.conduite_current_id)row.classList.add('current-timed');time.className='line-time'+(isTimecode(position)?' true-time':'');time.textContent=position;text.className='line-text';text.textContent=cue.text;if(cue.mode==='library'){const meta=document.createElement('div');row.classList.add('library-line');meta.className='library-meta';meta.append(time,targets);row.append(text,actions,meta)}else row.append(time,text,targets,actions);return row}
+function isTimecode(value){return /^\d{2}:\d{2}:\d{2}:\d{2}$/.test(String(value||''))}
+
+function cueLine(cue,position){const row=document.createElement('div'),time=document.createElement('div'),text=document.createElement('div'),targets=destinations(cue),edit=actionButton(cue),actions=document.createElement('div');actions.className='cue-actions';actions.append(edit);if(cue.status==='official'&&cue.mode!=='library')actions.append(deleteActionButton(cue));row.className='cue-line';row.dataset.cueId=cue.id;if(cue.mode==='timed'&&cue.id===snapshot.conduite_current_id)row.classList.add('current-timed');time.className='line-time'+(isTimecode(position)?' true-time':'');time.textContent=position;text.className='line-text';text.textContent=cue.text;if(cue.mode==='library'){const meta=document.createElement('div');row.classList.add('library-line');meta.className='library-meta';meta.append(time,targets);row.append(text,actions,meta)}else row.append(time,text,targets,actions);return row}
 function manualSectionKey(section){return'cl-show-info-manual-'+snapshot.active_session_id+'-'+postEl.value+'-'+section}async function setManualAnchor(cues,anchorAfter){await Promise.all(cues.map(cue=>api('/show-info/cues/'+encodeURIComponent(cue.id),{method:'PUT',body:JSON.stringify(scoped({anchor_after:anchorAfter}))})));await refresh()}function manualBlock(section,cues,timed){const details=document.createElement('details'),summary=document.createElement('summary'),title=document.createElement('span'),marker=document.createElement('span'),lines=document.createElement('div'),nav=document.createElement('div'),up=document.createElement('button'),down=document.createElement('button'),previous=document.createElement('button'),next=document.createElement('button'),localCues=cues.filter(cue=>cue.posts.includes(postEl.value)),key=manualSectionKey(section),anchors=[...timed.map(cue=>cue.id),''],currentAnchor=(cues.find(cue=>cue.anchor_after)||{}).anchor_after||'',anchorIndex=Math.max(0,anchors.indexOf(currentAnchor));let index=Math.max(0,Math.min(Number(localStorage.getItem(key)||0),Math.max(0,localCues.length-1)));details.className='manual-block';details.open=true;details.draggable=true;details.dataset.manualSection=section;details.ondragstart=event=>{details.classList.add('dragging');event.dataTransfer.setData('text/plain',section)};details.ondragend=()=>details.classList.remove('dragging');title.textContent='☰  '+section+' · '+cues.length+' cue'+(cues.length>1?'s':'');marker.textContent='SANS LTC';summary.append(title,marker);lines.className='manual-lines';cues.forEach(cue=>{const row=cueLine(cue,String(cue.order));if(localCues[index]&&cue.id===localCues[index].id)row.classList.add('manual-current');lines.append(row)});nav.className='manual-section-nav';up.textContent='↑';up.title='Déplacer le bloc plus haut';up.setAttribute('aria-label',up.title);up.disabled=anchorIndex===0;up.onclick=()=>setManualAnchor(cues,anchors[anchorIndex-1]);down.textContent='↓';down.title='Déplacer le bloc plus bas';down.setAttribute('aria-label',down.title);down.disabled=anchorIndex>=anchors.length-1;down.onclick=()=>setManualAnchor(cues,anchors[anchorIndex+1]);previous.textContent='◀';previous.title='Cue manuel précédent';previous.setAttribute('aria-label',previous.title);next.textContent='▶';next.title='Cue manuel suivant';next.setAttribute('aria-label',next.title);previous.disabled=!localCues.length||index===0;next.disabled=!localCues.length||index>=localCues.length-1;previous.onclick=()=>{localStorage.setItem(key,--index);renderSequence()};next.onclick=()=>{localStorage.setItem(key,++index);renderSequence()};nav.append(up,down,previous,next);details.append(summary,lines,nav);return details}
 let lastConduiteActiveId=null;function followConduiteActive(){const id=snapshot.conduite_current_id;if(!id||id===lastConduiteActiveId||!$('view-conduite').classList.contains('active'))return;const selection=window.getSelection(),control=document.activeElement;if((selection&&!selection.isCollapsed)||(control&&control!==document.body&&/^(INPUT|TEXTAREA|SELECT|BUTTON|SUMMARY)$/.test(control.tagName)))return;const row=$('timed-sequence').querySelector('[data-cue-id="'+CSS.escape(id)+'"]');if(row){lastConduiteActiveId=id;row.scrollIntoView({behavior:'smooth',block:'center'})}}
-let sectionFilter='TOUT';function renderSectionFilters(sections){const box=$('section-filters'),names=['TOUT',...sections];if(sectionFilter!=='TOUT'&&!sections.includes(sectionFilter))sectionFilter='TOUT';box.innerHTML='';names.forEach(name=>{const button=document.createElement('button');button.className='section-filter'+(name===sectionFilter?' active':'');button.textContent=name;button.onclick=()=>{sectionFilter=name;renderSequence()};box.append(button)})}function manualDropTarget(element,anchorAfter,groups){element.ondragover=event=>{if(event.dataTransfer.types.includes('text/plain')){event.preventDefault();element.classList.add('manual-drop-target','drop-target')}};element.ondragleave=()=>element.classList.remove('manual-drop-target','drop-target');element.ondrop=async event=>{event.preventDefault();element.classList.remove('manual-drop-target','drop-target');const cues=groups.get(event.dataTransfer.getData('text/plain'));if(cues)try{await setManualAnchor(cues,anchorAfter)}catch(error){$('error').textContent=error.message}}}function renderSequence(){const box=$('timed-sequence'),data=snapshot.conduite||{},timed=(data.timed||[]).filter(cue=>cue.status==='official'),allManual=(data.manual||[]).filter(cue=>cue.status==='official'),sections=[...new Set(allManual.map(cue=>cue.section))],manual=sectionFilter==='TOUT'?allManual:allManual.filter(cue=>cue.section===sectionFilter),groups=new Map();renderSectionFilters(sections);manual.forEach(cue=>{if(!groups.has(cue.section))groups.set(cue.section,[]);groups.get(cue.section).push(cue)});box.innerHTML='';const placed=new Set();timed.forEach(cue=>{const row=cueLine(cue,cue.timecode);manualDropTarget(row,cue.id,groups);box.append(row);groups.forEach((cues,section)=>{const anchor=cues.find(item=>item.anchor_after);if(anchor&&anchor.anchor_after===cue.id){box.append(manualBlock(section,cues,timed));placed.add(section)}})});groups.forEach((cues,section)=>{if(!placed.has(section))box.append(manualBlock(section,cues,timed))});const end=document.createElement('div');end.className='manual-end-drop';manualDropTarget(end,'',groups);box.append(end);if(!timed.length&&!groups.size)box.innerHTML='<div class="empty">Conduite vide</div>';followConduiteActive()}
+let sectionFilter='TOUT';function renderSectionFilters(sections){const box=$('section-filters'),names=['TOUT',...sections];if(sectionFilter!=='TOUT'&&!sections.includes(sectionFilter))sectionFilter='TOUT';box.innerHTML='';names.forEach(name=>{const button=document.createElement('button');button.className='section-filter'+(name===sectionFilter?' active':'');button.textContent=name;button.onclick=()=>{sectionFilter=name;renderSequence()};box.append(button)})}function manualDropTarget(element,anchorAfter,groups){element.ondragover=event=>{if(event.dataTransfer.types.includes('text/plain')){event.preventDefault();element.classList.add('manual-drop-target','drop-target')}};element.ondragleave=()=>element.classList.remove('manual-drop-target','drop-target');element.ondrop=async event=>{event.preventDefault();element.classList.remove('manual-drop-target','drop-target');const cues=groups.get(event.dataTransfer.getData('text/plain'));if(cues)try{await setManualAnchor(cues,anchorAfter)}catch(error){$('error').textContent=error.message}}}function renderSequence(){
+    /* CL_SHOWCUE_ORDERED_RENDER_V1 */
+
+    const box=$('timed-sequence');
+    const data=snapshot.conduite||{};
+
+    const timed=(data.timed||[]).filter(
+        cue=>cue.status==='official'
+    );
+
+    const realtime=(data.realtime||[]).filter(
+        cue=>cue.status==='official'
+    );
+
+    const allManual=(data.manual||[]).filter(
+        cue=>cue.status==='official'
+    );
+
+    const sections=[
+        ...new Set(
+            allManual.map(cue=>cue.section)
+        )
+    ];
+
+    const manual=
+        sectionFilter==='TOUT'
+            ? allManual
+            : allManual.filter(
+                cue=>cue.section===sectionFilter
+            );
+
+    const groups=new Map();
+
+    manual.forEach(cue=>{
+        if(!groups.has(cue.section)){
+            groups.set(cue.section,[]);
+        }
+
+        groups.get(cue.section).push(cue);
+    });
+
+    renderSectionFilters(sections);
+
+    box.innerHTML='';
+
+    const ordered=
+        typeof conduiteOrderedCues==='function'
+            ? conduiteOrderedCues()
+            : [...timed,...manual,...realtime];
+
+    const renderedManualSections=new Set();
+
+    ordered.forEach(cue=>{
+
+        if(cue.status!=='official'){
+            return;
+        }
+
+        if(cue.mode==='manual'){
+
+            if(!groups.has(cue.section)){
+                return;
+            }
+
+            if(renderedManualSections.has(cue.section)){
+                return;
+            }
+
+            const cues=groups.get(cue.section);
+
+            box.append(
+                manualBlock(
+                    cue.section,
+                    cues,
+                    timed
+                )
+            );
+
+            renderedManualSections.add(
+                cue.section
+            );
+
+            return;
+        }
+
+        if(cue.mode==='realtime'){
+
+            const row=cueLine(
+                cue,
+                cue.clock_time || '--:--:--'
+            );
+
+            row.classList.add(
+                'realtime-cue-row'
+            );
+
+            box.append(row);
+
+            return;
+        }
+
+        if(cue.mode==='timed'){
+
+            const row=cueLine(
+                cue,
+                cue.timecode
+            );
+
+            manualDropTarget(
+                row,
+                cue.id,
+                groups
+            );
+
+            box.append(row);
+        }
+    });
+
+    /*
+     * Sections manuelles éventuellement absentes
+     * de l'ordre courant.
+     */
+    groups.forEach((cues,section)=>{
+        if(!renderedManualSections.has(section)){
+            box.append(
+                manualBlock(
+                    section,
+                    cues,
+                    timed
+                )
+            );
+        }
+    });
+
+    const end=document.createElement('div');
+    end.className='manual-end-drop';
+
+    manualDropTarget(
+        end,
+        '',
+        groups
+    );
+
+    box.append(end);
+
+    if(
+        !timed.length &&
+        !realtime.length &&
+        !groups.size
+    ){
+        box.innerHTML=
+            '<div class="empty">Conduite vide</div>';
+    }
+
+    followConduiteActive();
+}
 function renderLibrary(){const box=$('library'),cues=((snapshot.conduite&&snapshot.conduite.library)||snapshot.library||[]).filter(cue=>cue.status==='official');box.innerHTML='';cues.forEach(cue=>box.append(cueLine(cue,'RÉSERVE')));if(!box.children.length)box.innerHTML='<div class="empty">Réserve vide</div>'}
-function renderDrafts(){const data=snapshot.conduite||{},drafts=['timed','manual','library'].flatMap(mode=>data[mode]||[]).filter(cue=>cue.status==='draft'),box=$('draft-list');box.innerHTML='';$('draft-count').textContent=drafts.length?'('+drafts.length+')':'';drafts.forEach(cue=>{const card=document.createElement('div'),row=cueLine(cue,cue.audio?'AUDIO':cue.mode==='timed'?cue.timecode:'NOTE'),label=document.createElement('div'),actions=document.createElement('div'),timed=document.createElement('button'),manual=document.createElement('button'),library=document.createElement('button'),remove=document.createElement('button');card.className='capture-card';label.className='capture-label';label.textContent='À PLACER';row.querySelector('.line-text').append(label);actions.className='capture-actions';timed.textContent='PLACER AU TC';manual.textContent='PLACER SANS LTC';library.textContent='METTRE EN RÉSERVE';remove.textContent='SUPPRIMER';remove.className='danger';timed.onclick=()=>openEditor(cue,'timed',true);manual.onclick=()=>openEditor(cue,'manual',true);library.onclick=()=>classifyAsLibrary(cue);remove.onclick=()=>deleteCue(cue);actions.append(timed,manual,library,remove);card.append(row,actions);box.append(card)});if(!drafts.length)box.innerHTML='<div class="empty">Aucun élément à placer</div>'}
+function renderDrafts(){const data=snapshot.conduite||{},drafts=['timed','manual','realtime','library'].flatMap(mode=>data[mode]||[]).filter(cue=>cue.status==='draft'),box=$('draft-list');box.innerHTML='';$('draft-count').textContent=drafts.length?'('+drafts.length+')':'';drafts.forEach(cue=>{const card=document.createElement('div'),row=cueLine(cue,cue.audio?'AUDIO':cue.mode==='timed'?cue.timecode:cue.mode==='realtime'?'🕒 '+cue.clock_time:'NOTE'),label=document.createElement('div'),actions=document.createElement('div'),timed=document.createElement('button'),manual=document.createElement('button'),library=document.createElement('button'),remove=document.createElement('button');card.className='capture-card';label.className='capture-label';label.textContent='À PLACER';row.querySelector('.line-text').append(label);actions.className='capture-actions';timed.textContent='PLACER AU TC';manual.textContent='PLACER SANS LTC';library.textContent='METTRE EN RÉSERVE';remove.textContent='SUPPRIMER';remove.className='danger';timed.onclick=()=>openEditor(cue,'timed',true);manual.onclick=()=>openEditor(cue,'manual',true);library.onclick=()=>classifyAsLibrary(cue);remove.onclick=()=>deleteCue(cue);actions.append(timed,manual,library,remove);card.append(row,actions);box.append(card)});if(!drafts.length)box.innerHTML='<div class="empty">Aucun élément à placer</div>'}
 function renderCalls(calls={}){const incoming=calls.incoming||[],outgoing=calls.outgoing||[],incomingBox=$('call-incoming'),outgoingBox=$('call-outgoing'),callButton=$('call-button'),short=post=>destinationLabels[post]||post;incomingBox.innerHTML='';outgoingBox.innerHTML='';incoming.forEach(item=>{const card=document.createElement('div'),title=document.createElement('div'),ack=document.createElement('button');card.className='incoming-card';title.className='incoming-title';title.textContent='APPEL '+short(item.source);ack.textContent='RÉPONDRE';ack.onclick=async()=>{ack.disabled=true;try{await api('/show-info/call/'+encodeURIComponent(item.id)+'/ack',{method:'POST',body:JSON.stringify({post:postEl.value})});await refresh()}catch(error){$('error').textContent=error.message;ack.disabled=false}};card.append(title,ack);incomingBox.append(card)});outgoing.forEach(item=>{const row=document.createElement('div'),label=document.createElement('span');row.className='call-item '+item.state;label.textContent=item.state==='acknowledged'?short(item.destination)+' OK':short(item.destination)+' — APPEL EN COURS';row.append(label);if(item.state==='calling'){const cancel=document.createElement('button');cancel.className='quiet';cancel.textContent='ANNULER';cancel.onclick=async()=>{try{await api('/show-info/call/'+encodeURIComponent(item.id)+'/cancel',{method:'POST',body:JSON.stringify({post:postEl.value})});await refresh()}catch(error){$('call-error').textContent=error.message}};row.append(cancel)}outgoingBox.append(row)});callButton.className='call-button';if(incoming.length){callButton.classList.add('incoming');callButton.textContent='APPEL '+short(incoming[0].source)}else{const acknowledged=outgoing.find(item=>item.state==='acknowledged'),calling=outgoing.find(item=>item.state==='calling');if(acknowledged){callButton.classList.add('acknowledged');callButton.textContent=short(acknowledged.destination)+' OK'}else if(calling){callButton.classList.add('calling');callButton.textContent='CALL '+short(calling.destination)}else callButton.textContent='CALL'}document.querySelectorAll('[data-call-target]').forEach(button=>button.disabled=button.dataset.callTarget===postEl.value)}
-function renderDistribution(distribution={}){const box=$('distribution-list'),editable=postEl.value==='PLATEAU';box.innerHTML='';$('distribution-note').textContent=editable?'PLATEAU peut changer l’artiste actif. La modification est immédiatement partagée.':'Lecture seule — les affectations sont pilotées depuis PLATEAU.';(distribution.roles||[]).forEach(item=>{const row=document.createElement('div'),role=document.createElement('div'),select=document.createElement('select'),tech=document.createElement('div'),active=item.active||{};row.className='distribution-row';role.className='distribution-role';role.textContent=item.role;select.disabled=!editable;select.append(new Option('NON AFFECTÉ',''));(item.alternatives||[]).forEach(value=>select.append(new Option(value.artist,value.artist)));select.value=active.artist||'';select.onchange=async()=>{select.disabled=true;try{await api('/show-info/distribution/active',{method:'PUT',body:JSON.stringify(scoped({post:postEl.value,role:item.role,artist:select.value,revision:distribution.revision}))});await refresh()}catch(error){$('error').textContent=error.message;await refresh()}};tech.className='distribution-tech';tech.textContent=(active.equipment_slots||[]).map(slot=>slot.value).filter(Boolean).join(' · ')||(item.status==='multiple'?'PLUSIEURS ACTIFS':'AUCUNE FICHE ACTIVE');row.append(role,select,tech);box.append(row)});if(!box.children.length)box.innerHTML='<div class="empty">Aucune distribution préparée</div>'}
+let distributionDocument=null;
+let distributionEditingIndex=null;
+
+function equipmentLabel(slot){
+    if(!slot||!slot.value)return'';
+    return String(slot.type||'ÉQUIPEMENT').toUpperCase()+' : '+slot.value;
+}
+
+function renderDistribution(distribution={}){
+    const box=$('distribution-list');
+    const editable=postEl.value==='PLATEAU';
+    const add=$('distribution-add');
+
+    box.innerHTML='';
+    if(add)add.hidden=!editable;
+
+    $('distribution-note').textContent=editable
+        ? 'PLATEAU peut gérer les rôles, artistes et équipements.'
+        : 'Lecture seule — les affectations sont pilotées depuis PLATEAU.';
+
+    (distribution.roles||[]).forEach(item=>{
+        const row=document.createElement('div');
+        const role=document.createElement('div');
+        const select=document.createElement('select');
+        const tech=document.createElement('div');
+        const active=item.active||{};
+
+        row.className='distribution-row';
+
+        role.className='distribution-role';
+        role.textContent=item.role;
+
+        select.disabled=!editable;
+        select.append(new Option('NON AFFECTÉ',''));
+
+        (item.alternatives||[]).forEach(value=>{
+            select.append(new Option(value.artist,value.artist));
+        });
+
+        select.value=active.artist||'';
+
+        select.onchange=async()=>{
+            select.disabled=true;
+            try{
+                await api('/show-info/distribution/active',{
+                    method:'PUT',
+                    body:JSON.stringify(scoped({
+                        post:postEl.value,
+                        role:item.role,
+                        artist:select.value,
+                        revision:distribution.revision
+                    }))
+                });
+                await refresh();
+            }catch(error){
+                $('error').textContent=error.message;
+                await refresh();
+            }
+        };
+
+        tech.className='distribution-tech distribution-tech-grid';
+
+        const slots=active.equipment_slots||[];
+
+        const slotGroup=(type,label)=>{
+            const cell=document.createElement('div');
+            cell.className='distribution-tech-cell';
+
+            const caption=document.createElement('div');
+            caption.className='distribution-tech-label';
+            caption.textContent=label;
+
+            const values=slots
+                .filter(slot=>String(slot.type||'').toUpperCase()===type)
+                .map(slot=>slot.value)
+                .filter(Boolean);
+
+            const value=document.createElement('div');
+            value.className='distribution-tech-value';
+            value.textContent=values.join(' · ')||'—';
+
+            cell.append(caption,value);
+            return cell;
+        };
+
+        tech.append(
+            slotGroup('MICRO','MICRO'),
+            slotGroup('IEM','EAR / IEM'),
+            slotGroup('ÉQUIPEMENT','ÉQUIPEMENT')
+        );
+
+        const actions=document.createElement('div');
+        actions.className='distribution-actions';
+
+        if(editable){
+            const edit=document.createElement('button');
+            edit.type='button';
+            edit.className='quiet';
+            edit.textContent='MODIFIER';
+            edit.onclick=()=>openDistributionEditorForRole(item);
+
+            const addArtist=document.createElement('button');
+            addArtist.type='button';
+            addArtist.className='quiet';
+            addArtist.textContent='+ ARTISTE';
+            addArtist.onclick=()=>openDistributionEditor(null,item.role);
+
+            actions.append(edit,addArtist);
+        }
+
+        row.append(role,select,tech,actions);
+        box.append(row);
+    });
+
+    if(!box.children.length){
+        box.innerHTML='<div class="empty">Aucune distribution préparée</div>';
+    }
+}
+
+function buildEquipmentSlots(slots=[]){
+    /* CL_SHOWCUE_EQUIPMENT_ROW_DELETE_V1 */
+
+    const box=$('distribution-equipment-slots');
+    box.innerHTML='';
+
+    for(let index=0;index<3;index++){
+        const current=slots[index]||{};
+        const line=document.createElement('div');
+
+        line.style.display='grid';
+        line.style.gridTemplateColumns='150px minmax(0,1fr) auto';
+        line.style.gap='8px';
+        line.style.margin='7px 0';
+        line.style.alignItems='center';
+
+        const type=document.createElement('select');
+        type.dataset.equipmentType=index;
+
+        [
+            ['', '— TYPE —'],
+            ['MICRO','MICRO'],
+            ['IEM','EAR / IEM'],
+            ['ÉQUIPEMENT','ÉQUIPEMENT']
+        ].forEach(([value,label])=>{
+            type.append(new Option(label,value));
+        });
+
+        if(
+            current.type &&
+            ![...type.options].some(
+                option=>option.value===current.type
+            )
+        ){
+            type.append(
+                new Option(current.type,current.type)
+            );
+        }
+
+        type.value=current.type||'';
+
+        const value=document.createElement('input');
+        value.dataset.equipmentValue=index;
+
+        const updatePlaceholder=()=>{
+            if(type.value==='MICRO'){
+                value.placeholder='ex. HF 3';
+            }else if(type.value==='IEM'){
+                value.placeholder='ex. IEM 2';
+            }else{
+                value.placeholder='Numéro / référence';
+            }
+        };
+
+        value.value=current.value||'';
+        updatePlaceholder();
+
+        type.addEventListener(
+            'change',
+            updatePlaceholder
+        );
+
+        const remove=document.createElement('button');
+
+        remove.type='button';
+        remove.className='danger';
+        remove.textContent='SUPPRIMER';
+        remove.title='Supprimer uniquement cet équipement';
+
+        remove.onclick=()=>{
+
+            /*
+             * Relit les 3 lignes telles qu'elles sont actuellement
+             * affichées, puis enlève uniquement la ligne demandée.
+             */
+            const currentSlots=[];
+
+            for(let slotIndex=0;slotIndex<3;slotIndex++){
+                const slotType=document.querySelector(
+                    '[data-equipment-type="'+slotIndex+'"]'
+                );
+
+                const slotValue=document.querySelector(
+                    '[data-equipment-value="'+slotIndex+'"]'
+                );
+
+                currentSlots.push({
+                    type:slotType ? slotType.value.trim() : '',
+                    value:slotValue ? slotValue.value.trim() : ''
+                });
+            }
+
+            currentSlots.splice(index,1);
+
+            /*
+             * Les lignes suivantes remontent.
+             * Une ligne vide reste disponible en dernière position.
+             */
+            buildEquipmentSlots(currentSlots);
+        };
+
+        /*
+         * Inutile d'afficher SUPPRIMER sur une ligne déjà vide.
+         */
+        remove.hidden=
+            !String(current.type||'').trim() &&
+            !String(current.value||'').trim();
+
+        const refreshDeleteState=()=>{
+            remove.hidden=
+                !type.value.trim() &&
+                !value.value.trim();
+        };
+
+        type.addEventListener(
+            'change',
+            refreshDeleteState
+        );
+
+        value.addEventListener(
+            'input',
+            refreshDeleteState
+        );
+
+        line.append(
+            type,
+            value,
+            remove
+        );
+
+        box.append(line);
+    }
+}
+
+async function loadDistributionDocument(){
+    const result=await api('/show-info/builder/document');
+    distributionDocument=result.document;
+    return distributionDocument;
+}
+
+async function openDistributionEditor(index=null,roleHint=''){
+    try{
+        const document=await loadDistributionDocument();
+        distributionEditingIndex=index;
+
+        const row=index===null ? null : document.distribution[index];
+
+        $('distribution-editor-title').textContent=
+            row?'Modifier l’affectation':'Nouvelle affectation';
+
+        $('distribution-role').value=row?row.role:roleHint;
+        $('distribution-artist').value=row?row.artist:'';
+        $('distribution-active').checked=Boolean(row&&row.active);
+        $('distribution-notes').value=row?(row.notes||''):'';
+
+        buildEquipmentSlots(row?(row.equipment_slots||[]):[]);
+
+        $('distribution-delete').hidden=!row;
+        $('distribution-error').textContent='';
+        $('distribution-editor').showModal();
+
+    }catch(error){
+        $('error').textContent=error.message;
+    }
+}
+
+async function openDistributionEditorForRole(item){
+    try{
+        const document=await loadDistributionDocument();
+        const activeArtist=(item.active||{}).artist||'';
+
+        let index=document.distribution.findIndex(row=>
+            row.role===item.role && row.artist===activeArtist
+        );
+
+        if(index<0){
+            index=document.distribution.findIndex(row=>row.role===item.role);
+        }
+
+        await openDistributionEditor(index<0?null:index,item.role);
+
+    }catch(error){
+        $('error').textContent=error.message;
+    }
+}
+
+function readEquipmentSlots(){
+    const slots=[];
+
+    for(let index=0;index<3;index++){
+        const type=document.querySelector(
+            '[data-equipment-type="'+index+'"]'
+        ).value.trim();
+
+        const value=document.querySelector(
+            '[data-equipment-value="'+index+'"]'
+        ).value.trim();
+
+        if(type||value){
+            if(!type||!value){
+                throw new Error(
+                    'Chaque équipement doit avoir un type et un numéro / une valeur.'
+                );
+            }
+            slots.push({type,value});
+        }
+    }
+
+    return slots;
+}
+
 function render(data){snapshot=data;renderSessions(data);const currentLtc=data.ltc_connected?data.ltc_timecode:'--:--:--:--';$('ltc').textContent=currentLtc;$('title').textContent=$('ableton-scene').textContent=data.title||'—';$('ableton-duration').textContent=formatSeconds(data.scene_duration_seconds);$('ableton-elapsed').textContent=formatSeconds(data.elapsed_seconds);$('ableton-remaining').textContent=formatSeconds(data.remaining_seconds);$('transport').textContent=data.is_playing?'PLAY':'STOP';$('transport').classList.toggle('play',data.is_playing);renderLiveCue('past-second',data.previous_second);renderLiveCue('past',data.previous);renderLiveCue('current',data.current);$('current-meta').textContent=cueMeta(data.current);$('live-edit').hidden=!data.current;$('live-edit').onclick=()=>data.current&&openQuickEditor(data.current);renderLiveCue('next',data.next);renderLiveCue('following',data.following);renderSequence();renderLibrary();renderDrafts();renderDistribution(data.distribution);renderCalls(data.calls)}
 async function api(url,options={}){const headers=options.body instanceof FormData?{}:{'Content-Type':'application/json'};const response=await fetch(url,{cache:'no-store',headers,...options}),data=await response.json();if(!response.ok||!data.ok)throw new Error(data.message||'Erreur serveur');return data}function interactionActive(){const selection=window.getSelection(),control=document.activeElement,pointer=document.querySelector('button:active,summary:active');return Boolean(editor.open||quickEditor.open||recorderDialog.open||pointer||(selection&&!selection.isCollapsed)||(control&&/^(INPUT|TEXTAREA|SELECT)$/.test(control.tagName)))}let refreshInFlight=false;async function refresh(){if(refreshInFlight)return;refreshInFlight=true;try{const data=await api('/show-info/status?post='+encodeURIComponent(postEl.value));if(interactionActive()){renderCalls(data.calls);return}render(data);$('error').textContent=''}catch(error){$('error').textContent=error.message}finally{refreshInFlight=false}}function checkedPosts(){return[...$('form-posts').querySelectorAll('input:checked')].map(input=>input.value)}
 async function deleteCue(cue,errorId='error',sessionId=snapshot.active_session_id){if(!cue||!window.confirm('Supprimer définitivement ce cue ?'))return false;try{await api('/show-info/cues/'+encodeURIComponent(cue.id)+'?session_id='+encodeURIComponent(sessionId),{method:'DELETE'});recordedDraft=null;await refresh();return true}catch(error){$(errorId).textContent=error.message;return false}}async function classifyAsLibrary(cue){try{await api('/show-info/cues/'+encodeURIComponent(cue.id),{method:'PUT',body:JSON.stringify(scoped({mode:'library',status:'official'}))});await refresh()}catch(error){$('error').textContent=error.message}}
+
+$('distribution-add').onclick=()=>openDistributionEditor();
+
+$('distribution-cancel').onclick=()=>{
+    $('distribution-editor').close();
+    distributionEditingIndex=null;
+};
+
+$('distribution-form').addEventListener('submit',async event=>{
+    event.preventDefault();
+
+    try{
+        if(!distributionDocument)await loadDistributionDocument();
+
+        const role=$('distribution-role').value.trim();
+        const artist=$('distribution-artist').value.trim();
+
+        if(!role)throw new Error('Nom du rôle obligatoire.');
+        if(!artist)throw new Error('Nom de l’artiste obligatoire.');
+
+        const row={
+            role,
+            artist,
+            active:$('distribution-active').checked,
+            equipment_slots:readEquipmentSlots(),
+            notes:$('distribution-notes').value.trim()
+        };
+
+        const document=structuredClone(distributionDocument);
+
+        if(distributionEditingIndex===null){
+            if(document.distribution.some(item=>
+                item.role.toLocaleLowerCase()===role.toLocaleLowerCase() &&
+                item.artist.toLocaleLowerCase()===artist.toLocaleLowerCase()
+            )){
+                throw new Error('Cette affectation rôle / artiste existe déjà.');
+            }
+
+            document.distribution.push(row);
+            distributionEditingIndex=document.distribution.length-1;
+
+        }else{
+            document.distribution[distributionEditingIndex]=row;
+        }
+
+        if(row.active){
+            document.distribution.forEach((item,index)=>{
+                if(
+                    index!==distributionEditingIndex &&
+                    item.role.toLocaleLowerCase()===role.toLocaleLowerCase()
+                ){
+                    item.active=false;
+                }
+            });
+        }
+
+        await api('/show-info/builder/document',{
+            method:'PUT',
+            body:JSON.stringify(scoped({document}))
+        });
+
+        distributionDocument=null;
+        distributionEditingIndex=null;
+        $('distribution-editor').close();
+
+        await refresh();
+
+    }catch(error){
+        $('distribution-error').textContent=error.message;
+    }
+});
+
+$('distribution-delete').onclick=async()=>{
+    if(distributionEditingIndex===null||!distributionDocument)return;
+
+    if(!window.confirm('Supprimer cette affectation ?'))return;
+
+    try{
+        const document=structuredClone(distributionDocument);
+        document.distribution.splice(distributionEditingIndex,1);
+
+        await api('/show-info/builder/document',{
+            method:'PUT',
+            body:JSON.stringify(scoped({document}))
+        });
+
+        distributionDocument=null;
+        distributionEditingIndex=null;
+        $('distribution-editor').close();
+
+        await refresh();
+
+    }catch(error){
+        $('distribution-error').textContent=error.message;
+    }
+};
+
 $('call-button').onclick=()=>{$('call-error').textContent='';callPanel.showModal()};$('call-close').onclick=()=>callPanel.close();document.querySelectorAll('[data-call-target]').forEach(button=>button.onclick=async()=>{button.disabled=true;try{await api('/show-info/call',{method:'POST',body:JSON.stringify({source:postEl.value,destination:button.dataset.callTarget})});await refresh()}catch(error){$('call-error').textContent=error.message}finally{button.disabled=button.dataset.callTarget===postEl.value}});
 $('destinations-all').onclick=()=>$('form-posts').querySelectorAll('input').forEach(input=>input.checked=true);
 function prepareAnchorField(cue,mode){const select=$('form-anchor'),timed=((snapshot.conduite&&snapshot.conduite.timed)||[]).filter(item=>item.status==='official');$('anchor-field').hidden=mode!=='manual';select.innerHTML='<option value="">FIN DE CONDUITE</option>';timed.forEach(item=>{const option=document.createElement('option');option.value=item.id;option.textContent=item.timecode+' — '+item.text;select.append(option)});select.value=cue&&cue.mode==='manual'?(cue.anchor_after||''):''}
@@ -1639,7 +2878,7 @@ async function beginRecording(context){const selected=$('audio-input').value;loc
 async function captureAudio(){try{const context=await api('/show-info/capture',{method:'POST',body:'{}'});captured=context.timecode;recorderDialog.dataset.context=JSON.stringify(scoped(context));$('record-context').textContent=context.mode==='timed'?'LTC FIGÉ · '+context.timecode:'SANS LTC · CUE MANUEL';$('record-error').textContent='';$('record-state').textContent='Préparation des entrées système…';$('record-start').disabled=true;$('audio-input').disabled=false;recorderDialog.showModal();await prepareInputs()}catch(error){await stopStream();$('record-error').textContent=error.message;if(!recorderDialog.open)recorderDialog.showModal()}}$('capture-audio').onclick=$('draft-capture-audio').onclick=captureAudio;$('record-start').onclick=async()=>{try{await beginRecording(JSON.parse(recorderDialog.dataset.context))}catch(error){await stopStream();$('record-error').textContent=error.name==='NotFoundError'?'La source sélectionnée a disparu. Choisissez une autre entrée.':error.message;$('audio-input').disabled=false;$('record-start').disabled=false;await listInputs()}};$('record-stop').onclick=()=>{if(mediaRecorder&&mediaRecorder.state==='recording')mediaRecorder.stop()};$('record-cancel').onclick=async()=>{if(mediaRecorder&&mediaRecorder.state==='recording'){mediaRecorder.onstop=null;mediaRecorder.stop()}await stopStream();$('audio-input').disabled=false;recorderDialog.close()};$('audio-input').onchange=()=>localStorage.setItem('cl-showcue-audio-input',$('audio-input').value);
 async function cancelEditor(){clearTimeout(editorFocusTimer);editorFocusTimer=null;const disposable=recordedDraft&&editing&&recordedDraft.id===editing.id;if(disposable){try{await api('/show-info/cues/'+encodeURIComponent(editing.id)+'?session_id='+encodeURIComponent(editor.dataset.sessionId),{method:'DELETE'});recordedDraft=null}catch(error){$('form-error').textContent=error.message;return}}editor.close();editing=null;classifying=false;captured=null;await refresh()}$('editor-cancel').onclick=cancelEditor;$('editor-delete').onclick=async()=>{if(await deleteCue(editing,'form-error',editor.dataset.sessionId)){editor.close();editing=null;classifying=false;captured=null;await refresh()}};
 function renderQuickPosts(cue){const box=$('quick-posts');box.innerHTML='';Object.entries(destinationLabels).forEach(([post,label])=>{const button=document.createElement('button');button.type='button';button.className='quick-post'+(cue.posts.includes(post)?' active':'');button.dataset.post=post;button.textContent=label;button.setAttribute('aria-pressed',cue.posts.includes(post));button.onclick=()=>{const active=button.classList.contains('active'),count=box.querySelectorAll('.quick-post.active').length;if(active&&count===1){$('quick-error').textContent='Un cue doit conserver au moins un destinataire.';return}$('quick-error').textContent='';button.classList.toggle('active');button.setAttribute('aria-pressed',button.classList.contains('active'))};box.append(button)})}function quickCheckedPosts(){return[...$('quick-posts').querySelectorAll('.quick-post.active')].map(button=>button.dataset.post)}function openQuickEditor(cue){quickEditing=cue;quickEditor.dataset.sessionId=snapshot.active_session_id;$('quick-text').value=cue.text;$('quick-timecode-field').hidden=cue.mode!=='timed';quickSmpte.set(cue.timecode||'00:00:00:00');renderQuickPosts(cue);$('quick-error').textContent='';quickEditor.showModal()}$('quick-cancel').onclick=()=>{quickEditor.close();quickEditing=null;refresh()};$('quick-delete').onclick=async()=>{if(await deleteCue(quickEditing,'quick-error',quickEditor.dataset.sessionId)){quickEditor.close();quickEditing=null;await refresh()}};$('quick-form').addEventListener('submit',async event=>{event.preventDefault();if(!quickEditing)return;const payload={},text=$('quick-text').value,timecode=quickSmpte.get(),posts=quickCheckedPosts();if(text!==quickEditing.text)payload.text=text;if(quickEditing.mode==='timed'&&timecode!==quickEditing.timecode)payload.timecode=timecode;if(JSON.stringify(posts)!==JSON.stringify(quickEditing.posts))payload.posts=posts;if(!Object.keys(payload).length){quickEditor.close();quickEditing=null;await refresh();return}try{await api('/show-info/cues/'+encodeURIComponent(quickEditing.id),{method:'PUT',body:JSON.stringify(scoped(payload,quickEditor.dataset.sessionId))});quickEditor.close();quickEditing=null;await refresh()}catch(error){$('quick-error').textContent=error.message}});
-$('cue-form').addEventListener('submit',async event=>{event.preventDefault();const mode=editor.dataset.mode,payload={session_id:editor.dataset.sessionId,mode,text:$('form-text').value,posts:checkedPosts(),status:editing?(classifying?'official':$('form-status').value):'draft'};if(mode==='timed')payload.timecode=$('form-timecode').value;if(mode==='manual'){payload.section=$('form-section').value;payload.anchor_after=$('form-anchor').value;if(classifying&&(!editing||editing.mode!=='manual')){const sameSection=((snapshot.conduite&&snapshot.conduite.manual)||[]).filter(cue=>cue.section===payload.section);payload.order=Math.max(0,...sameSection.map(cue=>Number(cue.order)||0))+1}}try{const url=editing?'/show-info/cues/'+encodeURIComponent(editing.id):'/show-info/cues',method=editing?'PUT':'POST';await api(url,{method,body:JSON.stringify(payload)});recordedDraft=null;editor.close();editing=null;classifying=false;captured=null;await refresh()}catch(error){$('form-error').textContent=error.message}});
+$('cue-form').addEventListener('submit',async event=>{event.preventDefault();const mode=editor.dataset.mode,payload={session_id:editor.dataset.sessionId,mode,text:$('form-text').value,posts:checkedPosts(),status:editing?(classifying?'official':$('form-status').value):'draft'};if(mode==='timed')payload.timecode=$('form-timecode').value;if(mode==='realtime')payload.clock_time=$('form-clock-time').value;if(typeof collectFullCueBuilder==='function')payload.builder=collectFullCueBuilder();if(mode==='manual'){payload.section=$('form-section').value;payload.anchor_after=$('form-anchor').value;if(classifying&&(!editing||editing.mode!=='manual')){const sameSection=((snapshot.conduite&&snapshot.conduite.manual)||[]).filter(cue=>cue.section===payload.section);payload.order=Math.max(0,...sameSection.map(cue=>Number(cue.order)||0))+1}}try{const url=editing?'/show-info/cues/'+encodeURIComponent(editing.id):'/show-info/cues',method=editing?'PUT':'POST';await api(url,{method,body:JSON.stringify(payload)});recordedDraft=null;editor.close();editing=null;classifying=false;captured=null;await refresh()}catch(error){$('form-error').textContent=error.message}});
 sessionEl.onchange=async()=>{const target=sessionEl.value;sessionEl.disabled=true;try{await api('/show-info/sessions/'+encodeURIComponent(target)+'/activate',{method:'POST',body:'{}'});lastConduiteActiveId=null;sessionEl.blur();await refresh()}catch(error){$('error').textContent=error.message}finally{sessionEl.disabled=false}};
 $('session-new').onclick=async()=>{const name=window.prompt('Nom de la nouvelle session :');if(name===null)return;try{await api('/show-info/sessions',{method:'POST',body:JSON.stringify({name})});lastConduiteActiveId=null;sessionEl.blur();await refresh()}catch(error){$('error').textContent=error.message}};
 $('session-rename').onclick=async()=>{const current=(snapshot.sessions||[]).find(item=>item.id===snapshot.active_session_id),name=window.prompt('Nouveau nom de la session :',current?current.name:'');if(name===null)return;try{await api('/show-info/sessions/'+encodeURIComponent(snapshot.active_session_id),{method:'PUT',body:JSON.stringify({name})});await refresh()}catch(error){$('error').textContent=error.message}};
@@ -2480,16 +3719,18 @@ renderSequence = function(){
     box.innerHTML='';
 
     visible.forEach(cue=>{
-        const position =
-            cue.mode === 'timed' && isTimecode(cue.timecode)
+        const position = cue.mode === 'realtime'
+            ? (cue.clock_time || '--:--:--')
+            : cue.mode === 'timed' && isTimecode(cue.timecode)
                 ? cue.timecode
                 : '';
 
         const row = cueLine(cue,position);
+        if(cue.mode === 'realtime') row.classList.add('realtime-cue-row');
 
         /*
-         * Un TC ne modifie jamais la place de la ligne ici.
-         * L'ordre vient uniquement de builder.number.
+         * L'ordre vient de conduiteOrderedCues(), jamais de l'heure.
+         * conduite_order est prioritaire sur l'ordre Builder initial.
          */
         box.append(row);
     });
@@ -2691,7 +3932,8 @@ $('capture-tc').onclick = captureTcOnSelectedConduiteCue;
         if(
             !cue ||
             cue.status !== 'official' ||
-            cue.mode === 'library'
+            cue.mode === 'library' ||
+            cue.mode === 'realtime'
         ){
             return row;
         }
@@ -2936,7 +4178,8 @@ $('capture-tc').onclick = captureTcOnSelectedConduiteCue;
 
         const source = [
             ...(data.timed || []),
-            ...(data.manual || [])
+            ...(data.manual || []),
+            ...(data.realtime || [])
         ].filter(cue => cue.status === 'official');
 
         const anyPersistent = source.some(
@@ -5646,4 +6889,3862 @@ $('capture-tc').onclick = captureTcOnSelectedConduiteCue;
 
 <link rel="stylesheet" href="/static/showcue-stage.css?v=mobile-conduite-1">
 <script src="/static/showcue-stage.js?v=mobile-conduite-1"></script>
+
+<!-- CL_SHOWCUE_DICTATION_V1 -->
+<style id="cl-showcue-dictation-style">
+.cl-dictation-bar{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    flex-wrap:wrap;
+    margin:8px 0 4px;
+}
+
+.cl-dictation-button{
+    border-color:#8c453f;
+    background:#55211f;
+    color:#ffe6df;
+}
+
+.cl-dictation-button.recording{
+    border-color:#e36a5d;
+    background:#8a2f28;
+    color:white;
+}
+
+.cl-dictation-status{
+    color:#b5aa9c;
+    font-size:.72rem;
+    font-weight:750;
+}
+
+.cl-dictation-status.listening{
+    color:#ff9b87;
+}
+
+.cl-dictation-preview{
+    margin-top:6px;
+    padding:7px 9px;
+    border:1px solid #51483d;
+    border-radius:7px;
+    background:#0e0c0a;
+    color:#d8d0c5;
+    font-size:.78rem;
+}
+
+.cl-dictation-preview:empty{
+    display:none;
+}
+</style>
+
+<script>
+(() => {
+    'use strict';
+
+    /*
+     * CL ShowCue — dictée V1
+     *
+     * La dictée ne crée JAMAIS directement un cue.
+     * Elle remplit uniquement le champ texte de l'éditeur.
+     * Le bouton de validation ShowCue existant reste responsable
+     * de la création / mise à jour réelle du cue.
+     */
+
+    const SpeechRecognition =
+        window.SpeechRecognition ||
+        window.webkitSpeechRecognition;
+
+    let recognition = null;
+    let target = null;
+
+    let baseText = '';
+    let liveText = '';
+    let activeBar = null;
+
+    function clean(value) {
+        return String(value || '')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    function combine(base, current) {
+        base = clean(base);
+        current = clean(current);
+
+        if (!base) return current;
+        if (!current) return base;
+
+        return base + ' ' + current;
+    }
+
+    function setStatus(text, active=false) {
+        if (!activeBar) return;
+
+        const status = activeBar.querySelector('.cl-dictation-status');
+
+        if (!status) return;
+
+        status.textContent = text;
+        status.classList.toggle('listening', active);
+    }
+
+    function setPreview(text) {
+        if (!activeBar) return;
+
+        const preview = activeBar.querySelector('.cl-dictation-preview');
+
+        if (preview)
+            preview.textContent = text || '';
+    }
+
+    function setButton(active) {
+        if (!activeBar) return;
+
+        const button = activeBar.querySelector('.cl-dictation-button');
+
+        if (!button) return;
+
+        button.classList.toggle('recording', active);
+        button.textContent = active
+            ? '■ Arrêter'
+            : '🎙 Dicter';
+    }
+
+    function commitLiveText() {
+        if (!target) return;
+
+        const value = combine(baseText, liveText);
+
+        if (value) {
+            target.value = value;
+
+            target.dispatchEvent(
+                new Event('input', {bubbles:true})
+            );
+
+            target.dispatchEvent(
+                new Event('change', {bubbles:true})
+            );
+        }
+
+        baseText = value;
+        liveText = '';
+
+        setPreview('');
+    }
+
+    function stopRecognition(commit=true) {
+        if (commit)
+            commitLiveText();
+
+        if (recognition) {
+            try {
+                recognition.stop();
+            } catch (_) {}
+        }
+
+        recognition = null;
+
+        setButton(false);
+        setStatus(
+            target ? 'Texte prêt à valider' : 'Prêt',
+            false
+        );
+    }
+
+    function startRecognition(textarea, bar) {
+
+        if (!SpeechRecognition) {
+            window.alert(
+                "La reconnaissance vocale WebKit n'est pas disponible " +
+                "dans cette version de ShowCue.\n\n" +
+                "Le module audio natif macOS pourra être utilisé à la place."
+            );
+            return;
+        }
+
+        if (recognition) {
+            stopRecognition(true);
+            return;
+        }
+
+        target = textarea;
+        activeBar = bar;
+
+        /*
+         * Tout ce qui existe AVANT la nouvelle dictée est considéré
+         * comme validé localement : la reconnaissance ne pourra plus
+         * le supprimer.
+         */
+        baseText = clean(target.value);
+        liveText = '';
+
+        recognition = new SpeechRecognition();
+
+        recognition.lang = 'fr-FR';
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.maxAlternatives = 1;
+
+        recognition.onstart = () => {
+            setButton(true);
+            setStatus('● Écoute…', true);
+        };
+
+        recognition.onresult = event => {
+
+            let interim = '';
+            let finals = [];
+
+            for (
+                let i = event.resultIndex;
+                i < event.results.length;
+                i++
+            ) {
+                const text =
+                    event.results[i][0].transcript;
+
+                if (event.results[i].isFinal)
+                    finals.push(text);
+                else
+                    interim += ' ' + text;
+            }
+
+            /*
+             * Les segments réellement finalisés deviennent immédiatement
+             * partie du texte protégé.
+             */
+            if (finals.length) {
+
+                const finalText =
+                    clean(finals.join(' '));
+
+                baseText =
+                    combine(baseText, finalText);
+
+                target.value = baseText;
+
+                target.dispatchEvent(
+                    new Event('input', {bubbles:true})
+                );
+            }
+
+            /*
+             * Une hypothèse partielle peut être réécrite par Apple/WebKit,
+             * mais seulement cette petite partie est remplaçable.
+             */
+            liveText = clean(interim);
+
+            const display =
+                combine(baseText, liveText);
+
+            target.value = display;
+
+            target.dispatchEvent(
+                new Event('input', {bubbles:true})
+            );
+
+            setPreview(
+                liveText
+                    ? 'En cours : ' + liveText
+                    : ''
+            );
+        };
+
+        recognition.onerror = event => {
+
+            /*
+             * On protège ce qu'on avait déjà reçu avant de fermer.
+             */
+            commitLiveText();
+
+            if (
+                event.error === 'no-speech' ||
+                event.error === 'aborted'
+            ) {
+                setStatus('Texte prêt à valider');
+            } else {
+                setStatus(
+                    'Dictée interrompue : ' +
+                    event.error
+                );
+            }
+        };
+
+        recognition.onend = () => {
+
+            /*
+             * Certains moteurs arrêtent spontanément une session.
+             * On ne vide surtout PAS le textarea.
+             */
+            commitLiveText();
+
+            recognition = null;
+
+            setButton(false);
+            setStatus('Texte prêt à valider');
+        };
+
+        try {
+            recognition.start();
+        } catch (error) {
+            recognition = null;
+            setButton(false);
+            setStatus(
+                'Impossible de démarrer la dictée'
+            );
+            console.error(
+                'ShowCue dictation:',
+                error
+            );
+        }
+    }
+
+    function makeBar(textarea) {
+
+        if (
+            textarea.dataset.showcueDictationAttached
+        )
+            return;
+
+        textarea.dataset.showcueDictationAttached =
+            '1';
+
+        const bar =
+            document.createElement('div');
+
+        bar.className =
+            'cl-dictation-bar';
+
+        const button =
+            document.createElement('button');
+
+        button.type = 'button';
+        button.className =
+            'cl-dictation-button';
+
+        button.textContent =
+            '🎙 Dicter';
+
+        const status =
+            document.createElement('span');
+
+        status.className =
+            'cl-dictation-status';
+
+        status.textContent =
+            'Prêt';
+
+        const preview =
+            document.createElement('div');
+
+        preview.className =
+            'cl-dictation-preview';
+
+        button.addEventListener(
+            'click',
+            event => {
+                event.preventDefault();
+                event.stopPropagation();
+
+                if (
+                    recognition &&
+                    target === textarea
+                ) {
+                    stopRecognition(true);
+                } else {
+                    if (recognition)
+                        stopRecognition(true);
+
+                    startRecognition(
+                        textarea,
+                        bar
+                    );
+                }
+            }
+        );
+
+        bar.append(button, status);
+
+        /*
+         * Preview sur une ligne entière.
+         */
+        const wrap =
+            document.createElement('div');
+
+        wrap.append(bar, preview);
+
+        textarea.insertAdjacentElement(
+            'afterend',
+            wrap
+        );
+    }
+
+    function scan() {
+
+        /*
+         * On cible volontairement les textarea contenus dans les dialogs
+         * ShowCue. Ainsi on ne modifie ni les autres pages ni la logique
+         * de conduite.
+         */
+        document
+            .querySelectorAll('dialog textarea')
+            .forEach(makeBar);
+    }
+
+    /*
+     * Quand l'utilisateur appuie sur un bouton qui ferme/valide
+     * la fenêtre, on fige d'abord la dernière hypothèse.
+     *
+     * Le handler ShowCue existant continue ensuite normalement.
+     */
+    document.addEventListener(
+        'click',
+        event => {
+
+            const button =
+                event.target.closest('button');
+
+            if (!button || !recognition)
+                return;
+
+            if (
+                activeBar &&
+                activeBar.contains(button)
+            )
+                return;
+
+            const dialog =
+                button.closest('dialog');
+
+            if (
+                dialog &&
+                target &&
+                dialog.contains(target)
+            ) {
+                commitLiveText();
+                stopRecognition(false);
+            }
+        },
+        true
+    );
+
+    /*
+     * Les dialogs sont construits/ouverts dynamiquement :
+     * MutationObserver permet de raccorder automatiquement
+     * le bouton Dictée aux éditeurs actuels et futurs.
+     */
+    const observer =
+        new MutationObserver(scan);
+
+    observer.observe(
+        document.documentElement,
+        {
+            childList:true,
+            subtree:true
+        }
+    );
+
+    scan();
+
+    console.info(
+        'CL ShowCue dictation V1 chargée'
+    );
+})();
+</script>
+
+
+
+<!-- CL_SHOWCUE_SHOW_CONTROL_LINK_V2 -->
+<style>
+  .cl-show-control-return {
+    position: fixed;
+    top: max(10px, env(safe-area-inset-top));
+    left: max(10px, env(safe-area-inset-left));
+    z-index: 10000;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+
+    min-height: 35px;
+    padding: 6px 11px;
+
+    border: 1px solid rgba(184, 86, 92, .72);
+    border-radius: 10px;
+
+    background:
+      linear-gradient(
+        180deg,
+        rgba(112, 48, 53, .94),
+        rgba(70, 31, 35, .96)
+      );
+
+    color: rgba(255, 236, 237, .97);
+
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.07),
+      0 4px 16px rgba(0,0,0,.26);
+
+    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(12px);
+
+    font-family:
+      -apple-system,
+      BlinkMacSystemFont,
+      "SF Pro Display",
+      "Segoe UI",
+      sans-serif;
+
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .075em;
+    text-decoration: none;
+    white-space: nowrap;
+
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .cl-show-control-return:active {
+    transform: scale(.96);
+
+    background:
+      linear-gradient(
+        180deg,
+        rgba(130, 56, 62, .98),
+        rgba(79, 34, 39, .98)
+      );
+  }
+
+  .cl-show-control-return__back {
+    font-size: 17px;
+    line-height: .8;
+    font-weight: 500;
+    letter-spacing: 0;
+    transform: translateY(-1px);
+  }
+
+  @media (max-width: 430px) {
+    .cl-show-control-return {
+      top: max(7px, env(safe-area-inset-top));
+      left: max(7px, env(safe-area-inset-left));
+      min-height: 32px;
+      padding: 5px 9px;
+      border-radius: 9px;
+      font-size: 9px;
+    }
+  }
+</style>
+
+<a
+  class="cl-show-control-return"
+  href="/"
+  aria-label="Retour à CL Show Control"
+>
+  <span class="cl-show-control-return__back">‹</span>
+  <span>SHOW CONTROL</span>
+</a>
+
+
+
+<!-- CL_SHOWCUE_MOBILE_HEADER_V4 -->
+<style>
+
+/* ==========================================================
+   SHOWCUE MOBILE — HEADER FINAL
+   ========================================================== */
+
+@media (max-width:600px){
+
+  /*
+   * Ligne Poste / retour Show Control.
+   * Le bouton est réellement inséré dans .v6-context-row par
+   * le petit JS ci-dessous : il ne flotte plus sur la page.
+   */
+  .v6-context-row{
+    display:grid !important;
+    grid-template-columns:auto minmax(0,1fr) !important;
+    align-items:end !important;
+    gap:8px 10px !important;
+  }
+
+  .v6-context-row .cl-show-control-return{
+    position:static !important;
+
+    grid-column:1 !important;
+    grid-row:1 !important;
+
+    align-self:end !important;
+
+    min-height:34px !important;
+    margin:0 !important;
+    padding:6px 10px !important;
+
+    border:1px solid rgba(180,76,82,.72) !important;
+    border-radius:9px !important;
+
+    background:
+      linear-gradient(
+        180deg,
+        rgba(111,45,50,.94),
+        rgba(70,29,33,.97)
+      ) !important;
+
+    color:#f7e8e6 !important;
+
+    box-shadow:
+      inset 0 1px rgba(255,255,255,.07),
+      0 3px 10px rgba(0,0,0,.18) !important;
+
+    font-size:9px !important;
+    font-weight:850 !important;
+    letter-spacing:.09em !important;
+
+    white-space:nowrap !important;
+  }
+
+  /*
+   * POSTE
+   * Beaucoup moins large qu'avant.
+   */
+  .v6-context-field:has(#post){
+    grid-column:2 !important;
+    grid-row:1 !important;
+
+    justify-self:start !important;
+
+    width:170px !important;
+    max-width:46vw !important;
+    min-width:0 !important;
+  }
+
+  #post{
+    width:100% !important;
+    min-width:0 !important;
+    max-width:none !important;
+  }
+
+  /*
+   * Les autres éléments de la context-row ne doivent pas
+   * reprendre de largeur inutile sur cette ligne.
+   */
+  .v6-network-slot{
+    min-width:0 !important;
+  }
+
+
+  /* ========================================================
+     HEURE + LTC
+     ======================================================== */
+
+  .operation-clocks.v6-clocks{
+    display:grid !important;
+
+    /*
+     * Colonne vide à gauche + HEURE exactement au centre
+     * + LTC aligné à droite.
+     */
+    grid-template-columns:1fr auto 1fr !important;
+
+    align-items:center !important;
+
+    width:100% !important;
+    margin-top:7px !important;
+    gap:7px !important;
+  }
+
+  .operation-clocks .v6-clock:first-child{
+    grid-column:2 !important;
+
+    min-width:145px !important;
+
+    text-align:center !important;
+  }
+
+  .operation-clocks .v6-clock-ltc{
+    grid-column:3 !important;
+
+    justify-self:end !important;
+    text-align:right !important;
+  }
+
+  /*
+   * HEURE : devient une vraie information principale.
+   */
+  #server-clock{
+    display:block !important;
+
+    color:#f3ede3 !important;
+
+    font-family:
+      ui-monospace,
+      "SF Mono",
+      Menlo,
+      Monaco,
+      Consolas,
+      monospace !important;
+
+    font-size:clamp(28px,8.3vw,39px) !important;
+    font-weight:680 !important;
+
+    font-variant-numeric:tabular-nums !important;
+    font-feature-settings:"tnum" 1 !important;
+
+    line-height:1 !important;
+    letter-spacing:.015em !important;
+
+    text-shadow:
+      0 2px 8px rgba(0,0,0,.28) !important;
+  }
+
+  .operation-clocks .v6-clock:first-child
+  .operation-clock-label{
+    display:block !important;
+
+    margin-bottom:3px !important;
+
+    color:rgba(214,201,188,.66) !important;
+
+    font-size:8px !important;
+    letter-spacing:.18em !important;
+  }
+
+  /*
+   * Le LTC reste la donnée technique verte.
+   */
+  #ltc{
+    color:#63df94 !important;
+  }
+
+
+  /* ========================================================
+     LIVE — BANDEAU ABLETON
+     ======================================================== */
+
+  #view-live .ableton-strip{
+    /*
+     * Un peu d'air par rapport au gros cartouche Cue courant.
+     */
+    margin-top:12px !important;
+    margin-bottom:14px !important;
+
+    /*
+     * Plus de place au titre qu'aux trois valeurs numériques.
+     */
+    grid-template-columns:
+      minmax(0,2.5fr)
+      auto
+      auto
+      auto !important;
+
+    gap:7px !important;
+
+    padding:9px 10px !important;
+  }
+
+  #view-live .ableton-main{
+    min-width:0 !important;
+    padding-right:3px !important;
+  }
+
+  #view-live .ableton-main .label{
+    margin-bottom:2px !important;
+
+    color:rgba(188,171,160,.70) !important;
+
+    font-size:8px !important;
+    font-weight:850 !important;
+    letter-spacing:.10em !important;
+  }
+
+  /*
+   * Annule explicitement l'ellipsis mobile existant.
+   * Jusqu'à deux lignes pour afficher réellement le nom.
+   */
+  #view-live #ableton-scene{
+    display:-webkit-box !important;
+
+    overflow:hidden !important;
+    text-overflow:clip !important;
+    white-space:normal !important;
+
+    -webkit-box-orient:vertical !important;
+    -webkit-line-clamp:2 !important;
+
+    color:#f0d7a6 !important;
+
+    font-family:
+      -apple-system,
+      BlinkMacSystemFont,
+      "SF Pro Display",
+      "Segoe UI",
+      sans-serif !important;
+
+    font-size:1rem !important;
+    font-weight:780 !important;
+
+    line-height:1.05 !important;
+    letter-spacing:.005em !important;
+  }
+
+  #view-live .ableton-value{
+    font-size:.80rem !important;
+    font-weight:850 !important;
+  }
+}
+
+
+/*
+ * Très petits iPhone :
+ * le poste reste confortable mais ne pousse jamais le retour.
+ */
+@media (max-width:390px){
+
+  .v6-context-field:has(#post){
+    width:150px !important;
+  }
+
+  #server-clock{
+    font-size:30px !important;
+  }
+
+  #view-live #ableton-scene{
+    font-size:.94rem !important;
+  }
+}
+
+</style>
+
+<script>
+(() => {
+  'use strict';
+
+  function installShowCueHeaderV4(){
+
+    const contextRow =
+      document.querySelector('.v6-context-row');
+
+    const returnButton =
+      document.querySelector('.cl-show-control-return');
+
+    /*
+     * Déplacement physique dans le header.
+     * Plus de position:fixed ni d'overlay.
+     */
+    if (
+      contextRow &&
+      returnButton &&
+      returnButton.parentElement !== contextRow
+    ){
+      contextRow.insertBefore(
+        returnButton,
+        contextRow.firstChild
+      );
+    }
+  }
+
+  if(document.readyState === 'loading'){
+    document.addEventListener(
+      'DOMContentLoaded',
+      installShowCueHeaderV4,
+      {once:true}
+    );
+  }else{
+    installShowCueHeaderV4();
+  }
+})();
+</script>
+
+
+<!-- CL_SHOWCUE_NAV_RETURN_V6 -->
+<style>
+@media (max-width:600px){
+
+  /*
+   * L'ancien gros bouton retour reste dans le DOM,
+   * mais il n'est plus affiché.
+   */
+  .cl-show-control-return{
+    display:none !important;
+  }
+
+  /*
+   * Barre de navigation mobile :
+   * petit bouton retour + 4 vues ShowCue.
+   */
+  .v6-tabs{
+    display:grid !important;
+
+    grid-template-columns:
+      44px
+      repeat(4, minmax(0,1fr)) !important;
+
+    align-items:stretch !important;
+    gap:2px !important;
+
+    width:100% !important;
+  }
+
+  /*
+   * Les quatre onglets existants restent fonctionnels.
+   */
+  .v6-tabs .tab{
+    min-width:0 !important;
+    padding:8px 2px 7px !important;
+
+    font-size:.63rem !important;
+    letter-spacing:.055em !important;
+
+    white-space:nowrap !important;
+  }
+
+  /*
+   * Retour Show Control intégré à la barre.
+   */
+  .v6-tabs .cl-showcontrol-nav-return{
+    display:flex !important;
+    align-items:center !important;
+    justify-content:center !important;
+
+    min-width:0 !important;
+    width:44px !important;
+
+    border:1px solid rgba(180,76,82,.66) !important;
+    border-radius:9px !important;
+
+    background:
+      linear-gradient(
+        180deg,
+        rgba(104,42,48,.92),
+        rgba(65,27,31,.97)
+      ) !important;
+
+    color:#f4e5e3 !important;
+
+    font-size:22px !important;
+    font-weight:500 !important;
+    line-height:1 !important;
+
+    text-decoration:none !important;
+
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.05),
+      0 2px 8px rgba(0,0,0,.22) !important;
+
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  .v6-tabs .cl-showcontrol-nav-return:active{
+    transform:scale(.94);
+  }
+}
+
+
+/* Très petits écrans */
+@media (max-width:390px){
+
+  .v6-tabs{
+    grid-template-columns:
+      40px
+      repeat(4,minmax(0,1fr)) !important;
+  }
+
+  .v6-tabs .cl-showcontrol-nav-return{
+    width:40px !important;
+    font-size:20px !important;
+  }
+
+  .v6-tabs .tab{
+    font-size:.58rem !important;
+    letter-spacing:.035em !important;
+  }
+}
+</style>
+
+<script>
+(() => {
+  'use strict';
+
+  function installShowControlNavReturn(){
+
+    const tabs =
+      document.querySelector('.v6-tabs');
+
+    if(!tabs) return;
+
+    if(
+      tabs.querySelector(
+        '.cl-showcontrol-nav-return'
+      )
+    ){
+      return;
+    }
+
+    const link =
+      document.createElement('a');
+
+    link.className =
+      'cl-showcontrol-nav-return';
+
+    link.href = '/';
+
+    link.textContent = '‹';
+
+    link.title = 'Show Control';
+
+    link.setAttribute(
+      'aria-label',
+      'Retour à CL Show Control'
+    );
+
+    tabs.insertBefore(
+      link,
+      tabs.firstElementChild
+    );
+  }
+
+  if(document.readyState === 'loading'){
+    document.addEventListener(
+      'DOMContentLoaded',
+      installShowControlNavReturn,
+      {once:true}
+    );
+  }else{
+    installShowControlNavReturn();
+  }
+})();
+</script>
+
+
+
+
+
+
+<!-- CL_SHOWCUE_FINAL_VISUAL_V11 -->
+<style>
+
+/* ==========================================================
+   CL SHOWCUE MOBILE — HEADER COMPACT V11
+   Poste/LTC en haut — CALL/heure en bas
+   ========================================================== */
+
+@media (max-width:650px){
+
+  /* --------------------------------------------------------
+     CONTENEUR PRINCIPAL
+     -------------------------------------------------------- */
+
+  .showcue-header-v6{
+    position:relative !important;
+
+    height:166px !important;
+    min-height:166px !important;
+
+    margin-bottom:8px !important;
+    padding:0 !important;
+
+    overflow:visible !important;
+
+    border-radius:12px !important;
+  }
+
+
+  /* --------------------------------------------------------
+     SUPPRIME L'ESPACE RÉSERVÉ PAR LES 3 ANCIENNES RANGÉES
+     -------------------------------------------------------- */
+
+  .showcue-header-v6 > .v6-brand-row,
+  .showcue-header-v6 > .v6-context-row,
+  .showcue-header-v6 > .v6-clocks{
+    position:absolute !important;
+
+    margin:0 !important;
+    padding:0 !important;
+
+    min-height:0 !important;
+
+    border:0 !important;
+    background:transparent !important;
+  }
+
+
+  /* ========================================================
+     POSTE — EN HAUT À GAUCHE
+     ======================================================== */
+
+  .showcue-header-v6 > .v6-context-row{
+    top:13px !important;
+    left:14px !important;
+
+    width:52% !important;
+    height:auto !important;
+
+    display:block !important;
+  }
+
+  /* SESSION invisible sur cette vue mobile */
+  .v6-context-row
+  .v6-context-field:first-of-type{
+    display:none !important;
+  }
+
+  .v6-context-field:has(#post){
+    display:block !important;
+
+    width:100% !important;
+    max-width:none !important;
+
+    margin:0 !important;
+  }
+
+  .v6-context-field:has(#post) .v6-label{
+    display:block !important;
+
+    margin:0 0 3px !important;
+
+    font-size:9px !important;
+    font-weight:650 !important;
+
+    line-height:1 !important;
+    letter-spacing:.02em !important;
+  }
+
+  #post{
+    width:100% !important;
+    height:34px !important;
+    min-height:34px !important;
+
+    padding:
+      4px 30px
+      4px 10px !important;
+
+    font-size:16px !important;
+    font-weight:750 !important;
+
+    line-height:1 !important;
+  }
+
+  .v6-network-slot{
+    display:none !important;
+  }
+
+
+  /* ========================================================
+     LTC — EN HAUT À DROITE
+     ======================================================== */
+
+  .showcue-header-v6 > .v6-clocks{
+    top:17px !important;
+    right:14px !important;
+
+    width:auto !important;
+    height:auto !important;
+
+    display:block !important;
+  }
+
+  .v6-clocks .v6-clock:first-child{
+    position:absolute !important;
+
+    top:87px !important;
+    right:50% !important;
+
+    transform:translateX(50%) !important;
+
+    width:max-content !important;
+    min-width:0 !important;
+
+    display:block !important;
+
+    padding:0 !important;
+
+    text-align:center !important;
+  }
+
+  .v6-clocks .v6-clock-ltc{
+    display:flex !important;
+
+    align-items:center !important;
+    justify-content:flex-end !important;
+
+    gap:5px !important;
+
+    width:max-content !important;
+    min-width:0 !important;
+
+    padding:0 !important;
+  }
+
+  .v6-clock-ltc .operation-clock-label{
+    display:none !important;
+  }
+
+  #ltc{
+    font-size:22px !important;
+    font-weight:900 !important;
+
+    line-height:1 !important;
+
+    color:#63df94 !important;
+  }
+
+  #ltc::after{
+    content:"";
+  }
+
+
+  /* ========================================================
+     HEURE — BAS CENTRE
+     ======================================================== */
+
+  .v6-clocks
+  .v6-clock:first-child
+  .operation-clock-label{
+    display:block !important;
+
+    margin:0 0 3px !important;
+
+    font-size:7px !important;
+    font-weight:750 !important;
+
+    line-height:1 !important;
+
+    letter-spacing:.18em !important;
+  }
+
+  #server-clock{
+    display:block !important;
+
+    font-size:24px !important;
+    font-weight:850 !important;
+
+    line-height:1 !important;
+    letter-spacing:-.025em !important;
+  }
+
+
+  /* ========================================================
+     CALL — BAS GAUCHE
+     ======================================================== */
+
+  .showcue-header-v6 > .v6-brand-row{
+    left:14px !important;
+    bottom:13px !important;
+
+    width:auto !important;
+    height:auto !important;
+
+    display:block !important;
+  }
+
+  .v6-brand-row .v6-logo,
+  .v6-brand-row .v6-product{
+    display:none !important;
+  }
+
+  .v6-transport{
+    display:block !important;
+  }
+
+  #call-button{
+    height:34px !important;
+    min-height:34px !important;
+
+    padding:
+      4px
+      13px !important;
+
+    font-size:13px !important;
+    font-weight:800 !important;
+
+    line-height:1 !important;
+
+    border-radius:8px !important;
+  }
+
+  /* transport PLAY/STOP masqué ici :
+     le LTC reste l'indication technique principale */
+  #transport{
+    display:none !important;
+  }
+
+
+  /* ========================================================
+     NAVIGATION
+     Déjà gérée en barre basse fixe par les styles existants.
+     Elle ne doit jamais réserver de hauteur dans le header.
+     ======================================================== */
+
+  .showcue-header-v6 > .v6-navigation{
+    margin:0 !important;
+  }
+
+
+  /* ========================================================
+     LIVE : on profite réellement de la hauteur gagnée
+     ======================================================== */
+
+  #view-live{
+    gap:5px !important;
+  }
+
+  #view-live .live-current{
+    margin-top:0 !important;
+  }
+
+  #view-live .ableton-strip{
+    margin-top:0 !important;
+    margin-bottom:5px !important;
+  }
+
+}
+
+
+/* Très petits iPhone */
+
+@media (max-width:390px){
+
+  .showcue-header-v6{
+    height:158px !important;
+    min-height:158px !important;
+  }
+
+  #ltc{
+    font-size:20px !important;
+  }
+
+  #server-clock{
+    font-size:22px !important;
+  }
+
+}
+
+</style>
+
+
+<!-- CL_SHOWCUE_FINAL_VISUAL_V12 -->
+<style>
+
+@media (max-width:650px){
+
+  /* ========================================================
+     1. HORLOGE DE RÉGIE / STUDIO
+     ======================================================== */
+
+  .v6-clocks .v6-clock:first-child{
+    padding:5px 11px !important;
+
+    border:1px solid rgba(199,185,169,.28) !important;
+    border-radius:8px !important;
+
+    background:
+      linear-gradient(
+        180deg,
+        rgba(24,25,27,.98),
+        rgba(7,8,9,.98)
+      ) !important;
+
+    box-shadow:
+      inset 0 1px rgba(255,255,255,.06),
+      inset 0 0 12px rgba(0,0,0,.55),
+      0 3px 10px rgba(0,0,0,.30) !important;
+  }
+
+  .v6-clocks
+  .v6-clock:first-child
+  .operation-clock-label{
+    color:rgba(225,210,193,.60) !important;
+
+    font-size:7px !important;
+    font-weight:850 !important;
+
+    letter-spacing:.22em !important;
+  }
+
+  #server-clock{
+    color:#f3eadc !important;
+
+    font-family:
+      "SF Mono",
+      SFMono-Regular,
+      Menlo,
+      Monaco,
+      monospace !important;
+
+    font-size:28px !important;
+    font-weight:900 !important;
+
+    font-variant-numeric:tabular-nums !important;
+    font-feature-settings:"tnum" 1 !important;
+
+    line-height:.95 !important;
+    letter-spacing:-.035em !important;
+
+    text-shadow:
+      0 0 8px rgba(255,238,207,.10),
+      0 2px 5px rgba(0,0,0,.60) !important;
+  }
+
+
+  /* ========================================================
+     2. ORDRE DU LIVE
+        TIMING D'ABORD — CONDUITE ENSUITE
+     ======================================================== */
+
+  #view-live.active{
+    display:flex !important;
+    flex-direction:column !important;
+
+    gap:0 !important;
+  }
+
+  #view-live .ableton-strip{
+    order:1 !important;
+  }
+
+  #view-live .live-past{
+    order:2 !important;
+  }
+
+  #view-live .live-current{
+    order:3 !important;
+  }
+
+  #view-live .live-ahead{
+    order:4 !important;
+  }
+
+  #view-live .live-untimed-checklist-panel{
+    order:5 !important;
+  }
+
+
+  /* ========================================================
+     3. SCÈNE ABLETON — VRAI BANDEAU DE TIMING
+     ======================================================== */
+
+  #view-live .ableton-strip{
+    margin:
+      4px
+      0
+      12px !important;
+
+    min-height:56px !important;
+
+    padding:
+      8px
+      11px !important;
+
+    border:
+      1px solid
+      rgba(151,166,188,.42) !important;
+
+    border-radius:9px !important;
+
+    background:
+      linear-gradient(
+        180deg,
+        rgba(38,43,52,.98),
+        rgba(27,31,39,.98)
+      ) !important;
+
+    box-shadow:
+      inset 0 1px rgba(255,255,255,.055),
+      0 3px 12px rgba(0,0,0,.24) !important;
+
+    grid-template-columns:
+      minmax(0,2.35fr)
+      auto
+      auto
+      auto !important;
+
+    gap:
+      9px !important;
+
+    align-items:center !important;
+  }
+
+  #view-live
+  .ableton-strip
+  .label{
+    color:rgba(211,216,225,.66) !important;
+
+    font-family:
+      -apple-system,
+      BlinkMacSystemFont,
+      "SF Pro Text",
+      "Segoe UI",
+      sans-serif !important;
+
+    font-size:7px !important;
+    font-weight:800 !important;
+
+    line-height:1 !important;
+    letter-spacing:.14em !important;
+  }
+
+  #view-live #ableton-scene{
+    margin-top:3px !important;
+
+    color:#f3d496 !important;
+
+    font-family:
+      -apple-system,
+      BlinkMacSystemFont,
+      "SF Pro Display",
+      "Segoe UI",
+      sans-serif !important;
+
+    font-size:15px !important;
+    font-weight:750 !important;
+
+    line-height:1.08 !important;
+    letter-spacing:0 !important;
+  }
+
+  #view-live .ableton-value{
+    color:#f0c66e !important;
+
+    font-family:
+      "SF Mono",
+      SFMono-Regular,
+      Menlo,
+      monospace !important;
+
+    font-size:17px !important;
+    font-weight:850 !important;
+
+    font-variant-numeric:tabular-nums !important;
+
+    line-height:1 !important;
+    letter-spacing:-.03em !important;
+  }
+
+
+  /* ========================================================
+     4. CONDUITE
+     ======================================================== */
+
+  #view-live .live-current{
+    margin:
+      0
+      0
+      12px !important;
+  }
+
+  #view-live .live-ahead{
+    margin-top:0 !important;
+  }
+
+}
+
+</style>
+
+
+
+<!-- CL_SHOWCUE_WORK_CLOCK_UI_V1 -->
+<style id="cl-work-clock-style">
+
+#cl-work-clock{
+    position:fixed;
+    right:14px;
+    top:12px;
+    z-index:8000;
+
+    font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
+
+    background:
+        rgba(10,10,14,.88);
+
+    color:#fff;
+
+    border:
+        1px solid rgba(255,255,255,.18);
+
+    border-radius:12px;
+
+    padding:
+        8px 12px;
+
+    backdrop-filter:
+        blur(12px);
+
+    box-shadow:
+        0 8px 25px rgba(0,0,0,.25);
+}
+
+#cl-work-clock-time{
+    font-size:20px;
+    font-weight:700;
+    letter-spacing:.04em;
+}
+
+#cl-work-clock-date{
+    font-size:10px;
+    opacity:.55;
+    text-align:right;
+}
+
+
+#cl-work-banner{
+    position:fixed;
+    left:50%;
+    bottom:16px;
+
+    transform:
+        translateX(-50%);
+
+    z-index:8000;
+
+    display:none;
+
+    width:
+        min(92vw,720px);
+
+    padding:
+        12px 16px;
+
+    border-radius:12px;
+
+    background:
+        rgba(190,30,45,.94);
+
+    color:white;
+
+    box-shadow:
+        0 10px 30px rgba(0,0,0,.35);
+}
+
+#cl-work-banner.visible{
+    display:block;
+}
+
+#cl-work-banner-time{
+    font-size:11px;
+    opacity:.75;
+}
+
+#cl-work-banner-text{
+    font-size:18px;
+    font-weight:700;
+    margin-top:2px;
+}
+
+#cl-work-banner-post{
+    font-size:12px;
+    margin-top:3px;
+    opacity:.8;
+}
+
+</style>
+
+
+<div id="cl-work-clock">
+    <div id="cl-work-clock-time">
+        --:--:--
+    </div>
+
+    <div id="cl-work-clock-date">
+        HEURE RÉSEAU
+    </div>
+</div>
+
+
+<div id="cl-work-banner">
+
+    <div id="cl-work-banner-time"></div>
+
+    <div id="cl-work-banner-text"></div>
+
+    <div id="cl-work-banner-post"></div>
+
+</div>
+
+
+<script id="cl-work-clock-script">
+
+(function(){
+
+    let serverEpoch=null;
+    let syncPerf=null;
+    let assignments=[];
+
+
+    function currentDate(){
+
+        if(
+            serverEpoch===null ||
+            syncPerf===null
+        ){
+            return new Date();
+        }
+
+        return new Date(
+            serverEpoch +
+            (
+                performance.now() -
+                syncPerf
+            )
+        );
+    }
+
+
+    async function syncClock(){
+
+        try{
+
+            const response=
+                await fetch(
+                    '/show-info/clock',
+                    {
+                        cache:'no-store'
+                    }
+                );
+
+            const data=
+                await response.json();
+
+            const epoch=
+                Number(
+                    data.server_epoch_ms
+                );
+
+            if(
+                !Number.isFinite(epoch)
+            ){
+                console.warn(
+                    'ShowCue clock : server_epoch_ms invalide',
+                    data
+                );
+                return;
+            }
+
+            /*
+             * Heure civile de référence = serveur Flask.
+             * performance.now() sert ensuite à faire avancer
+             * l'horloge localement entre deux synchronisations.
+             */
+            serverEpoch=epoch;
+            syncPerf=performance.now();
+
+        }catch(error){
+
+            console.warn(
+                'ShowCue clock sync',
+                error
+            );
+        }
+    }
+
+
+    async function loadAssignments(){
+
+        try{
+
+            const response=
+                await fetch(
+                    '/show-info/work-assignments',
+                    {
+                        cache:'no-store'
+                    }
+                );
+
+            const data=
+                await response.json();
+
+            assignments=
+                Array.isArray(
+                    data.assignments
+                )
+                    ? data.assignments
+                    : [];
+
+        }catch(error){
+
+            assignments=[];
+
+        }
+    }
+
+
+    function secondsOfDay(date){
+
+        return (
+            date.getHours()*3600 +
+            date.getMinutes()*60 +
+            date.getSeconds()
+        );
+    }
+
+
+    function parseTime(value){
+
+        const match=
+            String(value||'')
+            .trim()
+            .match(
+                /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/
+            );
+
+        if(!match){
+            return null;
+        }
+
+        return (
+            Number(match[1])*3600 +
+            Number(match[2])*60 +
+            Number(match[3]||0)
+        );
+    }
+
+
+    function update(){
+
+        const now=currentDate();
+
+        const time=
+            now.toLocaleTimeString(
+                'fr-FR',
+                {
+                    hour:'2-digit',
+                    minute:'2-digit',
+                    second:'2-digit',
+                    hour12:false,
+                    timeZone:'Europe/Paris'
+                }
+            );
+
+        const clock=
+            document.getElementById(
+                'cl-work-clock-time'
+            );
+
+        if(clock){
+            clock.textContent=time;
+        }
+
+
+        const current=
+            secondsOfDay(now);
+
+        let best=null;
+
+
+        assignments.forEach(item=>{
+
+            if(item.enabled===false){
+                return;
+            }
+
+            const target=
+                parseTime(
+                    item.time
+                );
+
+            if(target===null){
+                return;
+            }
+
+            const delta=
+                target-current;
+
+            /*
+             * Affichage :
+             * 60 secondes avant
+             * jusqu'à 90 secondes après.
+             */
+            if(
+                delta > 60 ||
+                delta < -90
+            ){
+                return;
+            }
+
+            if(
+                !best ||
+                Math.abs(delta) <
+                Math.abs(best.delta)
+            ){
+                best={
+                    item,
+                    delta
+                };
+            }
+
+        });
+
+
+        const banner=
+            document.getElementById(
+                'cl-work-banner'
+            );
+
+        if(!banner){
+            return;
+        }
+
+
+        if(!best){
+
+            banner.classList.remove(
+                'visible'
+            );
+
+            return;
+        }
+
+
+        banner.classList.add(
+            'visible'
+        );
+
+
+        const timeNode=
+            document.getElementById(
+                'cl-work-banner-time'
+            );
+
+        const textNode=
+            document.getElementById(
+                'cl-work-banner-text'
+            );
+
+        const postNode=
+            document.getElementById(
+                'cl-work-banner-post'
+            );
+
+
+        let prefix='';
+
+        if(best.delta > 0){
+
+            prefix=
+                'DANS '+
+                best.delta+
+                ' s';
+
+        }else if(
+            best.delta >= -10
+        ){
+
+            prefix=
+                'MAINTENANT';
+
+        }else{
+
+            prefix=
+                'EN COURS';
+        }
+
+
+        if(timeNode){
+
+            timeNode.textContent=
+                prefix+
+                ' · '+
+                best.item.time;
+
+        }
+
+
+        if(textNode){
+
+            textNode.textContent=
+                best.item.text || '';
+
+        }
+
+
+        if(postNode){
+
+            postNode.textContent=
+                best.item.post
+                    ? 'POSTE : '+
+                      best.item.post
+                    : '';
+
+        }
+
+    }
+
+
+    syncClock();
+    loadAssignments();
+
+    setInterval(
+        update,
+        250
+    );
+
+    setInterval(
+        syncClock,
+        10000
+    );
+
+    setInterval(
+        loadAssignments,
+        5000
+    );
+
+})();
+
+</script>
+
+
+<script id="showcue-full-cue-editor-v1-script">
+(function(){
+
+function builderOf(cue){
+  return cue && cue.builder && typeof cue.builder==='object'
+    ? cue.builder
+    : {};
+}
+
+function splitRoles(value){
+  return String(value||'')
+    .split('/')
+    .map(v=>v.trim())
+    .filter(Boolean);
+}
+
+function setFullCueMode(mode){
+
+  if(!['timed','realtime','manual'].includes(mode)){
+    mode='manual';
+  }
+
+  const radio=document.querySelector(
+    'input[name="full-cue-mode"][value="'+mode+'"]'
+  );
+
+  if(radio) radio.checked=true;
+
+  editor.dataset.mode=mode;
+
+  $('timecode-field').hidden=mode!=='timed';
+  $('realtime-field').hidden=mode!=='realtime';
+  $('section-field').hidden=mode!=='manual';
+  $('anchor-field').hidden=mode!=='manual';
+
+  if(mode==='manual' && !$('form-section').value){
+    $('form-section').value='PARTIE PARLÉE';
+  }
+}
+
+document.querySelectorAll(
+  'input[name="full-cue-mode"]'
+).forEach(radio=>{
+  radio.addEventListener('change',()=>{
+    setFullCueMode(radio.value);
+  });
+});
+
+
+function distributionRoles(){
+  const distribution=snapshot.distribution||{};
+  return Array.isArray(distribution.roles)
+    ? distribution.roles
+    : [];
+}
+
+function equipmentValues(active,type){
+
+  const slots=Array.isArray(active?.equipment_slots)
+    ? active.equipment_slots
+    : [];
+
+  return [...new Set(
+    slots
+      .filter(slot=>
+        String(slot.type||'').toUpperCase()===type
+      )
+      .map(slot=>String(slot.value||'').trim())
+      .filter(Boolean)
+  )];
+}
+
+function techSelect(values,saved,className,emptyLabel){
+
+  const select=document.createElement('select');
+  select.className=className;
+
+  select.append(
+    new Option(emptyLabel,'')
+  );
+
+  values.forEach(value=>{
+    select.append(
+      new Option(value,value)
+    );
+  });
+
+  if(
+    saved &&
+    ![...select.options].some(option=>option.value===saved)
+  ){
+    select.append(
+      new Option(saved,saved)
+    );
+  }
+
+  select.value=saved||'';
+
+  return select;
+}
+
+
+function renderFullCueRoles(cue){
+
+  const box=$('form-role-assignments');
+  box.innerHTML='';
+
+  const builder=builderOf(cue);
+
+  const selected=
+    new Set(splitRoles(builder.role));
+
+  const assignments=
+    builder.role_assignments &&
+    typeof builder.role_assignments==='object'
+      ? builder.role_assignments
+      : {};
+
+  const roles=distributionRoles();
+
+  if(!roles.length){
+    box.innerHTML=
+      '<div class="muted">Aucune distribution disponible</div>';
+    return;
+  }
+
+  roles.forEach(item=>{
+
+    const role=String(item.role||'').trim();
+    if(!role)return;
+
+    const active=item.active||{};
+    const assignment=assignments[role]||{};
+
+    const card=document.createElement('div');
+    card.className='full-cue-role-card';
+    card.dataset.role=role;
+
+    const head=document.createElement('div');
+    head.className='full-cue-role-head';
+
+    const enabled=document.createElement('input');
+    enabled.type='checkbox';
+    enabled.className='full-cue-role-enabled';
+    enabled.checked=selected.has(role);
+
+    const name=document.createElement('select');
+    name.className='full-cue-role-name full-cue-role-name-select';
+
+    distributionRoles().forEach(roleItem=>{
+      const value=String(roleItem.role||'').trim();
+      if(value){
+        name.add(new Option(value,value));
+      }
+    });
+
+    if(
+      role &&
+      ![...name.options].some(option=>option.value===role)
+    ){
+      name.add(new Option(role,role));
+    }
+
+    name.value=role;
+
+    const artist=document.createElement('span');
+    artist.className='full-cue-role-artist';
+    artist.textContent=
+      active.artist||'AUCUN ARTISTE ACTIF';
+
+    const remove=document.createElement('button');
+    remove.type='button';
+    remove.className='quiet full-cue-role-remove';
+    remove.textContent='RETIRER';
+
+    remove.onclick=()=>{
+      enabled.checked=false;
+      enabled.dispatchEvent(
+        new Event('change',{bubbles:true})
+      );
+    };
+
+    head.append(enabled,name,artist,remove);
+
+    const tech=document.createElement('div');
+    tech.className='full-cue-role-tech';
+
+    const micro=techSelect(
+      equipmentValues(active,'MICRO'),
+      String(assignment.microphone||''),
+      'full-cue-micro',
+      '— PAS DE MICRO —'
+    );
+
+    const iem=techSelect(
+      equipmentValues(active,'IEM'),
+      String(assignment.iem||''),
+      'full-cue-iem',
+      '— PAS D’IEM —'
+    );
+
+    const equipment=techSelect(
+      equipmentValues(active,'ÉQUIPEMENT'),
+      String(assignment.equipment||''),
+      'full-cue-equipment',
+      '— PAS D’ÉQUIPEMENT —'
+    );
+
+    [
+      ['MICRO',micro],
+      ['EAR / IEM',iem],
+      ['ÉQUIPEMENT',equipment]
+    ].forEach(([label,control])=>{
+
+      const caption=document.createElement('span');
+      caption.className='full-cue-tech-label';
+      caption.textContent=label;
+
+      tech.append(caption,control);
+    });
+
+    tech.hidden=!enabled.checked;
+
+    card.classList.toggle(
+      'full-cue-role-selected',
+      enabled.checked
+    );
+
+    /*
+     * CL_SHOWCUE_ROLE_LAYOUT_V4
+     * Les rôles disponibles restent dans le DOM pour le picker,
+     * mais seuls les rôles réellement affectés sont visibles.
+     */
+    card.style.setProperty(
+      'display',
+      enabled.checked ? 'block' : 'none',
+      'important'
+    );
+
+    name.disabled=!enabled.checked;
+    remove.hidden=!enabled.checked;
+
+    enabled.onchange=()=>{
+
+      const activeRole=Boolean(enabled.checked);
+
+      tech.hidden=!activeRole;
+
+      card.classList.toggle(
+        'full-cue-role-selected',
+        activeRole
+      );
+
+      card.style.setProperty(
+        'display',
+        activeRole ? 'block' : 'none',
+        'important'
+      );
+
+      name.disabled=!activeRole;
+      remove.hidden=!activeRole;
+
+      if(typeof syncFullCueRolePicker==='function'){
+        syncFullCueRolePicker();
+      }
+
+      if(typeof syncFullCueRoleSummary==='function'){
+        syncFullCueRoleSummary();
+      }
+    };
+
+    name.onchange=()=>{
+
+      const previousRole=String(
+        card.dataset.role||''
+      ).trim();
+
+      const nextRole=String(
+        name.value||''
+      ).trim();
+
+      if(!nextRole){
+        name.value=previousRole;
+        return;
+      }
+
+      const duplicate=[
+        ...document.querySelectorAll(
+          '#form-role-assignments .full-cue-role-card'
+        )
+      ].some(other=>
+        other!==card &&
+        other.querySelector('.full-cue-role-enabled')?.checked &&
+        String(other.dataset.role||'').trim()===nextRole
+      );
+
+      if(duplicate){
+        $('form-error').textContent=
+          'Ce rôle est déjà présent sur le cue.';
+        name.value=previousRole;
+        return;
+      }
+
+      card.dataset.role=nextRole;
+
+      const matching=
+        distributionRoles().find(item=>
+          String(item.role||'').trim()===nextRole
+        );
+
+      const active=matching?.active||{};
+
+      artist.textContent=
+        active.artist||'AUCUN ARTISTE ACTIF';
+
+      $('form-error').textContent='';
+
+      if(typeof syncFullCueRolePicker==='function'){
+        syncFullCueRolePicker();
+      }
+
+      if(typeof syncFullCueRoleSummary==='function'){
+        syncFullCueRoleSummary();
+      }
+    };
+
+    card.append(head,tech);
+    box.append(card);
+  });
+}
+
+
+window.collectFullCueBuilder=function(){
+
+  const previous=builderOf(editing);
+  const roles=[];
+  const assignments={};
+
+  document.querySelectorAll(
+    '#form-role-assignments .full-cue-role-card'
+  ).forEach(card=>{
+
+    const enabled=
+      card.querySelector('.full-cue-role-enabled');
+
+    if(!enabled?.checked)return;
+
+    const role=String(card.dataset.role||'').trim();
+    if(!role)return;
+
+    roles.push(role);
+
+    const values={
+      microphone:String(
+        card.querySelector('.full-cue-micro')?.value||''
+      ).trim(),
+
+      iem:String(
+        card.querySelector('.full-cue-iem')?.value||''
+      ).trim(),
+
+      equipment:String(
+        card.querySelector('.full-cue-equipment')?.value||''
+      ).trim()
+    };
+
+    const clean={};
+
+    Object.entries(values).forEach(([key,value])=>{
+      if(value)clean[key]=value;
+    });
+
+    if(Object.keys(clean).length){
+      assignments[role]=clean;
+    }
+  });
+
+  const builder={
+    ...previous,
+
+    role:roles.join(' / '),
+
+    section:String(
+      $('full-cue-builder-section')?.value || ''
+    ).trim(),
+
+    source:String(
+      $('full-cue-builder-source')?.value || ''
+    ).trim(),
+
+    type:String(
+      $('full-cue-builder-type')?.value || ''
+    ).trim()
+  };
+
+  if(Object.keys(assignments).length){
+    builder.role_assignments=assignments;
+  }else{
+    delete builder.role_assignments;
+  }
+
+  if(!roles.length){
+    builder.role='';
+    delete builder.role_assignments;
+    delete builder.artist_override;
+    delete builder.microphone_override;
+    delete builder.iem_override;
+    delete builder.equipment_override;
+  }
+
+  return builder;
+};
+
+
+$('full-cue-clear-roles').onclick=()=>{
+
+  document.querySelectorAll(
+    '#form-role-assignments .full-cue-role-enabled'
+  ).forEach(input=>{
+
+    input.checked=false;
+
+    input.dispatchEvent(
+      new Event('change',{bubbles:true})
+    );
+  });
+
+  syncFullCueRolePicker();
+  syncFullCueRoleSummary();
+};
+
+
+
+/* =========================================================
+   CL_SHOWCUE_EDITOR_ROLE_ADD_CLASSIFICATION_V1
+   ========================================================= */
+
+
+/* CL_SHOWCUE_EDITABLE_ROLE_NAMES_V1 */
+
+function syncFullCueRoleSummary(){
+
+  const button=$('full-cue-clear-roles');
+
+  if(!button)return;
+
+  const selected=[
+    ...document.querySelectorAll(
+      '#form-role-assignments .full-cue-role-card'
+    )
+  ]
+  .filter(card=>
+    card.querySelector('.full-cue-role-enabled')?.checked
+  )
+  .map(card=>
+    String(card.dataset.role||'').trim()
+  )
+  .filter(Boolean);
+
+  button.textContent=
+    selected.length
+      ? selected.join(' / ')+'  ×'
+      : 'AUCUN RÔLE';
+}
+
+function syncFullCueRolePicker(){
+
+  const picker=$('full-cue-role-picker');
+
+  if(!picker)return;
+
+  const previous=picker.value;
+
+  picker.innerHTML=
+    '<option value="">— CHOISIR UN RÔLE —</option>';
+
+  document.querySelectorAll(
+    '#form-role-assignments .full-cue-role-card'
+  ).forEach(card=>{
+
+    const role=String(
+      card.dataset.role || ''
+    ).trim();
+
+    if(!role)return;
+
+    const enabled=
+      card.querySelector('.full-cue-role-enabled');
+
+    const option=
+      document.createElement('option');
+
+    option.value=role;
+    option.textContent=
+      enabled?.checked
+        ? '✓ '+role
+        : role;
+
+    option.disabled=
+      Boolean(enabled?.checked);
+
+    picker.append(option);
+  });
+
+  if(
+    previous &&
+    [...picker.options].some(
+      option=>
+        option.value===previous &&
+        !option.disabled
+    )
+  ){
+    picker.value=previous;
+  }
+}
+
+
+function populateFullCueClassification(cue){
+
+  const builder=
+    typeof builderOf==='function'
+      ? builderOf(cue)
+      : (cue?.builder || {});
+
+  $('full-cue-builder-section').value=
+    String(
+      builder?.section ||
+      cue?.section ||
+      ''
+    ).trim();
+
+  $('full-cue-builder-source').value=
+    String(
+      builder?.source || ''
+    ).trim();
+
+  $('full-cue-builder-type').value=
+    String(
+      builder?.type || ''
+    ).trim();
+
+
+  /*
+   * Types réellement rencontrés dans la session
+   * + quelques valeurs usuelles.
+   */
+  const typeValues=new Set([
+    'AUTRE',
+    'TOP MUSIQUE',
+    'TECHNIQUE',
+    'CHANGEMENT MICRO',
+    'ÉQUIPEMENT ARTISTE'
+  ]);
+
+  const collectTypes=list=>{
+    (list || []).forEach(item=>{
+
+      const value=
+        String(
+          item?.builder?.type || ''
+        ).trim();
+
+      if(value)typeValues.add(value);
+    });
+  };
+
+  const conduite=snapshot?.conduite || {};
+
+  collectTypes(conduite.timed);
+  collectTypes(conduite.manual);
+  collectTypes(conduite.realtime);
+
+  const datalist=
+    $('full-cue-type-options');
+
+  datalist.innerHTML='';
+
+  [...typeValues]
+    .sort((a,b)=>
+      a.localeCompare(
+        b,
+        'fr',
+        {sensitivity:'base'}
+      )
+    )
+    .forEach(value=>
+      datalist.append(
+        new Option('',value)
+      )
+    );
+}
+
+
+$('full-cue-add-role').onclick=()=>{
+
+  const picker=
+    $('full-cue-role-picker');
+
+  const role=
+    String(
+      picker?.value || ''
+    ).trim();
+
+  if(!role){
+    $('form-error').textContent=
+      'Choisissez d’abord un rôle à ajouter.';
+    return;
+  }
+
+  const card=[
+    ...document.querySelectorAll(
+      '#form-role-assignments .full-cue-role-card'
+    )
+  ].find(item=>
+    String(item.dataset.role||'').trim()===role
+  );
+
+  if(!card){
+    $('form-error').textContent=
+      'Rôle introuvable dans la distribution.';
+    return;
+  }
+
+  const enabled=
+    card.querySelector(
+      '.full-cue-role-enabled'
+    );
+
+  if(enabled){
+    enabled.checked=true;
+
+    /*
+     * Important :
+     * déclenche exactement la même logique que
+     * l'activation manuelle d'un rôle.
+     */
+    enabled.dispatchEvent(
+      new Event('change',{bubbles:true})
+    );
+  }
+
+  $('form-error').textContent='';
+
+  syncFullCueRolePicker();
+  syncFullCueRoleSummary();
+
+  card.scrollIntoView({
+    block:'nearest',
+    behavior:'smooth'
+  });
+};
+
+
+$('capture-real-clock').onclick=async()=>{
+
+  const button=$('capture-real-clock');
+  button.disabled=true;
+
+  $('form-error').textContent='';
+
+  try{
+
+    const response=
+      await fetch('/show-info/clock',{
+        cache:'no-store'
+      });
+
+    const data=await response.json();
+
+    let seconds=
+      Math.floor(
+        Number(data.server_clock_seconds)
+      );
+
+    if(!Number.isFinite(seconds)){
+      throw new Error(
+        'Heure serveur indisponible'
+      );
+    }
+
+    seconds=((seconds%86400)+86400)%86400;
+
+    const hh=Math.floor(seconds/3600);
+    seconds-=hh*3600;
+
+    const mm=Math.floor(seconds/60);
+    const ss=seconds-mm*60;
+
+    $('form-clock-time').value=
+      [hh,mm,ss]
+        .map(v=>String(v).padStart(2,'0'))
+        .join(':');
+
+  }catch(error){
+
+    $('form-error').textContent=
+      error.message;
+
+  }finally{
+
+    button.disabled=false;
+  }
+};
+
+
+/*
+ * On enveloppe l'éditeur déjà existant.
+ */
+const previousOpenEditor=openEditor;
+
+openEditor=function(
+  cue=null,
+  mode=null,
+  classification=false
+){
+
+  previousOpenEditor(
+    cue,
+    mode,
+    classification
+  );
+
+  const actualMode=
+    mode ||
+    cue?.mode ||
+    'manual';
+
+  setFullCueMode(actualMode);
+
+  $('form-clock-time').value=
+    cue?.clock_time ||
+    '00:00:00';
+
+  renderFullCueRoles(cue);
+
+  populateFullCueClassification(cue);
+
+  syncFullCueRolePicker();
+  syncFullCueRoleSummary();
+};
+
+
+
+
+
+/* CL_SHOWCUE_FULL_EDITOR_EXPORTS_V1
+   Rend accessibles au patch Builder-live les fonctions
+   réellement utilisées par l'éditeur complet.
+*/
+window.renderFullCueRoles = renderFullCueRoles;
+window.populateFullCueClassification = populateFullCueClassification;
+window.syncFullCueRolePicker = syncFullCueRolePicker;
+window.syncFullCueRoleSummary = syncFullCueRoleSummary;
+
+})();
+</script>
+
+
+
+
+
+
+<!-- CL_SHOWCUE_ROLE_CARDS_FIX_V2 -->
+
+<style id="showcue-role-cards-fix-v2">
+
+/*
+ * Les cartes non utilisées existent toujours dans le DOM
+ * pour conserver la distribution disponible,
+ * mais elles ne polluent plus l'éditeur.
+ */
+#editor #form-role-assignments
+.full-cue-role-card:not(.full-cue-role-selected){
+    display:none !important;
+}
+
+#editor #form-role-assignments
+.full-cue-role-card.full-cue-role-selected{
+    display:block !important;
+    margin-top:8px;
+    padding:10px;
+    border:1px solid var(--line);
+    border-radius:8px;
+    background:rgba(255,255,255,.025);
+}
+
+#editor .full-cue-role-enabled{
+    display:none !important;
+}
+
+#editor .full-cue-role-head{
+    display:grid;
+    grid-template-columns:
+        minmax(150px,220px)
+        minmax(120px,1fr)
+        auto;
+    align-items:center;
+    gap:8px;
+}
+
+#editor .full-cue-role-name-select{
+    width:100% !important;
+    max-width:none !important;
+    font-weight:950;
+}
+
+#editor .full-cue-role-artist{
+    color:var(--muted);
+    font-size:.78rem;
+}
+
+#editor .full-cue-role-remove{
+    min-width:70px;
+}
+
+#editor .full-cue-role-tech{
+    margin-top:9px;
+}
+
+@media(max-width:760px){
+
+    #editor .full-cue-role-head{
+        grid-template-columns:1fr auto;
+    }
+
+    #editor .full-cue-role-artist{
+        grid-column:1/-1;
+    }
+}
+
+</style>
+
+<style id="showcue-editable-role-names-v1">
+
+#editor .full-cue-role-name-select{
+    width:auto;
+    min-width:140px;
+    max-width:240px;
+    padding:4px 7px;
+    font-weight:900;
+    color:#fff;
+    background:#25211d;
+}
+
+#editor #full-cue-clear-roles{
+    max-width:360px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+
+</style>
+
+<style id="showcue-full-editor-classification-v1">
+
+#editor .full-cue-role-actions{
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    gap:7px;
+    flex-wrap:wrap;
+}
+
+#editor #full-cue-role-picker{
+    min-width:180px;
+}
+
+#editor .full-cue-classification{
+    border-top:1px solid var(--line);
+    padding-top:10px;
+}
+
+#editor .full-cue-classification-grid{
+    display:grid;
+    grid-template-columns:
+        minmax(150px,.8fr)
+        minmax(190px,1.2fr)
+        minmax(160px,1fr);
+    gap:8px;
+    margin-top:7px;
+}
+
+#editor .full-cue-classification-grid label{
+    display:grid;
+    gap:4px;
+}
+
+#editor .full-cue-classification-grid label > span{
+    color:var(--muted);
+    font-size:.62rem;
+    font-weight:900;
+    letter-spacing:.08em;
+}
+
+#editor .full-cue-classification-grid input{
+    width:100%;
+    min-width:0;
+}
+
+@media(max-width:760px){
+
+    #editor .full-cue-role-actions{
+        display:grid;
+        grid-template-columns:1fr 1fr;
+    }
+
+    #editor #full-cue-role-picker{
+        grid-column:1/-1;
+        width:100%;
+    }
+
+    #editor .full-cue-classification-grid{
+        grid-template-columns:1fr;
+    }
+}
+
+</style>
+
+<script id="showcue-editor-visibility-fix-v1-script">
+(function(){
+
+    /*
+     * La modale peut conserver son scroll après une édition précédente.
+     * À chaque ouverture on revient systématiquement en haut.
+     */
+    const previousShowModal = editor.showModal.bind(editor);
+
+    editor.showModal = function(){
+
+        previousShowModal();
+
+        requestAnimationFrame(()=>{
+            const form=$('cue-form');
+
+            if(form){
+                form.scrollTop=0;
+            }
+
+            editor.scrollTop=0;
+        });
+    };
+
+})();
+</script>
+
+
+<style id="showcue-realtime-casting-meta-v1-style">
+/* CL_SHOWCUE_REALTIME_CASTING_META_V1 */
+
+#current-meta .realtime-casting-artists{
+    display:block;
+    margin-top:.28rem;
+    font-size:1.75rem;
+    line-height:1.08;
+    font-weight:950;
+    letter-spacing:.01em;
+}
+</style>
+
+<script id="showcue-realtime-live-v1-script">
+(function(){
+
+    let realtimeServerBase=null;
+    let realtimePerfBase=null;
+
+
+    function parseClockTime(value){
+
+        const match=
+            /^(\d{2}):(\d{2}):(\d{2})$/
+            .exec(String(value||'').trim());
+
+        if(!match)return null;
+
+        const hh=Number(match[1]);
+        const mm=Number(match[2]);
+        const ss=Number(match[3]);
+
+        if(
+            hh>23 ||
+            mm>59 ||
+            ss>59
+        ){
+            return null;
+        }
+
+        return hh*3600+mm*60+ss;
+    }
+
+
+    function serverSecondsNow(){
+
+        if(
+            realtimeServerBase===null ||
+            realtimePerfBase===null
+        ){
+            return null;
+        }
+
+        return (
+            realtimeServerBase +
+            (performance.now()-realtimePerfBase)/1000
+        ) % 86400;
+    }
+
+
+    async function syncRealtimeClock(){
+
+        try{
+
+            const response=
+                await fetch(
+                    '/show-info/clock',
+                    {cache:'no-store'}
+                );
+
+            const data=
+                await response.json();
+
+            const seconds=
+                Number(
+                    data.server_clock_seconds
+                );
+
+            if(Number.isFinite(seconds)){
+
+                realtimeServerBase=
+                    ((seconds%86400)+86400)%86400;
+
+                realtimePerfBase=
+                    performance.now();
+            }
+
+        }catch(error){
+            /* Le LIVE LTC reste intact si l'horloge réseau tombe. */
+        }
+    }
+
+
+    function signedClockDelta(target,now){
+
+        let delta=target-now;
+
+        /*
+         * Gestion propre du passage de minuit.
+         */
+        if(delta>43200)delta-=86400;
+        if(delta<-43200)delta+=86400;
+
+        return delta;
+    }
+
+
+    function realtimeForPost(data){
+
+        return (
+            Array.isArray(data.realtime)
+                ? data.realtime
+                : (
+                    Array.isArray(
+                        data.conduite?.realtime
+                    )
+                        ? data.conduite.realtime
+                        : []
+                )
+        ).filter(cue=>
+            cue &&
+            cue.status==='official'
+        );
+    }
+
+
+    function realtimeState(data){
+
+        const now=
+            serverSecondsNow();
+
+        if(now===null){
+            return null;
+        }
+
+        const candidates=
+            realtimeForPost(data)
+            .map(cue=>{
+
+                const target=
+                    parseClockTime(
+                        cue.clock_time
+                    );
+
+                if(target===null){
+                    return null;
+                }
+
+                return {
+                    cue,
+                    delta:signedClockDelta(
+                        target,
+                        now
+                    )
+                };
+
+            })
+            .filter(Boolean)
+            .filter(item=>
+                item.delta<=60 &&
+                item.delta>=-30
+            )
+            .sort((a,b)=>
+                Math.abs(a.delta)-
+                Math.abs(b.delta)
+            );
+
+
+        if(!candidates.length){
+            return null;
+        }
+
+
+        const item=
+            candidates[0];
+
+
+        if(item.delta>0){
+
+            return {
+                phase:'upcoming',
+                cue:item.cue,
+                delta:item.delta
+            };
+        }
+
+
+        return {
+            phase:'current',
+            cue:item.cue,
+            delta:item.delta
+        };
+    }
+
+
+    /* CL_SHOWCUE_REALTIME_CASTING_META_V1 */
+
+    function realtimeCastingArtists(cue){
+
+        const artists=[];
+
+        const addArtist=value=>{
+            value=String(value||'').trim();
+
+            if(
+                value &&
+                !artists.some(item=>
+                    item.toLocaleLowerCase('fr')===
+                    value.toLocaleLowerCase('fr')
+                )
+            ){
+                artists.push(value);
+            }
+        };
+
+        const participants=
+            cue?.resolved?.participants ||
+            cue?.resolved?.resolved_participants ||
+            [];
+
+        if(Array.isArray(participants)){
+            participants.forEach(
+                participant=>addArtist(participant?.artist)
+            );
+        }
+
+        if(!artists.length){
+            String(
+                cue?.resolved?.artist ||
+                cue?.resolved?.resolved_artist ||
+                ''
+            )
+                .split('/')
+                .map(value=>value.trim())
+                .filter(Boolean)
+                .forEach(addArtist);
+        }
+
+        return artists;
+    }
+
+
+    function realtimeMeta(cue){
+
+        const role=
+            String(
+                cue?.builder?.role || ''
+            ).trim();
+
+        const time=
+            String(
+                cue?.clock_time || ''
+            ).trim();
+
+        const isCasting=
+            String(
+                cue?.builder?.type || ''
+            )
+                .trim()
+                .toLocaleUpperCase('fr')==='CASTING';
+
+        const parts=[
+            'HEURE RÉELLE',
+            time
+        ];
+
+        /*
+         * Un QF CASTING n'affiche pas les noms de rôles.
+         */
+        if(role && !isCasting){
+            parts.push(role);
+        }
+
+        return parts.join(' · ');
+    }
+
+
+    function paintRealtimeMeta(element,cue){
+
+        if(!element){
+            return;
+        }
+
+        const isCasting=
+            String(
+                cue?.builder?.type || ''
+            )
+                .trim()
+                .toLocaleUpperCase('fr')==='CASTING';
+
+        if(!isCasting){
+            element.textContent=
+                realtimeMeta(cue);
+            return;
+        }
+
+        const artists=
+            realtimeCastingArtists(cue);
+
+        element.replaceChildren();
+
+        const clock=
+            document.createElement('span');
+
+        clock.className=
+            'stage-live-meta-timecode';
+
+        clock.textContent=
+            [
+                'HEURE RÉELLE',
+                cue?.clock_time || ''
+            ]
+                .filter(Boolean)
+                .join(' · ');
+
+        element.append(clock);
+
+        if(artists.length){
+
+            const names=
+                document.createElement('span');
+
+            names.className=
+                'stage-live-meta-artists realtime-casting-artists';
+
+            names.textContent=
+                artists.join(' · ');
+
+            element.append(names);
+        }
+    }
+
+
+    /*
+     * On enveloppe render() :
+     * le backend LTC reste source de vérité normale.
+     * On change uniquement les cartouches LIVE lorsque
+     * l'heure réelle est dans sa fenêtre d'action.
+     */
+    const realtimeOriginalRender=
+        render;
+
+
+    render=function(data){
+
+        realtimeOriginalRender(data);
+
+
+        const state=
+            realtimeState(data);
+
+        if(!state){
+            return;
+        }
+
+
+        const cue=
+            state.cue;
+
+
+        if(state.phase==='upcoming'){
+
+            /*
+             * On garde le cue LTC courant.
+             * Le cue horaire devient le prochain.
+             */
+            renderLiveCue(
+                'next',
+                cue
+            );
+
+            const seconds=
+                Math.max(
+                    1,
+                    Math.ceil(state.delta)
+                );
+
+            const nextTime = $('next-time');
+            if(nextTime){
+                nextTime.textContent = cue.clock_time + ' · H-' + seconds + 's';
+            }
+
+            const next=
+                $('next');
+
+            if(next){
+                next.dataset.realtime='1';
+            }
+
+            /*
+             * Le cue suivant LTC reste visible
+             * dans FOLLOWING.
+             */
+            renderLiveCue(
+                'following',
+                data.next
+            );
+
+            return;
+        }
+
+
+        /*
+         * À l'heure exacte et pendant 30 s :
+         * le cue HEURE RÉELLE devient réellement COURANT.
+         *
+         * Le cue LTC courant passe en mémoire juste au-dessus,
+         * sans modifier le moteur LTC ni son état.
+         */
+        renderLiveCue(
+            'past',
+            data.current
+        );
+
+        renderLiveCue(
+            'current',
+            cue
+        );
+
+        paintRealtimeMeta(
+            $('current-meta'),
+            cue
+        );
+
+        $('live-edit').hidden=false;
+
+        $('live-edit').onclick=()=>{
+            openQuickEditor(cue);
+        };
+
+
+        /*
+         * Puis on reprend la chronologie LTC.
+         */
+        renderLiveCue(
+            'next',
+            data.next
+        );
+
+        renderLiveCue(
+            'following',
+            data.following
+        );
+    };
+
+
+    /*
+     * Synchronisation immédiate puis périodique.
+     * Aucun polling plus rapide que nécessaire :
+     * l'affichage LIVE est déjà rafraîchi toutes les 2 s.
+     */
+    syncRealtimeClock();
+
+    window.setInterval(
+        syncRealtimeClock,
+        10000
+    );
+
+})();
+</script>
+
+
+<style id="showcue-role-layout-v4">
+
+/* CL_SHOWCUE_ROLE_LAYOUT_V4 */
+
+#editor #form-role-assignments{
+    display:grid !important;
+    grid-template-columns:1fr !important;
+    gap:8px !important;
+
+    width:100% !important;
+    min-width:0 !important;
+    max-width:100% !important;
+
+    overflow:visible !important;
+}
+
+#editor .full-cue-role-card.full-cue-role-selected{
+    width:100% !important;
+    min-width:0 !important;
+    max-width:100% !important;
+
+    box-sizing:border-box !important;
+
+    margin:0 !important;
+    padding:10px !important;
+
+    border:1px solid #51483b !important;
+    border-radius:8px !important;
+
+    background:#181511 !important;
+
+    overflow:hidden !important;
+}
+
+#editor .full-cue-role-enabled{
+    display:none !important;
+}
+
+/* DIRECTRICE | artiste | RETIRER */
+#editor .full-cue-role-head{
+    display:grid !important;
+
+    grid-template-columns:
+        minmax(150px,220px)
+        minmax(100px,1fr)
+        auto !important;
+
+    width:100% !important;
+    min-width:0 !important;
+
+    align-items:center !important;
+    gap:8px !important;
+
+    margin:0 0 10px !important;
+}
+
+#editor .full-cue-role-name-select{
+    position:static !important;
+
+    display:block !important;
+
+    width:100% !important;
+    min-width:0 !important;
+    max-width:100% !important;
+
+    margin:0 !important;
+
+    padding:7px 9px !important;
+
+    color:#fff2d2 !important;
+    background:#30271c !important;
+
+    border:1px solid #9b7740 !important;
+    border-radius:6px !important;
+
+    font-size:.82rem !important;
+    font-weight:950 !important;
+
+    opacity:1 !important;
+}
+
+#editor .full-cue-role-artist{
+    position:static !important;
+
+    display:block !important;
+
+    min-width:0 !important;
+
+    color:#cfc5b5 !important;
+
+    font-size:.75rem !important;
+
+    overflow:hidden !important;
+    text-overflow:ellipsis !important;
+    white-space:nowrap !important;
+}
+
+#editor .full-cue-role-remove{
+    position:static !important;
+
+    display:inline-flex !important;
+
+    align-items:center !important;
+    justify-content:center !important;
+
+    min-width:72px !important;
+
+    margin:0 !important;
+}
+
+/* MICRO / IEM / ÉQUIPEMENT */
+#editor .full-cue-role-tech{
+    width:100% !important;
+    min-width:0 !important;
+
+    display:grid !important;
+
+    grid-template-columns:
+        105px
+        minmax(0,1fr) !important;
+
+    gap:7px 10px !important;
+}
+
+#editor .full-cue-role-tech[hidden]{
+    display:none !important;
+}
+
+#editor .full-cue-role-tech select{
+    position:static !important;
+
+    width:100% !important;
+    min-width:0 !important;
+    max-width:100% !important;
+
+    margin:0 !important;
+}
+
+#editor .full-cue-tech-label{
+    align-self:center !important;
+}
+
+/* Evite que cette zone élargisse toute la modale */
+#editor #cue-form,
+#editor .full-cue-block{
+    min-width:0 !important;
+    max-width:100% !important;
+    box-sizing:border-box !important;
+}
+
+@media(max-width:760px){
+
+    #editor .full-cue-role-head{
+        grid-template-columns:minmax(0,1fr) auto !important;
+    }
+
+    #editor .full-cue-role-artist{
+        grid-column:1/-1 !important;
+    }
+
+    #editor .full-cue-role-tech{
+        grid-template-columns:1fr !important;
+    }
+}
+
+</style>
+
+
+<script id="showcue-live-builder-link-v1">
+/* CL_SHOWCUE_LIVE_BUILDER_LINK_V1
+
+   La modale ShowCue utilise le Builder actuel comme source
+   de vérité lorsqu'un builder_id existe.
+
+   Aucun enregistrement automatique :
+   la donnée ShowCue n'est modifiée que si l'utilisateur
+   clique ENREGISTRER.
+*/
+
+(function(){
+
+    let liveBuilderDocument=null;
+    let liveBuilderForEditing=null;
+
+
+    async function loadLiveBuilderDocument(){
+
+        const response=await fetch(
+            '/show-info/builder/document',
+            {cache:'no-store'}
+        );
+
+        if(!response.ok){
+            throw new Error(
+                'Builder indisponible ('+response.status+')'
+            );
+        }
+
+        const data=await response.json();
+
+        return data?.document || data || {};
+    }
+
+
+    function currentBuilderId(cue){
+
+        return String(
+            cue?.builder?.builder_id ||
+            cue?.builder_id ||
+            ''
+        ).trim();
+    }
+
+
+    function findLiveBuilderCue(document,builderId){
+
+        if(!builderId)return null;
+
+        const cues=
+            Array.isArray(document?.cues)
+                ? document.cues
+                : [];
+
+        return cues.find(item=>
+            String(
+                item?.id ||
+                item?.builder_id ||
+                ''
+            ).trim()===builderId
+        ) || null;
+    }
+
+
+    function liveCueWrapper(showCue,builderCue){
+
+        if(!builderCue)return showCue;
+
+        /*
+         * renderFullCueRoles() et populateFullCueClassification()
+         * attendent cue.builder.
+         */
+        return {
+            ...(showCue || {}),
+            builder:{
+                ...(showCue?.builder || {}),
+
+                ...builderCue,
+
+                /*
+                 * Dans le document Builder, l'id du cue EST
+                 * le builder_id stable utilisé par ShowCue.
+                 */
+                builder_id:
+                    String(
+                        builderCue.id ||
+                        showCue?.builder?.builder_id ||
+                        ''
+                    ).trim()
+            }
+        };
+    }
+
+
+    async function refreshEditorFromLiveBuilder(cue){
+
+        const builderId=currentBuilderId(cue);
+
+        liveBuilderForEditing=null;
+
+        if(!builderId){
+            return;
+        }
+
+        try{
+
+            liveBuilderDocument=
+                await loadLiveBuilderDocument();
+
+            const builderCue=
+                findLiveBuilderCue(
+                    liveBuilderDocument,
+                    builderId
+                );
+
+            if(!builderCue){
+                console.warn(
+                    '[ShowCue] builder_id introuvable :',
+                    builderId
+                );
+                return;
+            }
+
+            liveBuilderForEditing=
+                structuredClone(builderCue);
+
+            /*
+             * On vérifie que l'utilisateur n'a pas fermé ou
+             * changé de cue pendant la requête.
+             */
+            if(
+                !editor.open ||
+                currentBuilderId(editing)!==builderId
+            ){
+                return;
+            }
+
+            const effectiveCue=
+                liveCueWrapper(
+                    cue,
+                    liveBuilderForEditing
+                );
+
+            window.renderFullCueRoles(effectiveCue);
+
+            if(
+                typeof window.populateFullCueClassification
+                === 'function'
+            ){
+                window.populateFullCueClassification(
+                    effectiveCue
+                );
+            }
+
+            if(
+                typeof window.syncFullCueRolePicker
+                === 'function'
+            ){
+                window.syncFullCueRolePicker();
+            }
+
+            if(
+                typeof window.syncFullCueRoleSummary
+                === 'function'
+            ){
+                window.syncFullCueRoleSummary();
+            }
+
+            console.info(
+                '[ShowCue] Builder live chargé',
+                builderId,
+                liveBuilderForEditing.role,
+                liveBuilderForEditing.role_assignments
+            );
+
+        }catch(error){
+
+            console.warn(
+                '[ShowCue] lecture Builder live impossible',
+                error
+            );
+
+            /*
+             * On conserve alors le comportement ShowCue
+             * précédent : aucune édition n'est bloquée.
+             */
+        }
+    }
+
+
+    /*
+     * IMPORTANT :
+     * collectFullCueBuilder part du Builder live lorsqu'il a
+     * été trouvé, puis applique les choix présents dans l'UI.
+     */
+    const previousCollectFullCueBuilder=
+        window.collectFullCueBuilder;
+
+    window.collectFullCueBuilder=function(){
+
+        const uiBuilder=
+            previousCollectFullCueBuilder();
+
+        if(!liveBuilderForEditing){
+            return uiBuilder;
+        }
+
+        const builderId=
+            currentBuilderId(editing);
+
+        const liveId=
+            String(
+                liveBuilderForEditing.id ||
+                liveBuilderForEditing.builder_id ||
+                ''
+            ).trim();
+
+        if(
+            builderId &&
+            liveId &&
+            builderId===liveId
+        ){
+            return {
+                ...structuredClone(
+                    liveBuilderForEditing
+                ),
+                ...uiBuilder,
+                builder_id:builderId
+            };
+        }
+
+        return uiBuilder;
+    };
+
+
+    /*
+     * On enveloppe LA DERNIÈRE version actuelle d'openEditor.
+     */
+    const openEditorBeforeLiveBuilder=
+        openEditor;
+
+    openEditor=function(...args){
+
+        openEditorBeforeLiveBuilder(...args);
+
+        const cue=args[0] || null;
+
+        if(cue){
+            refreshEditorFromLiveBuilder(cue);
+        }else{
+            liveBuilderForEditing=null;
+        }
+    };
+
+
+    /*
+     * Ne jamais réutiliser les données d'un cue précédent.
+     */
+    const cancelButton=
+        document.getElementById('editor-cancel');
+
+    if(cancelButton){
+        cancelButton.addEventListener(
+            'click',
+            ()=>{
+                liveBuilderForEditing=null;
+            }
+        );
+    }
+
+})();
+</script>
+
 </body></html>

@@ -70,3 +70,5 @@ MANIFESTE_EXTRACTION.txt
 
 # Sauvegardes locales de travail
 *.before-*
+vendor/ffmpeg/macos/ffmpeg
+.showcue_https/

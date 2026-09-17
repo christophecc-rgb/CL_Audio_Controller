@@ -1,7 +1,152 @@
 <!doctype html>
-<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CL ShowCue Builder</title>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CL Cue Editor</title>
 <style>
 :root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--bg:#090807;--panel:#151311;--line:#3c352d;--text:#f5f1e9;--muted:#a29a90;--gold:#c79b50;--green:#62df91;--blue:#315f89;--violet:#5b4c7c}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text)}button,input,select{font:inherit;color:inherit}button,select,input{border:1px solid #514940;border-radius:6px;background:#24201c;padding:7px 9px}button{cursor:pointer;font-weight:800}.primary{border-color:#43865d;background:#2c5f3e}.action-blue{border-color:#47769e;background:#294d6d}.action-violet{border-color:#756395;background:#4b4066}.action-amber{display:inline-flex;align-items:center;border:1px solid #806637;border-radius:6px;background:#3b301d;color:#ead6b3!important;padding:7px 9px}.shell{padding:12px 14px 24px;max-width:1800px;margin:auto}.top{position:sticky;top:0;z-index:4;background:#090807f5;border-bottom:1px solid var(--line);padding:4px 0 10px}.bar,.tools,.filters,.tool-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.bar{justify-content:space-between}.title{display:flex;align-items:baseline;gap:12px;min-width:0}.title h1{margin:0;font-size:1.25rem}.header-right{display:flex;align-items:center;gap:12px}.header-right a{color:#d6c7ae;text-decoration:none;font-size:.76rem;font-weight:800}.builder-logo{display:block;width:104px;height:34px;object-fit:contain}.muted{color:var(--muted);font-size:.78rem}.tools{margin-top:8px;align-items:stretch}.tool-group{border-right:1px solid var(--line);padding-right:10px}.tool-group:last-child{border:0}.tool-label{color:var(--muted);font-size:.58rem;font-weight:900;letter-spacing:.08em}.tools a{text-decoration:none}.file{position:relative;overflow:hidden}.file input{position:absolute;inset:0;opacity:0;cursor:pointer}.filters{margin:10px 0}.filters label{display:flex;align-items:center;gap:5px;font-size:.68rem;color:var(--muted);font-weight:900}.filters select{padding:5px 7px}.summary{display:grid;grid-template-columns:repeat(6,minmax(100px,1fr));gap:6px;margin:8px 0}.metric{border:1px solid var(--line);border-radius:7px;background:var(--panel);padding:7px 9px}.metric strong{display:block;font-size:1.05rem}.warning{color:#ffbd72}.ok{color:var(--green)}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--panel)}table{border-collapse:collapse;min-width:1500px;width:100%;font-size:.75rem}th{position:sticky;top:0;z-index:2;background:#211d19;color:#d8c29d;font-size:.64rem;letter-spacing:.04em}th,td{border-right:1px solid #302b26;border-bottom:1px solid #302b26;padding:6px;vertical-align:top}td[contenteditable],span[contenteditable]{min-width:55px;white-space:pre-wrap}td[contenteditable]:focus,span[contenteditable]:focus{outline:2px solid var(--gold);outline-offset:1px;background:#29231c}.tc{color:var(--green);font-family:ui-monospace,monospace;white-space:nowrap}.tc button{padding:2px 4px;margin-left:4px;font-size:.58rem}.resolved{margin-top:3px;color:#80d89f;font-size:.66rem;white-space:normal}.override{max-width:82px}.text-cell{min-width:260px}.check{text-align:center;vertical-align:middle}.check input{width:17px;height:17px}.row-actions{width:38px;white-space:nowrap;text-align:center}.row-actions button{min-width:25px;min-height:25px;padding:2px 5px;font-size:.72rem;line-height:1}.origin-builder{color:#e0aa54}.origin-import{color:#74a8ec}.origin-ableton{color:#7ddca0}.section{margin-top:20px}.section h2{font-size:1rem}.distribution table{table-layout:fixed;min-width:760px}.distribution col.role{width:14%}.distribution col.artist{width:14%}.distribution col.active{width:8%}.distribution col.equipment{width:48%}.distribution col.notes{width:16%}.distribution col.actions{width:40px}.distribution tr.role-start td{border-top:2px solid #80683f}.distribution tr.active{background:#173221}.equipment-slots{display:flex;align-items:center;gap:4px;flex-wrap:wrap;min-width:0}.equipment-slot{display:grid;grid-template-columns:82px minmax(90px,150px) 23px;gap:3px;align-items:center}.equipment-slot select,.equipment-slot input{min-width:0;width:100%;padding:2px 4px;font-size:.66rem}.equipment-slot button{width:23px;height:23px;padding:0;font-size:.68rem;line-height:1}.add-equipment{margin-top:3px;padding:2px 6px;font-size:.6rem;font-weight:750;color:#bcb3a8;background:#1b1916}.add-equipment:disabled{display:none}.duplicate-assignment{color:#ffbd72;font-size:.64rem;font-weight:900}.validation{margin-top:6px;white-space:pre-wrap}.validation.ok{font-size:.7rem}.danger{color:#ff9494}.hidden{display:none}@media(max-width:1050px){.tools{align-items:flex-start}.tool-group{padding-right:7px}.distribution col.role,.distribution col.artist{width:15%}.distribution col.active{width:8%}.distribution col.equipment{width:45%}.distribution col.notes{width:17%}.equipment-slot{grid-template-columns:76px minmax(82px,135px) 23px}}@media(max-width:760px){.summary{grid-template-columns:repeat(3,1fr)}.bar{align-items:flex-start}.title{display:block}.header-right{margin-left:auto}.builder-logo{width:82px;height:28px}.tools button,.tools a{flex:0 1 auto;text-align:center}.tool-group{width:100%;border-right:0;border-bottom:1px solid var(--line);padding-bottom:6px}.shell{padding:8px}.distribution table{min-width:700px}}
+
+/* ==========================================================
+   CASTING & ÉQUIPEMENTS
+   ========================================================== */
+
+.casting-equipment-section{
+    border-top:1px solid var(--line);
+    padding-top:16px;
+}
+
+.casting-equipment-section > h2{
+    margin-bottom:4px;
+    letter-spacing:.04em;
+}
+
+.casting-editor-title{
+    margin:18px 0 8px;
+    color:#d8c29d;
+    font-size:.78rem;
+    letter-spacing:.08em;
+}
+
+.casting-overview{
+    display:grid;
+    grid-template-columns:
+        repeat(auto-fit,minmax(245px,1fr));
+    gap:9px;
+    margin:12px 0 6px;
+}
+
+.casting-role-card{
+    border:1px solid #4b443c;
+    border-radius:8px;
+    background:#171411;
+    padding:10px 11px;
+    min-width:0;
+}
+
+.casting-role-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:8px;
+    padding-bottom:7px;
+    margin-bottom:7px;
+    border-bottom:1px solid #332e29;
+}
+
+.casting-role-name{
+    color:#d9b36d;
+    font-weight:900;
+    font-size:.82rem;
+    letter-spacing:.05em;
+}
+
+.casting-role-count{
+    color:var(--muted);
+    font-size:.62rem;
+}
+
+.casting-person{
+    display:grid;
+    grid-template-columns:
+        minmax(95px,1fr) auto;
+    gap:7px;
+    align-items:center;
+    padding:5px 0;
+}
+
+.casting-person + .casting-person{
+    border-top:1px solid #292521;
+}
+
+.casting-person-name{
+    font-weight:800;
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+}
+
+.casting-person.active .casting-person-name{
+    color:#82e5a5;
+}
+
+.casting-active-badge{
+    border:1px solid #3d8e5e;
+    border-radius:999px;
+    padding:2px 6px;
+    color:#83e8a7;
+    font-size:.56rem;
+    font-weight:900;
+    white-space:nowrap;
+}
+
+.casting-replacement-badge{
+    color:#928b82;
+    font-size:.56rem;
+    font-weight:800;
+    white-space:nowrap;
+}
+
+.casting-equipment-list{
+    grid-column:1 / -1;
+    display:flex;
+    flex-wrap:wrap;
+    gap:4px;
+    margin-top:2px;
+}
+
+.casting-equipment-chip{
+    border:1px solid #655744;
+    border-radius:5px;
+    background:#272118;
+    color:#ddc59e;
+    padding:2px 5px;
+    font-size:.58rem;
+}
+
+.casting-no-equipment{
+    grid-column:1 / -1;
+    color:#9d948a;
+    font-size:.58rem;
+    font-style:italic;
+}
+
+.casting-person-note{
+    grid-column:1 / -1;
+    color:#aaa198;
+    font-size:.58rem;
+}
+
+.casting-empty{
+    border:1px dashed #544b42;
+    border-radius:8px;
+    color:var(--muted);
+    padding:12px;
+    font-size:.72rem;
+}
+
+@media(max-width:760px){
+    .casting-overview{
+        grid-template-columns:1fr;
+    }
+}
+
 </style>
 <style id="showcue-builder-micro-chip">
 .builder-micro-zone{
@@ -132,13 +277,65 @@ td[data-key="type"].kind-top::after{
 }
 </style>
 
-</head><body><main class="shell"><header class="top"><div class="bar"><div class="title"><h1>CL ShowCue Builder</h1><span class="muted">PRÉPARATION ISOLÉE · SESSION <span id="session">—</span></span></div><div class="header-right"><a href="/show-info">← CL SHOWCUE</a><img class="builder-logo" src="/assets/paradis%20latin.jpg" alt="Paradis Latin Cabaret"></div></div><div class="tools"><div class="tool-group"><span class="tool-label">ÉDITION</span><button class="action-blue" id="add-cue">+ CUE</button><button class="action-violet" id="add-distribution">+ AFFECTATION</button><button class="primary" id="save">ENREGISTRER BUILDER</button></div><div class="tool-group"><span class="tool-label">ÉCHANGE</span><label class="file"><button>IMPORT XLSX / CSV</button><input id="import" type="file" accept=".xlsx,.csv"></label><label class="file pdf-import"><button>IMPORT PDF</button><input id="import-pdf" type="file" accept=".pdf,application/pdf"></label><button disabled title="Import ALS non implémenté">IMPORT ALS — À VENIR</button><a class="action-amber" href="/show-info/builder/export.xlsx">EXPORT XLSX</a><a class="action-amber" href="/show-info/builder/export.csv">EXPORT CSV</a></div><div class="tool-group"><span class="tool-label">VALIDATION</span><button id="adopt" class="hidden action-violet">ADOPTER LA PRÉVISUALISATION</button><button class="action-blue" id="validate">VALIDER</button></div></div><div id="message" class="validation muted">Aucune donnée Builder ne modifie la conduite officielle.</div></header>
+<link rel="stylesheet" href="/static/showcue-editor.css?v=phase1">
+</head><body><main class="shell"><header class="top"><div class="bar"><div class="title"><h1>CL Cue Editor</h1><span class="muted">PRÉPARATION ISOLÉE · SESSION <span id="session">—</span></span></div><div class="header-right"><a href="/show-info">← CL SHOWCUE</a><img class="builder-logo" src="/assets/paradis%20latin.jpg" alt="Paradis Latin Cabaret"></div></div><div class="tools"><div class="tool-group"><span class="tool-label">ÉDITION</span><button class="action-blue" id="add-cue">+ CUE</button><button class="action-violet" id="add-distribution">+ AFFECTATION</button><button class="primary" id="save">ENREGISTRER</button></div><div class="tool-group"><span class="tool-label">ÉCHANGE</span><label class="file"><button>IMPORT XLSX / CSV</button><input id="import" type="file" accept=".xlsx,.csv"></label><label class="file pdf-import"><button>IMPORT PDF</button><input id="import-pdf" type="file" accept=".pdf,application/pdf"></label><button disabled title="Import ALS non implémenté">IMPORT ALS — À VENIR</button><a class="action-amber" href="/show-info/builder/export.xlsx">EXPORT XLSX</a><a class="action-amber" href="/show-info/builder/export.csv">EXPORT CSV</a></div><div class="tool-group"><span class="tool-label">VALIDATION</span><button id="adopt" class="hidden action-violet">ADOPTER LA PRÉVISUALISATION</button><button class="action-blue" id="validate">VALIDER</button></div></div><div id="message" class="validation muted">Aucune donnée de l’éditeur ne modifie la conduite officielle.</div></header>
 <div class="summary" id="summary"></div><div class="filters"><label>SECTION <select id="filter-section"><option value="">TOUT</option></select></label><label>TYPE <select id="filter-type"><option value="">TOUT</option></select></label><label>RÔLE <select id="filter-role"><option value="">TOUT</option></select></label><label>ARTISTE <select id="filter-artist"><option value="">TOUT</option></select></label></div>
 <section><div class="table-wrap"><table><thead><tr><th>#</th><th>TC</th><th>TABLEAU / MORCEAU</th><th>CUE / ACTION</th><th>CATÉGORIE</th><th>SECTION</th><th>RÔLE / AFFECTATION DU JOUR</th><th class="advanced-column">ARTISTE<br>FORCÉ</th><th class="advanced-column">MICRO<br>FORCÉ</th><th class="advanced-column">IEM<br>FORCÉ</th><th class="advanced-column">ÉQUIPEMENT<br>FORCÉ</th><th>FOH</th><th>RET</th><th>PLT</th><th>LUM</th><th class="advanced-column">ORIGINE</th><th class="advanced-column">NOTES</th><th></th></tr></thead><tbody id="cues"></tbody></table></div></section>
-<section class="section distribution"><h2>DISTRIBUTION DU JOUR</h2><p class="muted">Une affectation par rôle et artiste, avec jusqu’à trois équipements typés.</p><div class="table-wrap"><table><colgroup><col class="role"><col class="artist"><col class="active"><col class="equipment"><col class="notes"><col class="actions"></colgroup><thead><tr><th>RÔLE</th><th>ARTISTE</th><th>ACTIF</th><th>ÉQUIPEMENTS</th><th>NOTES</th><th></th></tr></thead><tbody id="distribution"></tbody></table></div></section>
+<section class="section distribution casting-equipment-section">
+<h2>CASTING &amp; ÉQUIPEMENTS</h2>
+
+<p class="muted">
+Vue synthétique du casting actif, des remplaçants et des équipements.
+La table située dessous reste la zone d’édition réelle.
+</p>
+
+<div id="casting-overview" class="casting-overview"></div>
+
+<h3 class="casting-editor-title">ÉDITION DE LA DISTRIBUTION</h3>
+
+<div class="table-wrap"><table><colgroup><col class="role"><col class="artist"><col class="active"><col class="equipment"><col class="notes"><col class="actions"></colgroup><thead><tr><th>RÔLE</th><th>ARTISTE</th><th>ACTIF</th><th>ÉQUIPEMENTS</th><th>NOTES</th><th></th></tr></thead><tbody id="distribution"></tbody></table></div></section>
 </main><script>
 const $=id=>document.getElementById(id),cueKeys=['number','timecode','source','text','type','section','role','artist','microphone','iem','equipment'],postKeys=['foh','ret','plt','lum'];let documentData={version:1,cues:[],distribution:[]},sessionId=null,preview=null;function newBuilderId(){const values=new Uint32Array(3);crypto.getRandomValues(values);return'builder_'+[...values].map(value=>value.toString(16)).join('')}
-async function api(url,options={}){const response=await fetch(url,{cache:'no-store',headers:options.body instanceof FormData?{}:{'Content-Type':'application/json'},...options}),data=await response.json();if(!response.ok||!data.ok)throw new Error(data.message||'Erreur serveur');return data}
+async function api(url,options={}){
+    const response=await fetch(
+        url,
+        {
+            cache:'no-store',
+            headers:
+                options.body instanceof FormData
+                    ? {}
+                    : {'Content-Type':'application/json'},
+            ...options
+        }
+    );
+
+    const data=await response.json();
+
+    if(!response.ok||!data.ok){
+        let message=data.message||'Erreur serveur';
+
+        if(
+            url==='/show-info/builder/document' &&
+            options.method==='PUT'
+        ){
+            let sentRevision='?';
+
+            try{
+                const sent=JSON.parse(options.body||'{}');
+                sentRevision=sent?.document?.revision;
+            }catch(_){}
+
+            message+=
+                ' [révision navigateur : '+
+                sentRevision+
+                ']';
+        }
+
+        throw new Error(message);
+    }
+
+    return data;
+}
 function editable(value,key){const td=document.createElement('td');td.contentEditable='true';td.textContent=value||'';td.dataset.key=key;return td}function removeButton(callback){const td=document.createElement('td'),button=document.createElement('button');td.className='row-actions';button.textContent='×';button.title='Supprimer';button.onclick=callback;td.append(button);return td}
 function readTables(){documentData.cues=[...$('cues').rows].map(row=>{const cue={id:row.dataset.id};cueKeys.forEach(key=>cue[key]=row.querySelector(`[data-key="${key}"]`).textContent.trim());postKeys.forEach(key=>cue[key]=row.querySelector(`[data-key="${key}"]`).checked);cue.origin=row.querySelector('[data-key="origin"]').textContent.trim();cue.notes=row.querySelector('[data-key="notes"]').textContent.trim();return cue});documentData.distribution=[...$('distribution').rows].map(row=>({role:row.querySelector('[data-key="role"]').textContent.trim(),artist:row.querySelector('[data-key="artist"]').textContent.trim(),microphone:row.querySelector('[data-key="microphone"]').textContent.trim(),iem:row.querySelector('[data-key="iem"]').textContent.trim(),equipment:row.querySelector('[data-key="equipment"]').textContent.trim(),active:row.querySelector('[data-key="active"]').checked,notes:row.querySelector('[data-key="notes"]').textContent.trim()}));return documentData}
 async function captureBuilderTc(target){try{const result=await api('/show-info/capture',{method:'POST',body:'{}'});if(!result.timecode){$('message').className='validation warning';$('message').textContent='Aucun LTC capturable : lecture arrêtée, signal absent ou invalide.';return}target.textContent=result.timecode;$('message').className='validation ok';$('message').textContent='LTC capturé : '+result.timecode}catch(error){$('message').textContent=error.message}}
@@ -149,8 +346,109 @@ if(r.microphone)assignmentParts.push('MICRO : '+r.microphone);
 if(r.iem)assignmentParts.push('IEM : '+r.iem);
 if(r.equipment)assignmentParts.push('ÉQUIPEMENT : '+r.equipment);
 resolved.textContent=assignmentParts.join(' · ')||({missing:'AUCUN ACTIF',multiple:'PLUSIEURS ACTIFS'}[r.distribution_status]||'');row.dataset.artist=r.artist||cue.artist||'';td.append(value,resolved);row.append(td);return}const td=editable(cue[key]??(key==='number'?index+1:''),key);if(['artist','microphone','iem','equipment'].includes(key))td.className='override';if(key==='text')td.className='text-cell';row.append(td)});postKeys.forEach(key=>{const td=document.createElement('td'),input=document.createElement('input');td.className='check';input.type='checkbox';input.checked=cue[key]!==false;input.dataset.key=key;td.append(input);row.append(td)});const origin=editable(cue.origin||'BUILDER','origin');origin.className='origin-'+(cue.origin||'BUILDER').toLowerCase();row.append(origin,editable(cue.notes,'notes'),removeButton(()=>{row.remove();refreshFilters()}));return row}
-function distributionRow(item={},roleStart=false){const row=document.createElement('tr'),role=editable(item.role,'role'),artist=editable(item.artist,'artist'),active=document.createElement('td'),checkbox=document.createElement('input'),equipment=document.createElement('td'),slots=document.createElement('div'),add=document.createElement('button');if(roleStart)row.classList.add('role-start');if(item.active)row.classList.add('active');active.className='check';checkbox.type='checkbox';checkbox.checked=Boolean(item.active);checkbox.dataset.key='active';checkbox.onchange=()=>row.classList.toggle('active',checkbox.checked);active.append(checkbox);slots.className='equipment-slots';equipment.dataset.key='equipment_slots';function addSlot(slot={}){if(slots.children.length>=3)return;const line=document.createElement('div'),type=document.createElement('select'),value=document.createElement('input'),remove=document.createElement('button');line.className='equipment-slot';type.dataset.slotKey='type';['MICRO','IEM','ÉQUIPEMENT','AUTRE'].forEach(kind=>type.add(new Option(kind,kind)));type.value=slot.type||'ÉQUIPEMENT';value.dataset.slotKey='value';value.value=slot.value||'';remove.type='button';remove.textContent='×';remove.title='Supprimer cet équipement';remove.onclick=()=>{line.remove();add.disabled=false;markDirty()};line.append(type,value,remove);slots.append(line);add.disabled=slots.children.length>=3}add.type='button';add.className='add-equipment';add.textContent='+ ÉQUIPEMENT';add.onclick=()=>{addSlot();markDirty()};(item.equipment_slots||[]).forEach(addSlot);add.disabled=slots.children.length>=3;equipment.append(slots,add);row.append(role,artist,active,equipment,editable(item.notes,'notes'),removeButton(()=>row.remove()));return row}
-function render(){const cues=$('cues'),distribution=$('distribution');cues.innerHTML='';distribution.innerHTML='';documentData.cues.forEach((cue,index)=>cues.append(cueRow(cue,index)));let previousRole=null;[...documentData.distribution].sort((a,b)=>a.role.localeCompare(b.role,'fr')).forEach(item=>{distribution.append(distributionRow(item,item.role!==previousRole));previousRole=item.role});refreshFilters()}function unique(key){if(key==='artist')return[...new Set(documentData.cues.map(cue=>(cue.resolved||{}).artist||cue.artist).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));return[...new Set(documentData.cues.map(cue=>cue[key]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'))}function refreshFilters(){readTables();[['filter-section','section'],['filter-type','type'],['filter-role','role'],['filter-artist','artist']].forEach(([id,key])=>{const select=$(id),value=select.value;select.innerHTML='<option value="">TOUT</option>';unique(key).forEach(item=>select.add(new Option(item,item)));select.value=value});applyFilters()}function applyFilters(){
+function distributionRow(item={},roleStart=false){const row=document.createElement('tr'),role=editable(item.role,'role'),artist=editable(item.artist,'artist'),active=document.createElement('td'),checkbox=document.createElement('input'),equipment=document.createElement('td'),slots=document.createElement('div'),add=document.createElement('button');if(roleStart)row.classList.add('role-start');if(item.active)row.classList.add('active');active.className='check';checkbox.type='checkbox';checkbox.checked=Boolean(item.active);checkbox.dataset.key='active';checkbox.onchange=()=>row.classList.toggle('active',checkbox.checked);active.append(checkbox);slots.className='equipment-slots';equipment.dataset.key='equipment_slots';function addSlot(slot={}){if(slots.children.length>=8)return;const line=document.createElement('div'),type=document.createElement('select'),value=document.createElement('input'),remove=document.createElement('button');line.className='equipment-slot';type.dataset.slotKey='type';['MICRO','IEM','ÉQUIPEMENT','AUTRE'].forEach(kind=>type.add(new Option(kind,kind)));type.value=slot.type||'ÉQUIPEMENT';value.dataset.slotKey='value';value.value=slot.value||'';remove.type='button';remove.textContent='×';remove.title='Supprimer cet équipement';remove.onclick=()=>{line.remove();add.disabled=false;markDirty()};line.append(type,value,remove);slots.append(line);add.disabled=slots.children.length>=8}add.type='button';add.className='add-equipment';add.textContent='+ ÉQUIPEMENT';add.onclick=()=>{addSlot();markDirty()};(item.equipment_slots||[]).forEach(addSlot);add.disabled=slots.children.length>=8;equipment.append(slots,add);row.append(role,artist,active,equipment,editable(item.notes,'notes'),removeButton(()=>row.remove()));return row}
+function builderTimecodeValue(value){
+    const match=String(value||'').trim().match(/^(\d{2}):(\d{2}):(\d{2}):(\d{2})$/);
+    if(!match)return null;
+
+    const h=Number(match[1]);
+    const m=Number(match[2]);
+    const s=Number(match[3]);
+    const f=Number(match[4]);
+
+    return (((h*60)+m)*60+s)*100+f;
+}
+
+function orderedBuilderCues(cues){
+    /*
+     * Tri prudent :
+     * - jamais de mélange entre sections ;
+     * - chaque cue sans TC reste attaché au cue timé précédent ;
+     * - les groupes timés sont classés chronologiquement ;
+     * - le JSON source n'est pas modifié par cette fonction.
+     */
+    const result=[];
+    let start=0;
+
+    while(start<cues.length){
+        const section=String(cues[start]?.section||'');
+        let end=start+1;
+
+        while(
+            end<cues.length &&
+            String(cues[end]?.section||'')===section
+        ){
+            end+=1;
+        }
+
+        const sectionCues=cues.slice(start,end);
+        const prefix=[];
+        const groups=[];
+        let current=null;
+
+        sectionCues.forEach((cue,originalIndex)=>{
+            const tc=builderTimecodeValue(cue.timecode);
+
+            if(tc===null){
+                if(current){
+                    current.items.push(cue);
+                }else{
+                    prefix.push(cue);
+                }
+                return;
+            }
+
+            current={
+                tc,
+                originalIndex,
+                items:[cue]
+            };
+
+            groups.push(current);
+        });
+
+        groups.sort((a,b)=>
+            a.tc-b.tc ||
+            a.originalIndex-b.originalIndex
+        );
+
+        result.push(...prefix);
+
+        groups.forEach(group=>{
+            result.push(...group.items);
+        });
+
+        start=end;
+    }
+
+    return result;
+}
+
+function render(){
+    const cues=$('cues'),distribution=$('distribution');
+
+    cues.innerHTML='';
+    distribution.innerHTML='';
+
+    orderedBuilderCues(documentData.cues)
+        .forEach((cue,index)=>cues.append(cueRow(cue,index)));
+
+    let previousRole=null;
+
+    [...documentData.distribution]
+        .sort((a,b)=>a.role.localeCompare(b.role,'fr'))
+        .forEach(item=>{
+            distribution.append(
+                distributionRow(
+                    item,
+                    item.role!==previousRole
+                )
+            );
+            previousRole=item.role;
+        });
+
+    refreshFilters();
+}function unique(key){if(key==='artist')return[...new Set(documentData.cues.map(cue=>(cue.resolved||{}).artist||cue.artist).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));return[...new Set(documentData.cues.map(cue=>cue[key]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'))}function refreshFilters(){readTables();[['filter-section','section'],['filter-type','type'],['filter-role','role'],['filter-artist','artist']].forEach(([id,key])=>{const select=$(id),value=select.value;select.innerHTML='<option value="">TOUT</option>';unique(key).forEach(item=>select.add(new Option(item,item)));select.value=value});applyFilters()}function applyFilters(){
     const filters={
         section:$('filter-section').value,
         type:$('filter-type').value,
@@ -178,9 +476,87 @@ function render(){const cues=$('cues'),distribution=$('distribution');cues.inner
     });
 }document.querySelectorAll('.filters select').forEach(select=>select.onchange=applyFilters);
 function showValidation(v){const metrics=[['TOTAL',v.total],['AVEC TC',v.timed],['SANS TC',v.without_timecode],['SUGGESTIONS',v.suggestions],['TC INVALIDES',v.invalid_timecodes.length],['TEXTES VIDES',v.empty_texts.length]];$('summary').innerHTML=metrics.map(([label,value])=>`<div class="metric"><span class="muted">${label}</span><strong>${value}</strong></div>`).join('');const issues=[v.possible_duplicates.length&&'Doublons possibles : '+v.possible_duplicates.join(', '),v.invalid_timecodes.length&&'TC invalides : '+v.invalid_timecodes.join(', '),v.empty_texts.length&&'Cues sans texte : '+v.empty_texts.join(', '),v.unknown_roles.length&&'Rôles inconnus : '+v.unknown_roles.join(', '),v.unknown_artists.length&&'Artistes inconnus : '+v.unknown_artists.join(', '),v.roles_without_active_artist.length&&'Rôles sans artiste actif : '+v.roles_without_active_artist.join(', '),v.roles_with_multiple_active_artists.length&&'Plusieurs artistes actifs : '+v.roles_with_multiple_active_artists.join(', '),v.duplicate_role_artists.length&&'DOUBLON À FUSIONNER : '+v.duplicate_role_artists.join(', '),v.invalid_equipment_slots.length&&'Équipements invalides : '+v.invalid_equipment_slots.join(', '),v.duplicate_equipment_slots.length&&'Équipements en double : '+v.duplicate_equipment_slots.join(', '),v.incomplete_equipment.length&&'Équipement non renseigné : '+v.incomplete_equipment.join(', ')].filter(Boolean);$('message').className='validation '+(v.ready?'ok':'warning');$('message').textContent=(v.ready?'PRÊT POUR LA FUTURE ÉTAPE D’IMPORT. ':'À CORRIGER AVANT IMPORT. ')+(issues.join('\n')||'Aucune incohérence bloquante.')+'\nDestinations : '+Object.entries(v.destinations).map(([key,value])=>key+' '+value).join(' · ')+'\nLa conduite officielle reste inchangée.'}
-$('add-cue').onclick=()=>{$('cues').append(cueRow({origin:'BUILDER'},$('cues').rows.length));refreshFilters()};$('add-distribution').onclick=()=>$('distribution').append(distributionRow());async function save(){if(preview)throw new Error('Adoptez explicitement la prévisualisation avant de l\u2019enregistrer dans le Builder.');const result=await api('/show-info/builder/document',{method:'PUT',body:JSON.stringify({session_id:sessionId,document:readTables()})});documentData=result.document;$('adopt').classList.add('hidden');render();showValidation(result.validation)}$('save').onclick=()=>save().catch(error=>$('message').textContent=error.message);$('validate').onclick=()=>save().catch(error=>$('message').textContent=error.message);$('import').onchange=async event=>{const form=new FormData();form.append('file',event.target.files[0]);try{const result=await api('/show-info/builder/import',{method:'POST',body:form});preview=result.document;documentData=preview;render();showValidation(result.validation);$('adopt').classList.remove('hidden');$('message').textContent+='\nPrévisualisation uniquement : cliquez ADOPTER puis ENREGISTRER BUILDER.';if(result.unknown_columns.length)$('message').textContent+='\nColonnes inconnues signalées : '+result.unknown_columns.join(', ')}catch(error){$('message').textContent=error.message}event.target.value=''};$('adopt').onclick=()=>{preview=null;$('adopt').classList.add('hidden');$('message').textContent='Prévisualisation adoptée en mémoire. Enregistrez pour confirmer dans le Builder.'};(async()=>{try{const result=await api('/show-info/builder/document');sessionId=result.session_id;$('session').textContent=sessionId;documentData=result.document;render();showValidation(result.validation)}catch(error){$('message').textContent=error.message}})();
+$('add-cue').onclick=()=>{$('cues').append(cueRow({origin:'BUILDER'},$('cues').rows.length));refreshFilters()};$('add-distribution').onclick=()=>$('distribution').append(distributionRow());async function save(){if(preview)throw new Error('Adoptez explicitement la prévisualisation avant de l\u2019enregistrer dans le Builder.');const result=await api('/show-info/builder/document',{method:'PUT',body:JSON.stringify({session_id:sessionId,document:readTables()})});documentData=result.document;$('adopt').classList.add('hidden');render();showValidation(result.validation)}$('save').onclick=()=>save().catch(error=>$('message').textContent=error.message);$('validate').onclick=()=>save().catch(error=>$('message').textContent=error.message);$('import').onchange=async event=>{const form=new FormData();form.append('file',event.target.files[0]);try{const result=await api('/show-info/builder/import',{method:'POST',body:form});preview=result.document;documentData=preview;render();showValidation(result.validation);$('adopt').classList.remove('hidden');$('message').textContent+='\nPrévisualisation uniquement : cliquez ADOPTER puis ENREGISTRER.';if(result.unknown_columns.length)$('message').textContent+='\nColonnes inconnues signalées : '+result.unknown_columns.join(', ')}catch(error){$('message').textContent=error.message}event.target.value=''};$('adopt').onclick=()=>{preview=null;$('adopt').classList.add('hidden');$('message').textContent='Prévisualisation adoptée en mémoire. Enregistrez pour confirmer dans le Builder.'};(async()=>{try{const result=await api('/show-info/builder/document');sessionId=result.session_id;$('session').textContent=sessionId;documentData=result.document;render();showValidation(result.validation)}catch(error){$('message').textContent=error.message}})();
 const builderStoredUnique=unique;unique=function(key){if(key==='artist')return[...new Set([...$('cues').rows].map(row=>row.dataset.artist).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));return builderStoredUnique(key)};
-const saveState=document.createElement('span');saveState.id='save-state';saveState.className='muted';saveState.textContent='SAUVEGARDÉ';$('save').after(saveState);let autosaveTimer=null,autosaveBlocked=false;const builderSavePipeline=save;function setSaveState(value,error=false){saveState.textContent=value;saveState.className=error?'danger':'muted'}function markDirty(){if(preview||autosaveBlocked)return;setSaveState('MODIFICATIONS…');clearTimeout(autosaveTimer);autosaveTimer=setTimeout(()=>save(),750)}save=async function(){if(autosaveBlocked)throw new Error('SESSION MODIFIÉE / RECHARGEMENT NÉCESSAIRE');clearTimeout(autosaveTimer);setSaveState('SAUVEGARDE…');try{await builderSavePipeline();setSaveState('SAUVEGARDÉ')}catch(error){if(/session active|session.*chang|document builder modifié|rechargement nécessaire/i.test(error.message))autosaveBlocked=true;setSaveState(autosaveBlocked?'SESSION MODIFIÉE / RECHARGEMENT NÉCESSAIRE':'ERREUR DE SAUVEGARDE',true);throw error}};['cues','distribution'].forEach(id=>{$(id).addEventListener('input',markDirty);$(id).addEventListener('change',markDirty);$(id).addEventListener('click',event=>{if(event.target.closest('.row-actions'))markDirty()})});$('add-cue').addEventListener('click',markDirty);$('add-distribution').addEventListener('click',markDirty);$('adopt').addEventListener('click',markDirty);const captureBuilderPipeline=captureBuilderTc;captureBuilderTc=async target=>{const before=target.textContent;await captureBuilderPipeline(target);if(target.textContent!==before)markDirty()};
+const saveState=document.createElement('span');
+saveState.id='save-state';
+saveState.className='muted';
+saveState.textContent='SAUVEGARDÉ';
+$('save').after(saveState);
+
+let autosaveTimer=null;
+let autosaveBlocked=false;
+let builderSaveQueue=Promise.resolve();
+
+const builderSavePipeline=save;
+
+function setSaveState(value,error=false){
+    saveState.textContent=value;
+    saveState.className=error?'danger':'muted';
+}
+
+function markDirty(){
+    if(preview||autosaveBlocked)return;
+
+    setSaveState('MODIFICATIONS…');
+    clearTimeout(autosaveTimer);
+
+    autosaveTimer=setTimeout(()=>{
+        save().catch(error=>{
+            $('message').textContent=error.message;
+        });
+    },750);
+}
+
+save=function(){
+    if(autosaveBlocked){
+        return Promise.reject(
+            new Error('SESSION MODIFIÉE / RECHARGEMENT NÉCESSAIRE')
+        );
+    }
+
+    clearTimeout(autosaveTimer);
+
+    const run=async()=>{
+        if(autosaveBlocked){
+            throw new Error(
+                'SESSION MODIFIÉE / RECHARGEMENT NÉCESSAIRE'
+            );
+        }
+
+        setSaveState('SAUVEGARDE…');
+
+        try{
+            await builderSavePipeline();
+            setSaveState('SAUVEGARDÉ');
+        }catch(error){
+            if(
+                /session active|session.*chang|document builder modifié|rechargement nécessaire/i
+                .test(error.message)
+            ){
+                autosaveBlocked=true;
+            }
+
+            setSaveState(
+                autosaveBlocked
+                    ? 'SESSION MODIFIÉE / RECHARGEMENT NÉCESSAIRE'
+                    : 'ERREUR DE SAUVEGARDE',
+                true
+            );
+
+            throw error;
+        }
+    };
+
+    /*
+     * Toutes les sauvegardes passent dans cette file.
+     * Un autosave, ENREGISTRER et PRÉVISUALISER SHOWCUE
+     * ne peuvent donc plus envoyer deux révisions concurrentes.
+     */
+    builderSaveQueue=builderSaveQueue.then(run,run);
+
+    return builderSaveQueue;
+};['cues','distribution'].forEach(id=>{$(id).addEventListener('input',markDirty);$(id).addEventListener('change',markDirty);$(id).addEventListener('click',event=>{if(event.target.closest('.row-actions'))markDirty()})});$('add-cue').addEventListener('click',markDirty);$('add-distribution').addEventListener('click',markDirty);$('adopt').addEventListener('click',markDirty);const captureBuilderPipeline=captureBuilderTc;captureBuilderTc=async target=>{const before=target.textContent;await captureBuilderPipeline(target);if(target.textContent!==before)markDirty()};
 let showCuePreviewToken=null;
 
 const validationGroup=document.querySelector('.tool-group:last-child');
@@ -550,12 +926,12 @@ const builderCueRowWithLegacyResolution=cueRow;cueRow=function(cue,index){const 
         // RÉCUPÉRATION / RETRAIT
         // ----------------------------------------------------
         if(
-            //R[ÉE]CUP/.test(all) ||
-            //R[ÉE]CUP[ÉE]R/.test(all) ||
-            //RETIR/.test(all) ||
-            //ENLEV/.test(all) ||
-            //D[ÉE]S/[ÉE]QUIP/.test(all) ||
-            //REPREND/.test(all)
+            /R[ÉE]CUP/.test(all) ||
+            /R[ÉE]CUP[ÉE]R/.test(all) ||
+            /RETIR/.test(all) ||
+            /ENLEV/.test(all) ||
+            /D[ÉE]S[ÉE]QUIP/.test(all) ||
+            /REPREND/.test(all)
         ){
             return {
                 label:'RÉCUP',
@@ -568,7 +944,7 @@ const builderCueRowWithLegacyResolution=cueRow;cueRow=function(cue,index){const 
         // ----------------------------------------------------
         if(
             type==='TEST MICRO' ||
-            /TEST(?:ER)?/.test(all)
+            /TEST(?:ER)/.test(all)
         ){
             return {
                 label:'TEST',
@@ -590,9 +966,9 @@ const builderCueRowWithLegacyResolution=cueRow;cueRow=function(cue,index){const 
         // ÉQUIPEMENT DIRECT
         // ----------------------------------------------------
         if(
-            //[ÉE]QUIP/.test(all) ||
-            /METTRE/.test(all) ||
-            //INSTALL/.test(all)
+            /[ÉE]QUIP/.test(all) ||
+            /METTRE/.test(all) ||
+            /INSTALL/.test(all)
         ){
             return {
                 label:'ÉQUIPER',
@@ -604,11 +980,11 @@ const builderCueRowWithLegacyResolution=cueRow;cueRow=function(cue,index){const 
         // PRÉPARATION / DONNER / DESCENDRE
         // ----------------------------------------------------
         if(
-            //PR[ÉE]PAR/.test(all) ||
-            /DONNER/.test(all) ||
-            /DESCENDRE/.test(all) ||
-            /APPORTER/.test(all) ||
-            /POSER/.test(all) ||
+            /PR[ÉE]PAR/.test(all) ||
+            /DONNER/.test(all) ||
+            /DESCENDRE/.test(all) ||
+            /APPORTER/.test(all) ||
+            /POSER/.test(all) ||
             type==='ÉQUIPEMENT ARTISTE'
         ){
             return {
@@ -728,6 +1104,8 @@ const builderCueRowWithLegacyResolution=cueRow;cueRow=function(cue,index){const 
 
         return {label:'REPÈRE',className:'kind-reference'};
     }
+
+    window.showcueCueKind = cueKind; // Shared unchanged mapping for consultation details.
 
     function decorateCueKind(row,cue){
         if(!row)return;
@@ -1002,7 +1380,7 @@ body.builder-show-advanced .builder-cues-table td:nth-child(17){
                     total+
                     ' cue'+
                     (total>1?'s':'')+
-                    ' · TC laissés vides · vérifiez puis ENREGISTRER BUILDER.';
+                    ' · TC laissés vides · vérifiez puis ENREGISTRER.';
             }
 
         }catch(error){
@@ -1132,7 +1510,7 @@ body.builder-show-advanced .builder-cues-table td:nth-child(17){
 <script id="showcue-builder-local-draft-v1">
 (function(){
 
-    const DRAFT_PREFIX='showcue_builder_draft_v1_';
+    const DRAFT_PREFIX='showcue_builder_draft_v2_';
 
     function draftKey(){
         const session=
@@ -1245,7 +1623,56 @@ body.builder-show-advanced .builder-cues-table td:nth-child(17){
 
         try{
 
-            documentData=draft.document;
+            /*
+             * Un brouillon appartient exactement à la revision serveur
+             * depuis laquelle il a été créé.
+             *
+             * Si le serveur a avancé depuis (migration, import, autre
+             * sauvegarde valide), le brouillon est périmé et ne doit
+             * surtout pas écraser le document plus récent.
+             */
+            const serverRevision=
+                documentData &&
+                Number.isFinite(Number(documentData.revision))
+                    ? Number(documentData.revision)
+                    : null;
+
+            const draftRevision=
+                draft.document &&
+                Number.isFinite(Number(draft.document.revision))
+                    ? Number(draft.document.revision)
+                    : null;
+
+            if(
+                serverRevision!==null &&
+                draftRevision!==null &&
+                draftRevision!==serverRevision
+            ){
+                clearLocalDraft();
+
+                const message=document.getElementById('message');
+
+                if(message){
+                    message.className='validation ok';
+                    message.textContent=
+                        'BROUILLON LOCAL PÉRIMÉ IGNORÉ · '+
+                        'le Builder serveur est plus récent.';
+                }
+
+                if(typeof setSaveState==='function'){
+                    setSaveState('SAUVEGARDÉ');
+                }
+
+                return false;
+            }
+
+            documentData={
+                ...draft.document,
+                revision:
+                    serverRevision!==null
+                        ? serverRevision
+                        : draft.document.revision
+            };
 
             if(typeof render==='function'){
                 render();
@@ -1340,9 +1767,14 @@ body.builder-show-advanced .builder-cues-table td:nth-child(17){
     /*
      * On sauvegarde également juste avant de quitter/recharger.
      */
+    /*
+     * Pas de sauvegarde automatique au simple reload/quittage.
+     * Sinon un état affiché est recréé immédiatement comme brouillon
+     * et restauré au chargement suivant.
+     */
     window.addEventListener(
         'beforeunload',
-        saveLocalDraft
+        clearLocalDraft
     );
 
 
@@ -1386,6 +1818,15 @@ body.builder-show-advanced .builder-cues-table td:nth-child(17){
     let restoreAttempts=0;
 
     function waitForBuilderSession(){
+        /*
+         * TEMPORAIREMENT DÉSACTIVÉ :
+         * le document serveur est la seule source de vérité.
+         * Les anciens brouillons locaux ne doivent plus remplacer
+         * la conduite chargée depuis Flask.
+         */
+        clearLocalDraft();
+        return;
+
 
         restoreAttempts+=1;
 
@@ -1449,46 +1890,28 @@ body.builder-show-advanced .builder-cues-table td:nth-child(17){
             );
         }
 
-        const currentDocument=readTables();
-
-        const result=await api(
-            '/show-info/builder/document',
-            {
-                method:'PUT',
-                body:JSON.stringify({
-                    session_id:sessionId,
-                    document:currentDocument
-                })
-            }
-        );
-
         /*
-         * Le serveur est désormais la référence.
+         * Une seule voie de sauvegarde.
+         *
+         * save() passe maintenant par la file builderSaveQueue :
+         * autosave, ENREGISTRER et PREVISUALISER ne peuvent plus
+         * envoyer deux revisions concurrentes.
+         *
+         * Le wrapper de brouillon local efface lui-même le draft
+         * après une sauvegarde serveur réussie.
          */
-        if(result.document){
-            documentData=result.document;
-        }
-
-        /*
-         * L'état vient d'être enregistré avec succès :
-         * suppression du brouillon local correspondant.
-         */
-        try{
-            localStorage.removeItem(
-                'showcue_builder_draft_v1_'+sessionId
-            );
-        }catch(error){
-            console.warn(
-                '[ShowCue Builder] impossible de supprimer le brouillon local',
-                error
+        if(typeof save!=='function'){
+            throw new Error(
+                'Sauvegarde Builder indisponible.'
             );
         }
 
-        if(typeof setSaveState==='function'){
-            setSaveState('SAUVEGARDÉ');
-        }
+        await save();
 
-        return result;
+        return {
+            ok:true,
+            document:documentData
+        };
     }
 
 
@@ -1696,6 +2119,4653 @@ body.builder-show-advanced .builder-cues-table td:nth-child(17){
 })();
 </script>
 
+
+<script id="showcue-builder-distribution-only-import">
+(function(){
+
+    const originalInput=document.getElementById('import');
+
+    if(!originalInput){
+        console.warn(
+            '[Cue Editor] import principal introuvable'
+        );
+        return;
+    }
+
+    const originalLabel=originalInput.closest('label');
+
+    if(
+        originalLabel &&
+        originalLabel.querySelector('button')
+    ){
+        const button=originalLabel.querySelector('button');
+
+        button.textContent='IMPORT CONDUITE COMPLÈTE';
+        button.title=
+            'Attention : remplace cues ET distribution après adoption.';
+    }
+
+    const label=document.createElement('label');
+    label.className='file';
+
+    const button=document.createElement('button');
+    button.type='button';
+    button.className='action-violet';
+    button.textContent='IMPORT DISTRIBUTION UNIQUEMENT';
+    button.title=
+        'Importe rôles, artistes et équipements sans remplacer les cues.';
+
+    const input=document.createElement('input');
+    input.id='import-distribution-only';
+    input.type='file';
+    input.accept='.xlsx,.csv';
+
+    label.append(button,input);
+
+    if(originalLabel){
+        originalLabel.after(label);
+    }
+
+    input.onchange=async event=>{
+
+        if(!event.target.files.length){
+            return;
+        }
+
+        const form=new FormData();
+        form.append(
+            'file',
+            event.target.files[0]
+        );
+
+        try{
+            const beforeCount=
+                Array.isArray(documentData?.cues)
+                    ? documentData.cues.length
+                    : 0;
+
+            const result=await api(
+                '/show-info/builder/import-distribution',
+                {
+                    method:'POST',
+                    body:form
+                }
+            );
+
+            const afterCount=
+                Array.isArray(result.document?.cues)
+                    ? result.document.cues.length
+                    : 0;
+
+            /*
+             * Garde-fou absolu côté navigateur :
+             * un import distribution ne doit JAMAIS changer
+             * le nombre de cues.
+             */
+            if(afterCount!==beforeCount){
+                throw new Error(
+                    'SÉCURITÉ IMPORT DISTRIBUTION — '+
+                    'nombre de cues modifié : '+
+                    beforeCount+
+                    ' → '+
+                    afterCount+
+                    '. Import annulé.'
+                );
+            }
+
+            preview=result.document;
+            documentData=preview;
+
+            render();
+            showValidation(result.validation);
+
+            $('adopt').classList.remove('hidden');
+
+            $('message').textContent+=
+                '\n\nIMPORT DISTRIBUTION UNIQUEMENT'+
+                ' — '+result.preserved_cues+
+                ' cues conservées à l’identique'+
+                ' — '+result.imported_distribution+
+                ' affectations importées.'+
+                '\nPrévisualisation uniquement : '+
+                'cliquez ADOPTER puis ENREGISTRER.';
+
+            if(result.unknown_columns.length){
+                $('message').textContent+=
+                    '\nColonnes inconnues signalées : '+
+                    result.unknown_columns.join(', ');
+            }
+
+        }catch(error){
+            $('message').className='validation warning';
+            $('message').textContent=error.message;
+        }
+
+        event.target.value='';
+    };
+
+})();
+</script>
+
+
+<script id="showcue-casting-equipment-overview">
+(function(){
+
+    function textOf(row,key){
+        const node=row.querySelector('[data-key="'+key+'"]');
+
+        if(!node){
+            return '';
+        }
+
+        if(node.value!==undefined){
+            return String(node.value||'').trim();
+        }
+
+        return String(node.textContent||'').trim();
+    }
+
+
+    function equipmentOf(row){
+        const values=[];
+
+        row.querySelectorAll('.equipment-slot').forEach(slot=>{
+            const type=
+                slot.querySelector('[data-slot-key="type"]')?.value || '';
+
+            const value=
+                slot.querySelector('[data-slot-key="value"]')?.value || '';
+
+            if(String(value).trim()){
+                values.push({
+                    type:String(type).trim(),
+                    value:String(value).trim()
+                });
+            }
+        });
+
+        return values;
+    }
+
+
+    function escapeHtml(value){
+        return String(value ?? '')
+            .replaceAll('&','&amp;')
+            .replaceAll('<','&lt;')
+            .replaceAll('>','&gt;')
+            .replaceAll('"','&quot;')
+            .replaceAll("'",'&#039;');
+    }
+
+
+    function refreshCastingEquipmentOverview(){
+        const target=document.getElementById('casting-overview');
+        const tbody=document.getElementById('distribution');
+
+        if(!target || !tbody){
+            return;
+        }
+
+        const roles=new Map();
+
+        [...tbody.rows].forEach(row=>{
+            const role=textOf(row,'role');
+            const artist=textOf(row,'artist');
+
+            if(!role && !artist){
+                return;
+            }
+
+            const active=
+                Boolean(
+                    row.querySelector(
+                        '[data-key="active"]'
+                    )?.checked
+                );
+
+            const notes=textOf(row,'notes');
+
+            const person={
+                artist:artist || 'ARTISTE NON RENSEIGNÉ',
+                active,
+                notes,
+                equipment:equipmentOf(row)
+            };
+
+            if(!roles.has(role || 'RÔLE NON RENSEIGNÉ')){
+                roles.set(
+                    role || 'RÔLE NON RENSEIGNÉ',
+                    []
+                );
+            }
+
+            roles.get(
+                role || 'RÔLE NON RENSEIGNÉ'
+            ).push(person);
+        });
+
+        if(!roles.size){
+            target.innerHTML=
+                '<div class="casting-empty">'+
+                'Aucune distribution renseignée.'+
+                '</div>';
+            return;
+        }
+
+        target.innerHTML='';
+
+        [...roles.entries()]
+            .sort((a,b)=>
+                a[0].localeCompare(
+                    b[0],
+                    'fr',
+                    {sensitivity:'base'}
+                )
+            )
+            .forEach(([role,people])=>{
+
+                const card=document.createElement('div');
+                card.className='casting-role-card';
+
+                const activeCount=
+                    people.filter(person=>person.active).length;
+
+                let body='';
+
+                people.forEach(person=>{
+
+                    const equipment=
+                        person.equipment.length
+                            ? (
+                                '<div class="casting-equipment-list">'+
+                                person.equipment.map(item=>
+                                    '<span class="casting-equipment-chip">'+
+                                    escapeHtml(item.type)+
+                                    ' · '+
+                                    escapeHtml(item.value)+
+                                    '</span>'
+                                ).join('')+
+                                '</div>'
+                            )
+                            : (
+                                '<div class="casting-no-equipment">'+
+                                'Équipement non renseigné'+
+                                '</div>'
+                            );
+
+                    const note=
+                        person.notes
+                            ? (
+                                '<div class="casting-person-note">'+
+                                escapeHtml(person.notes)+
+                                '</div>'
+                            )
+                            : '';
+
+                    body+=
+                        '<div class="casting-person '+
+                        (person.active?'active':'')+
+                        '">'+
+
+                        '<div class="casting-person-name">'+
+                        escapeHtml(person.artist)+
+                        '</div>'+
+
+                        (
+                            person.active
+                                ? '<span class="casting-active-badge">ACTIF</span>'
+                                : '<span class="casting-replacement-badge">REMPLAÇANT</span>'
+                        )+
+
+                        equipment+
+                        note+
+
+                        '</div>';
+                });
+
+                card.innerHTML=
+                    '<div class="casting-role-header">'+
+                        '<span class="casting-role-name">'+
+                        escapeHtml(role)+
+                        '</span>'+
+                        '<span class="casting-role-count">'+
+                        people.length+
+                        ' artiste'+
+                        (people.length>1?'s':'')+
+                        (
+                            activeCount!==1
+                                ? ' · '+activeCount+' actif(s)'
+                                : ''
+                        )+
+                        '</span>'+
+                    '</div>'+
+                    body;
+
+                target.append(card);
+            });
+    }
+
+
+    const distribution=document.getElementById('distribution');
+
+    if(distribution){
+
+        distribution.addEventListener(
+            'input',
+            ()=>requestAnimationFrame(
+                refreshCastingEquipmentOverview
+            ),
+            true
+        );
+
+        distribution.addEventListener(
+            'change',
+            ()=>requestAnimationFrame(
+                refreshCastingEquipmentOverview
+            ),
+            true
+        );
+
+        distribution.addEventListener(
+            'click',
+            ()=>setTimeout(
+                refreshCastingEquipmentOverview,
+                0
+            ),
+            true
+        );
+
+        const observer=new MutationObserver(()=>{
+            requestAnimationFrame(
+                refreshCastingEquipmentOverview
+            );
+        });
+
+        observer.observe(
+            distribution,
+            {
+                childList:true,
+                subtree:true
+            }
+        );
+    }
+
+    setTimeout(
+        refreshCastingEquipmentOverview,
+        0
+    );
+
+})();
+</script>
+
+
+<style id="cue-editor-header-v2-style">
+
+/* ==========================================================
+   CL CUE EDITOR — HEADER V2
+   Réorganisation visuelle uniquement.
+   ========================================================== */
+
+.top{
+    position:sticky;
+    top:0;
+    z-index:20;
+    padding:8px 0 10px;
+    background:#090807f7;
+    backdrop-filter:blur(14px);
+}
+
+.top > .tools{
+    display:none !important;
+}
+
+.cue-v2-toolbar{
+    display:flex;
+    align-items:center;
+    gap:7px;
+    flex-wrap:wrap;
+    margin-top:8px;
+}
+
+.cue-v2-toolbar button,
+.cue-v2-toolbar .action-amber{
+    min-height:34px;
+    padding:6px 10px;
+    font-size:.69rem;
+    border-radius:7px;
+}
+
+.cue-v2-main-actions{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    flex-wrap:wrap;
+}
+
+.cue-v2-save-state{
+    display:flex;
+    align-items:center;
+    min-height:34px;
+    padding:0 7px;
+    font-size:.62rem;
+}
+
+.cue-v2-spacer{
+    flex:1 1 auto;
+}
+
+.cue-v2-menu{
+    position:relative;
+}
+
+.cue-v2-menu > summary{
+    list-style:none;
+    cursor:pointer;
+    border:1px solid #514940;
+    border-radius:7px;
+    background:#211d19;
+    color:#e0d4c2;
+    padding:8px 10px;
+    font-size:.66rem;
+    font-weight:900;
+    letter-spacing:.03em;
+    user-select:none;
+}
+
+.cue-v2-menu > summary::-webkit-details-marker{
+    display:none;
+}
+
+.cue-v2-menu > summary::after{
+    content:" ▾";
+    color:#988d80;
+}
+
+.cue-v2-menu[open] > summary{
+    border-color:#8a7048;
+    background:#29231c;
+}
+
+.cue-v2-menu-panel{
+    position:absolute;
+    top:calc(100% + 5px);
+    right:0;
+    z-index:50;
+
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+
+    min-width:225px;
+    padding:7px;
+
+    border:1px solid #514940;
+    border-radius:8px;
+    background:#151311;
+    box-shadow:0 12px 30px #000a;
+}
+
+.cue-v2-menu-panel > *{
+    width:100%;
+    margin:0 !important;
+}
+
+.cue-v2-menu-panel button,
+.cue-v2-menu-panel a{
+    justify-content:flex-start;
+    text-align:left;
+}
+
+.cue-v2-danger-note{
+    color:#e0a278;
+    font-size:.58rem;
+    line-height:1.25;
+    padding:2px 3px 5px;
+}
+
+.cue-v2-showcue{
+    display:flex;
+    align-items:center;
+    gap:5px;
+    padding-left:7px;
+    margin-left:2px;
+    border-left:1px solid #3d3730;
+}
+
+.cue-v2-showcue-label{
+    color:#9f958a;
+    font-size:.55rem;
+    font-weight:900;
+    letter-spacing:.08em;
+}
+
+#validate{
+    display:none !important;
+}
+
+/* ------------------------------------------
+   État / validation compact
+   ------------------------------------------ */
+
+.cue-v2-status{
+    margin-top:8px;
+    border-top:1px solid #29251f;
+    padding-top:7px;
+}
+
+.cue-v2-status-line{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+}
+
+.cue-v2-status-main{
+    color:#72df99;
+    font-size:.68rem;
+    font-weight:850;
+}
+
+.cue-v2-status-details{
+    margin-left:auto;
+}
+
+.cue-v2-status-details > summary{
+    cursor:pointer;
+    color:#b3a89c;
+    font-size:.6rem;
+    font-weight:800;
+}
+
+.cue-v2-status-details #message{
+    margin-top:7px;
+    padding:8px 10px;
+    border:1px solid #39332d;
+    border-radius:7px;
+    background:#12100e;
+    max-height:170px;
+    overflow:auto;
+    font-size:.63rem !important;
+    line-height:1.35;
+}
+
+/* On garde les compteurs mais plus discrets */
+.summary{
+    margin:9px 0 8px;
+}
+
+.metric{
+    padding:6px 9px;
+}
+
+.metric strong{
+    font-size:.96rem;
+}
+
+/* ------------------------------------------
+   Casting déplacé en haut et repliable
+   ------------------------------------------ */
+
+.cue-v2-casting-details{
+    margin:9px 0 10px;
+    border:1px solid #3b342d;
+    border-radius:8px;
+    background:#12100e;
+}
+
+.cue-v2-casting-details > summary{
+    cursor:pointer;
+    list-style:none;
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:8px 10px;
+    color:#d9bd8b;
+    font-size:.7rem;
+    font-weight:900;
+    letter-spacing:.05em;
+}
+
+.cue-v2-casting-details > summary::-webkit-details-marker{
+    display:none;
+}
+
+.cue-v2-casting-details > summary::before{
+    content:"▸";
+    color:#897558;
+}
+
+.cue-v2-casting-details[open] > summary::before{
+    content:"▾";
+}
+
+.cue-v2-casting-body{
+    padding:0 10px 10px;
+}
+
+.cue-v2-casting-body .casting-equipment-section{
+    margin:0;
+    padding-top:0;
+    border-top:0;
+}
+
+.cue-v2-casting-body .casting-equipment-section > h2,
+.cue-v2-casting-body .casting-equipment-section > p{
+    display:none;
+}
+
+/* ------------------------------------------
+   Mobile
+   ------------------------------------------ */
+
+@media(max-width:760px){
+
+    .cue-v2-toolbar{
+        align-items:stretch;
+    }
+
+    .cue-v2-main-actions{
+        width:100%;
+    }
+
+    .cue-v2-spacer{
+        display:none;
+    }
+
+    .cue-v2-menu{
+        flex:1 1 30%;
+    }
+
+    .cue-v2-menu > summary{
+        text-align:center;
+    }
+
+    .cue-v2-menu-panel{
+        position:fixed;
+        left:12px;
+        right:12px;
+        top:auto;
+        width:auto;
+        min-width:0;
+    }
+
+    .cue-v2-showcue{
+        width:100%;
+        padding:7px 0 0;
+        margin:0;
+        border-left:0;
+        border-top:1px solid #3d3730;
+    }
+
+    .cue-v2-status-details{
+        margin-left:0;
+    }
+}
+
+</style>
+
+<script id="cue-editor-header-v2">
+(function(){
+
+    function byId(id){
+        return document.getElementById(id);
+    }
+
+    const header=document.querySelector('header.top');
+    const oldTools=header?.querySelector('.tools');
+
+    if(!header || !oldTools){
+        console.warn('[Cue Editor V2] header introuvable');
+        return;
+    }
+
+    if(byId('cue-v2-toolbar')){
+        return;
+    }
+
+
+    /* ======================================================
+       BARRE PRINCIPALE
+       ====================================================== */
+
+    const toolbar=document.createElement('div');
+    toolbar.id='cue-v2-toolbar';
+    toolbar.className='cue-v2-toolbar';
+
+    const main=document.createElement('div');
+    main.className='cue-v2-main-actions';
+
+    const addCue=byId('add-cue');
+    const save=byId('save');
+    const saveState=byId('save-state');
+
+    if(addCue)main.append(addCue);
+    if(save)main.append(save);
+
+    if(saveState){
+        const stateWrap=document.createElement('span');
+        stateWrap.className='cue-v2-save-state';
+        stateWrap.append(saveState);
+        main.append(stateWrap);
+    }
+
+    toolbar.append(main);
+
+
+    /* ======================================================
+       CASTING — bouton d'ouverture directe
+       ====================================================== */
+
+    const castingButton=document.createElement('button');
+    castingButton.type='button';
+    castingButton.className='action-violet';
+    castingButton.textContent='CASTING & ÉQUIPEMENTS';
+
+    toolbar.append(castingButton);
+
+
+    const spacer=document.createElement('span');
+    spacer.className='cue-v2-spacer';
+    toolbar.append(spacer);
+
+
+    /* ======================================================
+       Créateur de menu
+       ====================================================== */
+
+    function makeMenu(label){
+        const details=document.createElement('details');
+        details.className='cue-v2-menu';
+
+        const summary=document.createElement('summary');
+        summary.textContent=label;
+
+        const panel=document.createElement('div');
+        panel.className='cue-v2-menu-panel';
+
+        details.append(summary,panel);
+
+        details.addEventListener('toggle',()=>{
+            if(!details.open)return;
+
+            document
+                .querySelectorAll('.cue-v2-menu')
+                .forEach(other=>{
+                    if(other!==details){
+                        other.open=false;
+                    }
+                });
+        });
+
+        return {details,panel};
+    }
+
+
+    /* ======================================================
+       IMPORTER
+       ====================================================== */
+
+    const importer=makeMenu('IMPORTER');
+
+    const fullImport=byId('import')?.closest('label');
+    const distributionImport=
+        byId('import-distribution-only')?.closest('label');
+    const pdfImport=byId('import-pdf')?.closest('label');
+
+    const alsButton=[...oldTools.querySelectorAll('button')]
+        .find(button=>
+            button.textContent.includes('IMPORT ALS')
+        );
+
+    if(distributionImport){
+        const btn=distributionImport.querySelector('button');
+        if(btn)btn.textContent='DISTRIBUTION UNIQUEMENT';
+        importer.panel.append(distributionImport);
+    }
+
+    if(fullImport){
+        const warning=document.createElement('div');
+        warning.className='cue-v2-danger-note';
+        warning.textContent=
+            'Remplacement complet : cues + distribution.';
+        importer.panel.append(warning);
+
+        const btn=fullImport.querySelector('button');
+        if(btn)btn.textContent='CONDUITE COMPLÈTE';
+        importer.panel.append(fullImport);
+    }
+
+    if(pdfImport){
+        importer.panel.append(pdfImport);
+    }
+
+    if(alsButton){
+        importer.panel.append(alsButton);
+    }
+
+    toolbar.append(importer.details);
+
+
+    /* ======================================================
+       EXPORTER
+       ====================================================== */
+
+    const exporter=makeMenu('EXPORTER');
+
+    [...oldTools.querySelectorAll('a')].forEach(link=>{
+        if(
+            link.textContent.includes('EXPORT XLSX') ||
+            link.textContent.includes('EXPORT CSV')
+        ){
+            exporter.panel.append(link);
+        }
+    });
+
+    toolbar.append(exporter.details);
+
+
+    /* ======================================================
+       OUTILS
+       ====================================================== */
+
+    const outils=makeMenu('OUTILS');
+
+    const advanced=[...document.querySelectorAll('button')]
+        .find(button=>
+            button.textContent.trim()==='OPTIONS AVANCÉES'
+        );
+
+    const addDistribution=byId('add-distribution');
+
+    if(advanced){
+        outils.panel.append(advanced);
+    }
+
+    if(addDistribution){
+        addDistribution.textContent='+ AFFECTATION MANUELLE';
+        outils.panel.append(addDistribution);
+    }
+
+    const resources=[...header.querySelectorAll('details')]
+        .find(details=>
+            details.querySelector('summary')?.textContent
+                .includes('RESSOURCES CL')
+        );
+
+    if(resources){
+        resources.style.margin='0';
+        outils.panel.append(resources);
+    }
+
+    toolbar.append(outils.details);
+
+
+    /* ======================================================
+       SHOWCUE
+       ====================================================== */
+
+    const showcue=document.createElement('div');
+    showcue.className='cue-v2-showcue';
+
+    const showcueLabel=document.createElement('span');
+    showcueLabel.className='cue-v2-showcue-label';
+    showcueLabel.textContent='SHOWCUE';
+
+    showcue.append(showcueLabel);
+
+    const previewButton=[...document.querySelectorAll('button')]
+        .find(button=>
+            button.textContent.trim()==='PRÉVISUALISER SHOWCUE'
+        );
+
+    const importButton=[...document.querySelectorAll('button')]
+        .find(button=>
+            button.textContent.trim()==='IMPORTER DANS SHOWCUE'
+        );
+
+    if(previewButton){
+        previewButton.textContent='PRÉVISUALISER';
+        showcue.append(previewButton);
+    }
+
+    if(importButton){
+        importButton.textContent='IMPORTER';
+        showcue.append(importButton);
+    }
+
+    toolbar.append(showcue);
+
+    oldTools.after(toolbar);
+
+
+    /* ======================================================
+       VALIDATION COMPACTE
+       ====================================================== */
+
+    const message=byId('message');
+
+    if(message){
+        const status=document.createElement('div');
+        status.className='cue-v2-status';
+
+        const line=document.createElement('div');
+        line.className='cue-v2-status-line';
+
+        const mainStatus=document.createElement('span');
+        mainStatus.className='cue-v2-status-main';
+
+        const details=document.createElement('details');
+        details.className='cue-v2-status-details';
+
+        const summary=document.createElement('summary');
+        summary.textContent='DÉTAILS';
+
+        details.append(summary,message);
+        line.append(mainStatus,details);
+        status.append(line);
+
+        toolbar.after(status);
+
+        function refreshStatus(){
+            const total=
+                document.querySelector(
+                    '#summary .metric:first-child strong'
+                )?.textContent || '—';
+
+            const warningLines=
+                String(message.textContent||'')
+                    .split('\n')
+                    .filter(line=>
+                        /inconnu|sans artiste|non renseigné|invalide/i
+                            .test(line)
+                    );
+
+            const ready=
+                String(message.textContent||'')
+                    .includes('PRÊT');
+
+            mainStatus.textContent=
+                (ready?'✓ ':'')+
+                total+
+                ' cues'+
+                (
+                    warningLines.length
+                        ? ' · '+warningLines.length+
+                          ' point(s) à vérifier'
+                        : ' · prêt'
+                );
+        }
+
+        const observer=new MutationObserver(refreshStatus);
+
+        observer.observe(
+            message,
+            {
+                childList:true,
+                subtree:true,
+                characterData:true
+            }
+        );
+
+        const summaryNode=byId('summary');
+
+        if(summaryNode){
+            observer.observe(
+                summaryNode,
+                {
+                    childList:true,
+                    subtree:true,
+                    characterData:true
+                }
+            );
+        }
+
+        setTimeout(refreshStatus,50);
+    }
+
+
+    /* ======================================================
+       CASTING EN HAUT, REPLIABLE
+       ====================================================== */
+
+    const castingSection=
+        document.querySelector('.casting-equipment-section');
+
+    const summaryMetrics=byId('summary');
+
+    if(castingSection && summaryMetrics){
+
+        const details=document.createElement('details');
+        details.id='cue-v2-casting';
+        details.className='cue-v2-casting-details';
+
+        const summary=document.createElement('summary');
+        summary.textContent='CASTING & ÉQUIPEMENTS';
+
+        const body=document.createElement('div');
+        body.className='cue-v2-casting-body';
+
+        castingSection.before(details);
+        details.append(summary,body);
+        body.append(castingSection);
+
+        summaryMetrics.before(details);
+
+        castingButton.onclick=()=>{
+            details.open=!details.open;
+
+            if(details.open){
+                details.scrollIntoView({
+                    block:'nearest',
+                    behavior:'smooth'
+                });
+            }
+        };
+    }
+
+
+    /* ======================================================
+       Fermer les menus en cliquant ailleurs
+       ====================================================== */
+
+    document.addEventListener('click',event=>{
+        if(event.target.closest('.cue-v2-menu')){
+            return;
+        }
+
+        document
+            .querySelectorAll('.cue-v2-menu[open]')
+            .forEach(details=>{
+                details.open=false;
+            });
+    });
+
+})();
+</script>
+
+
+<style id="cue-editor-header-v3-style">
+
+/* ==========================================================
+   CUE EDITOR V3 — finitions ergonomiques
+   ========================================================== */
+
+.cue-v2-casting-details{
+    margin-top:8px;
+}
+
+/* Cartes casting plus compactes */
+.casting-overview{
+    grid-template-columns:
+        repeat(auto-fit,minmax(220px,1fr));
+    gap:7px;
+}
+
+.casting-role-card{
+    padding:8px 10px;
+}
+
+.casting-person{
+    padding:4px 0;
+}
+
+/* La table technique n'est plus immédiatement imposée */
+.casting-distribution-editor{
+    margin-top:10px;
+    border-top:1px solid #332d27;
+    padding-top:7px;
+}
+
+.casting-distribution-editor > summary{
+    cursor:pointer;
+    list-style:none;
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+
+    border:1px solid #514940;
+    border-radius:6px;
+    background:#201c18;
+    color:#d0c1ab;
+
+    padding:6px 9px;
+    font-size:.62rem;
+    font-weight:900;
+}
+
+.casting-distribution-editor > summary::-webkit-details-marker{
+    display:none;
+}
+
+.casting-distribution-editor > summary::before{
+    content:"▸";
+    color:#9b8666;
+}
+
+.casting-distribution-editor[open] > summary::before{
+    content:"▾";
+}
+
+.casting-distribution-editor-body{
+    margin-top:8px;
+}
+
+/* Ressources CL uniquement dans OUTILS */
+header.top > details:not(.cue-v2-menu):not(.cue-v2-status-details){
+    margin-top:0;
+}
+
+</style>
+
+<script id="cue-editor-header-v3">
+(function(){
+
+    function install(){
+
+        /* --------------------------------------------------
+           1. CASTING fermé par défaut
+           -------------------------------------------------- */
+
+        const casting=document.getElementById('cue-v2-casting');
+
+        if(casting){
+            casting.open=false;
+        }
+
+
+        /* --------------------------------------------------
+           2. La table d'édition devient un sous-panneau
+           -------------------------------------------------- */
+
+        const castingSection=
+            document.querySelector('.casting-equipment-section');
+
+        if(
+            castingSection &&
+            !document.getElementById('casting-distribution-editor')
+        ){
+            const tableWrap=
+                castingSection.querySelector('.table-wrap');
+
+            const editorTitle=
+                castingSection.querySelector('.casting-editor-title');
+
+            if(tableWrap){
+
+                const details=document.createElement('details');
+                details.id='casting-distribution-editor';
+                details.className='casting-distribution-editor';
+
+                const summary=document.createElement('summary');
+                summary.textContent='MODIFIER LA DISTRIBUTION';
+
+                const body=document.createElement('div');
+                body.className='casting-distribution-editor-body';
+
+                tableWrap.before(details);
+                details.append(summary,body);
+
+                if(editorTitle){
+                    editorTitle.remove();
+                }
+
+                body.append(tableWrap);
+            }
+        }
+
+
+        /* --------------------------------------------------
+           3. CASTING button : toggle simple, sans scroll
+           -------------------------------------------------- */
+
+        const castingButton=[...document.querySelectorAll('button')]
+            .find(button=>
+                button.textContent.trim()==='CASTING & ÉQUIPEMENTS'
+            );
+
+        if(castingButton && casting){
+            castingButton.onclick=()=>{
+                casting.open=!casting.open;
+            };
+        }
+
+
+        /* --------------------------------------------------
+           4. Déplacer RESSOURCES CL dans OUTILS
+              même s'il est créé après les scripts précédents.
+           -------------------------------------------------- */
+
+        function moveResources(){
+
+            const resources=[...document.querySelectorAll('details')]
+                .find(details=>
+                    details.querySelector(':scope > summary')
+                        ?.textContent
+                        .trim()
+                        .includes('RESSOURCES CL')
+                );
+
+            const outils=[...document.querySelectorAll('.cue-v2-menu')]
+                .find(details=>
+                    details.querySelector(':scope > summary')
+                        ?.textContent
+                        .trim()
+                        .startsWith('OUTILS')
+                );
+
+            const panel=
+                outils?.querySelector('.cue-v2-menu-panel');
+
+            if(
+                resources &&
+                panel &&
+                !panel.contains(resources)
+            ){
+                resources.style.margin='0';
+                resources.style.width='100%';
+
+                panel.append(resources);
+            }
+        }
+
+        moveResources();
+
+        const observer=new MutationObserver(moveResources);
+
+        observer.observe(
+            document.body,
+            {
+                childList:true,
+                subtree:true
+            }
+        );
+
+        setTimeout(moveResources,250);
+        setTimeout(moveResources,1000);
+    }
+
+    if(document.readyState==='loading'){
+        document.addEventListener('DOMContentLoaded',install);
+    }else{
+        install();
+    }
+
+})();
+</script>
+
+
+<style id="showcue-import-safe-ui-style">
+
+.cue-import-safe-panel{
+    display:flex;
+    flex-direction:column;
+    gap:7px;
+}
+
+.cue-import-primary{
+    border:1px solid #537f61 !important;
+    background:#17301f !important;
+    color:#9de4b4 !important;
+    font-weight:900 !important;
+}
+
+.cue-import-primary:hover{
+    background:#1d3b27 !important;
+}
+
+.cue-import-description{
+    color:#9b948a;
+    font-size:.58rem;
+    line-height:1.35;
+    padding:0 3px 4px;
+}
+
+.cue-import-advanced{
+    margin-top:3px;
+    border-top:1px solid #37312b;
+    padding-top:7px;
+}
+
+.cue-import-advanced > summary{
+    cursor:pointer;
+    list-style:none;
+    color:#a89d90;
+    font-size:.61rem;
+    font-weight:900;
+    padding:5px 3px;
+}
+
+.cue-import-advanced > summary::-webkit-details-marker{
+    display:none;
+}
+
+.cue-import-advanced > summary::before{
+    content:"▸";
+    margin-right:5px;
+    color:#9b7b50;
+}
+
+.cue-import-advanced[open] > summary::before{
+    content:"▾";
+}
+
+.cue-import-danger-box{
+    margin-top:5px;
+    padding:7px;
+    border:1px solid #704a37;
+    border-radius:6px;
+    background:#261912;
+}
+
+.cue-import-danger-note{
+    color:#e4ad87;
+    font-size:.58rem;
+    line-height:1.35;
+    margin-bottom:6px;
+}
+
+.cue-import-danger-box button{
+    border-color:#86533c !important;
+    color:#f0b38c !important;
+}
+
+</style>
+
+<script id="showcue-import-safe-ui">
+(function(){
+
+    function install(){
+
+        const importer=[...document.querySelectorAll('.cue-v2-menu')]
+            .find(details=>
+                details.querySelector(':scope > summary')
+                    ?.textContent
+                    .trim()
+                    .startsWith('IMPORTER')
+            );
+
+        if(!importer)return;
+
+        const panel=importer.querySelector('.cue-v2-menu-panel');
+
+        if(!panel)return;
+
+        if(panel.querySelector('.cue-import-safe-panel')){
+            return;
+        }
+
+        const distributionLabel=
+            document.getElementById('import-distribution-only')
+                ?.closest('label');
+
+        const fullLabel=
+            document.getElementById('import')
+                ?.closest('label');
+
+        const pdfLabel=
+            document.getElementById('import-pdf')
+                ?.closest('label');
+
+        const alsButton=[...panel.querySelectorAll('button')]
+            .find(button=>
+                button.textContent.includes('IMPORT ALS')
+            );
+
+        const safe=document.createElement('div');
+        safe.className='cue-import-safe-panel';
+
+        /* -----------------------------------------------
+           IMPORT NORMAL : distribution seulement
+           ----------------------------------------------- */
+
+        if(distributionLabel){
+
+            const btn=distributionLabel.querySelector('button');
+
+            if(btn){
+                btn.textContent='IMPORTER LA DISTRIBUTION';
+                btn.classList.add('cue-import-primary');
+            }
+
+            safe.append(distributionLabel);
+
+            const desc=document.createElement('div');
+            desc.className='cue-import-description';
+            desc.textContent=
+                'Casting + micros + IEM + équipements. '+
+                'La conduite et les cues sont conservées.';
+
+            safe.append(desc);
+        }
+
+        /* -----------------------------------------------
+           IMPORT PDF
+           ----------------------------------------------- */
+
+        if(pdfLabel){
+            const btn=pdfLabel.querySelector('button');
+
+            if(btn){
+                btn.textContent='IMPORTER UN PDF';
+            }
+
+            safe.append(pdfLabel);
+        }
+
+        /* -----------------------------------------------
+           ALS
+           ----------------------------------------------- */
+
+        if(alsButton){
+            safe.append(alsButton);
+        }
+
+        /* -----------------------------------------------
+           AVANCÉ : conduite complète
+           ----------------------------------------------- */
+
+        if(fullLabel){
+
+            const advanced=document.createElement('details');
+            advanced.className='cue-import-advanced';
+
+            const summary=document.createElement('summary');
+            summary.textContent='AVANCÉ — REMPLACER LA CONDUITE';
+
+            const danger=document.createElement('div');
+            danger.className='cue-import-danger-box';
+
+            const warning=document.createElement('div');
+            warning.className='cue-import-danger-note';
+            warning.textContent=
+                'Attention : cet import remplace la conduite complète '+
+                'et la distribution. À utiliser uniquement pour une '+
+                'migration ou un remplacement volontaire.';
+
+            const btn=fullLabel.querySelector('button');
+
+            if(btn){
+                btn.textContent='REMPLACER LA CONDUITE COMPLÈTE';
+            }
+
+            danger.append(warning,fullLabel);
+            advanced.append(summary,danger);
+            safe.append(advanced);
+        }
+
+        panel.innerHTML='';
+        panel.append(safe);
+    }
+
+    if(document.readyState==='loading'){
+        document.addEventListener('DOMContentLoaded',install);
+    }else{
+        install();
+    }
+
+    setTimeout(install,250);
+    setTimeout(install,1000);
+
+})();
+</script>
+
+
+<style id="casting-material-manager-style">
+
+/* ==========================================================
+   CASTING & MATÉRIEL — panneau d'administration
+   ========================================================== */
+
+.cmm-open-button{
+    width:100%;
+    text-align:left;
+    border-color:#725c3f !important;
+    background:#292116 !important;
+    color:#e3c890 !important;
+    font-weight:900 !important;
+}
+
+.cmm-backdrop{
+    position:fixed;
+    inset:0;
+    z-index:5000;
+    display:none;
+    background:#000b;
+    backdrop-filter:blur(5px);
+}
+
+.cmm-backdrop.open{
+    display:flex;
+}
+
+.cmm-window{
+    width:min(1500px,calc(100vw - 28px));
+    height:min(900px,calc(100vh - 28px));
+    margin:auto;
+    overflow:hidden;
+    display:flex;
+    flex-direction:column;
+
+    border:1px solid #54493e;
+    border-radius:12px;
+    background:#100e0c;
+    box-shadow:0 25px 80px #000;
+}
+
+.cmm-header{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:12px 14px;
+    border-bottom:1px solid #39322b;
+    background:#171411;
+}
+
+.cmm-title{
+    font-size:1rem;
+    font-weight:950;
+    letter-spacing:.06em;
+    color:#ddc08d;
+}
+
+.cmm-subtitle{
+    color:#8f877d;
+    font-size:.63rem;
+}
+
+.cmm-spacer{
+    flex:1;
+}
+
+.cmm-close{
+    min-width:38px;
+    font-size:1rem;
+}
+
+.cmm-tabs{
+    display:flex;
+    gap:4px;
+    padding:8px 12px 0;
+    border-bottom:1px solid #332e29;
+    background:#141210;
+}
+
+.cmm-tab{
+    border:0;
+    border-bottom:2px solid transparent;
+    border-radius:5px 5px 0 0;
+    background:transparent;
+    color:#9d948a;
+    padding:9px 12px;
+    font-size:.67rem;
+    font-weight:900;
+}
+
+.cmm-tab.active{
+    color:#e4c892;
+    border-bottom-color:#b99052;
+    background:#211c16;
+}
+
+.cmm-body{
+    flex:1;
+    min-height:0;
+    overflow:auto;
+    padding:14px;
+}
+
+.cmm-panel{
+    display:none;
+}
+
+.cmm-panel.active{
+    display:block;
+}
+
+.cmm-role-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(245px,1fr));
+    gap:10px;
+}
+
+.cmm-role-card{
+    border:1px solid #403931;
+    border-radius:9px;
+    background:#171411;
+    overflow:hidden;
+}
+
+.cmm-role-head{
+    padding:9px 11px;
+    border-bottom:1px solid #352f29;
+    color:#dfbd7b;
+    font-size:.72rem;
+    font-weight:950;
+    letter-spacing:.05em;
+}
+
+.cmm-person{
+    display:grid;
+    grid-template-columns:auto 1fr;
+    gap:8px;
+    padding:9px 11px;
+    align-items:start;
+}
+
+.cmm-person + .cmm-person{
+    border-top:1px solid #2c2823;
+}
+
+.cmm-person-name{
+    font-weight:850;
+    color:#ddd5cb;
+}
+
+.cmm-person.active .cmm-person-name{
+    color:#8de2a9;
+}
+
+.cmm-person-note{
+    grid-column:2;
+    width:100%;
+    min-height:27px;
+    padding:5px 7px;
+    border:1px solid #3b3530;
+    border-radius:5px;
+    background:#0d0c0b;
+    color:#aaa198;
+    font-size:.6rem;
+}
+
+.cmm-table-wrap{
+    overflow:auto;
+    border:1px solid #3a342e;
+    border-radius:8px;
+}
+
+.cmm-table{
+    width:100%;
+    border-collapse:collapse;
+    min-width:1050px;
+}
+
+.cmm-table th{
+    position:sticky;
+    top:0;
+    z-index:2;
+    background:#201c18;
+    color:#b9ab98;
+    padding:7px 8px;
+    text-align:left;
+    font-size:.6rem;
+    letter-spacing:.04em;
+    border-bottom:1px solid #4a4138;
+}
+
+.cmm-table td{
+    padding:6px 8px;
+    border-bottom:1px solid #2b2723;
+    vertical-align:middle;
+    font-size:.66rem;
+}
+
+.cmm-table tr.cmm-active{
+    background:#13231a;
+}
+
+.cmm-equip{
+    display:grid;
+    grid-template-columns:105px minmax(150px,1fr);
+    gap:5px;
+    margin:3px 0;
+}
+
+.cmm-equip select,
+.cmm-equip input,
+.cmm-note-input{
+    width:100%;
+    box-sizing:border-box;
+    min-height:29px;
+    border:1px solid #484038;
+    border-radius:5px;
+    background:#0e0d0c;
+    color:#ddd4c8;
+    padding:4px 6px;
+    font-size:.62rem;
+}
+
+.cmm-material-groups{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+    gap:10px;
+}
+
+.cmm-material-card{
+    border:1px solid #403931;
+    border-radius:8px;
+    background:#171411;
+    padding:10px;
+}
+
+.cmm-material-card h3{
+    margin:0 0 8px;
+    color:#d7b878;
+    font-size:.68rem;
+    letter-spacing:.06em;
+}
+
+.cmm-material-item{
+    padding:6px 7px;
+    border-top:1px solid #2d2924;
+    color:#d0c8bd;
+    font-size:.64rem;
+}
+
+.cmm-material-item:first-of-type{
+    border-top:0;
+}
+
+.cmm-empty{
+    color:#847c73;
+    font-size:.65rem;
+    font-style:italic;
+}
+
+.cmm-footer{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:10px 14px;
+    border-top:1px solid #39322b;
+    background:#171411;
+}
+
+.cmm-footer-message{
+    flex:1;
+    color:#948a80;
+    font-size:.61rem;
+}
+
+.cmm-save{
+    border-color:#3d7d54 !important;
+    background:#17301f !important;
+    color:#9be0b1 !important;
+    font-weight:950 !important;
+}
+
+@media(max-width:760px){
+    .cmm-window{
+        width:100vw;
+        height:100vh;
+        border-radius:0;
+    }
+
+    .cmm-subtitle{
+        display:none;
+    }
+
+    .cmm-role-grid{
+        grid-template-columns:1fr;
+    }
+}
+
+</style>
+
+<div id="casting-material-manager" class="cmm-backdrop" aria-hidden="true">
+
+    <div class="cmm-window">
+
+        <div class="cmm-header">
+            <div>
+                <div class="cmm-title">CASTING &amp; MATÉRIEL</div>
+                <div class="cmm-subtitle">
+                    Administration de la distribution du Cue Editor
+                </div>
+            </div>
+
+            <div class="cmm-spacer"></div>
+
+            <button
+                type="button"
+                id="cmm-close"
+                class="cmm-close"
+                title="Fermer"
+            >×</button>
+        </div>
+
+        <div class="cmm-tabs">
+            <button type="button" class="cmm-tab active" data-tab="casting">
+                CASTING
+            </button>
+
+            <button type="button" class="cmm-tab" data-tab="assignments">
+                AFFECTATIONS
+            </button>
+
+            <button type="button" class="cmm-tab" data-tab="material">
+                MATÉRIEL
+            </button>
+        </div>
+
+        <div class="cmm-body">
+
+            <section
+                id="cmm-panel-casting"
+                class="cmm-panel active"
+            ></section>
+
+            <section
+                id="cmm-panel-assignments"
+                class="cmm-panel"
+            ></section>
+
+            <section
+                id="cmm-panel-material"
+                class="cmm-panel"
+            ></section>
+
+        </div>
+
+        <div class="cmm-footer">
+            <span id="cmm-footer-message" class="cmm-footer-message">
+                Les modifications utilisent directement la distribution du Cue Editor.
+            </span>
+
+            <button type="button" id="cmm-cancel">
+                FERMER
+            </button>
+
+            <button type="button" id="cmm-save" class="cmm-save">
+                ENREGISTRER
+            </button>
+        </div>
+
+    </div>
+</div>
+
+<script id="casting-material-manager-script">
+(function(){
+
+    const TYPES=['MICRO','IEM','ÉQUIPEMENT','AUTRE'];
+
+    const modal=document.getElementById('casting-material-manager');
+    const closeButton=document.getElementById('cmm-close');
+    const cancelButton=document.getElementById('cmm-cancel');
+    const saveButton=document.getElementById('cmm-save');
+    const footerMessage=document.getElementById('cmm-footer-message');
+
+    function distributionRows(){
+        const tbody=document.getElementById('distribution');
+        return tbody ? [...tbody.rows] : [];
+    }
+
+    function nodeValue(row,key){
+        const node=row.querySelector('[data-key="'+key+'"]');
+        if(!node)return '';
+
+        if(node.type==='checkbox'){
+            return Boolean(node.checked);
+        }
+
+        if(node.value!==undefined){
+            return String(node.value||'').trim();
+        }
+
+        return String(node.textContent||'').trim();
+    }
+
+    function setNodeValue(row,key,value){
+        const node=row.querySelector('[data-key="'+key+'"]');
+        if(!node)return;
+
+        if(node.type==='checkbox'){
+            node.checked=Boolean(value);
+            node.dispatchEvent(
+                new Event('change',{bubbles:true})
+            );
+            return;
+        }
+
+        if(node.value!==undefined){
+            node.value=value ?? '';
+            node.dispatchEvent(
+                new Event('input',{bubbles:true})
+            );
+        }else{
+            node.textContent=value ?? '';
+            node.dispatchEvent(
+                new Event('input',{bubbles:true})
+            );
+        }
+    }
+
+    function rowSlots(row){
+        return [...row.querySelectorAll('.equipment-slot')].map(slot=>({
+            type:String(
+                slot.querySelector('[data-slot-key="type"]')?.value ||
+                'ÉQUIPEMENT'
+            ),
+            value:String(
+                slot.querySelector('[data-slot-key="value"]')?.value || ''
+            ).trim()
+        })).filter(slot=>slot.value);
+    }
+
+    function ensureSlots(row,count){
+        const add=row.querySelector('.add-equipment');
+
+        while(
+            row.querySelectorAll('.equipment-slot').length < count &&
+            row.querySelectorAll('.equipment-slot').length < 8
+        ){
+            if(!add)break;
+            add.click();
+        }
+    }
+
+    function setSlot(row,index,type,value){
+        ensureSlots(row,index+1);
+
+        const slots=[...row.querySelectorAll('.equipment-slot')];
+        const slot=slots[index];
+
+        if(!slot)return;
+
+        const typeInput=slot.querySelector('[data-slot-key="type"]');
+        const valueInput=slot.querySelector('[data-slot-key="value"]');
+
+        if(typeInput){
+            typeInput.value=TYPES.includes(type)
+                ? type
+                : 'ÉQUIPEMENT';
+
+            typeInput.dispatchEvent(
+                new Event('change',{bubbles:true})
+            );
+        }
+
+        if(valueInput){
+            valueInput.value=value || '';
+            valueInput.dispatchEvent(
+                new Event('input',{bubbles:true})
+            );
+        }
+    }
+
+    function snapshot(){
+        return distributionRows().map((row,index)=>({
+            index,
+            role:nodeValue(row,'role'),
+            artist:nodeValue(row,'artist'),
+            active:Boolean(nodeValue(row,'active')),
+            notes:nodeValue(row,'notes'),
+            slots:rowSlots(row)
+        }));
+    }
+
+    function escapeHtml(value){
+        return String(value ?? '')
+            .replaceAll('&','&amp;')
+            .replaceAll('<','&lt;')
+            .replaceAll('>','&gt;')
+            .replaceAll('"','&quot;')
+            .replaceAll("'",'&#039;');
+    }
+
+    function grouped(data){
+        const result=new Map();
+
+        data.forEach(item=>{
+            const role=item.role || 'RÔLE NON RENSEIGNÉ';
+
+            if(!result.has(role)){
+                result.set(role,[]);
+            }
+
+            result.get(role).push(item);
+        });
+
+        return result;
+    }
+
+    function renderCasting(){
+        const target=document.getElementById('cmm-panel-casting');
+        const data=snapshot();
+        const groups=grouped(data);
+
+        let html='<div class="cmm-role-grid">';
+
+        [...groups.entries()]
+            .sort((a,b)=>a[0].localeCompare(b[0],'fr'))
+            .forEach(([role,people])=>{
+
+                html+=
+                    '<div class="cmm-role-card">'+
+                    '<div class="cmm-role-head">'+
+                    '<span>'+escapeHtml(role)+'</span>'+
+                    '<button type="button" '+
+                    'data-cmm-add-artist="'+escapeHtml(role)+'" '+
+                    'style="float:right;padding:3px 7px;font-size:.55rem;">'+
+                    '+ ARTISTE'+
+                    '</button>'+
+                    '</div>';
+
+                people.forEach(person=>{
+
+                    html+=
+                        '<div class="cmm-person '+
+                        (person.active?'active':'')+
+                        '">'+
+
+                        '<input '+
+                        'type="radio" '+
+                        'name="cmm-role-'+
+                        escapeHtml(role)+
+                        '" '+
+                        'data-cmm-index="'+person.index+'" '+
+                        (person.active?'checked':'')+
+                        '>'+
+
+                        '<div class="cmm-person-name">'+
+                        escapeHtml(
+                            person.artist ||
+                            'ARTISTE NON RENSEIGNÉ'
+                        )+
+                        '</div>'+
+
+                        '<button type="button" '+
+                        'data-cmm-remove-artist="'+person.index+'" '+
+                        'title="Supprimer cet artiste" '+
+                        'style="grid-column:3;padding:2px 7px;">×</button>'+
+
+                        '<input '+
+                        'class="cmm-person-note" '+
+                        'data-cmm-note="'+person.index+'" '+
+                        'value="'+escapeHtml(person.notes)+'" '+
+                        'placeholder="Observation">'+
+
+                        '</div>';
+                });
+
+                html+='</div>';
+            });
+
+        html+='</div>';
+
+        html+=
+            '<div style="margin-top:12px;">'+
+            '<button type="button" id="cmm-add-role">'+
+            '+ NOUVEAU RÔLE'+
+            '</button>'+
+            '</div>';
+
+        target.innerHTML=html;
+
+        target.querySelectorAll('input[type="radio"]')
+            .forEach(input=>{
+                input.addEventListener('change',()=>{
+
+                    if(!input.checked)return;
+
+                    const index=Number(
+                        input.dataset.cmmIndex
+                    );
+
+                    const row=distributionRows()[index];
+
+                    if(!row)return;
+
+                    const role=nodeValue(row,'role');
+
+                    distributionRows().forEach(other=>{
+                        if(nodeValue(other,'role')===role){
+                            setNodeValue(
+                                other,
+                                'active',
+                                other===row
+                            );
+                        }
+                    });
+
+                    if(typeof markDirty==='function'){
+                        markDirty();
+                    }
+
+                    renderAll();
+                });
+            });
+
+        target.querySelectorAll('[data-cmm-note]')
+            .forEach(input=>{
+                input.addEventListener('input',()=>{
+
+                    const index=Number(
+                        input.dataset.cmmNote
+                    );
+
+                    const row=distributionRows()[index];
+
+                    if(row){
+                        setNodeValue(
+                            row,
+                            'notes',
+                            input.value
+                        );
+
+                        if(typeof markDirty==='function'){
+                            markDirty();
+                        }
+                    }
+                });
+            });
+
+        target.querySelectorAll('[data-cmm-add-artist]')
+            .forEach(button=>{
+                button.onclick=()=>{
+
+                    const role=
+                        button.dataset.cmmAddArtist;
+
+                    const artist=String(
+                        window.prompt(
+                            'Nom du nouvel artiste pour '+role+' :'
+                        ) || ''
+                    ).trim();
+
+                    if(!artist)return;
+
+                    const duplicate=snapshot().some(item=>
+                        item.role.localeCompare(
+                            role,
+                            'fr',
+                            {sensitivity:'base'}
+                        )===0 &&
+                        item.artist.localeCompare(
+                            artist,
+                            'fr',
+                            {sensitivity:'base'}
+                        )===0
+                    );
+
+                    if(duplicate){
+                        footerMessage.textContent=
+                            'Cet artiste existe déjà pour ce rôle.';
+                        return;
+                    }
+
+                    const tbody=
+                        document.getElementById('distribution');
+
+                    tbody.append(
+                        distributionRow({
+                            role:role,
+                            artist:artist,
+                            active:false,
+                            equipment_slots:[],
+                            notes:''
+                        })
+                    );
+
+                    if(typeof markDirty==='function'){
+                        markDirty();
+                    }
+
+                    footerMessage.textContent=
+                        artist+
+                        ' ajouté à '+
+                        role+
+                        '. Cliquez ENREGISTRER pour confirmer.';
+
+                    renderAll();
+                };
+            });
+
+        target.querySelectorAll('[data-cmm-remove-artist]')
+            .forEach(button=>{
+                button.onclick=()=>{
+
+                    const index=Number(
+                        button.dataset.cmmRemoveArtist
+                    );
+
+                    const current=snapshot()[index];
+                    const row=distributionRows()[index];
+
+                    if(!current || !row)return;
+
+                    const ok=window.confirm(
+                        'Supprimer '+
+                        current.artist+
+                        ' du rôle '+
+                        current.role+
+                        ' ?'
+                    );
+
+                    if(!ok)return;
+
+                    row.remove();
+
+                    if(typeof markDirty==='function'){
+                        markDirty();
+                    }
+
+                    footerMessage.textContent=
+                        current.artist+
+                        ' supprimé. Cliquez ENREGISTRER pour confirmer.';
+
+                    renderAll();
+                };
+            });
+
+        const addRole=
+            document.getElementById('cmm-add-role');
+
+        if(addRole){
+            addRole.onclick=()=>{
+
+                const role=String(
+                    window.prompt('Nom du nouveau rôle :') || ''
+                ).trim();
+
+                if(!role)return;
+
+                const artist=String(
+                    window.prompt(
+                        'Premier artiste pour '+role+' :'
+                    ) || ''
+                ).trim();
+
+                if(!artist)return;
+
+                const existing=snapshot().some(item=>
+                    item.role.localeCompare(
+                        role,
+                        'fr',
+                        {sensitivity:'base'}
+                    )===0
+                );
+
+                if(existing){
+                    footerMessage.textContent=
+                        'Ce rôle existe déjà. Utilisez + ARTISTE.';
+                    return;
+                }
+
+                document.getElementById('distribution').append(
+                    distributionRow({
+                        role:role,
+                        artist:artist,
+                        active:true,
+                        equipment_slots:[],
+                        notes:''
+                    },true)
+                );
+
+                if(typeof markDirty==='function'){
+                    markDirty();
+                }
+
+                footerMessage.textContent=
+                    'Rôle '+
+                    role+
+                    ' créé avec '+
+                    artist+
+                    '. Cliquez ENREGISTRER pour confirmer.';
+
+                renderAll();
+            };
+        }
+    }
+
+    function renderAssignments(){
+        const target=
+            document.getElementById('cmm-panel-assignments');
+
+        const data=snapshot();
+
+        const catalog=Array.isArray(documentData.equipment_catalog)
+            ? documentData.equipment_catalog
+            : [];
+
+        const listId='cmm-equipment-catalog-values';
+
+        const values=[
+            ...new Set(
+                catalog
+                    .map(item=>String(item.value||'').trim())
+                    .filter(Boolean)
+            )
+        ].sort((a,b)=>a.localeCompare(b,'fr'));
+
+        let html=
+            '<datalist id="'+listId+'">'+
+            values.map(value=>
+                '<option value="'+escapeHtml(value)+'"></option>'
+            ).join('')+
+            '</datalist>'+
+
+            '<div class="cmm-table-wrap">'+
+            '<table class="cmm-table">'+
+            '<thead><tr>'+
+            '<th>RÔLE</th>'+
+            '<th>ARTISTE</th>'+
+            '<th>ACTIF</th>'+
+            '<th>ÉQUIPEMENT 1</th>'+
+            '<th>ÉQUIPEMENT 2</th>'+
+            '<th>ÉQUIPEMENT 3</th>'+
+            '<th>ÉQUIPEMENT 4</th>'+
+            '<th>OBSERVATION</th>'+
+            '</tr></thead><tbody>';
+
+        data.forEach(item=>{
+
+            html+=
+                '<tr class="'+
+                (item.active?'cmm-active':'')+
+                '">'+
+                '<td>'+escapeHtml(item.role)+'</td>'+
+                '<td>'+escapeHtml(item.artist)+'</td>'+
+                '<td>'+
+                (item.active?'✓':'—')+
+                '</td>';
+
+            for(let i=0;i<4;i++){
+
+                const slot=item.slots[i] || {
+                    type:'ÉQUIPEMENT',
+                    value:''
+                };
+
+                html+=
+                    '<td>'+
+                    '<div class="cmm-equip">'+
+
+                    '<select '+
+                    'data-cmm-slot-type="'+item.index+':'+i+'">'+
+                    TYPES.map(type=>
+                        '<option value="'+
+                        escapeHtml(type)+
+                        '" '+
+                        (type===slot.type?'selected':'')+
+                        '>'+
+                        escapeHtml(type)+
+                        '</option>'
+                    ).join('')+
+                    '</select>'+
+
+                    '<input '+
+                    'list="'+listId+'" '+
+                    'data-cmm-slot-value="'+item.index+':'+i+'" '+
+                    'value="'+escapeHtml(slot.value)+'" '+
+                    'placeholder="Aucun">'+
+
+                    '</div>'+
+                    '</td>';
+            }
+
+            html+=
+                '<td>'+
+                '<input '+
+                'class="cmm-note-input" '+
+                'data-cmm-assignment-note="'+item.index+'" '+
+                'value="'+escapeHtml(item.notes)+'" '+
+                'placeholder="Observation">'+
+                '</td>'+
+                '</tr>';
+        });
+
+        html+='</tbody></table></div>';
+
+        target.innerHTML=html;
+
+        target
+            .querySelectorAll('[data-cmm-slot-type]')
+            .forEach(select=>{
+
+                select.addEventListener('change',()=>{
+
+                    const [rowIndex,slotIndex]=
+                        select.dataset.cmmSlotType
+                            .split(':')
+                            .map(Number);
+
+                    const valueInput=target.querySelector(
+                        '[data-cmm-slot-value="'+
+                        rowIndex+':'+slotIndex+
+                        '"]'
+                    );
+
+                    const row=distributionRows()[rowIndex];
+
+                    if(row){
+                        setSlot(
+                            row,
+                            slotIndex,
+                            select.value,
+                            valueInput?.value || ''
+                        );
+                    }
+
+                    if(typeof markDirty==='function'){
+                        markDirty();
+                    }
+
+                    renderMaterial();
+                });
+            });
+
+        target
+            .querySelectorAll('[data-cmm-slot-value]')
+            .forEach(input=>{
+
+                input.addEventListener('change',()=>{
+
+                    const [rowIndex,slotIndex]=
+                        input.dataset.cmmSlotValue
+                            .split(':')
+                            .map(Number);
+
+                    const typeSelect=target.querySelector(
+                        '[data-cmm-slot-type="'+
+                        rowIndex+':'+slotIndex+
+                        '"]'
+                    );
+
+                    const row=distributionRows()[rowIndex];
+
+                    if(row){
+                        setSlot(
+                            row,
+                            slotIndex,
+                            typeSelect?.value || 'ÉQUIPEMENT',
+                            input.value
+                        );
+                    }
+
+                    if(typeof markDirty==='function'){
+                        markDirty();
+                    }
+
+                    renderMaterial();
+                });
+            });
+
+        target
+            .querySelectorAll('[data-cmm-assignment-note]')
+            .forEach(input=>{
+
+                input.addEventListener('input',()=>{
+
+                    const index=Number(
+                        input.dataset.cmmAssignmentNote
+                    );
+
+                    const row=distributionRows()[index];
+
+                    if(row){
+                        setNodeValue(
+                            row,
+                            'notes',
+                            input.value
+                        );
+
+                        if(typeof markDirty==='function'){
+                            markDirty();
+                        }
+                    }
+                });
+            });
+    }
+
+    function renderMaterial(){
+        const target=
+            document.getElementById('cmm-panel-material');
+
+        if(!Array.isArray(documentData.equipment_catalog)){
+            documentData.equipment_catalog=[];
+        }
+
+        /* Migration locale complémentaire :
+           ajoute au catalogue tout matériel déjà affecté. */
+        snapshot().forEach(item=>{
+            item.slots.forEach(slot=>{
+                if(!slot.value)return;
+
+                const exists=
+                    documentData.equipment_catalog.some(entry=>
+                        String(entry.type||'').toLocaleUpperCase('fr')===
+                            String(slot.type||'').toLocaleUpperCase('fr') &&
+                        String(entry.value||'').toLocaleLowerCase('fr')===
+                            String(slot.value||'').toLocaleLowerCase('fr')
+                    );
+
+                if(!exists){
+                    documentData.equipment_catalog.push({
+                        type:slot.type || 'ÉQUIPEMENT',
+                        value:slot.value
+                    });
+                }
+            });
+        });
+
+        documentData.equipment_catalog.sort((a,b)=>
+            String(a.type||'').localeCompare(
+                String(b.type||''),
+                'fr'
+            ) ||
+            String(a.value||'').localeCompare(
+                String(b.value||''),
+                'fr'
+            )
+        );
+
+        const usageCount=(entry)=>{
+            let count=0;
+
+            snapshot().forEach(item=>{
+                item.slots.forEach(slot=>{
+                    if(
+                        String(slot.type||'').toLocaleUpperCase('fr')===
+                            String(entry.type||'').toLocaleUpperCase('fr') &&
+                        String(slot.value||'').toLocaleLowerCase('fr')===
+                            String(entry.value||'').toLocaleLowerCase('fr')
+                    ){
+                        count++;
+                    }
+                });
+            });
+
+            return count;
+        };
+
+        let html=
+            '<div style="display:grid;grid-template-columns:140px minmax(220px,1fr) auto;gap:7px;margin-bottom:14px;">'+
+
+            '<select id="cmm-new-material-type">'+
+            TYPES.map(type=>
+                '<option value="'+escapeHtml(type)+'">'+
+                escapeHtml(type)+
+                '</option>'
+            ).join('')+
+            '</select>'+
+
+            '<input id="cmm-new-material-value" '+
+            'placeholder="Nom du nouveau matériel">'+
+
+            '<button type="button" id="cmm-add-material">'+
+            '+ AJOUTER'+
+            '</button>'+
+
+            '</div>';
+
+        html+=
+            '<div style="color:#9d948a;font-size:.62rem;margin-bottom:8px;">'+
+            '<strong>BIBLIOTHÈQUE MATÉRIEL DU SPECTACLE</strong><br>'+
+            'Un matériel peut exister ici sans être affecté à un artiste.'+
+            '</div>';
+
+        if(!documentData.equipment_catalog.length){
+            html+=
+                '<div class="cmm-empty">'+
+                'Aucun matériel dans le catalogue.'+
+                '</div>';
+        }
+
+        documentData.equipment_catalog.forEach((entry,index)=>{
+
+            const used=usageCount(entry);
+
+            html+=
+                '<div style="display:grid;grid-template-columns:140px minmax(220px,1fr) auto auto;gap:7px;align-items:center;padding:8px 0;border-top:1px solid #2d2924;">'+
+
+                '<select data-catalog-type="'+index+'">'+
+                TYPES.map(type=>
+                    '<option value="'+escapeHtml(type)+'" '+
+                    (type===entry.type?'selected':'')+
+                    '>'+
+                    escapeHtml(type)+
+                    '</option>'
+                ).join('')+
+                '</select>'+
+
+                '<input data-catalog-value="'+index+'" '+
+                'value="'+escapeHtml(entry.value)+'">'+
+
+                '<button type="button" data-catalog-save="'+index+'">'+
+                'APPLIQUER'+
+                '</button>'+
+
+                '<button type="button" data-catalog-delete="'+index+'" '+
+                (used ? 'disabled ' : '')+
+                'title="'+
+                (used
+                    ? 'Matériel encore affecté'
+                    : 'Supprimer du catalogue')+
+                '">'+
+                'SUPPRIMER'+
+                '</button>'+
+
+                '<div style="grid-column:2 / -1;color:#837b72;font-size:.56rem;">'+
+                (used
+                    ? 'Utilisé dans '+used+' affectation(s)'
+                    : 'Non affecté')+
+                '</div>'+
+
+                '</div>';
+        });
+
+        target.innerHTML=html;
+
+        const add=
+            document.getElementById('cmm-add-material');
+
+        if(add){
+            add.onclick=()=>{
+
+                const type=
+                    document.getElementById(
+                        'cmm-new-material-type'
+                    ).value;
+
+                const value=String(
+                    document.getElementById(
+                        'cmm-new-material-value'
+                    ).value || ''
+                ).trim();
+
+                if(!value){
+                    footerMessage.textContent=
+                        'Saisissez un nom de matériel.';
+                    return;
+                }
+
+                const exists=
+                    documentData.equipment_catalog.some(entry=>
+                        String(entry.type||'').toLocaleUpperCase('fr')===
+                            type.toLocaleUpperCase('fr') &&
+                        String(entry.value||'').toLocaleLowerCase('fr')===
+                            value.toLocaleLowerCase('fr')
+                    );
+
+                if(exists){
+                    footerMessage.textContent=
+                        'Ce matériel existe déjà.';
+                    return;
+                }
+
+                documentData.equipment_catalog.push({
+                    type,
+                    value
+                });
+
+                if(typeof markDirty==='function'){
+                    markDirty();
+                }
+
+                footerMessage.textContent=
+                    value+
+                    ' ajouté au catalogue. Cliquez ENREGISTRER pour confirmer.';
+
+                renderMaterial();
+                renderAssignments();
+            };
+        }
+
+        target.querySelectorAll('[data-catalog-save]')
+            .forEach(button=>{
+
+                button.onclick=()=>{
+
+                    const index=Number(
+                        button.dataset.catalogSave
+                    );
+
+                    const oldEntry={
+                        ...documentData.equipment_catalog[index]
+                    };
+
+                    const newType=
+                        target.querySelector(
+                            '[data-catalog-type="'+index+'"]'
+                        ).value;
+
+                    const newValue=String(
+                        target.querySelector(
+                            '[data-catalog-value="'+index+'"]'
+                        ).value || ''
+                    ).trim();
+
+                    if(!newValue){
+                        footerMessage.textContent=
+                            'Le nom du matériel ne peut pas être vide.';
+                        return;
+                    }
+
+                    /* Si le matériel est déjà affecté,
+                       on répercute son renommage. */
+                    distributionRows().forEach(row=>{
+                        row.querySelectorAll('.equipment-slot')
+                            .forEach(slot=>{
+
+                                const typeInput=
+                                    slot.querySelector(
+                                        '[data-slot-key="type"]'
+                                    );
+
+                                const valueInput=
+                                    slot.querySelector(
+                                        '[data-slot-key="value"]'
+                                    );
+
+                                if(
+                                    typeInput.value===oldEntry.type &&
+                                    valueInput.value.trim()===oldEntry.value
+                                ){
+                                    typeInput.value=newType;
+                                    valueInput.value=newValue;
+                                }
+                            });
+                    });
+
+                    documentData.equipment_catalog[index]={
+                        type:newType,
+                        value:newValue
+                    };
+
+                    if(typeof markDirty==='function'){
+                        markDirty();
+                    }
+
+                    footerMessage.textContent=
+                        'Matériel modifié. Cliquez ENREGISTRER pour confirmer.';
+
+                    renderAssignments();
+                    renderMaterial();
+                };
+            });
+
+        target.querySelectorAll('[data-catalog-delete]')
+            .forEach(button=>{
+
+                button.onclick=()=>{
+
+                    if(button.disabled)return;
+
+                    const index=Number(
+                        button.dataset.catalogDelete
+                    );
+
+                    const entry=
+                        documentData.equipment_catalog[index];
+
+                    if(!entry)return;
+
+                    if(!window.confirm(
+                        'Supprimer '+entry.value+' du catalogue ?'
+                    )){
+                        return;
+                    }
+
+                    documentData.equipment_catalog.splice(
+                        index,
+                        1
+                    );
+
+                    if(typeof markDirty==='function'){
+                        markDirty();
+                    }
+
+                    footerMessage.textContent=
+                        'Matériel supprimé du catalogue. '+
+                        'Clique ENREGISTRER pour confirmer.';
+
+                    renderMaterial();
+                    renderAssignments();
+                };
+            });
+    }
+
+    function renderAll(){
+        renderCasting();
+        renderAssignments();
+        renderMaterial();
+    }
+
+    function openManager(){
+        renderAll();
+        modal.classList.add('open');
+        modal.setAttribute('aria-hidden','false');
+        document.body.style.overflow='hidden';
+    }
+
+    function closeManager(){
+        modal.classList.remove('open');
+        modal.setAttribute('aria-hidden','true');
+        document.body.style.overflow='';
+    }
+
+    function installToolsButton(){
+
+        const outils=[...document.querySelectorAll('.cue-v2-menu')]
+            .find(details=>
+                details.querySelector(':scope > summary')
+                    ?.textContent
+                    .trim()
+                    .startsWith('OUTILS')
+            );
+
+        const panel=outils?.querySelector('.cue-v2-menu-panel');
+
+        if(!panel)return false;
+
+        if(document.getElementById('cmm-open')){
+            return true;
+        }
+
+        const button=document.createElement('button');
+        button.type='button';
+        button.id='cmm-open';
+        button.className='cmm-open-button';
+        button.textContent='CASTING & MATÉRIEL';
+
+        button.onclick=()=>{
+            outils.open=false;
+            openManager();
+        };
+
+        panel.prepend(button);
+
+        return true;
+    }
+
+    document
+        .querySelectorAll('.cmm-tab')
+        .forEach(button=>{
+
+            button.onclick=()=>{
+
+                document
+                    .querySelectorAll('.cmm-tab')
+                    .forEach(item=>
+                        item.classList.toggle(
+                            'active',
+                            item===button
+                        )
+                    );
+
+                document
+                    .querySelectorAll('.cmm-panel')
+                    .forEach(panel=>
+                        panel.classList.toggle(
+                            'active',
+                            panel.id===
+                            'cmm-panel-'+button.dataset.tab
+                        )
+                    );
+
+                if(button.dataset.tab==='material'){
+                    renderMaterial();
+                }
+            };
+        });
+
+    closeButton.onclick=closeManager;
+    cancelButton.onclick=closeManager;
+
+    modal.addEventListener('click',event=>{
+        if(event.target===modal){
+            closeManager();
+        }
+    });
+
+    document.addEventListener('keydown',event=>{
+        if(event.key==='Escape' && modal.classList.contains('open')){
+            closeManager();
+        }
+    });
+
+    saveButton.onclick=async()=>{
+
+        if(typeof save!=='function'){
+            footerMessage.textContent=
+                'ERREUR : fonction de sauvegarde indisponible.';
+            return;
+        }
+
+        saveButton.disabled=true;
+        footerMessage.textContent='ENREGISTREMENT…';
+
+        try{
+            await save();
+
+            footerMessage.textContent=
+                '✓ CASTING ET MATÉRIEL ENREGISTRÉS';
+
+            renderAll();
+
+        }catch(error){
+
+            footerMessage.textContent=
+                'ERREUR : '+error.message;
+
+        }finally{
+            saveButton.disabled=false;
+        }
+    };
+
+    if(!installToolsButton()){
+        setTimeout(installToolsButton,250);
+        setTimeout(installToolsButton,1000);
+    }
+
+})();
+</script>
+
+
+<style id="showcue-cue-micro-selector-v1-style">
+
+.cue-micro-selector{
+    width:100%;
+    min-width:145px;
+    max-width:220px;
+    border:1px solid #4c443b;
+    border-radius:5px;
+    background:#0f0d0b;
+    color:#ddd4c8;
+    padding:5px 6px;
+    font-size:.61rem;
+}
+
+.cue-micro-selector.micro-required{
+    border-color:#9a673c;
+    background:#25190e;
+    color:#f1c889;
+}
+
+.cue-micro-selector.micro-selected{
+    border-color:#427253;
+    background:#102018;
+    color:#a8dfba;
+}
+
+</style>
+
+<script id="showcue-cue-micro-selector-v1">
+(function(){
+
+    function norm(value){
+        return String(value || '')
+            .trim()
+            .toLocaleLowerCase('fr');
+    }
+
+    function distributionForRole(role){
+        const data=Array.isArray(documentData?.distribution)
+            ? documentData.distribution
+            : [];
+
+        return data.filter(item=>
+            norm(item.role)===norm(role)
+        );
+    }
+
+    function activeDistributionForRole(role){
+        const rows=distributionForRole(role);
+
+        return rows.find(item=>item.active) || null;
+    }
+
+    function microsForRole(role){
+        const active=activeDistributionForRole(role);
+
+        if(!active)return [];
+
+        return (active.equipment_slots || [])
+            .filter(slot=>
+                String(slot.type || '')
+                    .trim()
+                    .toLocaleUpperCase('fr')==='MICRO'
+            )
+            .map(slot=>String(slot.value || '').trim())
+            .filter(Boolean);
+    }
+
+    function replaceMicroCell(row){
+        const cell=row.querySelector('[data-key="microphone"]');
+
+        if(!cell)return;
+
+        if(cell.tagName==='SELECT' &&
+           cell.classList.contains('cue-micro-selector')){
+            return;
+        }
+
+        const roleNode=row.querySelector('[data-key="role"]');
+
+        const role=String(
+            roleNode?.value !== undefined
+                ? roleNode.value
+                : roleNode?.textContent || ''
+        ).trim();
+
+        const current=String(
+            cell.value !== undefined
+                ? cell.value
+                : cell.textContent || ''
+        ).trim();
+
+        const micros=microsForRole(role);
+
+        const select=document.createElement('select');
+
+        select.dataset.key='microphone';
+        select.className='cue-micro-selector';
+
+        const auto=document.createElement('option');
+        auto.value='';
+
+        if(micros.length===0){
+            auto.textContent='— AUCUN MICRO —';
+        }else if(micros.length===1){
+            auto.textContent='— AUTO : '+micros[0]+' —';
+        }else{
+            auto.textContent='— MICRO À DÉFINIR —';
+        }
+
+        select.append(auto);
+
+        micros.forEach(value=>{
+            select.append(
+                new Option(value,value)
+            );
+        });
+
+        if(
+            current &&
+            !micros.some(value=>norm(value)===norm(current))
+        ){
+            select.append(
+                new Option(
+                    current+' · HORS AFFECTATION',
+                    current
+                )
+            );
+        }
+
+        select.value=current;
+
+        const refreshClass=()=>{
+            select.classList.toggle(
+                'micro-selected',
+                Boolean(select.value)
+            );
+
+            select.classList.toggle(
+                'micro-required',
+                !select.value && micros.length>1
+            );
+
+            select.title=
+                micros.length>1 && !select.value
+                ? 'Plusieurs micros disponibles : choisissez celui utilisé sur ce cue.'
+                : '';
+        };
+
+        select.addEventListener('change',()=>{
+            refreshClass();
+
+            if(typeof markDirty==='function'){
+                markDirty();
+            }
+        });
+
+        refreshClass();
+
+        cell.replaceWith(select);
+    }
+
+    function refreshCueMicroSelectors(){
+        const body=document.getElementById('cues');
+
+        if(!body)return;
+
+        [...body.rows].forEach(replaceMicroCell);
+    }
+
+    const previousRender=render;
+
+    render=function(){
+        const result=previousRender.apply(this,arguments);
+
+        refreshCueMicroSelectors();
+
+        return result;
+    };
+
+    const cues=document.getElementById('cues');
+
+    if(cues){
+        cues.addEventListener('input',event=>{
+            if(event.target.dataset.key==='role'){
+                setTimeout(refreshCueMicroSelectors,0);
+            }
+        });
+
+        cues.addEventListener('change',event=>{
+            if(event.target.dataset.key==='role'){
+                setTimeout(refreshCueMicroSelectors,0);
+            }
+        });
+
+        new MutationObserver(()=>{
+            refreshCueMicroSelectors();
+        }).observe(cues,{
+            childList:true,
+            subtree:false
+        });
+    }
+
+    setTimeout(refreshCueMicroSelectors,100);
+
+})();
+</script>
+
+
+<style id="showcue-builder-bulk-role-v1-style">
+
+.builder-role-control{
+    width:100%;
+    min-width:120px;
+    border:1px solid #4c443b;
+    border-radius:5px;
+    background:#100e0c;
+    color:#e7ded2;
+    padding:5px 6px;
+    font-size:.64rem;
+    font-weight:800;
+}
+
+.builder-role-control.role-empty{
+    border-color:#7c5838;
+    color:#c99f70;
+}
+
+.builder-role-cell{
+    position:relative;
+}
+
+.builder-bulk-cue-check{
+    width:15px;
+    height:15px;
+    margin:0 6px 0 0;
+    vertical-align:middle;
+    accent-color:#c79b50;
+}
+
+#builder-bulk-role-bar{
+    position:sticky;
+    top:0;
+    z-index:20;
+
+    display:flex;
+    align-items:center;
+    flex-wrap:wrap;
+    gap:7px;
+
+    margin:0 0 9px;
+    padding:7px 9px;
+
+    border:1px solid #494138;
+    border-radius:8px;
+
+    background:#171411f2;
+    backdrop-filter:blur(10px);
+}
+
+#builder-bulk-role-bar select{
+    min-width:145px;
+}
+
+#builder-bulk-role-count{
+    min-width:82px;
+    color:#c5b9aa;
+    font-size:.65rem;
+    font-weight:900;
+}
+
+#builder-bulk-role-apply{
+    border-color:#85672f;
+    background:#4a3515;
+    color:#ffe1a7;
+}
+
+#builder-bulk-role-unassign{
+    border-color:#754d49;
+    background:#321b19;
+    color:#e7aaa3;
+}
+
+</style>
+
+<script id="showcue-builder-bulk-role-v1">
+(function(){
+
+    const cuesBody=document.getElementById('cues');
+
+    if(!cuesBody)return;
+
+    /*
+     * Sélection temporaire des cues.
+     * Elle survit aux render() / autosaves mais n'est pas enregistrée
+     * dans les données métier.
+     */
+    const selectedCueIds=new Set();
+
+    function norm(value){
+        return String(value || '')
+            .trim()
+            .toLocaleLowerCase('fr');
+    }
+
+    function readValue(node){
+        if(!node)return '';
+
+        return String(
+            node.value !== undefined
+                ? node.value
+                : node.textContent || ''
+        ).trim();
+    }
+
+    function roles(){
+        const values=[];
+
+        const distributionBody=
+            document.getElementById('distribution');
+
+        if(distributionBody){
+            [...distributionBody.rows].forEach(row=>{
+                const node=row.querySelector('[data-key="role"]');
+                const value=readValue(node);
+
+                if(
+                    value &&
+                    !values.some(item=>norm(item)===norm(value))
+                ){
+                    values.push(value);
+                }
+            });
+        }
+
+        return values.sort((a,b)=>a.localeCompare(b,'fr'));
+    }
+
+    function makeRoleSelect(current){
+        const select=document.createElement('select');
+
+        select.dataset.key='role';
+        select.className='builder-role-control';
+
+        select.append(new Option('— RÔLE —',''));
+
+        roles().forEach(role=>{
+            select.append(new Option(role,role));
+        });
+
+        if(
+            current &&
+            ![...select.options].some(
+                option=>norm(option.value)===norm(current)
+            )
+        ){
+            select.append(
+                new Option(current+' · À VÉRIFIER',current)
+            );
+        }
+
+        select.value=current || '';
+
+        select.classList.toggle(
+            'role-empty',
+            !select.value
+        );
+
+        select.addEventListener('change',()=>{
+            select.classList.toggle(
+                'role-empty',
+                !select.value
+            );
+
+            /*
+             * Les overrides existants ne sont PAS supprimés.
+             * On ne détruit donc aucune saisie déjà faite.
+             */
+            select.dispatchEvent(
+                new Event('input',{bubbles:true})
+            );
+
+            if(typeof markDirty==='function'){
+                markDirty();
+            }
+        });
+
+        return select;
+    }
+
+    function enhanceRow(row){
+
+        const roleNode=
+            row.querySelector('[data-key="role"]');
+
+        if(!roleNode)return;
+
+        const cell=roleNode.closest('td');
+
+        if(!cell)return;
+
+        cell.classList.add('builder-role-cell');
+
+        if(!cell.querySelector('.builder-bulk-cue-check')){
+            const check=document.createElement('input');
+
+            check.type='checkbox';
+            check.className='builder-bulk-cue-check';
+            check.title='Sélectionner ce cue';
+
+            check.checked=
+                selectedCueIds.has(row.dataset.id);
+
+            check.addEventListener(
+                'change',
+                event=>{
+                    /*
+                     * Ne surtout pas laisser cet événement atteindre
+                     * le listener global du tableau : cette case sert
+                     * uniquement à la sélection en masse.
+                     */
+                    event.stopPropagation();
+
+                    if(check.checked){
+                        selectedCueIds.add(row.dataset.id);
+                    }else{
+                        selectedCueIds.delete(row.dataset.id);
+                    }
+
+                    updateCount();
+                }
+            );
+
+            check.addEventListener(
+                'input',
+                event=>event.stopPropagation()
+            );
+
+            cell.insertBefore(check,roleNode);
+        }
+
+        const bulkCheck=
+            cell.querySelector('.builder-bulk-cue-check');
+
+        if(bulkCheck){
+            bulkCheck.checked=
+                selectedCueIds.has(row.dataset.id);
+        }
+
+        if(
+            roleNode.tagName!=='SELECT' ||
+            !roleNode.classList.contains(
+                'builder-role-control'
+            )
+        ){
+            const current=readValue(roleNode);
+            const select=makeRoleSelect(current);
+
+            roleNode.replaceWith(select);
+        }
+    }
+
+    function enhanceRows(){
+        [...cuesBody.rows].forEach(enhanceRow);
+        refreshBulkRoles();
+        updateCount();
+    }
+
+    function selectedRows(){
+        return [...cuesBody.rows].filter(
+            row=>
+                row.querySelector(
+                    '.builder-bulk-cue-check'
+                )?.checked
+        );
+    }
+
+    function visibleRows(){
+        return [...cuesBody.rows].filter(
+            row=>!row.hidden
+        );
+    }
+
+    function updateCount(){
+        const count=
+            document.getElementById(
+                'builder-bulk-role-count'
+            );
+
+        if(count){
+            count.textContent=
+                selectedRows().length+
+                ' sélectionné(s)';
+        }
+    }
+
+    /* --------------------------------------------------------
+       BARRE D'AFFECTATION
+       -------------------------------------------------------- */
+
+    const bar=document.createElement('div');
+    bar.id='builder-bulk-role-bar';
+
+    const count=document.createElement('span');
+    count.id='builder-bulk-role-count';
+
+    const all=document.createElement('button');
+    all.type='button';
+    all.textContent='✓ TOUS VISIBLES';
+
+    const none=document.createElement('button');
+    none.type='button';
+    none.textContent='AUCUN';
+
+    const select=document.createElement('select');
+    select.id='builder-bulk-role-select';
+
+    const apply=document.createElement('button');
+    apply.type='button';
+    apply.id='builder-bulk-role-apply';
+    apply.textContent='REMPLACER PAR LE RÔLE';
+
+    const addRole=document.createElement('button');
+    addRole.type='button';
+    addRole.id='builder-bulk-role-add';
+    addRole.textContent='AJOUTER LE RÔLE';
+
+    const unassign=document.createElement('button');
+    unassign.type='button';
+    unassign.id='builder-bulk-role-unassign';
+    unassign.textContent='DÉSAFFECTER LE RÔLE';
+
+    bar.append(
+        count,
+        all,
+        none,
+        select,
+        apply,
+        addRole,
+        unassign
+    );
+
+    const table=cuesBody.closest('table');
+    const wrap=table?.parentElement;
+
+    if(wrap){
+        wrap.parentElement.insertBefore(
+            bar,
+            wrap
+        );
+    }
+
+    function refreshBulkRoles(){
+        const previous=select.value;
+
+        select.innerHTML='';
+        select.append(
+            new Option('— CHOISIR RÔLE —',''),
+            new Option('— AUCUN RÔLE —','__NONE__')
+        );
+
+        roles().forEach(role=>
+            select.append(
+                new Option(role,role)
+            )
+        );
+
+        if(
+            [...select.options].some(
+                option=>option.value===previous
+            )
+        ){
+            select.value=previous;
+        }
+    }
+
+    all.onclick=()=>{
+        visibleRows().forEach(row=>{
+            const check=
+                row.querySelector(
+                    '.builder-bulk-cue-check'
+                );
+
+            if(check){
+                check.checked=true;
+                selectedCueIds.add(row.dataset.id);
+            }
+        });
+
+        updateCount();
+    };
+
+    none.onclick=()=>{
+        [...cuesBody.rows].forEach(row=>{
+            const check=
+                row.querySelector(
+                    '.builder-bulk-cue-check'
+                );
+
+            if(check){
+                check.checked=false;
+                selectedCueIds.delete(row.dataset.id);
+            }
+        });
+
+        updateCount();
+    };
+
+    // CL_SHOWCUE_ROLE_CLEAR_SYNC_V1
+    function syncCueRoleImmediately(row,nextRole){
+        if(!row || !documentData || !Array.isArray(documentData.cues)){
+            return;
+        }
+
+        const id=String(row.dataset.id || '');
+
+        const cue=documentData.cues.find(
+            item=>String(item.id || '')===id
+        );
+
+        if(!cue)return;
+
+        cue.role=String(nextRole || '');
+
+        try{
+            const assignments=JSON.parse(
+                row.dataset.roleAssignments || '{}'
+            );
+
+            if(
+                assignments &&
+                typeof assignments==='object' &&
+                Object.keys(assignments).length
+            ){
+                cue.role_assignments=assignments;
+            }else{
+                delete cue.role_assignments;
+            }
+        }catch(_){
+            delete cue.role_assignments;
+        }
+    }
+
+
+    apply.onclick=()=>{
+
+        const role=select.value;
+        const rows=selectedRows();
+        const clearRole=(role==='__NONE__');
+
+        if(!role){
+            window.alert(
+                'Choisis d’abord un rôle.'
+            );
+            return;
+        }
+
+        if(!rows.length){
+            window.alert(
+                'Sélectionne au moins un cue.'
+            );
+            return;
+        }
+
+        const ok=window.confirm(
+            clearRole
+                ? 'Supprimer le rôle de '+
+                  rows.length+
+                  ' cue(s) ?'
+                : 'Affecter le rôle « '+
+                  role+
+                  ' » à '+
+                  rows.length+
+                  ' cue(s) ?'
+        );
+
+        if(!ok)return;
+
+        rows.forEach(row=>{
+
+            const control=
+                row.querySelector(
+                    '[data-key="role"]'
+                );
+
+            if(!control)return;
+
+            const nextRole=clearRole ? '' : role;
+
+            if(control.tagName==='SELECT'){
+
+                if(
+                    ![...control.options].some(
+                        option=>option.value===nextRole
+                    )
+                ){
+                    control.append(
+                        new Option(
+                            clearRole
+                                ? '— AUCUN RÔLE —'
+                                : nextRole,
+                            nextRole
+                        )
+                    );
+                }
+
+                control.value=nextRole;
+
+            }else{
+                control.textContent=nextRole;
+            }
+
+            control.classList.toggle(
+                'role-empty',
+                clearRole
+            );
+
+            if(clearRole){
+                row.dataset.roleAssignments='{}';
+            }
+
+            /*
+             * Important :
+             * le change peut provoquer un rerender.
+             * On met donc documentData à jour AVANT.
+             */
+            syncCueRoleImmediately(
+                row,
+                nextRole
+            );
+
+            control.dispatchEvent(
+                new Event(
+                    'change',
+                    {bubbles:true}
+                )
+            );
+        });
+
+        if(typeof markDirty==='function'){
+            markDirty();
+        }
+
+        /*
+         * On laisse les lignes cochées :
+         * pratique pour affecter ensuite un autre paramètre.
+         */
+        updateCount();
+
+        const message=
+            document.getElementById('message');
+
+        if(message){
+            message.textContent=
+                role+
+                ' affecté à '+
+                rows.length+
+                ' cue(s).';
+        }
+    };
+
+
+
+    addRole.onclick=()=>{
+
+        const role=String(select.value || '').trim();
+        const rows=selectedRows();
+
+        if(!role){
+            alert('Choisis un rôle à ajouter.');
+            return;
+        }
+
+        if(!rows.length){
+            alert('Sélectionne au moins un cue.');
+            return;
+        }
+
+        rows.forEach(row=>{
+
+            const control=row.querySelector('[data-key="role"]');
+            if(!control)return;
+
+            const current=String(
+                control.value !== undefined
+                    ? control.value
+                    : control.textContent || ''
+            ).trim();
+
+            const roles=current
+                .split('/')
+                .map(v=>v.trim())
+                .filter(Boolean);
+
+            if(
+                roles.some(v=>
+                    v.toLocaleLowerCase('fr')===
+                    role.toLocaleLowerCase('fr')
+                )
+            ){
+                return;
+            }
+
+            roles.push(role);
+
+            const next=roles.join(' / ');
+
+            if(control.value !== undefined){
+
+                if(
+                    ![...control.options].some(
+                        o=>o.value===next
+                    )
+                ){
+                    control.add(
+                        new Option(
+                            next+' · À VÉRIFIER',
+                            next
+                        )
+                    );
+                }
+
+                control.value=next;
+
+            }else{
+                control.textContent=next;
+            }
+
+            control.dispatchEvent(
+                new Event('change',{bubbles:true})
+            );
+        });
+
+        if(typeof markDirty==='function'){
+            markDirty();
+        }
+    };
+
+
+    unassign.onclick=()=>{
+
+        let requestedRole=
+            String(select.value || '').trim();
+
+        /*
+         * L'entrée AUCUN RÔLE n'est pas un vrai rôle.
+         * Pour DÉSAFFECTER elle signifie : retirer tous les rôles.
+         */
+        if(requestedRole==='__NONE__'){
+            requestedRole='';
+        }
+
+        const rows=
+            selectedRows();
+
+        if(!rows.length){
+            window.alert(
+                'Sélectionne au moins un cue.'
+            );
+            return;
+        }
+
+        const description=
+            requestedRole
+                ? 'Retirer le rôle « '+requestedRole+
+                  ' » de '+rows.length+' cue(s) ?'
+                : 'Retirer TOUS les rôles de '+
+                  rows.length+' cue(s) ?';
+
+        if(!window.confirm(description)){
+            return;
+        }
+
+        let changed=0;
+
+        rows.forEach(row=>{
+
+            const control=
+                row.querySelector(
+                    '[data-key="role"]'
+                );
+
+            if(!control)return;
+
+            const current=
+                String(
+                    control.value !== undefined
+                        ? control.value
+                        : control.textContent || ''
+                ).trim();
+
+            if(!current)return;
+
+            let next='';
+
+            if(requestedRole){
+
+                const roles=
+                    current
+                        .split('/')
+                        .map(value=>value.trim())
+                        .filter(Boolean);
+
+                const remaining=
+                    roles.filter(role=>
+                        role.toLocaleLowerCase('fr') !==
+                        requestedRole.toLocaleLowerCase('fr')
+                    );
+
+                /*
+                 * Aucun rôle correspondant :
+                 * on ne touche pas à cette ligne.
+                 */
+                if(remaining.length===roles.length){
+                    return;
+                }
+
+                next=
+                    remaining.join(' / ');
+
+            }else{
+
+                /*
+                 * Aucun rôle choisi dans le menu :
+                 * on vide toute l'affectation.
+                 */
+                next='';
+            }
+
+            if(control.value !== undefined){
+
+                /*
+                 * Un SELECT peut ne pas avoir l'option composite.
+                 * On l'ajoute si nécessaire avant de changer la valeur.
+                 */
+                if(
+                    next &&
+                    ![...control.options].some(
+                        option=>option.value===next
+                    )
+                ){
+                    control.add(
+                        new Option(
+                            next+' · À VÉRIFIER',
+                            next
+                        )
+                    );
+                }
+
+                control.value=next;
+
+            }else{
+
+                control.textContent=next;
+            }
+
+            control.classList.toggle(
+                'role-empty',
+                !next
+            );
+
+            /*
+             * Nettoyage des role_assignments devenus orphelins.
+             */
+            try{
+
+                const assignments=
+                    JSON.parse(
+                        row.dataset.roleAssignments || '{}'
+                    );
+
+                const remainingRoles=
+                    next
+                        .split('/')
+                        .map(value=>value.trim())
+                        .filter(Boolean);
+
+                const cleaned={};
+
+                Object.entries(assignments || {})
+                    .forEach(([role,data])=>{
+
+                        const keep=
+                            remainingRoles.some(
+                                remaining=>
+                                    remaining
+                                        .toLocaleLowerCase('fr') ===
+                                    role
+                                        .toLocaleLowerCase('fr')
+                            );
+
+                        if(keep){
+                            cleaned[role]=data;
+                        }
+                    });
+
+                row.dataset.roleAssignments=
+                    JSON.stringify(cleaned);
+
+            }catch(_){
+                row.dataset.roleAssignments='{}';
+            }
+
+            /*
+             * Même protection que REMPLACER :
+             * mémoriser le rôle avant tout rerender.
+             */
+            syncCueRoleImmediately(
+                row,
+                next
+            );
+
+            control.dispatchEvent(
+                new Event(
+                    'change',
+                    {bubbles:true}
+                )
+            );
+
+            changed++;
+        });
+
+        if(
+            changed &&
+            typeof markDirty==='function'
+        ){
+            markDirty();
+        }
+
+        const message=
+            document.getElementById('message');
+
+        if(message){
+
+            if(requestedRole){
+                message.textContent=
+                    'Rôle « '+
+                    requestedRole+
+                    ' » retiré de '+
+                    changed+
+                    ' cue(s).';
+            }else{
+                message.textContent=
+                    'Rôles supprimés sur '+
+                    changed+
+                    ' cue(s).';
+            }
+        }
+    };
+
+
+    /* --------------------------------------------------------
+       RECONSTRUCTION APRÈS RENDER()
+       -------------------------------------------------------- */
+
+    const oldRender=render;
+
+    render=function(){
+        const result=
+            oldRender.apply(this,arguments);
+
+        enhanceRows();
+
+        return result;
+    };
+
+    new MutationObserver(()=>{
+        enhanceRows();
+    }).observe(
+        cuesBody,
+        {
+            childList:true,
+            subtree:false
+        }
+    );
+
+    /*
+     * Si CASTING change : recharge la liste des rôles.
+     */
+    const distribution=
+        document.getElementById('distribution');
+
+    if(distribution){
+        distribution.addEventListener(
+            'input',
+            refreshBulkRoles
+        );
+
+        distribution.addEventListener(
+            'change',
+            refreshBulkRoles
+        );
+    }
+
+    enhanceRows();
+
+})();
+</script>
+
+
+<style id="showcue-multirole-participant-editor-v2-style">
+
+.cl-multirole-editor{
+    margin-top:7px;
+    padding-top:6px;
+    border-top:1px solid #443c34;
+    display:grid;
+    gap:6px;
+}
+
+.cl-multirole-row{
+    display:grid;
+    grid-template-columns:minmax(115px,.7fr) minmax(170px,1.3fr);
+    gap:7px;
+    align-items:center;
+
+    padding:6px;
+
+    border:1px solid #40382f;
+    border-radius:6px;
+
+    background:#14110f;
+}
+
+.cl-multirole-ident{
+    min-width:0;
+    color:#e4c78d;
+    font-size:.61rem;
+    font-weight:900;
+    line-height:1.25;
+}
+
+.cl-multirole-ident small{
+    display:block;
+    margin-top:3px;
+    color:#968d81;
+    font-size:.52rem;
+    font-weight:700;
+}
+
+.cl-multirole-micro{
+    width:100%;
+    min-width:0;
+
+    border:1px solid #554a3f;
+    border-radius:5px;
+
+    padding:5px 6px;
+
+    background:#0f0d0b;
+    color:#ddd2c5;
+
+    font-size:.59rem;
+    font-weight:750;
+}
+
+.cl-multirole-micro.needs-choice{
+    border-color:#b17331;
+    background:#2c1b0d;
+    color:#f0c17b;
+}
+
+.cl-multirole-micro.selected{
+    border-color:#4f8b62;
+    background:#102318;
+    color:#aee2bd;
+}
+
+</style>
+
+<script id="showcue-multirole-participant-editor-v2">
+(function(){
+
+    const cuesBody=document.getElementById('cues');
+
+    if(!cuesBody)return;
+
+    const norm=value=>
+        String(value || '')
+            .trim()
+            .toLocaleLowerCase('fr');
+
+    const readNode=node=>{
+        if(!node)return '';
+
+        return String(
+            node.value !== undefined
+                ? node.value
+                : node.textContent || ''
+        ).trim();
+    };
+
+    function splitRoles(value){
+        const result=[];
+
+        String(value || '')
+            .split('/')
+            .map(v=>v.trim())
+            .filter(Boolean)
+            .forEach(role=>{
+                if(!result.some(v=>norm(v)===norm(role))){
+                    result.push(role);
+                }
+            });
+
+        return result;
+    }
+
+    function activeDistribution(role){
+        return (
+            (documentData?.distribution || [])
+                .find(item=>
+                    Boolean(item.active) &&
+                    norm(item.role)===norm(role)
+                )
+            || null
+        );
+    }
+
+    function equipment(item,type){
+        return (item?.equipment_slots || [])
+            .filter(slot=>
+                String(slot?.type || '')
+                    .trim()
+                    .toLocaleUpperCase('fr')
+                === type
+            )
+            .map(slot=>String(slot?.value || '').trim())
+            .filter(Boolean);
+    }
+
+    function parseAssignments(row){
+        try{
+            const value=JSON.parse(
+                row.dataset.roleAssignments || '{}'
+            );
+
+            return (
+                value &&
+                typeof value==='object' &&
+                !Array.isArray(value)
+            )
+                ? value
+                : {};
+        }catch(_){
+            return {};
+        }
+    }
+
+    function storeAssignments(row,assignments){
+        const clean={};
+
+        Object.entries(assignments || {})
+            .forEach(([role,item])=>{
+
+                if(!item || typeof item!=='object')return;
+
+                const one={};
+
+                ['microphone','iem','equipment']
+                    .forEach(key=>{
+                        const value=String(
+                            item[key] || ''
+                        ).trim();
+
+                        if(value)one[key]=value;
+                    });
+
+                if(Object.keys(one).length){
+                    clean[role]=one;
+                }
+            });
+
+        row.dataset.roleAssignments=
+            JSON.stringify(clean);
+    }
+
+    function roleKey(assignments,role){
+        return (
+            Object.keys(assignments)
+                .find(key=>norm(key)===norm(role))
+            || role
+        );
+    }
+
+    function currentAssignment(assignments,role){
+        const key=Object.keys(assignments)
+            .find(key=>norm(key)===norm(role));
+
+        return key
+            ? assignments[key] || {}
+            : {};
+    }
+
+    function buildEditor(row){
+
+        const roleNode=
+            row.querySelector('[data-key="role"]');
+
+        if(!roleNode)return;
+
+        const roleCell=roleNode.closest('td');
+
+        if(!roleCell)return;
+
+        roleCell
+            .querySelectorAll('.cl-multirole-editor')
+            .forEach(node=>node.remove());
+
+        const roles=splitRoles(
+            readNode(roleNode)
+        );
+
+        if(roles.length < 2)return;
+
+        const assignments=
+            parseAssignments(row);
+
+        const editor=
+            document.createElement('div');
+
+        editor.className='cl-multirole-editor';
+
+        roles.forEach(role=>{
+
+            const dist=
+                activeDistribution(role);
+
+            const artist=
+                String(dist?.artist || '').trim();
+
+            const micros=
+                equipment(dist,'MICRO');
+
+            const iems=
+                equipment(dist,'IEM');
+
+            const saved=
+                currentAssignment(
+                    assignments,
+                    role
+                );
+
+            const line=
+                document.createElement('div');
+
+            line.className='cl-multirole-row';
+
+            const ident=
+                document.createElement('div');
+
+            ident.className='cl-multirole-ident';
+
+            ident.append(
+                document.createTextNode(
+                    role+
+                    ' · '+
+                    (artist || 'AUCUN ACTIF')
+                )
+            );
+
+            if(iems.length){
+                const small=
+                    document.createElement('small');
+
+                small.textContent=
+                    iems.length===1
+                        ? 'IEM : '+iems[0]
+                        : 'IEM : '+iems.join(' · ');
+
+                ident.append(small);
+            }
+
+            const select=
+                document.createElement('select');
+
+            select.className=
+                'cl-multirole-micro';
+
+            select.dataset.role=role;
+
+            if(!micros.length){
+
+                select.add(
+                    new Option(
+                        '— AUCUN MICRO AFFECTÉ —',
+                        ''
+                    )
+                );
+
+                select.disabled=true;
+
+            }else{
+
+                select.add(
+                    new Option(
+                        micros.length===1
+                            ? 'AUTO · '+micros[0]
+                            : '— MICRO À CHOISIR —',
+                        ''
+                    )
+                );
+
+                micros.forEach(micro=>
+                    select.add(
+                        new Option(micro,micro)
+                    )
+                );
+            }
+
+            const selected=
+                String(
+                    saved.microphone || ''
+                ).trim();
+
+            if(
+                selected &&
+                !micros.some(
+                    micro=>norm(micro)===norm(selected)
+                )
+            ){
+                select.add(
+                    new Option(
+                        selected+' · HORS CASTING',
+                        selected
+                    )
+                );
+            }
+
+            select.value=selected;
+
+            function paint(){
+                select.classList.toggle(
+                    'selected',
+                    Boolean(select.value)
+                );
+
+                select.classList.toggle(
+                    'needs-choice',
+                    !select.value &&
+                    micros.length>1
+                );
+            }
+
+            paint();
+
+            select.addEventListener(
+                'change',
+                event=>{
+
+                    event.stopPropagation();
+
+                    const all=
+                        parseAssignments(row);
+
+                    const key=
+                        roleKey(all,role);
+
+                    const item={
+                        ...(all[key] || {})
+                    };
+
+                    if(select.value){
+                        item.microphone=
+                            select.value;
+                    }else{
+                        delete item.microphone;
+                    }
+
+                    if(Object.keys(item).length){
+                        all[key]=item;
+                    }else{
+                        delete all[key];
+                    }
+
+                    storeAssignments(
+                        row,
+                        all
+                    );
+
+                    paint();
+
+                    /*
+                     * Déclenche le mécanisme autosave déjà présent.
+                     */
+                    if(typeof markDirty==='function'){
+                        markDirty();
+                    }
+                }
+            );
+
+            line.append(
+                ident,
+                select
+            );
+
+            editor.append(line);
+        });
+
+        roleCell.append(editor);
+    }
+
+    function refreshAll(){
+        [...cuesBody.rows]
+            .forEach(buildEditor);
+    }
+
+
+    /* ========================================================
+       1. CUE ROW
+       Charger role_assignments venant du serveur.
+       ======================================================== */
+
+    const originalCueRow=cueRow;
+
+    cueRow=function(cue,index){
+
+        const row=
+            originalCueRow.apply(
+                this,
+                arguments
+            );
+
+        row.dataset.roleAssignments=
+            JSON.stringify(
+                cue?.role_assignments || {}
+            );
+
+        queueMicrotask(
+            ()=>buildEditor(row)
+        );
+
+        return row;
+    };
+
+
+    /* ========================================================
+       2. READ TABLES
+       Réinjecter role_assignments avant sauvegarde.
+       ======================================================== */
+
+    const originalReadTables=readTables;
+
+    readTables=function(){
+
+        const result=
+            originalReadTables.apply(
+                this,
+                arguments
+            );
+
+        const rows=[...cuesBody.rows];
+
+        result.cues.forEach(
+            (cue,index)=>{
+
+                const row=rows[index];
+
+                if(!row)return;
+
+                const assignments=
+                    parseAssignments(row);
+
+                if(Object.keys(assignments).length){
+                    cue.role_assignments=
+                        assignments;
+                }else{
+                    delete cue.role_assignments;
+                }
+            }
+        );
+
+        return result;
+    };
+
+
+    /* ========================================================
+       3. RÔLE MODIFIÉ
+       ======================================================== */
+
+    function refreshChangedRole(event){
+
+        if(
+            event.target?.dataset?.key !== 'role'
+        ){
+            return;
+        }
+
+        const row=
+            event.target.closest('tr');
+
+        if(!row)return;
+
+        setTimeout(
+            ()=>buildEditor(row),
+            0
+        );
+    }
+
+    cuesBody.addEventListener(
+        'change',
+        refreshChangedRole
+    );
+
+    cuesBody.addEventListener(
+        'input',
+        refreshChangedRole
+    );
+
+
+    /* ========================================================
+       4. RECONSTRUCTION DU TABLEAU
+       ======================================================== */
+
+    new MutationObserver(()=>{
+        refreshAll();
+    }).observe(
+        cuesBody,
+        {
+            childList:true,
+            subtree:false
+        }
+    );
+
+    refreshAll();
+
+})();
+</script>
+
+
+<script id="showcue-role-assignments-persistence-v3">
+(function(){
+
+    if(typeof readTables!=='function')return;
+
+    const previousReadTables=readTables;
+
+    function parseRoleAssignments(row){
+        try{
+            const parsed=JSON.parse(
+                row.dataset.roleAssignments || '{}'
+            );
+
+            return (
+                parsed &&
+                typeof parsed==='object' &&
+                !Array.isArray(parsed)
+            )
+                ? parsed
+                : {};
+        }catch(_){
+            return {};
+        }
+    }
+
+    readTables=function(){
+
+        const result=
+            previousReadTables.apply(
+                this,
+                arguments
+            );
+
+        const rows=[
+            ...document.getElementById('cues').rows
+        ];
+
+        /*
+         * On rattache par ID et non par index,
+         * donc tri/filtre/rerender ne peut plus décaler les cues.
+         */
+        const byId=new Map(
+            rows.map(row=>[
+                String(row.dataset.id || ''),
+                row
+            ])
+        );
+
+        result.cues.forEach(cue=>{
+
+            const row=
+                byId.get(
+                    String(cue.id || '')
+                );
+
+            if(!row)return;
+
+            const assignments=
+                parseRoleAssignments(row);
+
+            if(Object.keys(assignments).length){
+                cue.role_assignments=
+                    assignments;
+            }else{
+                delete cue.role_assignments;
+            }
+        });
+
+        return result;
+    };
+
+})();
+</script>
+
 </body></html>
 
 <script id="cl-transport-resources">
@@ -1726,3 +6796,5 @@ body.builder-show-advanced .builder-cues-table td:nth-child(17){
     }catch(error){document.getElementById('cl-import-result').textContent=error.message}
 })();
 </script>
+
+<script src="/static/showcue-editor.js?v=phase1"></script>

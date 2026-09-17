@@ -1160,6 +1160,7 @@ body.is-arrangement-paused .card.current {
 
     let arrangementDesiredPlaying = null;
     let pendingArrangementDesired = null;
+    let arrangementGoInProgress = false;
 
     function renderArrangementTransport(playing) {
       arrangementDesiredPlaying = Boolean(playing);
@@ -1251,6 +1252,11 @@ body.is-arrangement-paused .card.current {
 async function runArrangementGo() {
   if (busy) return;
 
+  // Un GO est prioritaire et atomique :
+  // aucune ancienne demande Pause/Lecture ne doit pouvoir l'annuler.
+  arrangementGoInProgress = true;
+  pendingArrangementDesired = null;
+
   let launchIndex = manualNextIndex !== null ? manualNextIndex : selectedMarkerIndex;
 
   if (launchIndex === null || typeof launchIndex === 'undefined') {
@@ -1298,21 +1304,12 @@ async function runArrangementGo() {
     setStatus('○ GO Arrangement impossible', false);
   } finally {
     setTimeout(() => {
+      // Les commandes Pause/Lecture reçues pendant le GO sont volontairement
+      // ignorées : le GO doit rester prioritaire jusqu'à sa fin.
+      pendingArrangementDesired = null;
+      arrangementGoInProgress = false;
       setDisabled(false);
-
-      if (pendingArrangementDesired !== null) {
-        const queuedDesired = pendingArrangementDesired;
-        pendingArrangementDesired = null;
-
-        renderArrangementTransport(queuedDesired);
-
-        sendAction({
-          action: 'pause',
-          desired_playing: queuedDesired
-        });
-      } else {
-        update();
-      }
+      update();
     }, 80);
   }
 }
@@ -1384,6 +1381,11 @@ markerSelectEl.addEventListener('change', () => {
     });
 
     function runArrangementPlayPause() {
+      if (arrangementGoInProgress) {
+        setStatus('● GO en cours — commande Pause/Lecture ignorée', true);
+        return Promise.resolve();
+      }
+
       if (
         arrangementDesiredPlaying === null &&
         pendingArrangementDesired === null

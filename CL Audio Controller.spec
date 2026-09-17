@@ -27,7 +27,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['markupsafe._speedups'],
+    excludes=['markupsafe._speedups', 'PIL'],
     noarchive=False,
     optimize=0,
 )
@@ -46,7 +46,7 @@ exe = EXE(
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
-    target_arch=__import__('os').environ.get('CL_BUILD_ARCH', 'arm64'),
+    target_arch=__import__('os').environ.get('CL_BUILD_ARCH', 'universal2'),
     codesign_identity=None,
     entitlements_file=None,
     icon=['CL_AUDIO.icns'],
@@ -62,13 +62,13 @@ coll = COLLECT(
 )
 app = BUNDLE(
     coll,
-    name='CL Audio Show Control.app',
+    name='CL Show Control.app',
     icon='CL_AUDIO.icns',
     bundle_identifier='com.claudio.controller',
     info_plist={
-        'CFBundleDisplayName': 'CL Audio Show Control',
+        'CFBundleDisplayName': 'CL Show Control',
         'CFBundleShortVersionString': '2.2.0',
         'CFBundleVersion': '6',
-        'NSHighResolutionCapable': True,
+        'LSMinimumSystemVersion': '11.0', 'NSHighResolutionCapable': True,
     },
 )

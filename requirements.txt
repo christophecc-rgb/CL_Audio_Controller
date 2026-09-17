@@ -30,3 +30,6 @@ macholib==1.16.4
 setuptools==82.0.1
 
 pypdf>=5.0
+
+# Génération des icônes pendant le build uniquement
+Pillow==12.3.0

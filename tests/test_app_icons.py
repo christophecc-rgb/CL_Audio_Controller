@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class AppIconTests(unittest.TestCase):
     def test_generated_icon_family_has_one_accent_per_application_group(self):
-        generator = (ROOT / "scripts" / "generate_app_icon_variants.py").read_text()
+        generator = (ROOT / "scripts" / "generate_app_icon_variants.py").read_text() + (ROOT / "resources/app_identity.json").read_text()
         for name, color in {
             "CL_Audio_Show_Control": "#D84A4A",
             "CL_Ableton": "#E58A3A",
@@ -38,8 +38,8 @@ class AppIconTests(unittest.TestCase):
         self.assertIn('CL_MIDI_RTP.icns" "$KIT_ROOT/CL MIDI RTP Agent.app', release)
 
     def test_every_icon_uses_cl_and_its_function_without_generic_audio_label(self):
-        generator = (ROOT / "scripts" / "generate_app_icon_variants.py").read_text()
-        for label in ("SHOW CONTROL", "BUILDER", "MIDI RTP DIAG", "MIDI ANALYZER",
+        generator = (ROOT / "scripts" / "generate_app_icon_variants.py").read_text() + (ROOT / "resources/app_identity.json").read_text()
+        for label in ("CONTROL", "ARRANGEMENT", "MIDI RTP DIAG", "MIDI ANALYZER",
                       "MIDI NETWORK", "MIDI PERFORMANCE", "MIDI RTP"):
             self.assertIn(label, generator)
         self.assertIn('draw.text((512, 430), "CL"', generator)

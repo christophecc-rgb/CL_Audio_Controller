@@ -27,7 +27,7 @@ DISTRIBUTION_COLUMNS = (
 )
 LEGACY_DISTRIBUTION_COLUMNS = ("RÔLE", "ARTISTE", "MICRO", "IEM", "ÉQUIPEMENT", "ACTIF", "NOTES")
 EQUIPMENT_TYPES = ("MICRO", "IEM", "ÉQUIPEMENT", "AUTRE")
-MAX_EQUIPMENT_SLOTS = 3
+MAX_EQUIPMENT_SLOTS = 8
 BUILDER_TYPES = (
     "TOP MUSIQUE", "TOP LIGHT", "CHANGEMENT MICRO", "TEST MICRO", "TEST EAR / IEM",
     "ÉQUIPEMENT ARTISTE", "ENTRÉE ARTISTE", "SORTIE ARTISTE", "CHANGEMENT COSTUME",
@@ -89,7 +89,7 @@ def _normalize_equipment_slots(raw, assignment_index):
     if not isinstance(slots, list):
         raise ValueError(f"equipment_slots de l’affectation #{assignment_index} invalide")
     if len(slots) > MAX_EQUIPMENT_SLOTS:
-        raise ValueError(f"affectation #{assignment_index} : maximum 3 équipements")
+        raise ValueError(f"affectation #{assignment_index} : maximum {MAX_EQUIPMENT_SLOTS} équipements")
     normalized = []
     for slot_index, slot in enumerate(slots, 1):
         if not isinstance(slot, dict):
@@ -97,6 +97,50 @@ def _normalize_equipment_slots(raw, assignment_index):
         normalized.append({"type": _text(slot.get("type")).upper(),
                            "value": _text(slot.get("value"))})
     return normalized
+
+
+# CL_SHOWCUE_ROLE_ASSIGNMENTS_CORE_V1
+def _normalize_role_assignments(value):
+    """
+    Affectations techniques propres à chaque rôle d'un cue.
+
+    Exemple :
+    {
+        "MENEUSE": {"microphone": "DPA 4088 #1"},
+        "DIRECTRICE": {"microphone": "DPA 4088 #3"}
+    }
+    """
+    if value in (None, ""):
+        return {}
+
+    if not isinstance(value, dict):
+        raise ValueError("role_assignments invalide")
+
+    result = {}
+
+    for raw_role, raw_assignment in value.items():
+        role = _text(raw_role)
+
+        if not role:
+            continue
+
+        if not isinstance(raw_assignment, dict):
+            raise ValueError(
+                f"role_assignments {role} invalide"
+            )
+
+        assignment = {}
+
+        for key in ("microphone", "iem", "equipment"):
+            item = _text(raw_assignment.get(key))
+
+            if item:
+                assignment[key] = item
+
+        if assignment:
+            result[role] = assignment
+
+    return result
 
 
 def normalize_builder_document(document):
@@ -126,6 +170,9 @@ def normalize_builder_document(document):
             "plt": _boolean(raw.get("plt", True), "PLT"),
             "lum": _boolean(raw.get("lum", True), "LUM"),
             "origin": _text(raw.get("origin")) or "BUILDER", "notes": _text(raw.get("notes")),
+            "role_assignments": _normalize_role_assignments(
+                raw.get("role_assignments")
+            ),
         }
         cues.append(cue)
     distribution = []
@@ -317,6 +364,215 @@ def resolve_builder_cue(cue, distribution):
     }
 
 
+
+# CL_SHOWCUE_MULTIROLE_V1
+# ------------------------------------------------------------------
+# Compatibilité multi-rôles.
+# Le stockage historique "MARCEL / DIRECTRICE" reste inchangé.
+# ------------------------------------------------------------------
+
+_resolve_builder_cue_single_role = resolve_builder_cue
+
+
+def split_builder_roles(value):
+    """Découpe un rôle composite sans modifier le libellé stocké."""
+    values = []
+
+    for item in str(value or "").split("/"):
+        item = item.strip()
+
+        if not item:
+            continue
+
+        if item.casefold() not in {
+            existing.casefold()
+            for existing in values
+        }:
+            values.append(item)
+
+    return values
+
+
+def resolve_builder_cue(cue, distribution):
+    roles = split_builder_roles(
+        (cue or {}).get("role", "")
+    )
+
+    # Comportement historique inchangé.
+    if len(roles) <= 1:
+        return _resolve_builder_cue_single_role(
+            cue,
+            distribution
+        )
+
+    participants = []
+
+    for role in roles:
+        subcue = dict(cue or {})
+
+        subcue["role"] = role
+
+        # Les overrides historiques sont globaux au cue.
+        # Ils seraient ambigus s'ils étaient appliqués à plusieurs rôles.
+        subcue["artist"] = ""
+        subcue["microphone"] = ""
+        subcue["iem"] = ""
+        subcue["equipment"] = ""
+
+        resolved = _resolve_builder_cue_single_role(
+            subcue,
+            distribution
+        )
+
+        participants.append({
+            "role": role,
+            "artist": resolved.get("artist", ""),
+            "equipment_slots": list(
+                resolved.get("equipment_slots") or []
+            ),
+            "microphone": resolved.get("microphone"),
+            "iem": resolved.get("iem"),
+            "equipment": resolved.get("equipment"),
+            "distribution_status":
+                resolved.get("distribution_status", "missing"),
+        })
+
+    active_count = sum(
+        participant.get("distribution_status") == "active"
+        for participant in participants
+    )
+
+    artists = [
+        participant["artist"]
+        for participant in participants
+        if participant.get("artist")
+    ]
+
+    equipment_slots = []
+
+    for participant in participants:
+        for slot in participant.get(
+            "equipment_slots",
+            []
+        ):
+            equipment_slots.append({
+                **slot,
+                "role": participant["role"],
+                "artist": participant["artist"],
+            })
+
+    return {
+        "role": " / ".join(roles),
+
+        "roles": roles,
+        "participants": participants,
+
+        "artist": " / ".join(artists),
+        "resolved_artist": " / ".join(artists),
+
+        # Un micro global n'a pas de sens avec plusieurs artistes.
+        "microphone": None,
+        "resolved_microphone": None,
+
+        "iem": None,
+        "resolved_iem": None,
+
+        "equipment": None,
+        "resolved_equipment": None,
+
+        "equipment_slots": equipment_slots,
+        "resolved_equipment_slots": equipment_slots,
+
+        "distribution_status":
+            "active"
+            if active_count == len(roles)
+            else "missing",
+
+        "overrides": {
+            "multi_role": True
+        },
+    }
+
+
+
+# Applique les choix cue/rôle au résultat final du resolver.
+_resolve_builder_cue_without_role_assignments = resolve_builder_cue
+
+
+def resolve_builder_cue(cue, distribution):
+    result = _resolve_builder_cue_without_role_assignments(
+        cue,
+        distribution
+    )
+
+    assignments = _normalize_role_assignments(
+        (cue or {}).get("role_assignments")
+    )
+
+    if not assignments:
+        return result
+
+    def for_role(role):
+        wanted = _role_key(role)
+
+        for assignment_role, assignment in assignments.items():
+            if _role_key(assignment_role) == wanted:
+                return assignment
+
+        return {}
+
+    participants = result.get("participants")
+
+    # --------------------------------------------------------
+    # MULTI-RÔLES
+    # --------------------------------------------------------
+    if isinstance(participants, list):
+
+        for participant in participants:
+            assignment = for_role(
+                participant.get("role")
+            )
+
+            if not assignment:
+                continue
+
+            if "microphone" in assignment:
+                participant["microphone"] = assignment["microphone"]
+
+            if "iem" in assignment:
+                participant["iem"] = assignment["iem"]
+
+            if "equipment" in assignment:
+                participant["equipment"] = assignment["equipment"]
+
+        result["participants"] = participants
+
+        # Un cue multi-rôles n'a volontairement pas
+        # de microphone global unique.
+        return result
+
+    # --------------------------------------------------------
+    # CUE SIMPLE — compatible avec la même structure
+    # --------------------------------------------------------
+    assignment = for_role(
+        result.get("role") or (cue or {}).get("role")
+    )
+
+    if assignment.get("microphone"):
+        result["microphone"] = assignment["microphone"]
+        result["resolved_microphone"] = assignment["microphone"]
+
+    if assignment.get("iem"):
+        result["iem"] = assignment["iem"]
+        result["resolved_iem"] = assignment["iem"]
+
+    if assignment.get("equipment"):
+        result["equipment"] = assignment["equipment"]
+        result["resolved_equipment"] = assignment["equipment"]
+
+    return result
+
+
 def resolved_builder_document(document):
     document = normalize_builder_document(document)
     return {**document, "cues": [
@@ -347,6 +603,7 @@ def builder_import_values(document):
             "notes": cue["notes"], "resolved_artist": resolved["artist"],
             "resolved_microphone": resolved["microphone"], "resolved_iem": resolved["iem"],
             "resolved_equipment": resolved["equipment"],
+            "resolved_participants": resolved.get("participants", []),
         }
         item = {"text": cue["text"], "posts": posts, "status": "official",
                 "builder": {key: value for key, value in metadata.items() if value}}
@@ -407,22 +664,364 @@ def _sheet_xml(rows):
             f'<sheetData>{"".join(xml_rows)}</sheetData></worksheet>')
 
 
+def _cue_assignment_rows(document):
+    """
+    Feuille SAISIE :
+    une ligne simple par cue + rôle, pensée pour correction humaine.
+    """
+    rows = []
+
+    distribution = document.get("distribution", []) or []
+
+    def active_for_role(role):
+        role_key = str(role or "").strip().casefold()
+
+        for item in distribution:
+            if (
+                item.get("active")
+                and str(item.get("role") or "").strip().casefold() == role_key
+            ):
+                return item
+
+        return None
+
+    def values_by_type(item, kind):
+        if not item:
+            return []
+
+        return [
+            str(slot.get("value") or "").strip()
+            for slot in item.get("equipment_slots", []) or []
+            if str(slot.get("type") or "").strip().upper() == kind
+            and str(slot.get("value") or "").strip()
+        ]
+
+    for cue in document.get("cues", []):
+
+        raw_role = str(cue.get("role") or "").strip()
+
+        if "split_builder_roles" in globals():
+            roles = split_builder_roles(raw_role)
+        else:
+            roles = [
+                value.strip()
+                for value in raw_role.split("/")
+                if value.strip()
+            ]
+
+        if not roles:
+            roles = [""]
+
+        assignments = (
+            cue.get("role_assignments")
+            if isinstance(cue.get("role_assignments"), dict)
+            else {}
+        )
+
+        def role_assignment(role):
+            key = str(role or "").casefold()
+
+            for name, data in assignments.items():
+                if str(name).casefold() == key:
+                    return data if isinstance(data, dict) else {}
+
+            return {}
+
+        for role in roles:
+
+            active = active_for_role(role)
+
+            artist = str(
+                (active or {}).get("artist") or ""
+            ).strip()
+
+            micros = values_by_type(active, "MICRO")
+            iems = values_by_type(active, "IEM")
+            others = (
+                values_by_type(active, "ÉQUIPEMENT")
+                + values_by_type(active, "AUTRE")
+            )
+
+            assignment = role_assignment(role)
+
+            current_micro = str(
+                assignment.get("microphone")
+                or (
+                    cue.get("microphone")
+                    if len(roles) == 1
+                    else ""
+                )
+                or ""
+            ).strip()
+
+            current_iem = str(
+                assignment.get("iem")
+                or (
+                    cue.get("iem")
+                    if len(roles) == 1
+                    else ""
+                )
+                or ""
+            ).strip()
+
+            current_other = str(
+                assignment.get("equipment")
+                or (
+                    cue.get("equipment")
+                    if len(roles) == 1
+                    else ""
+                )
+                or ""
+            ).strip()
+
+            status = []
+
+            if not role:
+                status.append("RÔLE À RENSEIGNER")
+            elif not active:
+                status.append("ARTISTE ACTIF INTROUVABLE")
+
+            if len(micros) > 1 and not current_micro:
+                status.append("MICRO À CHOISIR")
+
+            rows.append([
+                cue.get("number", ""),
+                cue.get("timecode", ""),
+                cue.get("section", ""),
+                cue.get("text", ""),
+
+                role,
+                artist,
+
+                micros[0] if len(micros) > 0 else "",
+                micros[1] if len(micros) > 1 else "",
+                micros[2] if len(micros) > 2 else "",
+
+                current_micro,
+
+                iems[0] if len(iems) > 0 else "",
+                current_iem,
+
+                " · ".join(others),
+                current_other,
+
+                cue.get("notes", ""),
+                " / ".join(status),
+
+                cue.get("id", ""),
+            ])
+
+    return rows
+
+def _material_catalog_rows(document):
+    """Référence simple de tout le matériel connu du spectacle."""
+    rows = []
+    seen = set()
+
+    catalog = document.get("equipment_catalog") or []
+
+    for item in catalog:
+        if not isinstance(item, dict):
+            continue
+
+        typ = str(item.get("type") or "").strip()
+        value = str(item.get("value") or "").strip()
+
+        if not value:
+            continue
+
+        key = (typ.casefold(), value.casefold())
+
+        if key in seen:
+            continue
+
+        seen.add(key)
+        rows.append([typ, value])
+
+    # Sécurité/migration : tout matériel réellement affecté
+    # apparaît aussi, même s'il manque au catalogue.
+    for assignment in document.get("distribution", []):
+        for slot in assignment.get("equipment_slots", []) or []:
+            typ = str(slot.get("type") or "").strip()
+            value = str(slot.get("value") or "").strip()
+
+            if not value:
+                continue
+
+            key = (typ.casefold(), value.casefold())
+
+            if key in seen:
+                continue
+
+            seen.add(key)
+            rows.append([typ, value])
+
+    rows.sort(
+        key=lambda row: (
+            str(row[0]).casefold(),
+            str(row[1]).casefold(),
+        )
+    )
+
+    return rows
+
+
 def export_xlsx(document):
     document = normalize_builder_document(document)
-    sheets = [
-        [BUILDER_COLUMNS, *[_cue_row(cue) for cue in document["cues"]]],
-        [DISTRIBUTION_COLUMNS, *[_distribution_row(row) for row in document["distribution"]]],
-    ]
-    output = io.BytesIO()
-    with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
-        archive.writestr("[Content_Types].xml", '<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>')
-        archive.writestr("_rels/.rels", '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>')
-        archive.writestr("xl/workbook.xml", '<?xml version="1.0" encoding="UTF-8"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="CONDUITE" sheetId="1" r:id="rId1"/><sheet name="DISTRIBUTION" sheetId="2" r:id="rId2"/></sheets></workbook>')
-        archive.writestr("xl/_rels/workbook.xml.rels", '<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/></Relationships>')
-        for index, rows in enumerate(sheets, 1):
-            archive.writestr(f"xl/worksheets/sheet{index}.xml", _sheet_xml(rows))
-    return output.getvalue()
 
+    assignment_columns = (
+        "#",
+        "TC",
+        "SECTION",
+        "CUE",
+
+        "RÔLE À UTILISER",
+        "ARTISTE ACTIF",
+
+        "MICRO DISPO 1",
+        "MICRO DISPO 2",
+        "MICRO DISPO 3",
+
+        "MICRO UTILISÉ",
+
+        "IEM DISPO",
+        "IEM UTILISÉ",
+
+        "AUTRE MATÉRIEL DISPO",
+        "AUTRE MATÉRIEL UTILISÉ",
+
+        "OBSERVATION",
+        "À CORRIGER",
+
+        "BUILDER ID — NE PAS MODIFIER",
+    )
+
+    material_columns = (
+        "TYPE",
+        "MATÉRIEL",
+    )
+
+    sheets = [
+        (
+            "SAISIE",
+            [
+                assignment_columns,
+                *_cue_assignment_rows(document),
+            ],
+        ),
+        (
+            "CONDUITE — RÉF",
+            [
+                BUILDER_COLUMNS,
+                *[
+                    _cue_row(cue)
+                    for cue in document["cues"]
+                ],
+            ],
+        ),
+        (
+            "CASTING — RÉF",
+            [
+                DISTRIBUTION_COLUMNS,
+                *[
+                    _distribution_row(row)
+                    for row in document["distribution"]
+                ],
+            ],
+        ),
+        (
+            "MATÉRIEL — RÉF",
+            [
+                material_columns,
+                *_material_catalog_rows(document),
+            ],
+        ),
+    ]
+
+    output = io.BytesIO()
+
+    content_types = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">',
+        '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>',
+        '<Default Extension="xml" ContentType="application/xml"/>',
+        '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>',
+    ]
+
+    workbook_sheets = []
+    workbook_relationships = []
+
+    for index, (name, _rows) in enumerate(sheets, 1):
+        content_types.append(
+            f'<Override PartName="/xl/worksheets/sheet{index}.xml" '
+            'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
+        )
+
+        workbook_sheets.append(
+            f'<sheet name="{escape(name)}" '
+            f'sheetId="{index}" r:id="rId{index}"/>'
+        )
+
+        workbook_relationships.append(
+            f'<Relationship Id="rId{index}" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" '
+            f'Target="worksheets/sheet{index}.xml"/>'
+        )
+
+    content_types.append("</Types>")
+
+    with zipfile.ZipFile(
+        output,
+        "w",
+        zipfile.ZIP_DEFLATED,
+    ) as archive:
+
+        archive.writestr(
+            "[Content_Types].xml",
+            "".join(content_types),
+        )
+
+        archive.writestr(
+            "_rels/.rels",
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<Relationships '
+            'xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rId1" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" '
+            'Target="xl/workbook.xml"/>'
+            '</Relationships>',
+        )
+
+        archive.writestr(
+            "xl/workbook.xml",
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<workbook '
+            'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+            'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+            '<sheets>'
+            + "".join(workbook_sheets)
+            + '</sheets></workbook>',
+        )
+
+        archive.writestr(
+            "xl/_rels/workbook.xml.rels",
+            '<?xml version="1.0" encoding="UTF-8"?>'
+            '<Relationships '
+            'xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            + "".join(workbook_relationships)
+            + '</Relationships>',
+        )
+
+        for index, (_name, rows) in enumerate(
+            sheets,
+            1,
+        ):
+            archive.writestr(
+                f"xl/worksheets/sheet{index}.xml",
+                _sheet_xml(rows),
+            )
+
+    return output.getvalue()
 
 def _rows_to_document(conduite_rows, distribution_rows, unknown_columns=None):
     if not conduite_rows:
@@ -556,3 +1155,85 @@ def import_xlsx(payload):
         raise ValueError("feuille CONDUITE manquante")
     unknown = []
     return _rows_to_document(sheets["CONDUITE"], sheets.get("DISTRIBUTION", []), unknown), unknown
+
+
+# CL_SHOWCUE_EQUIPMENT_CATALOG_V1
+# ------------------------------------------------------------------
+# Extension du document Builder :
+# catalogue matériel indépendant des affectations.
+# ------------------------------------------------------------------
+
+_normalize_builder_document_without_equipment_catalog = normalize_builder_document
+
+
+def _normalize_equipment_catalog(values):
+    result = []
+    seen = set()
+
+    for item in values or []:
+        if not isinstance(item, dict):
+            continue
+
+        equipment_type = str(
+            item.get("type") or "ÉQUIPEMENT"
+        ).strip().upper()
+
+        if equipment_type not in {
+            "MICRO",
+            "IEM",
+            "ÉQUIPEMENT",
+            "AUTRE",
+        }:
+            equipment_type = "ÉQUIPEMENT"
+
+        value = str(
+            item.get("value") or ""
+        ).strip()
+
+        if not value:
+            continue
+
+        key = (
+            equipment_type.casefold(),
+            value.casefold(),
+        )
+
+        if key in seen:
+            continue
+
+        seen.add(key)
+
+        result.append({
+            "type": equipment_type,
+            "value": value,
+        })
+
+    return result
+
+
+def normalize_builder_document(document):
+    source = document if isinstance(document, dict) else {}
+
+    result = _normalize_builder_document_without_equipment_catalog(
+        source
+    )
+
+    supplied = source.get("equipment_catalog")
+
+    # Migration transparente des anciens documents :
+    # le catalogue initial est déduit des affectations existantes.
+    if supplied is None:
+        supplied = []
+
+        for row in result.get("distribution", []):
+            for slot in row.get("equipment_slots", []) or []:
+                supplied.append({
+                    "type": slot.get("type"),
+                    "value": slot.get("value"),
+                })
+
+    result["equipment_catalog"] = _normalize_equipment_catalog(
+        supplied
+    )
+
+    return result

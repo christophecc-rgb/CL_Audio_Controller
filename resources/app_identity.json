@@ -1,0 +1,112 @@
+[
+  {
+    "name": "CL Show Control",
+    "icon": "CL_Audio_Show_Control",
+    "label": "CONTROL",
+    "color": "#D84A4A",
+    "legacy_names": [
+      "CL Audio Show Control",
+      "CL Audio Controller"
+    ]
+  },
+  {
+    "name": "CL Audio Export",
+    "icon": "CL_Audio_Export",
+    "label": "AUDIO EXPORT",
+    "color": "#E16B9A",
+    "legacy_names": [
+      "CL Show Audio Builder"
+    ]
+  },
+  {
+    "name": "CL ShowCue",
+    "icon": "CL_ShowCue",
+    "label": "SHOW CUES",
+    "color": "#45C9D0",
+    "legacy_names": []
+  },
+  {
+    "name": "CL Cue Editor",
+    "icon": "CL_Cue_Editor",
+    "label": "CUE EDITOR",
+    "color": "#A66BE0",
+    "legacy_names": [
+      "CL ShowCue Builder"
+    ]
+  },
+  {
+    "name": "CL Arrangement Builder",
+    "icon": "CL_Ableton",
+    "label": "ARRANGEMENT",
+    "color": "#E58A3A",
+    "legacy_names": [
+      "Arrangement Builder Live"
+    ]
+  },
+  {
+    "name": "CL MIDI & RTP Diagnostic",
+    "icon": "CL_MIDI_RTP_Diagnostic",
+    "label": "MIDI RTP DIAG",
+    "color": "#D5A735",
+    "legacy_names": []
+  },
+  {
+    "name": "CL MIDI Network Manager",
+    "icon": "CL_MIDI_Network",
+    "label": "MIDI NETWORK",
+    "color": "#32B89C",
+    "legacy_names": []
+  },
+  {
+    "name": "CL MIDI Analyzer",
+    "icon": "CL_MIDI_Analyzer",
+    "label": "MIDI ANALYZER",
+    "color": "#3E9ED6",
+    "legacy_names": []
+  },
+  {
+    "name": "CL MIDI Performance Monitor",
+    "icon": "CL_MIDI_Performance",
+    "label": "MIDI PERFORMANCE",
+    "color": "#3974D8",
+    "legacy_names": []
+  },
+  {
+    "name": "CL MIDI RTP Agent",
+    "icon": "CL_MIDI_RTP",
+    "label": "MIDI RTP",
+    "color": "#6557C8",
+    "legacy_names": []
+  },
+  {
+    "name": "Créer le Kit CL",
+    "icon": "CL_Kit",
+    "label": "KIT",
+    "color": "#A3ACBA",
+    "legacy_names": []
+  },
+  {
+    "name": "Installer la Suite CL",
+    "icon": "CL_Install",
+    "label": "INSTALL",
+    "color": "#8CBF55",
+    "legacy_names": []
+  },
+  {
+    "name": "Désinstaller la Suite CL",
+    "icon": "CL_Uninstall",
+    "label": "UNINSTALL",
+    "color": "#B98162",
+    "legacy_names": []
+  },
+  {
+    "name": "CL Ableton Remote",
+    "icon": "CL_Remote",
+    "label": "REMOTE",
+    "color": "#C6BB81",
+    "legacy_names": [
+      "RemoteAbleton",
+      "Télécommande Ableton"
+    ]
+  }
+]
