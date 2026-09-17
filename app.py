@@ -33,6 +33,12 @@ from flask import Flask, jsonify, render_template, request, send_from_directory
 from show_audio_print_engine import PrintEngineError, capture_clean
 from build_identity import BUILD_ID, IDENTITY_PROTOCOL_VERSION, SERVICE_NAME
 from ableton_targets import DEFAULT_CONFIG_PATH, load_target
+from dataclasses import replace as dataclass_replace
+
+try:
+    from bonjour_remote import discover_ableton_remote
+except Exception:
+    discover_ableton_remote = None
 from server_ownership import OwnershipRecordError, write_record
 from cl_transport import available_sessions, session_file, load_library, transport_roots
 from showcue_session_archive import export_session, import_session, MAX_ARCHIVE_BYTES
@@ -42,6 +48,7 @@ from device_profiles import DeviceProfile, device_ui_snapshots, load_device_conf
 multiprocessing.freeze_support()
 
 import os
+import atexit
 import signal
 import webbrowser
 import threading
@@ -176,6 +183,74 @@ m4l_client = udp_client.SimpleUDPClient(M4L_IP, M4L_PORT)
 # suit la cible Ableton active afin de fonctionner aussi en mode distant.
 MIDI_MONITOR_SCENE_PORT = 9002
 MIDI_OUTGOING_OSC_PREFIX = "/cl/midi-monitor/outgoing/"
+MIDI_EXPECTED_UDP_IP = "0.0.0.0"
+MIDI_EXPECTED_UDP_PORT = 50023
+MIDI_EXPECTED_BONJOUR_NAME = "CL Show Control Expected"
+MIDI_EXPECTED_BONJOUR_TYPE = "_cl-midi-expected._udp"
+_midi_expected_bonjour_process = None
+_midi_expected_bonjour_lock = threading.Lock()
+
+
+def start_midi_expected_bonjour_publisher():
+    global _midi_expected_bonjour_process
+
+    with _midi_expected_bonjour_lock:
+        proc = _midi_expected_bonjour_process
+        if proc is not None and proc.poll() is None:
+            return
+
+        try:
+            proc = subprocess.Popen(
+                [
+                    "dns-sd",
+                    "-R",
+                    MIDI_EXPECTED_BONJOUR_NAME,
+                    MIDI_EXPECTED_BONJOUR_TYPE,
+                    "local.",
+                    str(MIDI_EXPECTED_UDP_PORT),
+                ],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                close_fds=True,
+            )
+        except OSError as exc:
+            print(
+                f"[MIDI Expected] Publication Bonjour impossible : {exc}",
+                flush=True,
+            )
+            return
+
+        _midi_expected_bonjour_process = proc
+        print(
+            "[MIDI Expected] Bonjour publié : "
+            f"{MIDI_EXPECTED_BONJOUR_NAME} "
+            f"{MIDI_EXPECTED_BONJOUR_TYPE} "
+            f"port {MIDI_EXPECTED_UDP_PORT}",
+            flush=True,
+        )
+
+
+def stop_midi_expected_bonjour_publisher():
+    global _midi_expected_bonjour_process
+
+    with _midi_expected_bonjour_lock:
+        proc = _midi_expected_bonjour_process
+        _midi_expected_bonjour_process = None
+
+    if proc is None or proc.poll() is not None:
+        return
+
+    try:
+        proc.terminate()
+        proc.wait(timeout=1.0)
+    except Exception:
+        try:
+            proc.kill()
+        except Exception:
+            pass
+
+
+atexit.register(stop_midi_expected_bonjour_publisher)
 MIDI_CONSOLE_STATE_PATH = Path("/private/tmp/CL_MIDI_Console_State.json")
 MIDI_CONSOLE_TITLE_OVERRIDES: Dict[str, Tuple[float, str]] = {}
 CONSOLE_FILES_ROOT = DEFAULT_CONFIG_PATH.parent / "Console Files"
@@ -206,8 +281,8 @@ def console_visual_state(validation_status: str, expected_activated_at: Any,
 def ableton_midi_roles(target_mode: str) -> Dict[str, str]:
     """Rôles MIDI dérivés exclusivement de Connexion Ableton OSC."""
     if str(target_mode) == "remote":
-        return {"mode": "Ableton distant", "expected_source": "Réseau Rtp MB Chris",
-                "returned_source": "local_simulator_tx"}
+        return {"mode": "Ableton distant", "expected_source": "Ableton MIDI Output",
+                "returned_source": "CL Direct RTP"}
     return {"mode": "Local", "expected_source": "Gestionnaire IAC Bus 1",
             "returned_source": "Réseau Rtp MB Chris"}
 
@@ -287,6 +362,37 @@ GENERATION_DEBUG = os.environ.get("CL_AUDIO_GENERATION_DEBUG", "0").strip().lowe
 
 app = Flask(__name__)
 ableton_target = load_target()
+
+if ableton_target.mode == "remote" and discover_ableton_remote is not None:
+    try:
+        _bonjour_remote = discover_ableton_remote()
+        _bonjour_ip = str(_bonjour_remote.get("ip") or "").strip()
+
+        if _bonjour_ip:
+            _configured_host = str(ableton_target.host)
+            ableton_target = dataclass_replace(
+                ableton_target,
+                host=_bonjour_ip,
+            )
+            print(
+                "[Ableton Remote] Bonjour : "
+                f"{_bonjour_remote.get('service_name') or 'CL Ableton Distant'} "
+                f"-> {_bonjour_remote.get('host') or '?'} "
+                f"-> {_bonjour_ip} "
+                f"(config précédente : {_configured_host})"
+            )
+        else:
+            print(
+                "[Ableton Remote] Bonjour non résolu ; "
+                f"fallback configuration : {ableton_target.host}"
+            )
+
+    except Exception as _bonjour_exc:
+        print(
+            "[Ableton Remote] Découverte Bonjour indisponible ; "
+            f"fallback configuration : {ableton_target.host} "
+            f"({_bonjour_exc})"
+        )
 ableton_transport = OSCTransport(
     host=ableton_target.host,
     send_port=ableton_target.send_port,
@@ -612,9 +718,9 @@ def build_device_state(
     expected_at = float(expected.get("expected_activated_at") or current_time)
     returned_program = returned.get("returned_midi_program")
     returned_at = float(returned.get("returned_received_at") or returned.get("returned_at") or 0)
-    return_recent = bool(returned_at and current_time - returned_at <= 12.0)
+    return_recent = bool(returned_at and current_time - returned_at <= 30.0)
     return_after_intent = bool(
-        return_recent and returned_at >= expected_at - max(0.0, float(remote_return_tolerance))
+        returned_at and returned_at >= expected_at - max(0.0, float(remote_return_tolerance))
     )
     confirmed = bool(
         expected_program is not None and returned_program is not None
@@ -1051,6 +1157,45 @@ def record_ableton_midi_output(
     return True
 
 
+def record_go_midi_expectations(scene_index: int, activated_at: float) -> None:
+    """Fige l'intention MIDI de la scène juste avant son lancement."""
+    with lock:
+        scene_map = state.get("console_scene_map") or {}
+        outgoing = dict(state.get("ableton_midi_output") or {})
+
+        for console_name in ("cl5", "ql1"):
+            device = resolve_device_profile(console_name)
+            if device is None:
+                continue
+
+            candidate = expected_console_scene_for_index(
+                scene_map, console_name, scene_index
+            )
+
+            intent = None
+            if candidate is not None:
+                try:
+                    midi_program = int(candidate.get("midi_program"))
+                except (TypeError, ValueError):
+                    midi_program = -1
+
+                if 0 <= midi_program <= 127:
+                    intent = {
+                        "midi_program": midi_program,
+                        "expected_midi_program": midi_program,
+                        "activated_at": float(activated_at),
+                        "expected_activated_at": float(activated_at),
+                        "scene_index": int(scene_index),
+                        "source": "show_control_go_intent",
+                    }
+
+            outgoing[device.id] = intent
+            if device.legacy_key:
+                outgoing[device.legacy_key] = intent
+
+        state["ableton_midi_output"] = outgoing
+
+
 state: Dict[str, Any] = {
     "current_set_id": None,
     "current_set_name": "",
@@ -1405,7 +1550,7 @@ def state_snapshot_locked() -> Dict[str, Any]:
             )
             return_recent = bool(
                 received_at
-                and now - received_at <= 12.0
+                and now - received_at <= 30.0
             )
             expected = expected_console_scene_for_index(
                 snapshot["console_scene_map"], console_name, active_scene,
@@ -1420,32 +1565,37 @@ def state_snapshot_locked() -> Dict[str, Any]:
                 == "Gestionnaire IAC Bus 1"
                 and int(midi_console.get("expected_monitor_status", -1)) == 0
             )
-            remote_midi_mode = (
-                ableton_target.mode == "remote" and "local_simulator_tx" in console_state
-            )
+            remote_midi_mode = ableton_target.mode == "remote"
             if remote_midi_mode:
-                # Le redémarrage transactionnel provoqué par le changement de
-                # Connexion Ableton OSC constitue une frontière de génération.
-                expected_midi_program = (
-                    console_midi_program if received_at >= SERVER_STARTED_AT else None
+                expected_midi_program = outgoing_intent.get(
+                    "expected_midi_program", outgoing_intent.get("midi_program")
                 )
-                expected_program_source = "ableton_remote_rtp_input" if console_midi_program is not None else "unavailable"
-                console_expected_activated_at = float(received_at or expected_activated_at)
-                simulator_tx = dict(console_state.get("local_simulator_tx") or {})
-                console_midi_program = simulator_tx.get("midi_program")
-                received_at = float(simulator_tx.get("timestamp") or 0)
-                if received_at < SERVER_STARTED_AT:
-                    console_midi_program = None
-                    received_at = 0
-                monitor_title = str(simulator_tx.get("title") or monitor_title).strip()
+                outgoing_activated_at = float(
+                    outgoing_intent.get(
+                        "expected_activated_at",
+                        outgoing_intent.get("activated_at", 0),
+                    ) or 0
+                )
+                if outgoing_activated_at < SERVER_STARTED_AT:
+                    expected_midi_program = None
+                    outgoing_activated_at = 0
+                expected_program_source = (
+                    "ableton_midi_output"
+                    if expected_midi_program is not None
+                    else "unavailable"
+                )
+                console_expected_activated_at = float(
+                    outgoing_activated_at or expected_activated_at
+                )
             else:
                 expected_midi_program = None
                 expected_program_source = "unavailable"
                 console_expected_activated_at = expected_activated_at
             # Vérité canonique EXPECTED :
-            # uniquement le Program Change réellement observé sur l'IAC.
-            # Les intentions M4L et noms de clips Ableton ne doivent jamais
-            # se faire passer pour un Program Change effectivement émis.
+            # en local, Program Change observé sur l'IAC ;
+            # en distant, Program Change confirmé par le retour OSC Ableton.
+            # Les noms de clips Ableton ne doivent jamais se faire passer
+            # pour un Program Change effectivement émis.
             if not remote_midi_mode and (
                 native_iac_monitor_ready
                 and native_iac_program is not None
@@ -1777,6 +1927,46 @@ def reset_live_set_state_locked(set_id: Optional[str], reason: str) -> int:
 def generation_is_current(expected_generation: int) -> bool:
     with lock:
         return int(state.get("set_generation", 0)) == int(expected_generation)
+
+
+def start_midi_expected_udp_listener():
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        sock.bind((MIDI_EXPECTED_UDP_IP, MIDI_EXPECTED_UDP_PORT))
+    except OSError as exc:
+        print(f"MIDI EXPECTED UDP indisponible: {exc}", flush=True)
+        sock.close()
+        return
+
+    print(f"MIDI EXPECTED UDP actif sur {MIDI_EXPECTED_UDP_IP}:{MIDI_EXPECTED_UDP_PORT}", flush=True)
+
+    while True:
+        try:
+            raw, source = sock.recvfrom(4096)
+            payload = json.loads(raw.decode("utf-8"))
+            if not isinstance(payload, dict):
+                continue
+            if payload.get("service") != "cl-midi-expected":
+                continue
+
+            console = str(payload.get("console") or "").strip().lower()
+            if console not in ("cl5", "ql1"):
+                continue
+
+            midi_program = int(payload.get("midi_program"))
+            timestamp = float(payload.get("timestamp") or time.time())
+
+            if record_ableton_midi_output(console, midi_program, activated_at=timestamp):
+                print(
+                    f"MIDI EXPECTED UDP <- {source[0]} {console.upper()} program={midi_program}",
+                    flush=True,
+                )
+        except (ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError):
+            continue
+        except OSError as exc:
+            print(f"MIDI EXPECTED UDP erreur: {exc}", flush=True)
+            time.sleep(0.2)
 
 
 def osc_reply(address, *args, source_host=None):
@@ -6560,6 +6750,7 @@ def shutdown():
         if callable(shutdown_callback):
             shutdown_callback()
         else:
+            stop_midi_expected_bonjour_publisher()
             os.kill(os.getpid(), signal.SIGTERM)
 
     threading.Thread(target=stop_process, daemon=True).start()
@@ -6970,6 +7161,8 @@ def execute_go_transaction(request_id: str, expected_generation: int, scene_numb
                 scene_index,
                 requested_name,
             )
+
+            record_go_midi_expectations(scene_index, intent_started_at)
 
             # Le lancement utilise l'index de la transaction, jamais selected_scene.
             send("/live/scene/fire_as_selected", scene_index)
@@ -7860,6 +8053,8 @@ if __name__ == "__main__":
             state["message"] = "Bibliothèques historiques migrées sans supprimer les originaux"
     threading.Thread(target=start_osc_server, daemon=True).start()
     threading.Thread(target=start_ltc_udp_listener, daemon=True).start()
+    threading.Thread(target=start_midi_expected_udp_listener, daemon=True).start()
+    start_midi_expected_bonjour_publisher()
     threading.Thread(target=background_refresh, daemon=True).start()
     threading.Thread(target=scan_scene_names_async, kwargs={"limit": 120, "clear_before_scan": True}, daemon=True).start()
     info = build_server_info()

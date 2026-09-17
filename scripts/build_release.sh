@@ -336,12 +336,14 @@ mkdir -p \
   "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/MacOS" \
   "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/Resources"
 ditto "$PROJECT_ROOT/assets/app_icons/CL_MIDI_RTP.icns" "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/Resources/CL_MIDI_RTP.icns"
-for tool in CLMIDINetworkGuardian CLMIDIRTPAgent CLMIDIRoundTripTester CLMIDIRTPResponder CLYamahaConsoleSimulator CLMIDINetworkDashboard CLAudioConfigurationChecker; do
+for tool in CLMIDINetworkGuardian CLMIDIRTPAgent CLMIDIDirectBridge CLMIDIRoundTripTester CLMIDIRTPResponder CLYamahaConsoleSimulator CLMIDINetworkDashboard CLAudioConfigurationChecker; do
   ditto "$BUILD_ROOT/midi-tools/$tool" "$KIT_ROOT/CL MIDI Network Tools/$tool"
   ditto "$BUILD_ROOT/midi-tools/$tool" "$KIT_ROOT/CL MIDI Network Manager.app/Contents/Resources/Network Tools/$tool"
 done
 ditto "$BUILD_ROOT/midi-tools/CLMIDIRTPAgent" "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/MacOS/CL MIDI RTP Agent"
+ditto "$BUILD_ROOT/midi-tools/CLMIDIDirectBridge" "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/MacOS/CLMIDIDirectBridge"
 chmod +x "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/MacOS/CL MIDI RTP Agent"
+chmod +x "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/MacOS/CLMIDIDirectBridge"
 cat > "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

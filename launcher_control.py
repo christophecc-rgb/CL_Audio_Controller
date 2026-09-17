@@ -394,11 +394,25 @@ def run_embedded_server():
     if getattr(sys, "frozen", False):
         resources_dir = Path(sys.executable).resolve().parents[1] / "Resources"
         module.app.template_folder = str(resources_dir / "templates")
-    for target_name in ("start_osc_server", "start_ltc_udp_listener", "background_refresh", "scan_scene_names_async"):
+    for target_name in (
+        "start_osc_server",
+        "start_ltc_udp_listener",
+        "start_midi_expected_udp_listener",
+        "background_refresh",
+        "scan_scene_names_async",
+    ):
         target = getattr(module, target_name, None)
         if callable(target):
             kwargs = {"limit": 120, "clear_before_scan": True} if target_name == "scan_scene_names_async" else {}
             threading.Thread(target=target, kwargs=kwargs, daemon=True).start()
+
+    start_expected_bonjour = getattr(
+        module,
+        "start_midi_expected_bonjour_publisher",
+        None,
+    )
+    if callable(start_expected_bonjour):
+        start_expected_bonjour()
 
     module.app.run(host="0.0.0.0", port=WEB_PORT, debug=False, use_reloader=False, threaded=True)
 
@@ -1548,7 +1562,7 @@ body.show-mode .console-title{
       <div class="network-title-row"><div class="access-head">Connexion AbletonOSC</div><span id="modeBadge" class="mode-badge">MODE LOCAL</span><span id="networkLtc" class="network-timecode offline">--:--:--:--</span></div>
       <div class="network-grid">
         <label>MODE GÉNÉRAL<select id="abletonMode" onchange="updateNetworkFields()"><option value="local">Ableton local</option><option value="remote">Ableton distant</option></select></label>
-        <label>Adresse Ableton<input id="abletonHost" value="127.0.0.1"></label>
+        <label>Adresse Ableton active<input id="abletonHost" value="127.0.0.1"></label>
         <div class="ports-readonly"><span>Ports AbletonOSC fixes</span><strong><span id="abletonSendPort">11000</span> → <span id="abletonReplyPort">11001</span></strong></div>
       </div>
       <div class="network-buttons">
@@ -1669,6 +1683,14 @@ function render(s){
   el('orphanCard').className='card orphan '+(s.orphan_actions_available?'show':'');
   if(s.orphan_actions_available)el('orphanDetail').textContent='Instance '+s.orphan_instance_id+' · PID '+s.orphan_process_id+' · '+s.build_id;
   if(!networkFormInitialized&&s.ableton_profiles)initializeNetworkForm(s);
+  const activeTarget=s.ableton_server_target||{};
+  const activeMode=activeTarget.mode||s.ableton_active_mode||'local';
+  const activeHost=activeTarget.host||'';
+  if(!networkFormDirty){
+    el('abletonHost').value=activeMode==='remote'
+      ? (activeHost||'')
+      : '127.0.0.1';
+  }
   if(s.ableton_config){el('techAbletonMode').textContent='Ableton · '+(s.ableton_config.mode==='local'?'Local':'Distant');el('techAbletonAddress').textContent=s.ableton_config.host+':'+s.ableton_config.send_port+' → '+s.ableton_config.reply_port;el('techOscLabel').textContent='OSC aller · '+s.ableton_config.send_port;el('techReturnLabel').textContent='OSC retour · '+s.ableton_config.reply_port;}
   el('ltcDestination').textContent=s.ltc_destination+':'+s.ltc_port;
   if(s.osc_transport){el('techAbletonLatency').textContent='Dernière réponse · '+(s.osc_transport.last_latency_ms==null?'—':Math.round(s.osc_transport.last_latency_ms)+' ms');el('techAbletonTimeouts').textContent='Timeouts · '+s.osc_transport.timeout_count;}

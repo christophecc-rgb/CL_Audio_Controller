@@ -17,6 +17,11 @@ clang -arch arm64 -arch x86_64 -mmacosx-version-min=10.15 -fobjc-arc -fblocks \
 
 clang -arch arm64 -arch x86_64 -mmacosx-version-min=10.15 -fobjc-arc -fblocks \
   -framework Foundation -framework CoreMIDI \
+  "$SCRIPT_DIR/CLMIDIDirectBridge.m" \
+  -o "$OUTPUT_DIR/CLMIDIDirectBridge"
+
+clang -arch arm64 -arch x86_64 -mmacosx-version-min=10.15 -fobjc-arc -fblocks \
+  -framework Foundation -framework CoreMIDI \
   "$SCRIPT_DIR/CLYamahaConsoleSimulator.m" \
   -o "$OUTPUT_DIR/CLYamahaConsoleSimulator"
 
@@ -86,6 +91,7 @@ MACOSX_DEPLOYMENT_TARGET=10.15 clang -arch arm64 -arch x86_64 -fobjc-arc -fblock
   -o "$OUTPUT_DIR/CLMIDIAnalyzer"
 echo "$OUTPUT_DIR/CLMIDINetworkGuardian"
 echo "$OUTPUT_DIR/CLMIDIRTPAgent"
+echo "$OUTPUT_DIR/CLMIDIDirectBridge"
 echo "$OUTPUT_DIR/CLYamahaConsoleSimulator"
 echo "$OUTPUT_DIR/CLMIDIRTPResponder"
 echo "$OUTPUT_DIR/CLMIDIRoundTripTester"

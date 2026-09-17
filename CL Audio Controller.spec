@@ -6,6 +6,7 @@ a = Analysis(
     binaries=[],
     datas=[
         ('app.py', '.'),
+        ('config/ableton_remote_discovery.json', 'config'),
         ('device_profiles.py', '.'),
         ('show_cues.py', '.'),
         ('showcue_builder.py', '.'),
@@ -23,7 +24,7 @@ a = Analysis(
         ('show_cues.json', '.'),
         ('show_cues_audio', 'show_cues_audio'),
     ],
-    hiddenimports=['app', 'pypdf', 'showcue_pdf_import', 'showcue_session_archive', 'cl_transport', 'show_audio_print_engine', 'osc_transport', 'ltc_receiver', 'show_cues', 'showcue_builder', 'device_profiles', 'pythonosc.dispatcher', 'pythonosc.osc_server', 'pythonosc.udp_client'],
+    hiddenimports=['app', 'pypdf', 'showcue_pdf_import', 'showcue_session_archive', 'cl_transport', 'show_audio_print_engine', 'osc_transport', 'bonjour_remote', 'ltc_receiver', 'show_cues', 'showcue_builder', 'device_profiles', 'pythonosc.dispatcher', 'pythonosc.osc_server', 'pythonosc.udp_client'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

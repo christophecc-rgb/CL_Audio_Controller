@@ -139,7 +139,7 @@ static NSString *CLArgument(NSString *command, NSString *name) {
             NSString *validation = console[@"validation_status"] ?: @""; id age = console[@"last_return_age_seconds"];
             if (!validation.length) {
                 if (!expected) validation = @"unavailable";
-                else if (age != nil && age != NSNull.null && [age doubleValue] > 12.0) validation = @"stale";
+                else if (age != nil && age != NSNull.null && [age doubleValue] > 30.0) validation = @"stale";
                 else if (returned && [expected integerValue] == [returned integerValue]) validation = @"confirmed";
                 else if (returned) validation = @"mismatch"; else validation = @"waiting";
             }

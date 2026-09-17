@@ -201,6 +201,8 @@ prepare_rtp_agent_replacement() {
   local legacy_executable="$USER_APPS/CL MIDI RTP Agent.app/Contents/MacOS/CL MIDI RTP Agent"
   local executable pid
 
+  /usr/bin/pkill -f 'CLMIDIDirectBridge' >/dev/null 2>&1 || true
+
   [[ "$INSTALL_HOME" == "$HOME" ]] || return 0
 
   /bin/launchctl bootout "gui/$(id -u)/com.claudio.midi-rtp-agent" >/dev/null 2>&1 || true
@@ -472,6 +474,7 @@ if [[ "$INSTALL_ABLETON_READER" == 1 ]]; then
     # Une instance peut avoir été relancée automatiquement entre-temps.
     # On nettoie toutes les instances RTP avant le bootstrap launchd final.
     /usr/bin/pkill -f 'CL MIDI RTP Agent\.app/Contents/MacOS/CL MIDI RTP Agent' >/dev/null 2>&1 || true
+    /usr/bin/pkill -f 'CLMIDIDirectBridge' >/dev/null 2>&1 || true
     sleep 1
 
     # launchd devient l'unique propriétaire du processus.
