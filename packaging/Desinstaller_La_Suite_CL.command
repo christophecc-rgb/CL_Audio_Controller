@@ -2,6 +2,9 @@
 set -euo pipefail
 
 INSTALL_HOME="${CL_SUITE_INSTALL_HOME:-$HOME}"
+USER_APPS="$INSTALL_HOME/Applications"
+PROD_APPS="$USER_APPS/Prod Ableton"
+MIDI_NETWORK_APPS="$USER_APPS/Analyse - Réseau - MIDI"
 SUPPORT_DIR="$INSTALL_HOME/Library/Application Support/CL Audio Controller"
 INSTALL_MANIFEST="$SUPPORT_DIR/CL_Suite_install_manifest.tsv"
 TRASH_ROOT="${CL_SUITE_TRASH_DIR:-$INSTALL_HOME/.Trash}"
@@ -122,11 +125,12 @@ is_allowed_target() {
     "$INSTALL_HOME/Applications/CL Audio Controller.app"|\
     "$INSTALL_HOME/Applications/CL ShowCue.app"|\
     "$INSTALL_HOME/Applications/CL Cue Editor.app"|\
-    "$INSTALL_HOME/Applications/CL MIDI & RTP Diagnostic.app"|\
-    "$INSTALL_HOME/Applications/CL MIDI Analyzer.app"|\
-    "$INSTALL_HOME/Applications/CL MIDI Performance Monitor.app"|\
-    "$INSTALL_HOME/Applications/CL Arrangement Builder.app"|\
-    "$INSTALL_HOME/Applications/CL Audio Export.app"|\
+    "$MIDI_NETWORK_APPS/CL MIDI & RTP Diagnostic.app"|\
+    "$MIDI_NETWORK_APPS/CL MIDI Analyzer.app"|\
+    "$MIDI_NETWORK_APPS/CL MIDI Performance Monitor.app"|\
+    "$PROD_APPS/CL Arrangement Builder.app"|\
+    "$PROD_APPS/CL Audio Export.app"|\
+    "$PROD_APPS/CL Ableton Remote.app"|\
     "$INSTALL_HOME/Applications/CL Audio Configuration Checker.app"|\
     "$INSTALL_HOME/Music/Ableton/User Library/Remote Scripts/AbletonOSC"|\
     "$INSTALL_HOME/Music/Ableton/User Library/Remote Scripts/CL_Arrangement_Builder_Live"|\
@@ -135,9 +139,9 @@ is_allowed_target() {
     "$INSTALL_HOME/Music/Ableton/User Library/Presets/Audio Effects/Max Audio Effect/CL Audio Controller - Live 10"|\
     "$INSTALL_HOME/Music/Ableton/User Library/Presets/MIDI Effects/Max MIDI Effect/CL MIDI Console Monitor"|\
     "$INSTALL_HOME/Library/Application Support/CL MIDI Console/Network Tools"|\
-    "$INSTALL_HOME/Applications/CL MIDI Network Manager.app"|\
+    "$MIDI_NETWORK_APPS/CL MIDI Network Manager.app"|\
     "$INSTALL_HOME/Applications/CL MIDI Network Assistant.app"|\
-    "$INSTALL_HOME/Applications/CL MIDI RTP Agent.app"|\
+    "$MIDI_NETWORK_APPS/CL MIDI RTP Agent.app"|\
     "$INSTALL_HOME/Applications/CL MIDI RTP Simulator.app"|\
     "$INSTALL_HOME/Applications/CL MIDI RTP Receiver.app") return 0 ;;
     *) return 1 ;;

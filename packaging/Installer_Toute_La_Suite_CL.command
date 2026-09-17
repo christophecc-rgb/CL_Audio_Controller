@@ -10,6 +10,8 @@ LIVE10_SOURCE_ROOT="$COMPONENTS_ROOT/Ableton Live 10"
 MIDI_TOOLS_SOURCE="$COMPONENTS_ROOT/Outils réseau MIDI"
 INSTALL_HOME="${CL_SUITE_INSTALL_HOME:-$HOME}"
 USER_APPS="$INSTALL_HOME/Applications"
+PROD_APPS="$USER_APPS/Prod Ableton"
+MIDI_NETWORK_APPS="$USER_APPS/Analyse - Réseau - MIDI"
 SUPPORT_DIR="$INSTALL_HOME/Library/Application Support/CL Audio Controller"
 INSTALL_MANIFEST="$SUPPORT_DIR/CL_Suite_install_manifest.tsv"
 STAMP="$(date '+%Y-%m-%d_%H%M%S')"
@@ -195,20 +197,37 @@ prepare_controller_replacement() {
 }
 
 prepare_rtp_agent_replacement() {
-  local executable="$USER_APPS/CL MIDI RTP Agent.app/Contents/MacOS/CL MIDI RTP Agent" pid
+  local new_executable="$MIDI_NETWORK_APPS/CL MIDI RTP Agent.app/Contents/MacOS/CL MIDI RTP Agent"
+  local legacy_executable="$USER_APPS/CL MIDI RTP Agent.app/Contents/MacOS/CL MIDI RTP Agent"
+  local executable pid
+
   [[ "$INSTALL_HOME" == "$HOME" ]] || return 0
+
   /bin/launchctl bootout "gui/$(id -u)/com.claudio.midi-rtp-agent" >/dev/null 2>&1 || true
-  while IFS= read -r pid; do
-    [[ "$pid" =~ ^[0-9]+$ ]] || continue
-    kill -TERM "$pid" 2>/dev/null || true
-  done < <(/usr/bin/pgrep -f -x "$executable" 2>/dev/null || true)
-  for _ in 1 2 3 4 5 6 7 8 9 10; do
-    /usr/bin/pgrep -f -x "$executable" >/dev/null 2>&1 || break
-    sleep 0.2
+
+  # Arrête aussi bien l'ancien emplacement que le nouveau.
+  for executable in "$new_executable" "$legacy_executable"; do
+    while IFS= read -r pid; do
+      [[ "$pid" =~ ^[0-9]+$ ]] || continue
+      kill -TERM "$pid" 2>/dev/null || true
+    done < <(/usr/bin/pgrep -f -x "$executable" 2>/dev/null || true)
   done
-  if /usr/bin/pgrep -f -x "$executable" >/dev/null 2>&1; then
-    fail "CL MIDI RTP Agent fonctionne encore après la demande d’arrêt propre"
-  fi
+
+  # Laisse le temps aux deux processus de réellement disparaître.
+  for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    if ! /usr/bin/pgrep -f -x "$new_executable" >/dev/null 2>&1 \
+       && ! /usr/bin/pgrep -f -x "$legacy_executable" >/dev/null 2>&1; then
+      break
+    fi
+    sleep 0.25
+  done
+
+  /usr/bin/pgrep -f -x "$new_executable" >/dev/null 2>&1 \
+    && fail "CL MIDI RTP Agent fonctionne encore au nouvel emplacement après la demande d’arrêt propre"
+
+  /usr/bin/pgrep -f -x "$legacy_executable" >/dev/null 2>&1 \
+    && fail "L’ancien CL MIDI RTP Agent fonctionne encore après la demande d’arrêt propre"
+
   rm -f "$INSTALL_HOME/Library/LaunchAgents/com.claudio.midi-rtp-agent.plist"
 }
 
@@ -232,9 +251,10 @@ retire_legacy_app_names() {
     "$USER_APPS/CL Show Control.app")
       trash_existing "$USER_APPS/CL Audio Show Control.app"
       trash_existing "$USER_APPS/CL Audio Controller.app" ;;
-    "$USER_APPS/CL Audio Export.app") trash_existing "$USER_APPS/CL Show Audio Builder.app" ;;
+    "$PROD_APPS/CL Audio Export.app") trash_existing "$USER_APPS/CL Show Audio Builder.app" ;;
     "$USER_APPS/CL Cue Editor.app") trash_existing "$USER_APPS/CL ShowCue Builder.app" ;;
-    "$USER_APPS/CL Arrangement Builder.app") trash_existing "$USER_APPS/Arrangement Builder Live.app" ;;
+    "$PROD_APPS/CL Arrangement Builder.app") trash_existing "$USER_APPS/Arrangement Builder Live.app" ;;
+    "$MIDI_NETWORK_APPS/CL MIDI RTP Agent.app") trash_existing "$USER_APPS/CL MIDI RTP Agent.app" ;;
   esac
   return 0
 }
@@ -379,7 +399,7 @@ fi
 
 say ""; say "Vérification de l'intégrité du kit…"
 verify_selected_components
-mkdir -p "$USER_APPS" "$REMOTE_SCRIPTS" "$ABLETON_LIBRARY/Presets"
+mkdir -p "$USER_APPS" "$PROD_APPS" "$MIDI_NETWORK_APPS" "$REMOTE_SCRIPTS" "$ABLETON_LIBRARY/Presets"
 
 [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 || "$INSTALL_SHOWCUE" == 1 ]] && prepare_controller_replacement
 [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 || "$INSTALL_SHOWCUE" == 1 ]] && install_item "$APPLICATIONS_SOURCE/CL Show Control.app" "$USER_APPS/CL Show Control.app" "Centre de contrôle — CL Show Control" "controller"
@@ -400,13 +420,13 @@ if [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 || "$INSTALL_SHOWCUE"
   fi
 fi
 if [[ "$INSTALL_DIAGNOSTIC_TOOLS" == 1 ]]; then
-  install_item "$APPLICATIONS_SOURCE/CL MIDI & RTP Diagnostic.app" "$USER_APPS/CL MIDI & RTP Diagnostic.app" "Diagnostic — MIDI & RTP" "diagnostic-tools"
-  install_item "$APPLICATIONS_SOURCE/CL MIDI Analyzer.app" "$USER_APPS/CL MIDI Analyzer.app" "Diagnostic — MIDI Analyzer" "diagnostic-tools"
-  install_item "$APPLICATIONS_SOURCE/CL MIDI Performance Monitor.app" "$USER_APPS/CL MIDI Performance Monitor.app" "Diagnostic — Performance Monitor" "diagnostic-tools"
+  install_item "$APPLICATIONS_SOURCE/CL MIDI & RTP Diagnostic.app" "$MIDI_NETWORK_APPS/CL MIDI & RTP Diagnostic.app" "Diagnostic — MIDI & RTP" "diagnostic-tools"
+  install_item "$APPLICATIONS_SOURCE/CL MIDI Analyzer.app" "$MIDI_NETWORK_APPS/CL MIDI Analyzer.app" "Diagnostic — MIDI Analyzer" "diagnostic-tools"
+  install_item "$APPLICATIONS_SOURCE/CL MIDI Performance Monitor.app" "$MIDI_NETWORK_APPS/CL MIDI Performance Monitor.app" "Diagnostic — Performance Monitor" "diagnostic-tools"
 fi
 if [[ "$INSTALL_CONTROLLER" == 1 ]]; then
   install_item "$MIDI_TOOLS_SOURCE" "$MIDI_TOOLS_TARGET" "Télécommande — Outils diagnostic réseau MIDI" "controller"
-  install_item "$APPLICATIONS_SOURCE/CL MIDI Network Manager.app" "$USER_APPS/CL MIDI Network Manager.app" "Gestion réseau — CL MIDI Network Manager" "controller"
+  install_item "$APPLICATIONS_SOURCE/CL MIDI Network Manager.app" "$MIDI_NETWORK_APPS/CL MIDI Network Manager.app" "Gestion réseau — CL MIDI Network Manager" "controller"
 fi
 if [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_ABLETON_READER" == 1 ]]; then
   install_item "$LIVE_CURRENT_SOURCE/Remote Scripts/AbletonOSC" "$REMOTE_SCRIPTS/AbletonOSC" "Ableton Lecteur — AbletonOSC CL" "ableton-reader"
@@ -414,43 +434,50 @@ if [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_ABLETON_READER" == 1 ]]; then
 fi
 if [[ "$INSTALL_ABLETON_READER" == 1 ]]; then
   prepare_rtp_agent_replacement
-  install_item "$APPLICATIONS_SOURCE/CL MIDI RTP Agent.app" "$USER_APPS/CL MIDI RTP Agent.app" "Ableton Lecteur — Agent RTP léger" "ableton-reader"
+  install_item "$APPLICATIONS_SOURCE/CL MIDI RTP Agent.app" "$MIDI_NETWORK_APPS/CL MIDI RTP Agent.app" "Ableton Lecteur — Agent RTP léger" "ableton-reader"
   if [[ "$INSTALL_HOME" == "$HOME" && "${CL_SUITE_SKIP_POSTINSTALL:-0}" != "1" ]]; then
     say ""; say "Ableton Lecteur — Activation du démarrage automatique RTP"
     # LaunchServices peut retourner -1712 alors que l’agent a bien démarré :
     # l’état réel (processus + LaunchAgent) fait foi.
-    /usr/bin/open -gj "$USER_APPS/CL MIDI RTP Agent.app" >/dev/null 2>&1 || true
-    for _ in 1 2 3 4 5; do
+    RTP_AGENT_EXEC="$MIDI_NETWORK_APPS/CL MIDI RTP Agent.app/Contents/MacOS/CL MIDI RTP Agent"
+
+    # Agent de fond : lancement direct du binaire.
+    # Évite les délais/cache LaunchServices juste après remplacement du bundle.
+    "$RTP_AGENT_EXEC" >/dev/null 2>&1 &
+    # L'agent peut enregistrer son LaunchAgent puis être relancé par launchd.
+    # On laisse jusqu'à 15 secondes avant de conclure à un échec.
+    for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
       if [[ -f "$INSTALL_HOME/Library/LaunchAgents/com.claudio.midi-rtp-agent.plist" ]] \
-        && /usr/bin/pgrep -f -x "$USER_APPS/CL MIDI RTP Agent.app/Contents/MacOS/CL MIDI RTP Agent" >/dev/null 2>&1; then
+        && /usr/bin/pgrep -f -x "$MIDI_NETWORK_APPS/CL MIDI RTP Agent.app/Contents/MacOS/CL MIDI RTP Agent" >/dev/null 2>&1; then
         break
       fi
       sleep 1
     done
     [[ -f "$INSTALL_HOME/Library/LaunchAgents/com.claudio.midi-rtp-agent.plist" ]] \
       || fail "CL MIDI RTP Agent n’a pas enregistré son démarrage automatique"
-    /usr/bin/pgrep -f -x "$USER_APPS/CL MIDI RTP Agent.app/Contents/MacOS/CL MIDI RTP Agent" >/dev/null 2>&1 \
+    /usr/bin/pgrep -f -x "$MIDI_NETWORK_APPS/CL MIDI RTP Agent.app/Contents/MacOS/CL MIDI RTP Agent" >/dev/null 2>&1 \
       || fail "CL MIDI RTP Agent ne fonctionne pas après son lancement"
     say "  ✓ Agent RTP actif et enregistré pour les prochaines ouvertures de session"
   fi
 fi
 if [[ "$INSTALL_BUILDER" == 1 ]]; then
-  install_item "$APPLICATIONS_SOURCE/CL Arrangement Builder.app" "$USER_APPS/CL Arrangement Builder.app" "Builder — Application" "builder"
+  install_item "$APPLICATIONS_SOURCE/CL Arrangement Builder.app" "$PROD_APPS/CL Arrangement Builder.app" "Builder — Application" "builder"
   install_item "$LIVE_CURRENT_SOURCE/Remote Scripts/CL_Arrangement_Builder_Live" "$REMOTE_SCRIPTS/CL_Arrangement_Builder_Live" "Builder — Remote Script" "builder"
 fi
 if [[ "$INSTALL_SHOW_AUDIO_BUILDER" == 1 ]]; then
-  install_item "$APPLICATIONS_SOURCE/CL Audio Export.app" "$USER_APPS/CL Audio Export.app" "Show Audio Builder — Application" "show-audio-builder"
+  install_item "$APPLICATIONS_SOURCE/CL Audio Export.app" "$PROD_APPS/CL Audio Export.app" "Show Audio Builder — Application" "show-audio-builder"
+  install_item "$APPLICATIONS_SOURCE/CL Ableton Remote.app" "$PROD_APPS/CL Ableton Remote.app" "Ableton — Télécommande" "controller"
 fi
 [[ "$INSTALL_AUTOSCENE" == 1 ]] && install_item "$LIVE_CURRENT_SOURCE/Max for Live/Paradis Latin AutoScene" "$M4L_AUTOSCENE_TARGET" "AutoScene — Version Live 11/12" "autoscene"
 [[ "$INSTALL_AUTOSCENE_LIVE10" == 1 ]] && install_item "$LIVE10_SOURCE_ROOT/Max for Live/Paradis Latin AutoScene - Live 10" "$M4L_LIVE10_TARGET" "AutoScene — Version Live 10" "autoscene-live10"
 if [[ "$INSTALL_MIDI_CONSOLE" == 1 ]]; then
   install_item "$LIVE_CURRENT_SOURCE/Max for Live/CL MIDI Console Monitor" "$M4L_MIDI_CONSOLE_TARGET" "MIDI Console — Périphérique Max for Live" "midi-console"
   [[ "$INSTALL_CONTROLLER" != 1 ]] && install_item "$MIDI_TOOLS_SOURCE" "$MIDI_TOOLS_TARGET" "MIDI Console — Outils réseau" "midi-console"
-  [[ "$INSTALL_CONTROLLER" != 1 ]] && install_item "$APPLICATIONS_SOURCE/CL MIDI Network Manager.app" "$USER_APPS/CL MIDI Network Manager.app" "MIDI Console — Gestionnaire réseau" "midi-console"
+  [[ "$INSTALL_CONTROLLER" != 1 ]] && install_item "$APPLICATIONS_SOURCE/CL MIDI Network Manager.app" "$MIDI_NETWORK_APPS/CL MIDI Network Manager.app" "MIDI Console — Gestionnaire réseau" "midi-console"
 fi
 if [[ ( "$INSTALL_CONTROLLER" == 1 || "$INSTALL_MIDI_CONSOLE" == 1 ) && "$INSTALL_HOME" == "$HOME" && "${CL_SUITE_SKIP_POSTINSTALL:-0}" != "1" ]]; then
   say ""; say "Télécommande — Activation de la reconnexion RTP au démarrage"
-  /usr/bin/open -gj "$USER_APPS/CL MIDI Network Manager.app" --args --background-monitor >/dev/null 2>&1 || true
+  /usr/bin/open -gj "$MIDI_NETWORK_APPS/CL MIDI Network Manager.app" --args --background-monitor >/dev/null 2>&1 || true
   for _ in 1 2 3 4 5; do
     [[ -f "$HOME/Library/LaunchAgents/com.claudio.midi-network-monitor.plist" ]] && break
     sleep 1

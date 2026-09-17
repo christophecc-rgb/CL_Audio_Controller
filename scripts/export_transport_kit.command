@@ -187,21 +187,22 @@ mkdir -p \
 
 echo
 echo "Assemblage des applications et composants…"
-ditto "$CONTROLLER_ROOT/CL Show Control.app" "$COMPONENTS_ROOT/Applications/CL Show Control.app"
+ditto "$CONTROLLER_ROOT/01 — Applications principales/CL Show Control.app" "$COMPONENTS_ROOT/Applications/CL Show Control.app"
+ditto "$CONTROLLER_ROOT/02 — Production/CL Ableton Remote.app" "$COMPONENTS_ROOT/Applications/CL Ableton Remote.app"
 ditto "$SHOW_AUDIO_APP" "$COMPONENTS_ROOT/Applications/CL Audio Export.app"
 for showcue_name in "CL ShowCue" "CL Cue Editor"; do
   ditto "$BUILD_ROOT/showcue-dist/$showcue_name.app" "$COMPONENTS_ROOT/Applications/$showcue_name.app"
 done
 ditto "$SUITE_ROOT/CL_Transport" "$COMPONENTS_ROOT/CL_Transport"
 
-ditto "$CONTROLLER_ROOT/CL MIDI Network Manager.app" "$COMPONENTS_ROOT/Applications/CL MIDI Network Manager.app"
-ditto "$CONTROLLER_ROOT/CL MIDI RTP Agent.app" "$COMPONENTS_ROOT/Applications/CL MIDI RTP Agent.app"
-ditto "$CONTROLLER_ROOT/CL MIDI & RTP Diagnostic.app" "$COMPONENTS_ROOT/Applications/CL MIDI & RTP Diagnostic.app"
-ditto "$CONTROLLER_ROOT/CL MIDI Analyzer.app" "$COMPONENTS_ROOT/Applications/CL MIDI Analyzer.app"
-ditto "$CONTROLLER_ROOT/CL MIDI Performance Monitor.app" "$COMPONENTS_ROOT/Applications/CL MIDI Performance Monitor.app"
+ditto "$CONTROLLER_ROOT/03 — MIDI & Réseau/CL MIDI Network Manager.app" "$COMPONENTS_ROOT/Applications/CL MIDI Network Manager.app"
+ditto "$CONTROLLER_ROOT/03 — MIDI & Réseau/CL MIDI RTP Agent.app" "$COMPONENTS_ROOT/Applications/CL MIDI RTP Agent.app"
+ditto "$CONTROLLER_ROOT/03 — MIDI & Réseau/CL MIDI & RTP Diagnostic.app" "$COMPONENTS_ROOT/Applications/CL MIDI & RTP Diagnostic.app"
+ditto "$CONTROLLER_ROOT/03 — MIDI & Réseau/CL MIDI Analyzer.app" "$COMPONENTS_ROOT/Applications/CL MIDI Analyzer.app"
+ditto "$CONTROLLER_ROOT/03 — MIDI & Réseau/CL MIDI Performance Monitor.app" "$COMPONENTS_ROOT/Applications/CL MIDI Performance Monitor.app"
 ditto "$BUILDER_APP" "$COMPONENTS_ROOT/Applications/CL Arrangement Builder.app"
 
-ditto "$CONTROLLER_ROOT/AbletonOSC CL/AbletonOSC" "$COMPONENTS_ROOT/Ableton Live 11-12/Remote Scripts/AbletonOSC"
+ditto "$CONTROLLER_ROOT/04 — Ableton & Max for Live/AbletonOSC CL/AbletonOSC" "$COMPONENTS_ROOT/Ableton Live 11-12/Remote Scripts/AbletonOSC"
 ditto "$BUILDER_DIR/RemoteScript" "$COMPONENTS_ROOT/Ableton Live 11-12/Remote Scripts/CL_Arrangement_Builder_Live"
 
 for file in "XFADER OSC BRIDGE v8.amxd" "LTC Display v2.0 Remote Config.amxd" cache.js; do
@@ -216,7 +217,7 @@ done
 for file in "Paradis Latin AutoScene - Live 10.amxd" "Paradis Latin AutoScene - Live 10.maxpat" ParadisLatin_AutoScene.js paradis_latin_logo.jpg; do
   ditto "$PROJECT_DIR/M4L/Install/$file" "$COMPONENTS_ROOT/Ableton Live 10/Max for Live/Paradis Latin AutoScene - Live 10/$file"
 done
-ditto "$CONTROLLER_ROOT/CL MIDI Network Tools" "$COMPONENTS_ROOT/Outils réseau MIDI"
+ditto "$CONTROLLER_ROOT/03 — MIDI & Réseau/CL MIDI Network Tools" "$COMPONENTS_ROOT/Outils réseau MIDI"
 
 # Les caches trouvés dans d'anciens livrables Builder ne sont jamais requis à
 # l'exécution. Ils sont retirés uniquement de la copie temporaire distribuée.
