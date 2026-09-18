@@ -1719,7 +1719,8 @@ function render(s){
     card.classList.toggle('unavailable',!supported);
     card.querySelector('.console-program span').textContent=showReturned?value.returned_scene_memory:(value.expected_scene_memory??'—');
     const title=card.querySelector('.console-title');title.textContent=value.library?((showReturned?value.returned_title:value.expected_title)||'Titre console non résolu'):'';title.hidden=!value.library;
-    card.querySelector('.console-state').textContent=!supported?'Non actif en production':status==='confirmed'?'✓ Synchronisée':status==='mismatch'?'⚠ Divergence · attendu mémoire '+(value.expected_scene_memory??'—'):status==='stale'?'':status==='local_fallback'?'En attente du retour MIDI':'En attente du retour console';
+    const hasReturnedConsole=value.returned_scene_memory!=null||value.returned_midi_program!=null;
+    card.querySelector('.console-state').textContent=!supported?'Non actif en production':status==='confirmed'?'✓ Synchronisée':status==='mismatch'?'⚠ Divergence · attendu mémoire '+(value.expected_scene_memory??'—'):status==='stale'?'':status==='local_fallback'?'En attente du retour MIDI':status==='unavailable'&&hasReturnedConsole?'Retour console reçu':'En attente du retour console';
     card.querySelector('.console-meta').textContent=supported&&legacy?'Offset titre '+formatOffset(value.title_offset??offsets[legacy]??0)+(value.received_at?' · retour reçu':''):('Canal MIDI '+(value.midi_channel||'—'));
   };
   devices.forEach(renderConsole);

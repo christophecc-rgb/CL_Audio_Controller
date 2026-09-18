@@ -337,8 +337,17 @@ mkdir -p \
   "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/Resources"
 ditto "$PROJECT_ROOT/assets/app_icons/CL_MIDI_RTP.icns" "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/Resources/CL_MIDI_RTP.icns"
 for tool in CLMIDINetworkGuardian CLMIDIRTPAgent CLMIDIDirectBridge CLMIDIRoundTripTester CLMIDIRTPResponder CLYamahaConsoleSimulator CLMIDINetworkDashboard CLAudioConfigurationChecker; do
+  verify_universal "$BUILD_ROOT/midi-tools/$tool"
+  sign_universal_binary "$BUILD_ROOT/midi-tools/$tool"
+  /usr/bin/codesign --verify --strict "$BUILD_ROOT/midi-tools/$tool"
+
   ditto "$BUILD_ROOT/midi-tools/$tool" "$KIT_ROOT/CL MIDI Network Tools/$tool"
   ditto "$BUILD_ROOT/midi-tools/$tool" "$KIT_ROOT/CL MIDI Network Manager.app/Contents/Resources/Network Tools/$tool"
+
+  chmod +x     "$KIT_ROOT/CL MIDI Network Tools/$tool"     "$KIT_ROOT/CL MIDI Network Manager.app/Contents/Resources/Network Tools/$tool"
+
+  /usr/bin/codesign --verify --strict     "$KIT_ROOT/CL MIDI Network Tools/$tool"
+  /usr/bin/codesign --verify --strict     "$KIT_ROOT/CL MIDI Network Manager.app/Contents/Resources/Network Tools/$tool"
 done
 ditto "$BUILD_ROOT/midi-tools/CLMIDIRTPAgent" "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/MacOS/CL MIDI RTP Agent"
 ditto "$BUILD_ROOT/midi-tools/CLMIDIDirectBridge" "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/MacOS/CLMIDIDirectBridge"
@@ -359,7 +368,9 @@ cat > "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/Info.plist" <<EOF
 <key>LSMinimumSystemVersion</key><string>10.15</string>
 </dict></plist>
 EOF
+xattr -cr "$KIT_ROOT/CL MIDI RTP Agent.app"
 codesign --force --deep --sign - "$KIT_ROOT/CL MIDI RTP Agent.app"
+codesign --verify --deep --strict "$KIT_ROOT/CL MIDI RTP Agent.app"
 ditto "$MIDI_TOOLS_SOURCE/reconnect_legacy_rtp.applescript" "$KIT_ROOT/CL MIDI Network Tools/reconnect_legacy_rtp.applescript"
 ditto "$MIDI_TOOLS_SOURCE/reconnect_legacy_rtp.applescript" "$KIT_ROOT/CL MIDI Network Manager.app/Contents/Resources/Network Tools/reconnect_legacy_rtp.applescript"
 ditto "$MIDI_TOOLS_SOURCE/connect_rtp_peer.applescript" "$KIT_ROOT/CL MIDI Network Tools/connect_rtp_peer.applescript"
@@ -415,12 +426,20 @@ PRIMARY_DIR="$KIT_ROOT/01 — Applications principales"
 PRODUCTION_DIR="$KIT_ROOT/02 — Production"
 MIDI_DIR="$KIT_ROOT/03 — MIDI & Réseau"
 ABLETON_DIR="$KIT_ROOT/04 — Ableton & Max for Live"
+SHOWCUE_DATA_DIR="$KIT_ROOT/05 — Données ShowCue"
+SHOWCUE_SESSIONS_SOURCE="$PROJECT_ROOT/CL_Transport/ShowCue_Sessions"
+
+[[ -d "$SHOWCUE_SESSIONS_SOURCE" ]] || {
+  echo "Sessions ShowCue officielles absentes : $SHOWCUE_SESSIONS_SOURCE" >&2
+  exit 1
+}
 
 mkdir -p \
   "$PRIMARY_DIR" \
   "$PRODUCTION_DIR" \
   "$MIDI_DIR" \
-  "$ABLETON_DIR"
+  "$ABLETON_DIR" \
+  "$SHOWCUE_DATA_DIR"
 
 for app in \
   "CL Show Control.app" \
@@ -464,6 +483,34 @@ if [[ -d "$KIT_ROOT/CL MIDI Network Tools" ]]; then
   mv "$KIT_ROOT/CL MIDI Network Tools" "$MIDI_DIR/CL MIDI Network Tools"
 fi
 
+echo
+echo "========== VALIDATION SIGNATURES MIDI/RÉSEAU =========="
+
+for tool in CLMIDINetworkGuardian CLMIDIRTPAgent CLMIDIDirectBridge CLMIDIRoundTripTester CLMIDIRTPResponder CLYamahaConsoleSimulator CLMIDINetworkDashboard CLAudioConfigurationChecker; do
+  for binary in     "$MIDI_DIR/CL MIDI Network Tools/$tool"     "$MIDI_DIR/CL MIDI Network Manager.app/Contents/Resources/Network Tools/$tool"
+  do
+    verify_universal "$binary"
+    /usr/bin/codesign --verify --strict "$binary"
+  done
+done
+
+/usr/bin/codesign --verify --deep --strict   "$MIDI_DIR/CL MIDI Network Manager.app"
+/usr/bin/codesign --verify --deep --strict   "$MIDI_DIR/CL MIDI RTP Agent.app"
+
+echo
+echo "========== NETTOYAGE XATTR FINAL =========="
+
+while IFS= read -r -d '' app; do
+  /usr/bin/xattr -cr "$app"
+  /usr/bin/codesign --verify --deep --strict "$app"
+done < <(/usr/bin/find "$KIT_ROOT" -type d -name "*.app" -print0)
+
+if /usr/bin/xattr -lr "$KIT_ROOT" 2>/dev/null | /usr/bin/grep -q 'com.apple.quarantine'; then
+  echo "ERREUR : com.apple.quarantine encore présent dans le kit final" >&2
+  /usr/bin/xattr -lr "$KIT_ROOT" 2>/dev/null | /usr/bin/grep -B2 -A2 'com.apple.quarantine' >&2 || true
+  exit 1
+fi
+
 for item in \
   "AbletonOSC CL" \
   "Ableton Live 11-12" \
@@ -472,6 +519,23 @@ do
   if [[ -e "$KIT_ROOT/$item" ]]; then
     mv "$KIT_ROOT/$item" "$ABLETON_DIR/$item"
   fi
+done
+
+echo
+echo "========== CONDUITES SHOWCUE =========="
+
+for session in \
+  "Oiseau de Paradis.showcue" \
+  "Mon Premier Cabaret.showcue"
+do
+  source_session="$SHOWCUE_SESSIONS_SOURCE/$session"
+
+  [[ -f "$source_session" ]] || {
+    echo "Conduite ShowCue officielle absente : $source_session" >&2
+    exit 1
+  }
+
+  /usr/bin/ditto     "$source_session"     "$SHOWCUE_DATA_DIR/$session"
 done
 
 cat > "$KIT_ROOT/VERSIONS.txt" <<EOF
@@ -505,7 +569,7 @@ EOF
 
 "$CL_PYTHON" "$PROJECT_ROOT/scripts/verify_macos_architectures.py" "$KIT_ROOT" --target "$CL_BUILD_ARCH" --report "$KIT_ROOT/ARCHITECTURES.json"
 
-if [[ "$SKIP_DMG" != "1" ]]; then
+if [[ "${MINIMAL_RELEASE:-0}" != "1" && "$SKIP_DMG" != "1" ]]; then
   echo
   echo "========== DMG =========="
   hdiutil create \
@@ -521,18 +585,26 @@ ditto -c -k --sequesterRsrc --keepParent \
   "$KIT_ROOT" \
   "$RELEASE_DIR/$ZIP_NAME"
 
-echo
-echo "========== ZIP MAX FOR LIVE =========="
-ditto -c -k --sequesterRsrc --keepParent \
-  "$KIT_ROOT/04 — Ableton & Max for Live/Max for Live à installer" \
-  "$RELEASE_DIR/$M4L_ZIP_NAME"
+if [[ "${MINIMAL_RELEASE:-0}" != "1" ]]; then
+  echo
+  echo "========== ZIP MAX FOR LIVE =========="
+  ditto -c -k --sequesterRsrc --keepParent \
+    "$KIT_ROOT/04 — Ableton & Max for Live/Max for Live à installer" \
+    "$RELEASE_DIR/$M4L_ZIP_NAME"
+fi
 
 echo
 echo "========== SHA-256 =========="
 (
   cd "$RELEASE_DIR"
-  checksum_files=("$ZIP_NAME" "$M4L_ZIP_NAME")
-  [[ "$SKIP_DMG" == "1" ]] || checksum_files=("$DMG_NAME" "${checksum_files[@]}")
+
+  if [[ "${MINIMAL_RELEASE:-0}" == "1" ]]; then
+    checksum_files=("$ZIP_NAME")
+  else
+    checksum_files=("$ZIP_NAME" "$M4L_ZIP_NAME")
+    [[ "$SKIP_DMG" == "1" ]] || checksum_files=("$DMG_NAME" "${checksum_files[@]}")
+  fi
+
   shasum -a 256 "${checksum_files[@]}" > SHA256SUMS.txt
 )
 

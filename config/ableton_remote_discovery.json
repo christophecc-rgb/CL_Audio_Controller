@@ -1,0 +1,9 @@
+{
+  "enabled": true,
+  "service_name": "CL Ableton Distant",
+  "service_type": "_apple-midi._udp",
+  "osc_send_port": 11000,
+  "osc_reply_port": 11001,
+  "last_known_host": "MacBook-Pro.local",
+  "last_known_ip": "192.168.1.138"
+}

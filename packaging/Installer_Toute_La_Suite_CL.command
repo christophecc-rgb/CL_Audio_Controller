@@ -7,7 +7,7 @@ INTEGRITY_MANIFEST="$SCRIPT_DIR/COMPONENTS_SHA256.txt"
 APPLICATIONS_SOURCE="$COMPONENTS_ROOT/Applications"
 LIVE_CURRENT_SOURCE="$COMPONENTS_ROOT/Ableton Live 11-12"
 LIVE10_SOURCE_ROOT="$COMPONENTS_ROOT/Ableton Live 10"
-MIDI_TOOLS_SOURCE="$COMPONENTS_ROOT/Outils réseau MIDI"
+MIDI_TOOLS_SOURCE="$COMPONENTS_ROOT/Outils_reseau_MIDI"
 INSTALL_HOME="${CL_SUITE_INSTALL_HOME:-$HOME}"
 USER_APPS="$INSTALL_HOME/Applications"
 PROD_APPS="$USER_APPS/Prod Ableton"
@@ -302,7 +302,7 @@ verify_selected_components() {
       "Composants/Applications/CL Audio Export.app/"*) [[ "$INSTALL_SHOW_AUDIO_BUILDER" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Ableton Live 11-12/Max for Live/Paradis Latin AutoScene/"*) [[ "$INSTALL_AUTOSCENE" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Ableton Live 10/Max for Live/Paradis Latin AutoScene - Live 10/"*) [[ "$INSTALL_AUTOSCENE_LIVE10" == 1 ]] && echo "$line" >> "$selected" ;;
-      "Composants/Applications/CL MIDI Network Manager.app/"*|"Composants/Outils réseau MIDI/"*) [[ "$INSTALL_MIDI_CONSOLE" == 1 || "$INSTALL_CONTROLLER" == 1 ]] && echo "$line" >> "$selected" ;;
+      "Composants/Applications/CL MIDI Network Manager.app/"*|"Composants/Outils_reseau_MIDI/"*) [[ "$INSTALL_MIDI_CONSOLE" == 1 || "$INSTALL_CONTROLLER" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Ableton Live 11-12/Max for Live/CL MIDI Console Monitor/"*) [[ "$INSTALL_MIDI_CONSOLE" == 1 ]] && echo "$line" >> "$selected" ;;
     esac
   done < "$INTEGRITY_MANIFEST"
@@ -414,7 +414,25 @@ if [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 || "$INSTALL_SHOWCUE"
   # Ressources persistantes : ne jamais remplacer le dossier existant.
   if [[ -e "$TRANSPORT_TARGET" ]]; then
     say "CL_Transport existant conservé : $TRANSPORT_TARGET"
-    say "Ressources du nouveau kit disponibles dans : $TRANSPORT_SOURCE"
+
+    SOURCE_SHOWCUE="$TRANSPORT_SOURCE/ShowCue_Sessions"
+    TARGET_SHOWCUE="$TRANSPORT_TARGET/ShowCue_Sessions"
+
+    if [[ -d "$SOURCE_SHOWCUE" ]]; then
+      mkdir -p "$TARGET_SHOWCUE"
+
+      while IFS= read -r -d '' source_session; do
+        session_name="$(basename "$source_session")"
+        target_session="$TARGET_SHOWCUE/$session_name"
+
+        if [[ -e "$target_session" ]]; then
+          say "Conduite ShowCue existante conservée : $session_name"
+        else
+          ditto "$source_session" "$target_session"
+          say "Conduite ShowCue ajoutée : $session_name"
+        fi
+      done < <(find "$SOURCE_SHOWCUE" -maxdepth 1 -type f \( -name '*.showcue' -o -name '*.showcue.zip' \) -print0)
+    fi
   else
     mkdir -p "$(dirname "$TRANSPORT_TARGET")"
     ditto "$TRANSPORT_SOURCE" "$TRANSPORT_TARGET"

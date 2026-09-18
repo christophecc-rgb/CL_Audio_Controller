@@ -180,7 +180,7 @@ mkdir -p \
   "$COMPONENTS_ROOT/Ableton Live 11-12/Max for Live/Paradis Latin AutoScene" \
   "$COMPONENTS_ROOT/Ableton Live 11-12/Max for Live/CL MIDI Console Monitor" \
   "$COMPONENTS_ROOT/Ableton Live 10/Max for Live/Paradis Latin AutoScene - Live 10" \
-  "$COMPONENTS_ROOT/Outils réseau MIDI" \
+  "$COMPONENTS_ROOT/Outils_reseau_MIDI" \
   "$INSTALLER_RESOURCES/Documentation" \
   "$UNINSTALLER_APP/Contents/MacOS" \
   "$UNINSTALLER_APP/Contents/Resources"
@@ -217,7 +217,7 @@ done
 for file in "Paradis Latin AutoScene - Live 10.amxd" "Paradis Latin AutoScene - Live 10.maxpat" ParadisLatin_AutoScene.js paradis_latin_logo.jpg; do
   ditto "$PROJECT_DIR/M4L/Install/$file" "$COMPONENTS_ROOT/Ableton Live 10/Max for Live/Paradis Latin AutoScene - Live 10/$file"
 done
-ditto "$CONTROLLER_ROOT/03 — MIDI & Réseau/CL MIDI Network Tools" "$COMPONENTS_ROOT/Outils réseau MIDI"
+ditto "$CONTROLLER_ROOT/03 — MIDI & Réseau/CL MIDI Network Tools" "$COMPONENTS_ROOT/Outils_reseau_MIDI"
 
 # Les caches trouvés dans d'anciens livrables Builder ne sont jamais requis à
 # l'exécution. Ils sont retirés uniquement de la copie temporaire distribuée.
@@ -391,6 +391,22 @@ echo
 (cd "$SUITE_ROOT"; shasum -a 256 ARCHITECTURES.json >> SHA256SUMS.txt)
 echo "Création du ZIP sur le Bureau…"
 ditto -c -k --norsrc --keepParent "$SUITE_ROOT" "$BUILD_ROOT/final-kit.zip"
+
+echo "Vérification du ZIP après ré-extraction…"
+ROUNDTRIP_ROOT="$BUILD_ROOT/roundtrip-check"
+rm -rf "$ROUNDTRIP_ROOT"
+mkdir -p "$ROUNDTRIP_ROOT"
+ditto -x -k "$BUILD_ROOT/final-kit.zip" "$ROUNDTRIP_ROOT"
+
+ROUNDTRIP_SUITE="$(find "$ROUNDTRIP_ROOT" -maxdepth 1 -type d -name 'CL_Suite_Transport_*' -print -quit)"
+[[ -n "$ROUNDTRIP_SUITE" ]] || fail "suite ré-extraite introuvable"
+
+ROUNDTRIP_INSTALLER="$ROUNDTRIP_SUITE/Installer la Suite CL.app"
+ROUNDTRIP_UNINSTALLER="$ROUNDTRIP_SUITE/Désinstaller la Suite CL.app"
+
+codesign --verify --deep --strict "$ROUNDTRIP_INSTALLER" ||   fail "signature de l’installateur cassée après archivage/ré-extraction"
+
+codesign --verify --deep --strict "$ROUNDTRIP_UNINSTALLER" ||   fail "signature du désinstallateur cassée après archivage/ré-extraction"
 
 ZIP_SHA="$(shasum -a 256 "$BUILD_ROOT/final-kit.zip" | awk '{print $1}')"
 printf '%s  %s\n' "$ZIP_SHA" "$(basename "$DEST_ZIP")" > "$BUILD_ROOT/final-kit-sha.txt"

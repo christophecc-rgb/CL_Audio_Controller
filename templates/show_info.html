@@ -2209,7 +2209,7 @@ Maximum 3 équipements par artiste.
 const $=id=>document.getElementById(id),postEl=$('post'),sessionEl=$('session'),editor=$('editor'),quickEditor=$('quick-editor'),recorderDialog=$('recorder'),callPanel=$('call-panel');let snapshot={},editing=null,quickEditing=null,classifying=false,captured=null,recordedDraft=null,mediaRecorder=null,mediaStream=null,recordChunks=[],editorFocusTimer=null;
 const savedPost=localStorage.getItem('cl-show-info-post');if([...postEl.options].some(o=>o.value===savedPost))postEl.value=savedPost;
 function setView(view){if(!['live','conduite','distribution','captures'].includes(view))view='live';document.querySelectorAll('.view').forEach(item=>item.classList.toggle('active',item.id==='view-'+view));document.querySelectorAll('.tab').forEach(tab=>{const active=tab.dataset.view===view;tab.classList.toggle('active',active);tab.setAttribute('aria-selected',active)});localStorage.setItem('cl-show-info-view',view)}
-document.querySelectorAll('.tab').forEach(tab=>tab.onclick=()=>setView(tab.dataset.view));setView(localStorage.getItem('cl-show-info-view')||'live');
+document.querySelectorAll('.tab').forEach(tab=>tab.onclick=()=>{const view=tab.dataset.view;setView(view);if(view==='conduite'&&snapshot.is_playing){lastConduiteActiveId=null;requestAnimationFrame(()=>followConduiteActive());}});setView(localStorage.getItem('cl-show-info-view')||'live');
 function setupSmpte(rootId,targetId=null){const root=$(rootId),limits=[99,59,59,99],labels=['HH','MM','SS','FF'],inputs=[];root.innerHTML='';labels.forEach((label,index)=>{if(index){const separator=document.createElement('span');separator.className='smpte-separator';separator.textContent=':';root.append(separator)}const part=document.createElement('span'),up=document.createElement('button'),input=document.createElement('input'),down=document.createElement('button'),caption=document.createElement('small');part.className='smpte-part';up.type=down.type='button';up.textContent='▲';down.textContent='▼';up.setAttribute('aria-label','Augmenter '+label);down.setAttribute('aria-label','Diminuer '+label);input.type='text';input.inputMode='numeric';input.maxLength=2;input.setAttribute('aria-label',label);caption.textContent=label;const normalize=()=>{const value=Math.max(0,Math.min(limits[index],Number(input.value)||0));input.value=String(value).padStart(2,'0');sync()};const step=delta=>{input.value=String(Math.max(0,Math.min(limits[index],Number(input.value||0)+delta))).padStart(2,'0');sync()};up.onclick=()=>step(1);down.onclick=()=>step(-1);input.onfocus=()=>input.select();input.oninput=()=>{input.value=input.value.replace(/\D/g,'').slice(0,2);sync()};input.onblur=normalize;input.onkeydown=event=>{if(event.key==='ArrowUp'||event.key==='ArrowDown'){event.preventDefault();step(event.key==='ArrowUp'?1:-1)}};inputs.push(input);part.append(up,input,down,caption);root.append(part)});function sync(){if(targetId)$(targetId).value=inputs.map(input=>String(Math.max(0,Number(input.value)||0)).padStart(2,'0')).join(':')}return{set(value){const match=String(value||'').match(/^(\d{2}):(\d{2}):(\d{2}):(\d{2})$/),parts=match?match.slice(1):['00','00','00','00'];inputs.forEach((input,index)=>input.value=String(Math.min(limits[index],Number(parts[index])||0)).padStart(2,'0'));sync()},get(){return inputs.map(input=>String(Math.max(0,Number(input.value)||0)).padStart(2,'0')).join(':')}}}
 const formSmpte=setupSmpte('form-smpte','form-timecode'),quickSmpte=setupSmpte('quick-smpte');function formatSeconds(value){if(value===null||value===undefined||value==='')return'—';const seconds=Number(value);if(!Number.isFinite(seconds)||seconds<0)return'—';const rounded=Math.max(0,Math.round(seconds));return String(Math.floor(rounded/60)).padStart(2,'0')+':'+String(rounded%60).padStart(2,'0')}
 function scoped(values={},sessionId=snapshot.active_session_id){return{...values,session_id:sessionId}}
@@ -4176,6 +4176,10 @@ $('capture-tc').onclick = captureTcOnSelectedConduiteCue;
     conduiteOrderedCues = function(){
         const data = snapshot.conduite || {};
 
+        /*
+         * Ordre utilisateur / Builder existant.
+         * Il détermine uniquement les EMPLACEMENTS de la conduite.
+         */
         const source = [
             ...(data.timed || []),
             ...(data.manual || []),
@@ -4186,7 +4190,7 @@ $('capture-tc').onclick = captureTcOnSelectedConduiteCue;
             cue => persistentConduiteNumber(cue) !== null
         );
 
-        return source
+        const ordered = source
             .map((cue,index)=>({
                 cue,
                 index,
@@ -4198,11 +4202,6 @@ $('capture-tc').onclick = captureTcOnSelectedConduiteCue;
                         : null
             }))
             .sort((a,b)=>{
-
-                /*
-                 * Dès qu'un ordre persistant existe,
-                 * il devient la seule référence.
-                 */
                 if(anyPersistent){
                     const ao = a.persistent !== null
                         ? a.persistent
@@ -4215,10 +4214,6 @@ $('capture-tc').onclick = captureTcOnSelectedConduiteCue;
                     return ao - bo || a.index - b.index;
                 }
 
-                /*
-                 * Première utilisation :
-                 * on reprend exactement notre ordre actuel.
-                 */
                 const aBuilder = a.builderNumber !== null;
                 const bBuilder = b.builderNumber !== null;
 
@@ -4236,6 +4231,49 @@ $('capture-tc').onclick = captureTcOnSelectedConduiteCue;
                 return a.index - b.index;
             })
             .map(item => item.cue);
+
+        /*
+         * Règle métier :
+         *
+         * Les cues LTC sont TOUJOURS chronologiques entre eux.
+         * Les cues manuels/realtime restent exactement aux positions
+         * choisies par l'utilisateur.
+         *
+         * On trie donc uniquement la population "timed", puis on la
+         * réinjecte dans les emplacements timed de la conduite.
+         */
+        const tcUnits = value => {
+            const match = String(value || '').match(
+                /^(\d{2}):(\d{2}):(\d{2}):(\d{2})$/
+            );
+
+            if(!match){
+                return Number.POSITIVE_INFINITY;
+            }
+
+            return (
+                (((Number(match[1]) * 60 + Number(match[2])) * 60
+                    + Number(match[3])) * 100)
+                + Number(match[4])
+            );
+        };
+
+        const timed = ordered
+            .filter(cue => cue.mode === 'timed')
+            .slice()
+            .sort((a,b)=>
+                tcUnits(a.timecode) - tcUnits(b.timecode)
+            );
+
+        let timedIndex = 0;
+
+        return ordered.map(cue=>{
+            if(cue.mode !== 'timed'){
+                return cue;
+            }
+
+            return timed[timedIndex++] || cue;
+        });
     };
 
 
@@ -5125,6 +5163,15 @@ $('capture-tc').onclick = captureTcOnSelectedConduiteCue;
      */
     followConduiteActive = function(force=false){
 
+        /*
+         * Aucun repositionnement automatique en STOP / PAUSE.
+         * Le bouton SUIVRE LIVE peut toujours forcer volontairement
+         * un retour au cue courant.
+         */
+        if(!force && !snapshot.is_playing){
+            return;
+        }
+
         if(
             !force &&
             performance.now() < conduiteFollowPausedUntil
@@ -5164,18 +5211,30 @@ $('capture-tc').onclick = captureTcOnSelectedConduiteCue;
             return;
         }
 
-        const row = $('timed-sequence').querySelector(
+        const sequence = $('timed-sequence');
+
+        const row = sequence.querySelector(
             '[data-cue-id="'+CSS.escape(id)+'"]'
         );
 
-        if(row){
-            lastConduiteActiveId=id;
-
-            row.scrollIntoView({
-                behavior:'smooth',
-                block:'center'
-            });
+        if(!row){
+            return;
         }
+
+        lastConduiteActiveId = id;
+
+        /*
+         * #timed-sequence est le viewport scrollable réel
+         * de la conduite desktop.
+         */
+        const top =
+            row.offsetTop -
+            (sequence.clientHeight - row.offsetHeight) / 2;
+
+        sequence.scrollTo({
+            top:Math.max(0,top),
+            behavior:force ? 'auto' : 'smooth'
+        });
     };
 
 

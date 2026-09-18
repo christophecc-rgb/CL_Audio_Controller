@@ -428,6 +428,8 @@ static NSPasteboardType const CLSimulatorRowPasteboardType = @"com.cl-audio-cont
 - (void)recordSimulatorProgram:(NSInteger)program deviceID:(NSString *)deviceID;
 - (void)updateSimulatorCompactStatus;
 - (void)restorePersistedSimulatorAutoDevices;
+- (void)reconcilePersistedSimulatorAutoDevicesAfterModeChange;
+- (BOOL)remoteSimulatorAutoPathReady;
 - (void)rebuildConsoleLibraryRows;
 - (void)rebuildProgramChangeReturnCards;
 - (void)refreshProfileDrivenViews;
@@ -437,6 +439,7 @@ static NSPasteboardType const CLSimulatorRowPasteboardType = @"com.cl-audio-cont
 
 - (void)rebuildReturnDeviceRouting;
 - (void)updateAssistantPrimaryStatus;
+- (void)applyCLNetwork2026VisualStyle;
 - (void)applyEndpointSnapshotWithSources:(NSArray<NSString *> *)sources destinations:(NSArray<NSString *> *)destinations;
 @end
 
@@ -990,9 +993,9 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     targetPanel.wantsLayer = YES; targetPanel.layer.cornerRadius = 12; targetPanel.layer.borderWidth = 1;
     targetPanel.layer.backgroundColor = [NSColor colorWithRed:0.075 green:0.088 blue:0.11 alpha:1.0].CGColor;
     targetPanel.layer.borderColor = [NSColor colorWithWhite:0.24 alpha:1.0].CGColor; [content addSubview:targetPanel];
-    self.generalModeTitleLabel = [self label:@"MODE GÉNÉRAL" frame:NSMakeRect(16, 68, 150, 20) size:10 bold:YES];
+    self.generalModeTitleLabel = [self label:@"CIBLE DISTANTE · BONJOUR" frame:NSMakeRect(16, 72, 220, 18) size:10 bold:YES];
     [targetPanel addSubview:self.generalModeTitleLabel];
-    self.remoteTargetTitleLabel = [self label:@"CIBLE ABLETON DISTANTE (RTP)" frame:NSMakeRect(194, 68, 210, 20) size:10 bold:YES];
+    self.remoteTargetTitleLabel = [self label:@"Piloté automatiquement par CL Show Control" frame:NSMakeRect(268, 72, 184, 18) size:8 bold:NO];
     [targetPanel addSubview:self.remoteTargetTitleLabel];
     self.returnModeMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(16, 28, 168, 34) pullsDown:NO];
     [self.returnModeMenu addItemsWithTitles:@[@"Ableton local", @"Ableton distant"]];
@@ -1003,21 +1006,24 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     self.localReturnMode = self.returnModeMenu.indexOfSelectedItem == 0;
     [self stylePopup:self.returnModeMenu accent:[NSColor colorWithRed:0.58 green:0.34 blue:0.19 alpha:1.0]];
     [targetPanel addSubview:self.returnModeMenu];
-    self.targetMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(194, 28, 166, 34) pullsDown:NO];
+    self.returnModeMenu.hidden = YES;
+    self.targetMenu = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(16, 34, 300, 34) pullsDown:NO];
     self.targetMenu.target = self;
     self.targetMenu.action = @selector(targetChanged:);
     [self.targetMenu addItemWithTitle:@"Recherche des correspondants…"];
     [self stylePopup:self.targetMenu accent:[NSColor colorWithRed:0.34 green:0.72 blue:1.0 alpha:1.0]];
     [targetPanel addSubview:self.targetMenu];
-    self.connectButton = [self accentButton:@"Connecter" frame:NSMakeRect(370, 27, 82, 36) action:@selector(connectSelectedPeer:) color:[NSColor colorWithRed:0.12 green:0.42 blue:0.82 alpha:1.0]];
+    self.connectButton = [self accentButton:@"Établir RTP" frame:NSMakeRect(324, 34, 128, 34) action:@selector(connectSelectedPeer:) color:[NSColor colorWithRed:0.12 green:0.42 blue:0.82 alpha:1.0]];
     self.targetMenu.enabled = !self.localReturnMode;
     self.connectButton.enabled = !self.localReturnMode;
-    self.connectButton.title = self.localReturnMode ? @"Non requis" : @"Connecter";
+    self.connectButton.title = self.localReturnMode
+        ? @"Non requis"
+        : @"Établir RTP";
     self.connectButton.toolTip = self.localReturnMode
         ? @"Aucune connexion RTP n’est requise en mode Ableton local."
         : @"Recherche d’une cible RTP distante en cours.";
     [targetPanel addSubview:self.connectButton];
-    self.operatingModeReasonLabel = [self label:@"Mode conservé depuis la dernière configuration appliquée" frame:NSMakeRect(16, 6, 436, 18) size:8 bold:NO];
+    self.operatingModeReasonLabel = [self label:@"Mode distant · synchronisé automatiquement" frame:NSMakeRect(16, 8, 436, 18) size:8 bold:NO];
     self.operatingModeReasonLabel.textColor = [NSColor colorWithWhite:0.67 alpha:1.0];
     self.operatingModeReasonLabel.lineBreakMode = NSLineBreakByTruncatingTail;
     [targetPanel addSubview:self.operatingModeReasonLabel];
@@ -1169,15 +1175,26 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     [self loadSimulatorDevices];
     self.simulatorWindowButton = [self accentButton:@"Simulateur de retour…" frame:NSMakeRect(170, 53, 160, 32) action:@selector(openSimulatorWindow:) color:[NSColor colorWithRed:0.08 green:0.43 blue:0.39 alpha:1.0]];
     [content addSubview:self.simulatorWindowButton];
-    self.assistantTestBanner = [[NSView alloc] initWithFrame:NSMakeRect(16, 42, 468, 36)];
+    self.assistantTestBanner = [[NSView alloc] initWithFrame:NSMakeRect(80, 47, 340, 26)];
     self.assistantTestBanner.wantsLayer = YES;
-    self.assistantTestBanner.layer.cornerRadius = 9.0;
-    self.assistantTestBanner.layer.backgroundColor = [NSColor colorWithRed:0.24 green:0.12 blue:0.035 alpha:1.0].CGColor;
+    self.assistantTestBanner.layer.cornerRadius = 7.0;
+    self.assistantTestBanner.layer.backgroundColor =
+        [NSColor colorWithRed:0.115 green:0.105 blue:0.095 alpha:1.0].CGColor;
     self.assistantTestBanner.layer.borderWidth = 1.0;
-    self.assistantTestBanner.layer.borderColor = NSColor.systemOrangeColor.CGColor;
-    self.assistantTestStatusLabel = [self label:@"Mode test actif" frame:NSMakeRect(12, 7, 300, 22) size:10 bold:YES];
+    self.assistantTestBanner.layer.borderColor =
+        [NSColor colorWithRed:0.55 green:0.43 blue:0.30 alpha:0.38].CGColor;
+    self.assistantTestStatusLabel =
+        [self label:@"Mode test actif" frame:NSMakeRect(12, 4, 230, 18) size:9 bold:NO];
+    self.assistantTestStatusLabel.textColor =
+        [NSColor colorWithRed:0.72 green:0.69 blue:0.64 alpha:0.92];
     [self.assistantTestBanner addSubview:self.assistantTestStatusLabel];
-    self.assistantStopTestsButton = [self accentButton:@"Tout arrêter" frame:NSMakeRect(354, 4, 100, 28) action:@selector(stopIntegratedSimulator:) color:[NSColor colorWithRed:0.62 green:0.20 blue:0.18 alpha:1.0]];
+    self.assistantStopTestsButton =
+        [self accentButton:@"Arrêter"
+                     frame:NSMakeRect(250, 3, 80, 20)
+                    action:@selector(stopIntegratedSimulator:)
+                     color:[NSColor colorWithRed:0.30 green:0.22 blue:0.20 alpha:1.0]];
+    self.assistantStopTestsButton.font =
+        [NSFont systemFontOfSize:9.0 weight:NSFontWeightMedium];
     self.assistantStopTestsButton.toolTip = @"Arrêter uniquement toutes les simulations actives";
     [self.assistantTestBanner addSubview:self.assistantStopTestsButton];
     [content addSubview:self.assistantTestBanner];
@@ -1385,7 +1402,9 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
         @"return_monitor_source": self.localReturnMode ? CLLocalReturnEndpointName :
             (self.returnMonitorSource ? EndpointName(self.returnMonitorSource) : @""),
         @"return_monitor_status": @(self.returnMonitorStatus),
-        @"expected_devices": self.expectedDeviceStates ?: @{},
+        @"expected_devices": self.localReturnMode
+            ? (self.expectedDeviceStates ?: @{})
+            : @{},
         @"returned_devices": self.returnedDeviceStates ?: @{},
 
         @"rtp": @{
@@ -1937,6 +1956,8 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
             ? [NSString stringWithFormat:@"Mismatch · reçu %ld · attendu %ld", (long)receivedScene, (long)expectedProgram]
             : stale
             ? [NSString stringWithFormat:@"Retour ancien · %@", ageValue ? CLMidiAgeDescription(ageValue.doubleValue) : @"âge indisponible"]
+            : (!hasExpectedProgram && hasReturn)
+            ? @"Retour console reçu"
             : unavailable
             ? @"Indéterminé · attendu indisponible"
             : localFallback
@@ -2888,6 +2909,20 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
 
 - (void)queueExpectedProgram:(UInt8)program channel:(UInt8)channel {
     if (channel < 1 || channel > 16) return;
+
+    // Le chemin EXPECTED IAC appartient uniquement au mode Ableton local.
+    // En distant, la référence canonique est le retour physique RTP :
+    // une ancienne activité IAC ne doit jamais produire de divergence.
+    if (!self.localReturnMode) {
+        CLExpectedDiagnostic(
+            @"EXPECTED_IGNORED_REMOTE",
+            [NSString stringWithFormat:
+                @"channel=%u midi_program=%u",
+                channel,
+                program]
+        );
+        return;
+    }
     NSString *deviceID = self.expectedDeviceIDByChannel[@(channel)];
     if (!deviceID.length) return;
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -2956,74 +2991,503 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     self.assistantTestBanner.hidden = detailed || self.simulatorTasks.count == 0;
     self.compactSummary.hidden = YES;
     self.showModeButton.title = detailed ? @"Vue Spectacle" : @"Diagnostic détaillé";
-    self.remoteTargetTitleLabel.hidden = self.localReturnMode;
+    self.remoteTargetTitleLabel.hidden = YES;
     self.targetMenu.hidden = self.localReturnMode;
     self.connectButton.hidden = self.localReturnMode;
     self.localRTPNoteLabel.hidden = !detailed || !self.localReturnMode;
     self.localRTPDetailLabel.hidden = !detailed || !self.localReturnMode;
-    self.operatingModeReasonLabel.hidden = detailed;
+    self.operatingModeReasonLabel.hidden = YES;
+    self.returnModeMenu.hidden = YES;
     [self updateRoundTripPanelForCurrentMode];
     [self updateAssistantPrimaryStatus];
     if (detailed) {
         NSUInteger returnCount = self.programChangeReturnViews.count;
         NSUInteger returnRows = MAX((NSUInteger)1, (returnCount + 2) / 3);
         CGFloat returnsHeight = 32.0 + returnRows * 42.0 + (returnRows - 1) * 6.0;
-        CGFloat localHeight = MIN(768.0, MAX(690.0, 650.0 + returnsHeight));
-        CGFloat offset = self.localReturnMode ? 0.0 : 104.0;
+        /*
+         * Vue détaillée — layout calculé.
+         * Chaque zone dépend de la précédente : aucun chevauchement
+         * lorsque la hauteur Program Change varie.
+         */
+
         CGFloat actionsY = 190.0;
-        [self.window setContentSize:NSMakeSize(500, localHeight + offset)];
-        self.headerPanel.frame = NSMakeRect(16, localHeight - 80 + offset, 468, 64);
-        self.appTitleLabel.frame = NSMakeRect(20, localHeight - 120 + offset, 220, 24);
-        self.appSubtitleLabel.frame = NSMakeRect(0, 0, 1, 1);
-        self.showModeButton.frame = NSMakeRect(360, localHeight - 123 + offset, 124, 30);
-        self.assistantDevicesButton.frame = NSMakeRect(246, localHeight - 123 + offset, 106, 30);
-        self.statusPanel.frame = NSMakeRect(16, localHeight - 192 + offset, 468, 62);
 
-        CGFloat modePanelHeight = 58.0;
-        self.targetPanel.frame = NSMakeRect(16, localHeight - 250 + offset, 468, modePanelHeight);
-        self.generalModeTitleLabel.stringValue = self.localReturnMode ? @"MODE · LOCAL" : @"MODE GÉNÉRAL";
-        self.generalModeTitleLabel.frame = self.localReturnMode
-            ? NSMakeRect(14, 21, 96, 18) : NSMakeRect(12, 36, 96, 16);
-        self.returnModeMenu.frame = self.localReturnMode
-            ? NSMakeRect(116, 13, 164, 32) : NSMakeRect(12, 5, 148, 30);
-        self.remoteTargetTitleLabel.frame = NSMakeRect(168, 36, 214, 16);
-        self.targetMenu.frame = NSMakeRect(168, 5, 188, 30);
-        self.connectButton.frame = NSMakeRect(364, 5, 92, 30);
-        self.localRTPNoteLabel.frame = NSMakeRect(294, 29, 158, 16);
-        self.localRTPDetailLabel.frame = NSMakeRect(294, 11, 158, 16);
-        [self stylePopup:self.returnModeMenu accent:self.localReturnMode
-            ? [NSColor colorWithRed:0.58 green:0.34 blue:0.19 alpha:1.0]
-            : [NSColor colorWithRed:0.34 green:0.52 blue:0.68 alpha:1.0]];
+        CGFloat programY =
+            actionsY + 41.0;
 
-        // En distant uniquement, le diagnostic RTP occupe l'espace
-        // supplémentaire fourni par offset.
-        self.testPanel.frame = NSMakeRect(16, actionsY + 59.0 + returnsHeight + 116.0, 468, 96);
+        // Le diagnostic round-trip distant historique est retiré
+        // du workflow principal. Le backend suit directement les
+        // retours Program Change.
+        CGFloat diagnosticY =
+            programY + returnsHeight;
 
-        // Trois bibliothèques restent visibles.
-        self.programChangeReturnsPanel.frame = NSMakeRect(16, actionsY + 41.0, 468, returnsHeight);
+        CGFloat backendY =
+            programY + returnsHeight + 12.0;
+
+        CGFloat toolsY =
+            backendY + 116.0 + 12.0;
+
+        CGFloat toolsHeight = 44.0;
+
+        CGFloat targetHeight =
+            self.localReturnMode ? 58.0 : 90.0;
+
+        CGFloat targetY =
+            toolsY + toolsHeight + 12.0;
+
+        CGFloat statusY =
+            targetY + targetHeight + 12.0;
+
+        CGFloat appTitleY =
+            statusY + 62.0 + 20.0;
+
+        CGFloat headerY =
+            appTitleY + 40.0;
+
+        CGFloat contentHeight =
+            headerY + 80.0;
+
+        [self.window setContentSize:
+            NSMakeSize(500, contentHeight)];
+
+        /*
+         * En-tête
+         */
+
+        self.headerPanel.frame =
+            NSMakeRect(16, headerY, 468, 64);
+
+        self.appTitleLabel.frame =
+            NSMakeRect(20, appTitleY, 220, 24);
+
+        self.appSubtitleLabel.frame =
+            NSMakeRect(0, 0, 1, 1);
+
+        self.showModeButton.frame =
+            NSMakeRect(348, appTitleY - 4.0, 120, 32);
+
+        /*
+         * Statut général
+         */
+
+        self.statusPanel.frame =
+            NSMakeRect(16, statusY, 468, 62);
+
+        /*
+         * Cible Bonjour / RTP
+         */
+
+        self.targetPanel.frame =
+            NSMakeRect(16, targetY, 468, targetHeight);
+
+        self.generalModeTitleLabel.stringValue =
+            self.localReturnMode
+                ? @"PILOTÉ PAR CL SHOW CONTROL"
+                : @"CIBLE DISTANTE · BONJOUR";
+
+        self.generalModeTitleLabel.frame =
+            self.localReturnMode
+                ? NSMakeRect(14, 21, 250, 18)
+                : NSMakeRect(16, 65, 230, 18);
+
+        self.returnModeMenu.frame =
+            NSMakeRect(0, 0, 1, 1);
+
+        self.returnModeMenu.hidden = YES;
+
+        self.remoteTargetTitleLabel.hidden = YES;
+        self.operatingModeReasonLabel.hidden = YES;
+
+        if (self.localReturnMode) {
+            self.targetMenu.frame =
+                NSMakeRect(0, 0, 1, 1);
+
+            self.connectButton.frame =
+                NSMakeRect(0, 0, 1, 1);
+        } else {
+            self.targetMenu.frame =
+                NSMakeRect(16, 21, 300, 36);
+
+            self.connectButton.frame =
+                NSMakeRect(324, 21, 128, 36);
+        }
+
+        self.localRTPNoteLabel.frame =
+            NSMakeRect(294, 29, 158, 16);
+
+        self.localRTPDetailLabel.frame =
+            NSMakeRect(294, 11, 158, 16);
+
+        /*
+         * Actions principales
+         */
+
+        self.assistantDevicesButton.frame =
+            NSMakeRect(16, toolsY, 228, toolsHeight);
+
+        self.simulatorWindowButton.frame =
+            NSMakeRect(256, toolsY, 228, toolsHeight);
+
+        /*
+         * Backend & bibliothèques
+         */
+
+        self.consoleLibrariesPanel.frame =
+            NSMakeRect(16, backendY, 468, 116);
+
+        /*
+         * Diagnostic RTP
+         */
+
+        self.testPanel.frame =
+            NSMakeRect(0, 0, 1, 1);
+        self.testPanel.hidden = YES;
+
+        /*
+         * Retours Program Change
+         */
+
+        self.programChangeReturnsPanel.frame =
+            NSMakeRect(16, programY, 468, returnsHeight);
+
         [self rebuildProgramChangeReturnCards];
         [self updateConsoleReturnCards];
-        self.consoleLibrariesPanel.frame = NSMakeRect(16, actionsY + 50.0 + returnsHeight, 468, 116);
 
-        // Le simulateur étant désormais une palette séparée, son accès
-        // n'a plus besoin de réserver un grand panneau vide.
-        self.settingsButton.frame = NSMakeRect(16, actionsY, 146, 32);
-        self.simulatorWindowButton.frame = NSMakeRect(170, actionsY, 160, 32);
-        self.refreshButton.frame = NSMakeRect(338, actionsY, 146, 32);
+        /*
+         * Actions secondaires
+         */
 
-        // Les informations techniques remontent immédiatement sous l'accès
-        // au simulateur.
-        self.technicalPanel.frame = NSMakeRect(16, 47, 468, 132);
+        self.settingsButton.frame =
+            NSMakeRect(16, actionsY, 152, 32);
 
-        self.footerLabel.frame = NSMakeRect(16, 10, 468, 18);
+        self.refreshButton.frame =
+            NSMakeRect(332, actionsY, 152, 32);
+
+        /*
+         * Informations techniques
+         */
+
+        self.technicalPanel.frame =
+            NSMakeRect(16, 47, 468, 132);
+
+        self.footerLabel.frame =
+            NSMakeRect(16, 10, 468, 18);
     } else {
         [self layoutAssistantViewForRTPMode:!self.localReturnMode];
     }
+
+    [self applyCLNetwork2026VisualStyle];
+}
+
+
+// CL_NETWORK_2026_VISUAL_V1
+- (void)applyCLNetwork2026VisualStyle {
+
+    /*
+     * Palette CL Network 2026
+     *
+     * Le vert est réservé aux états réellement OK.
+     * Les actions utilisent bleu / teal.
+     * Le violet est réservé au diagnostic.
+     * Les panneaux utilisent des surfaces anthracite neutres.
+     */
+
+    NSColor *surface =
+        [NSColor colorWithRed:0.055
+                        green:0.064
+                         blue:0.080
+                        alpha:1.0];
+
+    NSColor *surfaceRaised =
+        [NSColor colorWithRed:0.075
+                        green:0.086
+                         blue:0.105
+                        alpha:1.0];
+
+    NSColor *surfaceInteractive =
+        [NSColor colorWithRed:0.095
+                        green:0.112
+                         blue:0.137
+                        alpha:1.0];
+
+    NSColor *neutralBorder =
+        [NSColor colorWithWhite:0.30 alpha:0.38];
+
+    NSColor *cyanAccent =
+        [NSColor colorWithRed:0.22
+                        green:0.70
+                         blue:0.80
+                        alpha:1.0];
+
+    NSColor *actionBlue =
+        [NSColor colorWithRed:0.16
+                        green:0.34
+                         blue:0.58
+                        alpha:1.0];
+
+    NSColor *simulatorTeal =
+        [NSColor colorWithRed:0.10
+                        green:0.42
+                         blue:0.43
+                        alpha:1.0];
+
+    NSColor *diagnosticPurple =
+        [NSColor colorWithRed:0.36
+                        green:0.28
+                         blue:0.56
+                        alpha:1.0];
+
+    NSColor *secondaryButton =
+        [NSColor colorWithRed:0.13
+                        green:0.15
+                         blue:0.19
+                        alpha:1.0];
+
+    /*
+     * PANNEAUX
+     */
+
+    NSArray<NSView *> *neutralPanels = @[
+        self.targetPanel,
+        self.consoleLibrariesPanel,
+        self.programChangeReturnsPanel,
+        self.technicalPanel
+    ];
+
+    for (NSView *panel in neutralPanels) {
+        panel.wantsLayer = YES;
+        panel.layer.cornerRadius = 12.0;
+        panel.layer.borderWidth = 1.0;
+        panel.layer.backgroundColor = surface.CGColor;
+        panel.layer.borderColor = neutralBorder.CGColor;
+    }
+
+    self.statusPanel.wantsLayer = YES;
+    self.statusPanel.layer.cornerRadius = 12.0;
+    self.statusPanel.layer.borderWidth = 1.0;
+    self.statusPanel.layer.backgroundColor =
+        surfaceRaised.CGColor;
+    self.statusPanel.layer.borderColor =
+        [cyanAccent colorWithAlphaComponent:0.42].CGColor;
+
+    self.testPanel.wantsLayer = YES;
+    self.testPanel.layer.cornerRadius = 12.0;
+    self.testPanel.layer.borderWidth = 1.0;
+    self.testPanel.layer.backgroundColor =
+        surface.CGColor;
+    self.testPanel.layer.borderColor =
+        [diagnosticPurple colorWithAlphaComponent:0.48].CGColor;
+
+    /*
+     * ACTIONS PRINCIPALES
+     *
+     * Deux boutons de même taille et de même poids visuel.
+     */
+
+    NSArray<NSButton *> *primaryButtons = @[
+        self.assistantDevicesButton,
+        self.simulatorWindowButton
+    ];
+
+    for (NSButton *button in primaryButtons) {
+        button.wantsLayer = YES;
+        button.bordered = NO;
+        button.layer.cornerRadius = 10.0;
+        button.contentTintColor = NSColor.whiteColor;
+        button.font =
+            [NSFont systemFontOfSize:13.0
+                             weight:NSFontWeightSemibold];
+    }
+
+    self.assistantDevicesButton.layer.backgroundColor =
+        actionBlue.CGColor;
+
+    self.simulatorWindowButton.layer.backgroundColor =
+        simulatorTeal.CGColor;
+
+    /*
+     * RTP : action standard, volontairement moins importante
+     * que Appareils / Simulateur.
+     */
+
+    self.connectButton.wantsLayer = YES;
+    self.connectButton.bordered = NO;
+    self.connectButton.layer.cornerRadius = 9.0;
+    self.connectButton.layer.backgroundColor =
+        actionBlue.CGColor;
+    self.connectButton.contentTintColor =
+        NSColor.whiteColor;
+    self.connectButton.font =
+        [NSFont systemFontOfSize:11.5
+                         weight:NSFontWeightSemibold];
+
+    /*
+     * Diagnostic : violet, jamais vert par défaut.
+     * Le vert doit représenter le RESULTAT, pas l'action.
+     */
+
+    self.testButton.wantsLayer = YES;
+    self.testButton.bordered = NO;
+    self.testButton.layer.cornerRadius = 9.0;
+    self.testButton.layer.backgroundColor =
+        diagnosticPurple.CGColor;
+    self.testButton.contentTintColor =
+        NSColor.whiteColor;
+    self.testButton.font =
+        [NSFont systemFontOfSize:11.5
+                         weight:NSFontWeightSemibold];
+
+    /*
+     * Actions secondaires.
+     */
+
+    NSArray<NSButton *> *secondaryButtons = @[
+        self.settingsButton,
+        self.refreshButton,
+        self.showModeButton
+    ];
+
+    for (NSButton *button in secondaryButtons) {
+        button.wantsLayer = YES;
+        button.bordered = NO;
+        button.layer.cornerRadius = 8.0;
+        button.layer.backgroundColor =
+            secondaryButton.CGColor;
+        button.contentTintColor =
+            [NSColor colorWithWhite:0.88 alpha:1.0];
+        button.font =
+            [NSFont systemFontOfSize:11.0
+                             weight:NSFontWeightMedium];
+    }
+
+    /*
+     * Popup Bonjour.
+     */
+
+    self.targetMenu.font =
+        [NSFont systemFontOfSize:12.5
+                         weight:NSFontWeightMedium];
+
+    self.targetMenu.controlSize =
+        NSControlSizeRegular;
+
+    self.targetMenu.wantsLayer = YES;
+    self.targetMenu.layer.cornerRadius = 8.0;
+
+    /*
+     * Titres.
+     */
+
+    self.generalModeTitleLabel.textColor =
+        cyanAccent;
+
+    self.generalModeTitleLabel.font =
+        [NSFont systemFontOfSize:10.0
+                         weight:NSFontWeightSemibold];
+
+    self.rtpTestTitle.textColor =
+        [diagnosticPurple blendedColorWithFraction:0.25
+                                           ofColor:NSColor.whiteColor];
+
+    self.rtpTestTitle.font =
+        [NSFont systemFontOfSize:10.0
+                         weight:NSFontWeightSemibold];
+
+    /*
+     * Titre principal.
+     */
+
+    self.appTitleLabel.font =
+        [NSFont systemFontOfSize:18.0
+                         weight:NSFontWeightSemibold];
+
+    /*
+     * Badges compacts.
+     * Leur couleur reste pilotée par leur logique d'état.
+     */
+
+    self.backendCompactStatus.font =
+        [NSFont systemFontOfSize:9.0
+                         weight:NSFontWeightSemibold];
+
+    self.simulatorCompactStatus.font =
+        [NSFont systemFontOfSize:9.0
+                         weight:NSFontWeightSemibold];
+
+    /*
+     * Petit relief uniquement pour les contrôles interactifs.
+     */
+
+    self.assistantDevicesButton.layer.shadowColor =
+        NSColor.blackColor.CGColor;
+    self.assistantDevicesButton.layer.shadowOpacity = 0.16;
+    self.assistantDevicesButton.layer.shadowRadius = 4.0;
+    self.assistantDevicesButton.layer.shadowOffset =
+        CGSizeMake(0.0, -1.0);
+
+    self.simulatorWindowButton.layer.shadowColor =
+        NSColor.blackColor.CGColor;
+    self.simulatorWindowButton.layer.shadowOpacity = 0.16;
+    self.simulatorWindowButton.layer.shadowRadius = 4.0;
+    self.simulatorWindowButton.layer.shadowOffset =
+        CGSizeMake(0.0, -1.0);
+
+    /*
+     * Surface interactive utilisée comme référence visuelle
+     * discrète pour le popup cible.
+     */
+    self.targetMenu.layer.backgroundColor =
+        surfaceInteractive.CGColor;
+
+    /*
+     * Bandeau MODE TEST :
+     * information présente mais volontairement secondaire.
+     */
+    self.assistantTestBanner.wantsLayer = YES;
+    self.assistantTestBanner.layer.cornerRadius = 7.0;
+    self.assistantTestBanner.layer.borderWidth = 1.0;
+    self.assistantTestBanner.layer.backgroundColor =
+        [NSColor colorWithRed:0.115
+                        green:0.105
+                         blue:0.095
+                        alpha:1.0].CGColor;
+    self.assistantTestBanner.layer.borderColor =
+        [NSColor colorWithRed:0.55
+                        green:0.43
+                         blue:0.30
+                        alpha:0.38].CGColor;
+    self.assistantTestStatusLabel.textColor =
+        [NSColor colorWithRed:0.72
+                        green:0.69
+                         blue:0.64
+                        alpha:0.92];
+    self.assistantTestStatusLabel.font =
+        [NSFont systemFontOfSize:9.0
+                         weight:NSFontWeightRegular];
+
+    self.assistantStopTestsButton.wantsLayer = YES;
+    self.assistantStopTestsButton.bordered = NO;
+    self.assistantStopTestsButton.layer.cornerRadius = 6.0;
+    self.assistantStopTestsButton.layer.backgroundColor =
+        [NSColor colorWithRed:0.30
+                        green:0.22
+                         blue:0.20
+                        alpha:1.0].CGColor;
+    self.assistantStopTestsButton.contentTintColor =
+        [NSColor colorWithWhite:0.82 alpha:1.0];
+    self.assistantStopTestsButton.font =
+        [NSFont systemFontOfSize:9.0
+                         weight:NSFontWeightMedium];
 }
 
 - (void)layoutAssistantViewForRTPMode:(BOOL)rtpMode {
-    CGFloat offset = rtpMode ? 104.0 : 0.0;
-    NSSize targetContentSize = NSMakeSize(500, 650 + offset);
+    /*
+     * Vue Spectacle compacte.
+     * Le diagnostic RTP historique ayant disparu, le mode distant
+     * n'a plus besoin des 104 px verticaux supplémentaires.
+     */
+    CGFloat offset = 0.0;
+    NSSize targetContentSize = NSMakeSize(500, 650);
     NSSize currentContentSize = self.window.contentView.bounds.size;
     if (fabs(currentContentSize.width - targetContentSize.width) > 0.5 ||
         fabs(currentContentSize.height - targetContentSize.height) > 0.5) {
@@ -3032,27 +3496,34 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     self.headerPanel.frame = NSMakeRect(16, 570 + offset, 468, 64);
     self.appTitleLabel.frame = NSMakeRect(20, 530 + offset, 220, 24); self.appSubtitleLabel.frame = NSMakeRect(0, 0, 1, 1);
     self.showModeButton.frame = NSMakeRect(360, 527 + offset, 124, 30); self.statusPanel.frame = NSMakeRect(16, 458 + offset, 468, 62);
-    CGFloat modePanelHeight = rtpMode ? 100.0 : 58.0;
-    CGFloat modePanelY = rtpMode ? 350.0 + offset : 392.0;
-    self.targetPanel.frame = NSMakeRect(16, modePanelY, 468, modePanelHeight); self.testPanel.frame = NSMakeRect(16, 343, 468, 96);
-    self.generalModeTitleLabel.stringValue = rtpMode ? @"MODE GÉNÉRAL" : @"MODE · LOCAL";
-    self.generalModeTitleLabel.frame = rtpMode ? NSMakeRect(16, 68, 150, 20) : NSMakeRect(16, 31, 140, 18);
+    CGFloat modePanelHeight = rtpMode ? 90.0 : 58.0;
+    CGFloat modePanelY = rtpMode ? 350.0 : 392.0;
+    self.targetPanel.frame = rtpMode
+        ? NSMakeRect(16, 350, 468, 90)
+        : NSMakeRect(16, 392, 468, 58);
+    self.testPanel.frame = NSMakeRect(0, 0, 1, 1);
+    self.testPanel.hidden = YES;
+    self.generalModeTitleLabel.stringValue = self.localReturnMode ? @"PILOTÉ PAR CL SHOW CONTROL" : @"CIBLE DISTANTE · BONJOUR";
+    self.generalModeTitleLabel.frame = rtpMode ? NSMakeRect(16, 65, 230, 18) : NSMakeRect(16, 31, 250, 18);
     self.returnModeMenu.frame = rtpMode ? NSMakeRect(16, 28, 168, 34) : NSMakeRect(276, 12, 176, 34);
-    self.remoteTargetTitleLabel.frame = NSMakeRect(194, 68, 210, 20);
-    self.targetMenu.frame = NSMakeRect(194, 28, 166, 34);
-    self.connectButton.frame = NSMakeRect(370, 27, 82, 36);
-    self.operatingModeReasonLabel.frame = NSMakeRect(16, 6, 436, 18);
+    self.remoteTargetTitleLabel.frame = NSMakeRect(16, 66, 220, 18);
+    self.targetMenu.frame = NSMakeRect(16, 27, 300, 34);
+    self.connectButton.frame = NSMakeRect(324, 27, 128, 34);
+    self.operatingModeReasonLabel.frame = rtpMode ? NSMakeRect(16, 5, 436, 16) : NSMakeRect(16, 6, 436, 18);
     self.assistantDevicesTitleLabel.frame = NSMakeRect(20, 313, 250, 22);
     self.assistantDevicesButton.frame = NSMakeRect(246, 527 + offset, 106, 30);
     self.assistantReturnPanel.frame = NSMakeRect(16, 90, 468, 215);
     self.assistantDevicesScroll.frame = self.assistantReturnPanel.bounds;
-    self.assistantTestBanner.frame = NSMakeRect(16, 42, 468, 36);
+    self.assistantTestBanner.frame = NSMakeRect(80, 47, 340, 26);
     self.footerLabel.frame = NSMakeRect(16, 10, 468, 18);
 }
 
 - (void)updateRoundTripPanelForCurrentMode {
     BOOL rtpMode = !self.localReturnMode;
-    self.testPanel.hidden = !rtpMode;
+    // Le round-trip historique supposait un simulateur sur le Mac distant.
+    // Les simulateurs Auto tournent désormais localement : ce panneau ne
+    // représente plus l'état opérationnel réel et reste masqué.
+    self.testPanel.hidden = YES;
     self.endpointMenu.enabled = rtpMode;
     self.testTargetMenu.enabled = rtpMode;
     self.programField.enabled = rtpMode;
@@ -3080,50 +3551,82 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
 
 - (void)updateAssistantPrimaryStatus {
     if (self.showModeEnabled) {
-        self.headline.stringValue = self.transportHeadline.length ? self.transportHeadline : @"DIAGNOSTIC";
+        self.headline.stringValue =
+            self.transportHeadline.length
+                ? self.transportHeadline
+                : @"DIAGNOSTIC";
         self.detail.stringValue = self.transportDetail ?: @"";
         return;
     }
-    NSString *mode = self.localReturnMode ? @"Ableton local" : @"Ableton distant";
+
+    NSString *mode =
+        self.localReturnMode ? @"Ableton local" : @"Ableton distant";
+
     NSColor *color = NSColor.systemOrangeColor;
     NSString *verdict = @"ATTENTION REQUISE";
-    NSString *explanation;
-    if (!self.showControlAvailable) {
-        explanation = [NSString stringWithFormat:@"%@ · Show Control indisponible, mode conservé localement.", mode];
-    } else if (self.localReturnMode && [self localReturnIsAvailable]) {
-        color = NSColor.systemGreenColor; verdict = @"PRÊT";
-        explanation = @"Ableton local · retour MIDI local disponible · RTP non requis.";
+    NSString *explanation = @"";
+
+    if (self.localReturnMode && [self localReturnIsAvailable]) {
+        color = NSColor.systemGreenColor;
+        verdict = @"PRÊT";
+        explanation =
+            @"Retour automatique local disponible · RTP non requis.";
     } else if (self.localReturnMode) {
-        color = NSColor.systemRedColor; verdict = @"INDISPONIBLE";
-        explanation = @"Ableton local · retour MIDI local indisponible · RTP non requis.";
-    } else if ([self.lastRTPTestStatus isEqualToString:@"validated"]) {
-        color = NSColor.systemGreenColor; verdict = @"PRÊT";
-        explanation = @"Ableton distant · liaison RTP validée par un aller-retour MIDI.";
-    } else if ([self.lastRTPTestStatus isEqualToString:@"running"]) {
-        explanation = @"Ableton distant · test RTP en cours.";
-    } else if ([self.lastRTPTestStatus isEqualToString:@"available"]) {
-        explanation = @"Ableton distant · RTP disponible, mais non validé par un aller-retour.";
+        color = NSColor.systemRedColor;
+        verdict = @"INDISPONIBLE";
+        explanation =
+            @"Retour MIDI local indisponible · RTP non requis.";
+    } else if ([self remoteSimulatorAutoPathReady]) {
+        color = NSColor.systemGreenColor;
+        verdict = @"PRÊT";
+        explanation =
+            @"Endpoint RTP disponible · retours automatiques actifs.";
+    } else if (
+        [self.lastRTPTestStatus isEqualToString:@"validated"]
+    ) {
+        color = NSColor.systemGreenColor;
+        verdict = @"PRÊT";
+        explanation =
+            @"Liaison RTP confirmée par le diagnostic aller-retour.";
+    } else if (
+        [self.lastRTPTestStatus isEqualToString:@"running"]
+    ) {
+        verdict = @"TEST EN COURS";
+        explanation =
+            @"Diagnostic aller-retour RTP en cours.";
     } else if (CLLocalRTPEndpointNames().count > 0) {
         color = NSColor.systemOrangeColor;
         verdict = @"DISPONIBLE";
-        explanation = @"Ableton distant · endpoint RTP disponible · fonctionnement actif.";
-    } else if ([self.lastRTPTestStatus isEqualToString:@"loop_detected"]) {
-        color = NSColor.systemRedColor; verdict = @"INDISPONIBLE";
-        explanation = @"Ableton distant · boucle MIDI détectée sur la liaison RTP.";
-    } else if ([self.lastRTPTestStatus isEqualToString:@"failed"] ||
-               [self.lastRTPTestStatus isEqualToString:@"timeout"] ||
-               [self.lastRTPTestStatus isEqualToString:@"send_error"]) {
-        color = NSColor.systemRedColor; verdict = @"INDISPONIBLE";
-        explanation = @"Ableton distant · le dernier test RTP a échoué.";
+        explanation =
+            @"Endpoint RTP disponible · retours Auto en attente.";
+    } else if (
+        [self.lastRTPTestStatus isEqualToString:@"loop_detected"]
+    ) {
+        color = NSColor.systemRedColor;
+        verdict = @"INDISPONIBLE";
+        explanation =
+            @"Boucle MIDI détectée sur la liaison RTP.";
     } else {
-        color = NSColor.systemRedColor; verdict = @"INDISPONIBLE";
-        explanation = @"Ableton distant · aucune cible RTP distante n’est détectée.";
+        color = NSColor.systemRedColor;
+        verdict = @"INDISPONIBLE";
+        explanation =
+            @"Aucun endpoint RTP exploitable n’est actuellement visible.";
     }
+
+    if (!self.showControlAvailable) {
+        explanation =
+            [explanation stringByAppendingString:
+                @" · CL Show Control indisponible, état MIDI conservé localement."];
+    }
+
     self.lamp.layer.backgroundColor = color.CGColor;
     self.lamp.layer.shadowColor = color.CGColor;
     self.lamp.layer.shadowOpacity = 0.65;
     self.lamp.layer.shadowRadius = 7.0;
-    self.headline.stringValue = [NSString stringWithFormat:@"%@ · %@", verdict, mode];
+
+    self.headline.stringValue =
+        [NSString stringWithFormat:@"%@ · %@", verdict, mode];
+
     self.detail.stringValue = explanation;
 }
 
@@ -3140,6 +3643,8 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
         } else {
             [self loadPublishedConsoleReturnState];
         }
+    } else {
+        [self writeConsoleReturnState];
     }
 }
 - (void)refreshNow:(id)sender {
@@ -3206,17 +3711,20 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     [self.returnModeMenu selectItemAtIndex:local ? 0 : 1];
     self.targetMenu.enabled = !local;
     self.connectButton.enabled = !local && self.discoveredPeers.count > 0 && !self.systemConnectRunning;
-    self.connectButton.title = local ? @"Non requis" : @"Connecter";
+    self.connectButton.title =
+        local ? @"Non requis" : @"Établir RTP";
     self.connectButton.toolTip = local
-        ? @"Aucune connexion RTP n’est requise en mode Ableton local."
-        : (self.discoveredPeers.count ? @"Demander à macOS de connecter la cible RTP sélectionnée."
-                                     : @"Aucune cible RTP distante n’est actuellement détectée.");
-    self.remoteTargetTitleLabel.hidden = local;
+        ? @"Aucune connexion RTP n’est requise en mode local."
+        : (self.discoveredPeers.count
+            ? @"Dépannage uniquement : forcer macOS à établir ou rétablir la session RTP."
+            : @"Aucune cible RTP distante n’est actuellement détectée.");
+    self.remoteTargetTitleLabel.hidden = YES;
+    self.remoteTargetTitleLabel.stringValue = @"Piloté automatiquement par CL Show Control";
     self.targetMenu.hidden = local;
     self.connectButton.hidden = local;
     self.localRTPNoteLabel.hidden = !self.showModeEnabled || !local;
     self.localRTPDetailLabel.hidden = !self.showModeEnabled || !local;
-    if (self.simulatorModeLabel) self.simulatorModeLabel.stringValue = local ? @"Ableton local · dérivé du mode général" : @"Ableton distant · dérivé du mode général";
+    if (self.simulatorModeLabel) self.simulatorModeLabel.stringValue = local ? @"Ableton local · piloté par CL Show Control" : @"Ableton distant · piloté par CL Show Control";
     [NSUserDefaults.standardUserDefaults setObject:(local ? @"local_dedicated" : @"rtp_remote")
                                             forKey:@"consoleReturnMode"];
     if (!changed) {
@@ -3226,6 +3734,42 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
         return;
     }
     [self simulatorModeChanged:nil];
+
+    // Le mode général est la source de vérité du transport simulateur.
+    // Les lignes déjà placées en Auto doivent suivre immédiatement
+    // Local <-> Distant sans intervention dans la banque 16 canaux.
+    [self reconcilePersistedSimulatorAutoDevicesAfterModeChange];
+
+    if (!local) {
+        NSString *peer = self.targetMenu.selectedItem.title ?: @"";
+        if (!peer.length ||
+            [peer hasPrefix:@"Aucun"] ||
+            [peer hasPrefix:@"Recherche"]) {
+            peer = [NSUserDefaults.standardUserDefaults
+                stringForKey:@"preferredRtpPeer"] ?: @"";
+        }
+
+        if (peer.length &&
+            ![peer hasPrefix:@"Aucun"] &&
+            ![peer hasPrefix:@"Recherche"]) {
+
+            [self.systemConnectAttemptedPeers removeObject:peer];
+
+            dispatch_after(
+                dispatch_time(
+                    DISPATCH_TIME_NOW,
+                    (int64_t)(0.6 * NSEC_PER_SEC)
+                ),
+                dispatch_get_main_queue(),
+                ^{
+                    if (!self.localReturnMode) {
+                        [self connectPeerThroughSystem:peer automatic:YES];
+                    }
+                }
+            );
+        }
+    }
+
     [self applyPresentationMode];
     if (message.length) self.lastTest.stringValue = message;
 }
@@ -3242,11 +3786,22 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
         dispatch_async(dispatch_get_main_queue(), ^{
             self.operatingModeSyncInFlight = NO;
             self.showControlAvailable = mode.length > 0;
+
             if (!self.operatingModeChangeInFlight) {
-                NSString *storedMode = [NSUserDefaults.standardUserDefaults stringForKey:@"consoleReturnMode"];
-                NSString *managerMode = [storedMode isEqualToString:@"rtp_remote"] ? @"remote" : @"local";
-                self.operatingModeReasonLabel.stringValue = @"Mode MIDI indépendant de CL Show Control";
-                [self applyOperatingMode:managerMode message:nil];
+                if ([mode isEqualToString:@"local"] || [mode isEqualToString:@"remote"]) {
+                    self.operatingModeReasonLabel.stringValue =
+                        [mode isEqualToString:@"local"] ? @"Mode local · synchronisé automatiquement" : @"Mode distant · synchronisé automatiquement";
+                    [self applyOperatingMode:mode message:nil];
+                } else {
+                    NSString *storedMode =
+                        [NSUserDefaults.standardUserDefaults stringForKey:@"consoleReturnMode"];
+                    NSString *managerMode =
+                        [storedMode isEqualToString:@"rtp_remote"] ? @"remote" : @"local";
+
+                    self.operatingModeReasonLabel.stringValue =
+                        @"CL Show Control indisponible · dernier mode MIDI conservé";
+                    [self applyOperatingMode:managerMode message:nil];
+                }
             } else {
                 [self updateAssistantPrimaryStatus];
             }
@@ -3270,7 +3825,7 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
                                            forKey:@"consoleReturnMode"];
 
     self.operatingModeReasonLabel.stringValue =
-        @"Mode MIDI indépendant de CL Show Control";
+        @"Mode manuel temporaire · CL Show Control reste maître";
 
     NSString *message = [mode isEqualToString:@"local"]
         ? @"MIDI local · retour dédié actif"
@@ -3373,11 +3928,12 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     [self stylePopup:self.targetMenu accent:[NSColor colorWithRed:0.34 green:0.72 blue:1.0 alpha:1.0]];
     self.targetMenu.enabled = !self.localReturnMode;
     self.connectButton.enabled = !self.localReturnMode && names.count > 0 && !self.systemConnectRunning;
-    self.connectButton.title = self.localReturnMode ? @"Non requis" : @"Connecter";
+    self.connectButton.title = self.localReturnMode ? @"Non requis" : @"Établir RTP";
     self.connectButton.toolTip = self.localReturnMode
         ? @"Aucune connexion RTP n’est requise en mode Ableton local."
-        : (names.count ? @"Demander à macOS de connecter la cible RTP sélectionnée."
-                       : @"Désactivé : aucune cible RTP distante détectée.");
+        : (names.count
+            ? @"Dépannage uniquement : forcer macOS à établir ou rétablir la session RTP."
+            : @"Aucune cible RTP distante n’est actuellement détectée.");
     self.technicalPeers.stringValue = names.count
         ? [NSString stringWithFormat:@"%lu détecté(s)\n%@", (unsigned long)names.count, [names componentsJoinedByString:@" · "]]
         : @"Aucun correspondant _apple-midi._udp détecté";
@@ -3562,21 +4118,167 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
                 BOOL postedPhysicalClick = CLPostDoubleClickFromConnectorReason(reason);
                 NSUInteger retry = [self.systemConnectRetryCounts[peer] unsignedIntegerValue] + 1;
                 self.systemConnectRetryCounts[peer] = @(retry);
-                BOOL willRetry = NO;
-                self.lastTest.stringValue = willRetry
-                    ? [NSString stringWithFormat:@"Connexion en attente · nouvel essai automatique %lu/8", (unsigned long)retry]
-                    : [NSString stringWithFormat:@"Connexion système incomplète · %@", reason];
-                CLAppendDiagnostic(@"rtp-connect-pending", [NSString stringWithFormat:@"peer=%@ reason=%@", peer, reason]);
+
+                CLAppendDiagnostic(
+                    @"rtp-connect-pending",
+                    [NSString stringWithFormat:@"peer=%@ reason=%@", peer, reason]
+                );
+
                 if (postedPhysicalClick) {
-                    CLAppendDiagnostic(@"rtp-connect-physical-click", [NSString stringWithFormat:@"peer=%@", peer]);
+                    CLAppendDiagnostic(
+                        @"rtp-connect-physical-click",
+                        [NSString stringWithFormat:@"peer=%@", peer]
+                    );
                 }
-                if (willRetry) {
-                    NSTimeInterval delay = postedPhysicalClick ? 1.0 : MIN(30.0, 5.0 + retry * 3.0);
-                    CLAppendDiagnostic(@"rtp-connect-retry-scheduled", [NSString stringWithFormat:@"peer=%@ attempt=%lu delay=%.0f", peer, (unsigned long)retry, delay]);
-                    dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                        [self.systemConnectAttemptedPeers removeObject:peer];
-                        [self connectPeerThroughSystem:peer automatic:YES];
-                    });
+
+                NSString *legacyScript =
+                    [self toolPath:@"reconnect_legacy_rtp.applescript"];
+
+                if ([NSFileManager.defaultManager fileExistsAtPath:legacyScript]) {
+                    self.lastTest.stringValue =
+                        [NSString stringWithFormat:
+                            @"Connexion RTP legacy vers %@…", peer];
+
+                    CLAppendDiagnostic(
+                        @"rtp-legacy-start",
+                        [NSString stringWithFormat:@"peer=%@", peer]
+                    );
+
+                    dispatch_async(
+                        dispatch_get_global_queue(
+                            QOS_CLASS_USER_INITIATED, 0
+                        ),
+                        ^{
+                            NSTask *legacyTask = [[NSTask alloc] init];
+                            legacyTask.executableURL =
+                                [NSURL fileURLWithPath:@"/usr/bin/osascript"];
+                            legacyTask.arguments =
+                                @[legacyScript, peer, peer];
+
+                            NSPipe *legacyOut = [NSPipe pipe];
+                            NSPipe *legacyErr = [NSPipe pipe];
+
+                            legacyTask.standardOutput = legacyOut;
+                            legacyTask.standardError = legacyErr;
+
+                            NSError *launchError = nil;
+                            BOOL launched =
+                                [legacyTask launchAndReturnError:&launchError];
+
+                            if (launched) {
+                                [legacyTask waitUntilExit];
+                            }
+
+                            NSData *outData =
+                                [legacyOut.fileHandleForReading
+                                    readDataToEndOfFile];
+
+                            NSData *errData =
+                                [legacyErr.fileHandleForReading
+                                    readDataToEndOfFile];
+
+                            NSString *legacyOutput =
+                                [[NSString alloc]
+                                    initWithData:outData
+                                    encoding:NSUTF8StringEncoding] ?: @"";
+
+                            NSString *legacyError =
+                                [[NSString alloc]
+                                    initWithData:errData
+                                    encoding:NSUTF8StringEncoding] ?: @"";
+
+                            legacyOutput =
+                                [legacyOutput
+                                    stringByTrimmingCharactersInSet:
+                                        NSCharacterSet.whitespaceAndNewlineCharacterSet];
+
+                            legacyError =
+                                [legacyError
+                                    stringByTrimmingCharactersInSet:
+                                        NSCharacterSet.whitespaceAndNewlineCharacterSet];
+
+                            BOOL legacyConnected =
+                                launched &&
+                                legacyTask.terminationStatus == 0 &&
+                                (
+                                    [legacyOutput
+                                        hasPrefix:@"connected:"] ||
+                                    [legacyOutput
+                                        hasPrefix:@"already-connected:"]
+                                );
+
+                            dispatch_async(
+                                dispatch_get_main_queue(),
+                                ^{
+                                    if (legacyConnected) {
+                                        [self.systemConnectRetryCounts
+                                            removeObjectForKey:peer];
+
+                                        if (![self.lastRTPTestStatus
+                                                isEqualToString:@"validated"] &&
+                                            ![self.lastRTPTestStatus
+                                                isEqualToString:@"running"]) {
+                                            self.lastRTPTestStatus =
+                                                @"available";
+                                            self.lastRTPTestLatencyMs = nil;
+                                            self.lastRTPTestAt =
+                                                [NSDate date];
+                                            self.lastRTPTestMessage =
+                                                [NSString stringWithFormat:
+                                                    @"%@ connecté via session RTP macOS legacy",
+                                                    peer];
+                                        }
+
+                                        self.lastTest.stringValue =
+                                            [NSString stringWithFormat:
+                                                @"✓ %@ connecté via RTP macOS",
+                                                peer];
+
+                                        CLAppendDiagnostic(
+                                            @"rtp-legacy-success",
+                                            legacyOutput
+                                        );
+                                    } else {
+                                        NSString *legacyReason =
+                                            launchError.localizedDescription
+                                            ?: (legacyError.length
+                                                ? legacyError
+                                                : legacyOutput.length
+                                                ? legacyOutput
+                                                : reason);
+
+                                        self.lastTest.stringValue =
+                                            [NSString stringWithFormat:
+                                                @"Connexion RTP impossible · %@",
+                                                legacyReason];
+
+                                        CLAppendDiagnostic(
+                                            @"rtp-legacy-failed",
+                                            [NSString stringWithFormat:
+                                                @"peer=%@ reason=%@",
+                                                peer,
+                                                legacyReason]
+                                        );
+                                    }
+
+                                    [self writeConsoleReturnState];
+                                }
+                            );
+                        }
+                    );
+                } else {
+                    self.lastTest.stringValue =
+                        [NSString stringWithFormat:
+                            @"Connexion système incomplète · %@",
+                            reason];
+
+                    CLAppendDiagnostic(
+                        @"rtp-legacy-missing",
+                        [NSString stringWithFormat:
+                            @"peer=%@ path=%@",
+                            peer,
+                            legacyScript ?: @""]
+                    );
                 }
             }
             [self writeConsoleReturnState];
@@ -3711,6 +4413,11 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
                 : @"Le port CL MIDI Return Test est indisponible."];
     } else if (self.loopDetectedEndpoint && [self.loopDetectedEndpoint isEqualToString:endpoint]) {
         [self setLamp:[NSColor systemRedColor] title:@"BOUCLE MIDI DÉTECTÉE" detail:@"Dans Ableton : désactivez Entrée RTP > Piste, puis relancez le test."];
+    } else if ([self remoteSimulatorAutoPathReady]) {
+        [self setLamp:
+            [NSColor systemGreenColor]
+            title:@"MIDI DISTANT OPÉRATIONNEL"
+            detail:@"Endpoint RTP disponible · retours Auto actifs. Le test aller-retour reste disponible dans Diagnostic."];
     } else if (
         [self.lastRTPTestStatus isEqualToString:@"validated"] &&
         self.validatedEndpoint &&
@@ -3761,8 +4468,8 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     } else if (hasSource && hasDestination) {
         [self setLamp:
             [NSColor systemOrangeColor]
-            title:@"RTP DISPONIBLE"
-            detail:@"Ports visibles · lancez un test aller-retour"];
+            title:@"MIDI DISTANT DISPONIBLE"
+            detail:@"Endpoint RTP visible · le test aller-retour est un diagnostic facultatif."];
 
     } else {
         [self setLamp:
@@ -3780,28 +4487,38 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     if (resourcePath.length) {
         NSString *bundled = [resourcePath stringByAppendingPathComponent:
             [@"Network Tools" stringByAppendingPathComponent:name]];
-        if ([fm isExecutableFileAtPath:bundled]) return bundled;
+        if ([fm fileExistsAtPath:bundled]) return bundled;
+
+        NSString *directBundled =
+            [resourcePath stringByAppendingPathComponent:name];
+        if ([fm fileExistsAtPath:directBundled]) return directBundled;
     }
 
-    NSString *executablePath = [NSBundle mainBundle].executablePath;
-    if (executablePath.length) {
-        NSString *sibling = [[executablePath stringByDeletingLastPathComponent]
+    NSString *executablePath =
+        NSProcessInfo.processInfo.arguments.firstObject ?: @"";
+    NSString *executableDir =
+        executablePath.stringByDeletingLastPathComponent;
+
+    if (executableDir.length) {
+        NSString *nextToExecutable =
+            [executableDir stringByAppendingPathComponent:name];
+        if ([fm fileExistsAtPath:nextToExecutable]) return nextToExecutable;
+
+        NSString *sourceDir =
+            executableDir.stringByDeletingLastPathComponent;
+        NSString *sourceCandidate =
+            [sourceDir stringByAppendingPathComponent:name];
+        if ([fm fileExistsAtPath:sourceCandidate]) return sourceCandidate;
+    }
+
+    NSString *cwd = fm.currentDirectoryPath ?: @"";
+    NSString *cwdCandidate =
+        [[cwd stringByAppendingPathComponent:@"tools/cl_midi_network"]
             stringByAppendingPathComponent:name];
-        if ([fm isExecutableFileAtPath:sibling]) return sibling;
-    }
+    if ([fm fileExistsAtPath:cwdCandidate]) return cwdCandidate;
 
-    NSString *cwd = [[NSFileManager defaultManager] currentDirectoryPath];
-    if (cwd.length) {
-        NSString *buildTool = [[cwd stringByAppendingPathComponent:@"build"]
-            stringByAppendingPathComponent:name];
-        if ([fm isExecutableFileAtPath:buildTool]) return buildTool;
-
-        NSString *direct = [cwd stringByAppendingPathComponent:name];
-        if ([fm isExecutableFileAtPath:direct]) return direct;
-    }
-
-    return resourcePath.length
-        ? [resourcePath stringByAppendingPathComponent:
+    return executableDir.length
+        ? [executableDir stringByAppendingPathComponent:
             [@"Network Tools" stringByAppendingPathComponent:name]]
         : name;
 }
@@ -4804,7 +5521,7 @@ static void CLClearPersistedSimulatorAutoDeviceIDs(void) {
 
 - (void)simulatorModeChanged:(id)sender {
     (void)sender;
-    self.simulatorModeLabel.stringValue = self.localReturnMode ? @"Ableton local · dérivé du mode général" : @"Ableton distant · dérivé du mode général";
+    self.simulatorModeLabel.stringValue = self.localReturnMode ? @"Ableton local · piloté par CL Show Control" : @"Ableton distant · piloté par CL Show Control";
     [self updateRoundTripPanelForCurrentMode];
     if (self.localReturnMode) {
         [self.simulatorInputEndpointMenu removeAllItems];
@@ -4917,7 +5634,15 @@ static void CLClearPersistedSimulatorAutoDeviceIDs(void) {
                     NSMutableDictionary *observed =
                         [strongSelf simulatorDeviceForID:deviceID];
 
-                    if (receivedLine && !strongSelf.localReturnMode) {
+                    // En RTP distant, une trame vue par le simulateur est
+                    // bidirectionnelle et ne permet pas de déterminer de façon
+                    // fiable qu'il s'agit d'une consigne "expected".
+                    //
+                    // L'état expected canonique reste réservé au chemin local
+                    // dédié CLExpectedEndpointName. Ne pas republier ici un RX
+                    // RTP comme état attendu, sinon un retour console réel peut
+                    // créer une fausse divergence dans Show Control.
+                    if (NO && receivedLine && !strongSelf.localReturnMode) {
                         NSDate *now = NSDate.date;
                         NSInteger channel =
                             [observed[@"channel"] integerValue];
@@ -4959,8 +5684,12 @@ static void CLClearPersistedSimulatorAutoDeviceIDs(void) {
     task.terminationHandler = ^(NSTask *finished) {
         (void)finished;
         dispatch_async(dispatch_get_main_queue(), ^{
-            if (self.simulatorTasks[deviceID] == task) [self.simulatorTasks removeObjectForKey:deviceID];
-            [self.simulatorOutputBuffers removeObjectForKey:deviceID];
+            // Ne jamais laisser la fin d'un ancien process supprimer
+            // l'état d'un nouveau process déjà relancé pour le même device.
+            if (self.simulatorTasks[deviceID] == task) {
+                [self.simulatorTasks removeObjectForKey:deviceID];
+                [self.simulatorOutputBuffers removeObjectForKey:deviceID];
+            }
             [self rebuildSimulatorDeviceRows];
         });
     };
@@ -5089,23 +5818,28 @@ static void CLClearPersistedSimulatorAutoDeviceIDs(void) {
     if (!self.simulatorCompactStatus)
         return;
 
+    NSSet<NSString *> *persisted =
+        CLPersistedSimulatorAutoDeviceIDs();
+
     NSUInteger targetCount = 0;
     NSUInteger runningCount = 0;
 
     for (NSMutableDictionary *device in self.simulatorDevices ?: @[]) {
+        NSString *deviceID = device[@"id"] ?: @"";
         BOOL enabled = [device[@"enabled"] boolValue];
         BOOL programChange =
             [[device[@"signal_type"] lowercaseString]
                 isEqualToString:@"program_change"];
 
-        if (!enabled || !programChange)
+        if (!deviceID.length ||
+            ![persisted containsObject:deviceID] ||
+            !enabled ||
+            !programChange)
             continue;
 
         targetCount++;
 
-        NSString *deviceID = device[@"id"] ?: @"";
-        NSTask *task =
-            deviceID.length ? self.simulatorTasks[deviceID] : nil;
+        NSTask *task = self.simulatorTasks[deviceID];
 
         if (task.running)
             runningCount++;
@@ -5137,6 +5871,105 @@ static void CLClearPersistedSimulatorAutoDeviceIDs(void) {
         self.simulatorCompactStatus.textColor =
             NSColor.systemRedColor;
     }
+}
+
+- (BOOL)remoteSimulatorAutoPathReady {
+    if (self.localReturnMode)
+        return NO;
+
+    NSArray<NSString *> *rtpEndpoints = CLLocalRTPEndpointNames();
+    if (!rtpEndpoints.count)
+        return NO;
+
+    NSSet<NSString *> *persisted =
+        CLPersistedSimulatorAutoDeviceIDs();
+
+    NSUInteger wanted = 0;
+    NSUInteger running = 0;
+
+    for (NSMutableDictionary *device in self.simulatorDevices ?: @[]) {
+        NSString *deviceID = device[@"id"] ?: @"";
+
+        if (!deviceID.length ||
+            ![persisted containsObject:deviceID] ||
+            ![device[@"enabled"] boolValue] ||
+            ![[device[@"signal_type"] lowercaseString]
+                isEqualToString:@"program_change"])
+            continue;
+
+        wanted++;
+
+        NSTask *task = self.simulatorTasks[deviceID];
+        if (task.running)
+            running++;
+    }
+
+    return wanted > 0 && running == wanted;
+}
+
+- (void)reconcilePersistedSimulatorAutoDevicesAfterModeChange {
+    if (self.backgroundMonitorOnly)
+        return;
+
+    NSSet<NSString *> *persisted =
+        CLPersistedSimulatorAutoDeviceIDs();
+
+    if (!persisted.count) {
+        [self updateSimulatorCompactStatus];
+        return;
+    }
+
+    NSUInteger stopped = 0;
+
+    for (NSMutableDictionary *device in self.simulatorDevices ?: @[]) {
+        NSString *deviceID = device[@"id"] ?: @"";
+
+        if (!deviceID.length ||
+            ![persisted containsObject:deviceID] ||
+            ![device[@"enabled"] boolValue] ||
+            ![[device[@"signal_type"] lowercaseString]
+                isEqualToString:@"program_change"])
+            continue;
+
+        NSTask *task = self.simulatorTasks[deviceID];
+
+        if (task.running) {
+            // On retire d'abord l'ancienne instance de nos tables.
+            // Son terminationHandler ne pourra donc pas effacer
+            // les buffers du futur process de remplacement.
+            [self.simulatorTasks removeObjectForKey:deviceID];
+            [self.simulatorOutputBuffers removeObjectForKey:deviceID];
+            [task terminate];
+            stopped++;
+        }
+    }
+
+    self.simulatorAutoRestoreAttempts = 0;
+    [self rebuildSimulatorDeviceRows];
+    [self updateSimulatorCompactStatus];
+
+    CLAppendDiagnostic(
+        @"simulator-auto-mode-reconcile",
+        [NSString stringWithFormat:
+            @"mode=%@ stopped=%lu persisted=%lu",
+            self.localReturnMode ? @"local" : @"remote",
+            (unsigned long)stopped,
+            (unsigned long)persisted.count]
+    );
+
+    // simulatorModeChanged: vient aussi de lancer refreshEndpoints.
+    // On laisse le snapshot CoreMIDI remettre les menus dans le nouveau
+    // mode avant de relancer. restore... possède ensuite son propre retry.
+    dispatch_after(
+        dispatch_time(
+            DISPATCH_TIME_NOW,
+            (int64_t)(0.35 * NSEC_PER_SEC)
+        ),
+        dispatch_get_main_queue(),
+        ^{
+            [self restorePersistedSimulatorAutoDevices];
+        }
+    );
 }
 
 - (void)restorePersistedSimulatorAutoDevices {
@@ -5229,6 +6062,10 @@ static void CLClearPersistedSimulatorAutoDeviceIDs(void) {
 
     [self rebuildSimulatorDeviceRows];
     [self updateSimulatorCompactStatus];
+
+    // Le voyant principal décrit le chemin MIDI utile.
+    // Recalcul immédiat après restauration des Auto.
+    [self refreshEndpoints];
 
     CLAppendDiagnostic(
         @"simulator-auto-restored",

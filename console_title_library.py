@@ -131,20 +131,37 @@ def _parse_json(text: str, assigned_console: Optional[str], rows: Dict[str, Dict
         payload = json.loads(text)
     except (ValueError, TypeError) as exc:
         raise LibraryImportError("JSON invalide") from exc
+
     groups: Iterable[tuple[Any, Any]]
-    if isinstance(payload, dict) and isinstance(payload.get("scenes"), list):
+    if isinstance(payload, dict) and isinstance(payload.get("entries"), list):
+        groups = ((payload.get("console") or assigned_console, payload["entries"]),)
+    elif isinstance(payload, dict) and isinstance(payload.get("scenes"), list):
         groups = ((payload.get("console") or assigned_console, payload["scenes"]),)
     elif isinstance(payload, dict) and isinstance(payload.get("consoles"), dict):
         groups = tuple(payload["consoles"].items())
     else:
         raise LibraryImportError("structure JSON non reconnue")
+
+    allowed_keys = {"console", "memory", "midi_program", "title"}
+
     for console, scenes in groups:
         if not isinstance(scenes, list):
-            raise LibraryImportError("la liste scenes doit être un tableau")
+            raise LibraryImportError("la liste scenes/entries doit être un tableau")
         for scene in scenes:
-            if not isinstance(scene, dict) or set(scene) - {"memory", "title"}:
+            if not isinstance(scene, dict) or set(scene) - allowed_keys:
                 raise LibraryImportError("entrée JSON invalide")
-            _add(rows, console, scene.get("memory"), scene.get("title"), warnings)
+
+            scene_console = scene.get("console") or console or assigned_console
+            if not scene_console:
+                raise LibraryImportError("console absente dans l’entrée JSON")
+
+            _add(
+                rows,
+                scene_console,
+                scene.get("memory"),
+                scene.get("title"),
+                warnings,
+            )
 
 
 def _parse_txt(text: str, assigned_console: Optional[str], rows: Dict[str, Dict[int, str]],

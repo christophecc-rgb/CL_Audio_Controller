@@ -29,7 +29,6 @@ on run argv
 				repeat with participantRow in rows of participantOutline
 					set participantContainer to group 1 of UI element 1 of participantRow
 					if exists static text connectedName of participantContainer then
-						set visible to false
 						return "already-connected:" & connectedName
 					end if
 				end repeat
@@ -52,7 +51,6 @@ on run argv
 					repeat with participantRow in rows of participantOutline
 						set participantContainer to group 1 of UI element 1 of participantRow
 						if exists static text connectedName of participantContainer then
-							set visible to false
 							return "connected:" & connectedName
 						end if
 					end repeat

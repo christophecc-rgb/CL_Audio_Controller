@@ -35,7 +35,11 @@ def build(destination, libraries, sessions=()):
             raise FileExistsError(f'Bibliothèque différente déjà présente : {target}')
         copy_resource(source, target)
     for directory in sessions:
-        for source in sorted(Path(directory).glob('*.showcue.zip')):
+        sources = sorted(
+            list(Path(directory).glob('*.showcue')) +
+            list(Path(directory).glob('*.showcue.zip'))
+        )
+        for source in sources:
             if source.is_file():
                 copy_resource(source, destination / 'ShowCue_Sessions' / source.name)
     files = {str(p.relative_to(destination)): hashlib.sha256(p.read_bytes()).hexdigest()
