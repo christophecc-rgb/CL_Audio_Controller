@@ -72,3 +72,4 @@ MANIFESTE_EXTRACTION.txt
 *.before-*
 vendor/ffmpeg/macos/ffmpeg
 .showcue_https/
+tools/ableton_mtc_bridge/CLAbletonMTCBridge
