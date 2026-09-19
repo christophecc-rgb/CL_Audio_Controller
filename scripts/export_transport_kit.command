@@ -179,6 +179,7 @@ mkdir -p \
   "$COMPONENTS_ROOT/Ableton Live 11-12/Max for Live/CL Audio Controller - Remote" \
   "$COMPONENTS_ROOT/Ableton Live 11-12/Max for Live/Paradis Latin AutoScene" \
   "$COMPONENTS_ROOT/Ableton Live 11-12/Max for Live/CL MIDI Console Monitor" \
+  "$COMPONENTS_ROOT/Ableton Live 11-12/Max for Live/CL Absolute MTC" \
   "$COMPONENTS_ROOT/Ableton Live 10/Max for Live/Paradis Latin AutoScene - Live 10" \
   "$COMPONENTS_ROOT/Outils_reseau_MIDI" \
   "$INSTALLER_RESOURCES/Documentation" \
@@ -214,6 +215,15 @@ done
 for file in "CL MIDI Console Monitor.amxd" "CL MIDI Console Monitor.maxpat" CLMidiConsoleDisplay.js CLMidiConsoleConfirmation.js paradis_latin_logo.jpg; do
   ditto "$PROJECT_DIR/M4L/Devices/CL MIDI Console Monitor/$file" "$COMPONENTS_ROOT/Ableton Live 11-12/Max for Live/CL MIDI Console Monitor/$file"
 done
+
+for file in "CL_Absolute_MTC.amxd" "CL_Absolute_MTC.maxpat"; do
+  source="$PROJECT_DIR/tools/ableton_mtc_bridge/max_for_live/$file"
+  [[ -f "$source" ]] || fail "CL Absolute MTC absent : $source"
+done
+
+ditto   "$PROJECT_DIR/tools/ableton_mtc_bridge/max_for_live/CL_Absolute_MTC.amxd"   "$COMPONENTS_ROOT/Ableton Live 11-12/Max for Live/CL Absolute MTC/CL Absolute MTC.amxd"
+
+ditto   "$PROJECT_DIR/tools/ableton_mtc_bridge/max_for_live/CL_Absolute_MTC.maxpat"   "$COMPONENTS_ROOT/Ableton Live 11-12/Max for Live/CL Absolute MTC/CL Absolute MTC.maxpat"
 for file in "Paradis Latin AutoScene - Live 10.amxd" "Paradis Latin AutoScene - Live 10.maxpat" ParadisLatin_AutoScene.js paradis_latin_logo.jpg; do
   ditto "$PROJECT_DIR/M4L/Install/$file" "$COMPONENTS_ROOT/Ableton Live 10/Max for Live/Paradis Latin AutoScene - Live 10/$file"
 done

@@ -1237,6 +1237,109 @@ button{font:inherit}
 .access-head,.tech-head{font-size:9px;font-weight:780;text-transform:uppercase;letter-spacing:.075em;color:#c9ced8;margin-bottom:6px}
 .access-card{border-color:#3a4453;background:linear-gradient(145deg,#1b2028,#171a20)}
 .access-card .access-head{color:#a9c9f4}
+
+.remote-mtc-grid{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) 145px;
+  gap:12px;
+  align-items:stretch;
+  margin-top:0;
+  width:100%;
+  min-width:0;
+}
+
+.remote-access-main{
+  min-width:0;
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  grid-template-areas:
+    "title address address"
+    "device device actions";
+  column-gap:7px;
+  row-gap:2px;
+  align-items:center;
+}
+
+.remote-inline-title{
+  grid-area:title;
+  color:#a9c9f4;
+  font-size:9px;
+  font-weight:800;
+  letter-spacing:.075em;
+  white-space:nowrap;
+}
+
+.remote-address-full{
+  grid-area:address;
+  width:100%;
+  min-width:0;
+}
+
+.remote-access-actions{
+  grid-area:actions;
+  display:flex;
+  gap:6px;
+  align-items:center;
+}
+
+.remote-access-actions .mini{
+  min-width:52px;
+  padding-left:8px;
+  padding-right:8px;
+}
+
+.remote-device-row{
+  grid-area:device;
+  min-width:0;
+}
+
+.device-row.remote-device-row{
+  margin-top:0;
+  justify-content:flex-start;
+  white-space:nowrap;
+}
+
+#cl-mtc-native-slot{
+  min-width:0;
+  display:flex;
+  align-self:stretch;
+}
+
+#cl-mtc-native-slot #cl-mtc-bridge-control{
+  position:static !important;
+  inset:auto !important;
+  width:100% !important;
+  min-width:0 !important;
+  margin:0 !important;
+  padding:5px 8px !important;
+  box-shadow:none !important;
+  align-self:stretch;
+}
+
+#cl-mtc-native-slot #cl-mtc-bridge-control > div:first-child{
+  margin-bottom:6px !important;
+}
+
+#cl-mtc-native-slot #cl-mtc-bridge-control > div:nth-child(2){
+  display:flex !important;
+  flex-direction:column !important;
+  gap:4px !important;
+}
+
+#cl-mtc-native-slot #cl-mtc-bridge-control > div:nth-child(2) button{
+  width:100% !important;
+  min-height:24px;
+  padding:3px 5px !important;
+}
+
+.action-status:empty{
+  display:none;
+}
+
+.content-grid{
+  margin-top:-3px;
+}
+
 .address-row{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center}
 .address-actions{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .address{height:31px;display:flex;align-items:center;padding:0 8px;border-radius:8px;background:#11141a;border:1px solid #303540;font:10px Menlo,monospace;color:#e4e8ee;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1550,12 +1653,27 @@ body.show-mode .console-title{
 
   <div class="content-grid">
     <section class="card access-card">
-      <div class="access-head">Accès distant</div>
-      <div class="address-row">
-        <div id="remoteAddress" class="address">—</div>
-        <div class="address-actions"><button class="mini" onclick="copyAddress()">Copier</button><button class="mini" onclick="runAction('/local-page','Ouverture locale')">Ouvrir</button></div>
+      <div class="remote-mtc-grid">
+
+        <div class="remote-access-main">
+
+          <div class="remote-inline-title">ACCÈS DISTANT</div>
+          <div id="remoteAddress" class="address remote-address-full">—</div>
+
+          <div class="remote-access-actions">
+            <button class="mini" onclick="copyAddress()">Copier</button>
+            <button class="mini" onclick="runAction('/local-page','Ouverture locale')">Ouvrir</button>
+          </div>
+
+          <div class="device-row remote-device-row">
+            <span>Télécommande iPhone / iPad</span>
+          </div>
+
+        </div>
+
+        <div id="cl-mtc-native-slot"></div>
+
       </div>
-      <div class="device-row"><span>Télécommande iPhone / iPad</span><span id="deviceBadge" class="badge">Disponible</span></div>
     </section>
 
     <section id="networkCard" class="card network-card local">
@@ -1676,7 +1794,7 @@ function render(s){
   else if(s.web){card.className='card system error';title.textContent='SERVEUR NON VALIDÉ';detail.textContent=s.identity_message||'Instance inconnue ou incompatible sur le port 5050';}
   else{card.className='card system error';title.textContent='SYSTÈME ARRÊTÉ';detail.textContent='Démarrez le serveur avant le spectacle';}
   const now=new Date();el('stateTime').textContent=now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
-  el('remoteAddress').textContent=s.lan_url;el('localAddress').textContent=s.local_url.replace(/^https?:\/\//,'');
+  el('remoteAddress').textContent=s.lan_url||'—';el('localAddress').textContent=s.local_url.replace(/^https?:\/\//,'');
   updateShowCurrent(s);
   setTech('techWeb',s.web);setTech('techOsc',s.osc);setTech('techReturn',s.ret);
   el('events').innerHTML=(s.events||[]).slice().reverse().join('<br>')||'Aucun événement récent.';
@@ -2231,6 +2349,381 @@ def quit_launcher():
 
     threading.Timer(0.5, close_owned_processes).start()
     return jsonify(message="Launcher fermé")
+
+
+
+# ===== CL MTC BRIDGE CONTROL BEGIN =====
+
+def _cl_mtc_bridge_executable():
+    """
+    Résout le bridge aussi bien :
+    - depuis le dépôt de développement ;
+    - depuis CL Show Control.app / PyInstaller.
+    """
+    import sys
+    from pathlib import Path
+
+    relative = (
+        Path("tools")
+        / "ableton_mtc_bridge"
+        / "CLAbletonMTCBridge"
+    )
+
+    candidates = []
+
+    # PyInstaller : sys._MEIPASS pointe vers le runtime bundle.
+    meipass = getattr(sys, "_MEIPASS", None)
+
+    if meipass:
+        base = Path(meipass)
+
+        candidates.extend([
+            base / relative,
+            base.parent / "Resources" / relative,
+            base.parent / "Frameworks" / relative,
+        ])
+
+    # Développement depuis le dépôt Git.
+    candidates.append(
+        Path(__file__).resolve().parent / relative
+    )
+
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+
+    # Retour déterministe pour les messages d'erreur.
+    return candidates[0]
+
+def _cl_mtc_bridge_pids():
+    import subprocess
+
+    exe = str(_cl_mtc_bridge_executable())
+
+    r = subprocess.run(
+        ["pgrep", "-f", exe],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    return [
+        int(line.strip())
+        for line in r.stdout.splitlines()
+        if line.strip().isdigit()
+    ]
+
+
+def _cl_mtc_bridge_status_data():
+    exe = _cl_mtc_bridge_executable()
+    pids = _cl_mtc_bridge_pids()
+
+    return {
+        "ok": True,
+        "running": bool(pids),
+        "pids": pids,
+        "exists": exe.exists(),
+        "executable": str(exe),
+    }
+
+
+def _cl_mtc_bridge_start_process():
+    import subprocess
+
+    exe = _cl_mtc_bridge_executable()
+
+    if not exe.exists():
+        return {
+            "ok": False,
+            "running": False,
+            "error": "Bridge introuvable : " + str(exe),
+        }
+
+    pids = _cl_mtc_bridge_pids()
+
+    if pids:
+        return {
+            "ok": True,
+            "running": True,
+            "pids": pids,
+            "message": "Bridge déjà actif",
+        }
+
+    log_path = "/tmp/CL_Ableton_MTC_Bridge.log"
+
+    log = open(log_path, "ab", buffering=0)
+
+    proc = subprocess.Popen(
+        [str(exe)],
+        cwd=str(exe.parent),
+        stdin=subprocess.DEVNULL,
+        stdout=log,
+        stderr=subprocess.STDOUT,
+        start_new_session=True,
+        close_fds=True,
+    )
+
+    return {
+        "ok": True,
+        "running": True,
+        "pid": proc.pid,
+        "message": "Bridge démarré",
+        "log": log_path,
+    }
+
+
+def _cl_mtc_bridge_stop_process():
+    import os
+    import signal
+    import time
+
+    pids = _cl_mtc_bridge_pids()
+
+    if not pids:
+        return {
+            "ok": True,
+            "running": False,
+            "message": "Bridge déjà arrêté",
+        }
+
+    for pid in pids:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+
+    deadline = time.time() + 2.0
+
+    while time.time() < deadline:
+        if not _cl_mtc_bridge_pids():
+            break
+
+        time.sleep(0.05)
+
+    remaining = _cl_mtc_bridge_pids()
+
+    return {
+        "ok": not bool(remaining),
+        "running": bool(remaining),
+        "pids": remaining,
+        "message": (
+            "Bridge arrêté"
+            if not remaining
+            else "Bridge toujours actif"
+        ),
+    }
+
+
+@app.route("/api/cl-mtc-bridge/status", methods=["GET"])
+def cl_mtc_bridge_status():
+    return _cl_mtc_bridge_status_data()
+
+
+@app.route("/api/cl-mtc-bridge/start", methods=["POST"])
+def cl_mtc_bridge_start():
+    return _cl_mtc_bridge_start_process()
+
+
+@app.route("/api/cl-mtc-bridge/stop", methods=["POST"])
+def cl_mtc_bridge_stop():
+    return _cl_mtc_bridge_stop_process()
+
+
+@app.route("/api/cl-mtc-bridge/restart", methods=["POST"])
+def cl_mtc_bridge_restart():
+    import time
+
+    _cl_mtc_bridge_stop_process()
+    time.sleep(0.2)
+
+    return _cl_mtc_bridge_start_process()
+
+
+@app.after_request
+def cl_mtc_bridge_inject_control(response):
+    try:
+        content_type = response.headers.get("Content-Type", "")
+
+        if "text/html" not in content_type:
+            return response
+
+        html = response.get_data(as_text=True)
+
+        if "</body>" not in html:
+            return response
+
+        if 'id="cl-mtc-bridge-control"' in html:
+            return response
+
+        widget = '''
+<div id="cl-mtc-bridge-control"
+     style="position:fixed;right:16px;bottom:16px;z-index:99999;padding:9px 10px;border-radius:10px;background:rgba(18,18,18,.92);color:white;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.20);min-width:175px;flex:0 0 auto;">
+
+  <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px;">
+    <span id="cl-mtc-dot"
+          style="width:9px;height:9px;border-radius:50%;background:#777;display:inline-block;"></span>
+
+    <strong>MTC Bridge</strong>
+
+    <span id="cl-mtc-state"
+          style="margin-left:auto;opacity:.8;">...</span>
+  </div>
+
+  <div style="display:flex;gap:6px;">
+    <button id="cl-mtc-stop"
+            type="button"
+            style="flex:1;padding:4px 5px;cursor:pointer;font-size:11px;">
+      Arrêter
+    </button>
+
+    <button id="cl-mtc-restart"
+            type="button"
+            style="flex:1;padding:4px 5px;cursor:pointer;font-size:11px;">
+      Relancer
+    </button>
+  </div>
+</div>
+
+<script>
+(function () {
+    const state = document.getElementById("cl-mtc-state");
+    const dot = document.getElementById("cl-mtc-dot");
+    const stop = document.getElementById("cl-mtc-stop");
+    const restart = document.getElementById("cl-mtc-restart");
+
+
+    function placeMTCBridgeBesideRemoteAccess() {
+        const widget =
+            document.getElementById("cl-mtc-bridge-control");
+
+        const slot =
+            document.getElementById("cl-mtc-native-slot");
+
+        if (!widget || !slot) {
+            return;
+        }
+
+        slot.appendChild(widget);
+
+        widget.style.position = "static";
+        widget.style.right = "auto";
+        widget.style.top = "auto";
+        widget.style.bottom = "auto";
+        widget.style.left = "auto";
+        widget.style.width = "100%";
+        widget.style.minWidth = "0";
+        widget.style.margin = "0";
+        widget.style.boxShadow = "none";
+    }
+
+    async function refreshMTCBridgeStatus() {
+        try {
+            const r = await fetch(
+                "/api/cl-mtc-bridge/status",
+                {cache: "no-store"}
+            );
+
+            const d = await r.json();
+
+            if (d.running) {
+                state.textContent = "Actif";
+                dot.style.background = "#38c172";
+            } else {
+                state.textContent = "Arrêté";
+                dot.style.background = "#e3342f";
+            }
+        } catch (e) {
+            state.textContent = "Erreur";
+            dot.style.background = "#f6993f";
+        }
+    }
+
+    stop.addEventListener("click", async function () {
+        stop.disabled = true;
+
+        try {
+            await fetch(
+                "/api/cl-mtc-bridge/stop",
+                {method: "POST"}
+            );
+        } finally {
+            stop.disabled = false;
+            refreshMTCBridgeStatus();
+        }
+    });
+
+    restart.addEventListener("click", async function () {
+        restart.disabled = true;
+        state.textContent = "Relance...";
+
+        try {
+            await fetch(
+                "/api/cl-mtc-bridge/restart",
+                {method: "POST"}
+            );
+        } finally {
+            restart.disabled = false;
+            refreshMTCBridgeStatus();
+        }
+    });
+
+    placeMTCBridgeBesideRemoteAccess();
+    refreshMTCBridgeStatus();
+
+    setTimeout(
+        placeMTCBridgeBesideRemoteAccess,
+        500
+    );
+
+    setInterval(
+        refreshMTCBridgeStatus,
+        3000
+    );
+})();
+</script>
+'''
+
+        html = html.replace(
+            "</body>",
+            widget + "\n</body>",
+            1
+        )
+
+        response.set_data(html)
+        response.headers.pop("Content-Length", None)
+
+    except Exception as e:
+        print("MTC Bridge UI injection error:", e)
+
+    return response
+
+
+def _cl_mtc_bridge_autostart():
+    try:
+        result = _cl_mtc_bridge_start_process()
+
+        if result.get("running"):
+            print(
+                "CL MTC Bridge : ACTIF",
+                result.get("pids")
+                or result.get("pid", "")
+            )
+        else:
+            print(
+                "CL MTC Bridge : ECHEC",
+                result.get("error", "")
+            )
+
+    except Exception as e:
+        print(
+            "CL MTC Bridge autostart error:",
+            e
+        )
+
+
+_cl_mtc_bridge_autostart()
+
+# ===== CL MTC BRIDGE CONTROL END =====
 
 
 if __name__ == "__main__":

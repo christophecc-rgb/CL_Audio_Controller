@@ -248,6 +248,18 @@ if [[ ! -f "$MIDI_DEVICE_SOURCE/CL MIDI Console Monitor.amxd" ]]; then
   exit 1
 fi
 
+MTC_M4L_SOURCE="$PROJECT_ROOT/tools/ableton_mtc_bridge/max_for_live"
+
+if [[ ! -f "$MTC_M4L_SOURCE/CL_Absolute_MTC.amxd" ]]; then
+  echo "CL Absolute MTC introuvable : $MTC_M4L_SOURCE" >&2
+  exit 1
+fi
+
+if [[ ! -f "$MTC_M4L_SOURCE/CL_Absolute_MTC.maxpat" ]]; then
+  echo "Source CL Absolute MTC introuvable : $MTC_M4L_SOURCE" >&2
+  exit 1
+fi
+
 echo
 "$APP_PATH/Contents/MacOS/CL Audio Controller" --check-showcue-runtime
 
@@ -267,6 +279,9 @@ mkdir -p "$KIT_ROOT/Ableton Live 11-12/Remote Scripts"
 ditto "$BUILDER_DIR/RemoteScript"   "$KIT_ROOT/Ableton Live 11-12/Remote Scripts/CL_Arrangement_Builder_Live"
 ditto "$M4L_SOURCE" "$KIT_ROOT/Max for Live à installer"
 ditto "$MIDI_DEVICE_SOURCE" "$KIT_ROOT/Max for Live à installer/CL MIDI Console Monitor"
+mkdir -p "$KIT_ROOT/Max for Live à installer/CL Absolute MTC"
+ditto "$MTC_M4L_SOURCE/CL_Absolute_MTC.amxd" "$KIT_ROOT/Max for Live à installer/CL Absolute MTC/CL Absolute MTC.amxd"
+ditto "$MTC_M4L_SOURCE/CL_Absolute_MTC.maxpat" "$KIT_ROOT/Max for Live à installer/CL Absolute MTC/CL Absolute MTC.maxpat"
 
 "$MIDI_TOOLS_SOURCE/build.sh" "$BUILD_ROOT/midi-tools"
 
@@ -563,6 +578,7 @@ EOF
     "04 — Ableton & Max for Live/Max for Live à installer/Paradis Latin AutoScene - Live 10.amxd" \
     "04 — Ableton & Max for Live/Max for Live à installer/Paradis Latin AutoScene - Live 10.maxpat" \
     "04 — Ableton & Max for Live/Max for Live à installer/CL MIDI Console Monitor/CL MIDI Console Monitor.amxd" \
+    "04 — Ableton & Max for Live/Max for Live à installer/CL Absolute MTC/CL Absolute MTC.amxd" \
     "03 — MIDI & Réseau/CL MIDI Network Tools/CLMIDIRoundTripTester" \
     > CONTENU_SHA256.txt
 )

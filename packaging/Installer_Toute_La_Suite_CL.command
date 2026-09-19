@@ -295,7 +295,7 @@ verify_selected_components() {
     rel="${line#*  }"
     case "$rel" in
       "Composants/Applications/CL Show Control.app/"*|"Composants/Applications/CL ShowCue.app/"*|"Composants/Applications/CL Cue Editor.app/"*|"Composants/CL_Transport/"*) [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 || "$INSTALL_SHOWCUE" == 1 ]] && echo "$line" >> "$selected" ;;
-      "Composants/Ableton Live 11-12/Remote Scripts/AbletonOSC/"*|"Composants/Ableton Live 11-12/Max for Live/CL Audio Controller - Remote/"*) [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_ABLETON_READER" == 1 ]] && echo "$line" >> "$selected" ;;
+      "Composants/Ableton Live 11-12/Remote Scripts/AbletonOSC/"*|"Composants/Ableton Live 11-12/Max for Live/CL Audio Controller - Remote/"*|"Composants/Ableton Live 11-12/Max for Live/CL Absolute MTC/"*) [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_ABLETON_READER" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Applications/CL MIDI RTP Agent.app/"*) [[ "$INSTALL_ABLETON_READER" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Applications/CL MIDI & RTP Diagnostic.app/"*|"Composants/Applications/CL MIDI Analyzer.app/"*|"Composants/Applications/CL MIDI Performance Monitor.app/"*) [[ "$INSTALL_DIAGNOSTIC_TOOLS" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Applications/CL Arrangement Builder.app/"*|"Composants/Ableton Live 11-12/Remote Scripts/CL_Arrangement_Builder_Live/"*) [[ "$INSTALL_BUILDER" == 1 ]] && echo "$line" >> "$selected" ;;
@@ -355,6 +355,7 @@ M4L_REMOTE_TARGET="$ABLETON_LIBRARY/Presets/Audio Effects/Max Audio Effect/CL Au
 M4L_AUTOSCENE_TARGET="$ABLETON_LIBRARY/Presets/Audio Effects/Max Audio Effect/CL Audio Controller - AutoScene"
 M4L_LIVE10_TARGET="$ABLETON_LIBRARY/Presets/Audio Effects/Max Audio Effect/CL Audio Controller - Live 10"
 M4L_MIDI_CONSOLE_TARGET="$ABLETON_LIBRARY/Presets/MIDI Effects/Max MIDI Effect/CL MIDI Console Monitor"
+M4L_MTC_TARGET="$ABLETON_LIBRARY/Presets/MIDI Effects/Max MIDI Effect/CL Absolute MTC"
 MIDI_TOOLS_TARGET="$INSTALL_HOME/Library/Application Support/CL MIDI Console/Network Tools"
 say ""; say "User Library retenue : $ABLETON_LIBRARY"
 
@@ -451,6 +452,7 @@ fi
 if [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_ABLETON_READER" == 1 ]]; then
   install_item "$LIVE_CURRENT_SOURCE/Remote Scripts/AbletonOSC" "$REMOTE_SCRIPTS/AbletonOSC" "Ableton Lecteur — AbletonOSC CL" "ableton-reader"
   install_item "$LIVE_CURRENT_SOURCE/Max for Live/CL Audio Controller - Remote" "$M4L_REMOTE_TARGET" "Ableton Lecteur — LTC et X-Fader" "ableton-reader"
+  install_item "$LIVE_CURRENT_SOURCE/Max for Live/CL Absolute MTC" "$M4L_MTC_TARGET" "Ableton Lecteur — CL Absolute MTC" "ableton-reader"
 fi
 if [[ "$INSTALL_ABLETON_READER" == 1 ]]; then
   prepare_rtp_agent_replacement

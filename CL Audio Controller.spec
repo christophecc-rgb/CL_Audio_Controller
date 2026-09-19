@@ -3,7 +3,12 @@
 a = Analysis(
     ['launcher_control.py'],
     pathex=[],
-    binaries=[],
+    binaries=[
+        (
+            'tools/ableton_mtc_bridge/CLAbletonMTCBridge',
+            'tools/ableton_mtc_bridge',
+        ),
+    ],
     datas=[
         ('app.py', '.'),
         ('config/ableton_remote_discovery.json', 'config'),
