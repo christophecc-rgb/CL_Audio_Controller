@@ -1617,7 +1617,7 @@ body.show-mode .console-title{
 <main class="app">
   <div class="topbar">
     <div class="brand"><img src="/paradis-logo" alt="Paradis Latin Cabaret"></div>
-    <div class="product-row"><div class="product-copy"><div class="product">CL AUDIO SHOW CONTROL</div></div><button id="showMode" class="show-toggle" onclick="toggleShowMode()">Mode spectacle</button></div>
+    <div class="product-row"><div class="product-copy"><div class="product">CL AUDIO SHOW CONTROL</div></div><button type="button" class="mini" onclick="window.open('/help','_blank')">Aide</button><button id="showMode" class="show-toggle" onclick="toggleShowMode()">Mode spectacle</button></div>
   </div>
 
   <section id="systemCard" class="card system warning">
@@ -2724,6 +2724,138 @@ def _cl_mtc_bridge_autostart():
 _cl_mtc_bridge_autostart()
 
 # ===== CL MTC BRIDGE CONTROL END =====
+
+
+
+@app.route("/help")
+def cl_show_control_help():
+    return """
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aide — CL Show Control</title>
+<style>
+body{
+    margin:0;
+    background:#11151b;
+    color:#e8edf3;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+main{
+    max-width:920px;
+    margin:0 auto;
+    padding:36px 24px 80px;
+}
+h1{
+    margin:0 0 6px;
+    font-size:28px;
+}
+.subtitle{
+    color:#8fa2b8;
+    margin-bottom:32px;
+}
+.help-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+    gap:14px;
+}
+.help-card{
+    display:block;
+    padding:18px;
+    border:1px solid #354150;
+    border-radius:12px;
+    background:#1a2028;
+    color:#e8edf3;
+    text-decoration:none;
+}
+.help-card:hover{
+    border-color:#6486aa;
+    background:#202936;
+}
+.help-card strong{
+    display:block;
+    margin-bottom:5px;
+}
+.help-card span{
+    color:#9baaba;
+    font-size:13px;
+}
+.back{
+    display:inline-block;
+    margin-bottom:25px;
+    color:#8fb9e5;
+    text-decoration:none;
+}
+</style>
+</head>
+
+<body>
+<main>
+<a class="back" href="/">← Retour à CL Show Control</a>
+
+<h1>CL Show Control — Aide</h1>
+<div class="subtitle">
+Documentation locale de la suite CL Audio.
+</div>
+
+<div class="help-grid">
+
+<a class="help-card" href="/help#start">
+<strong>Prise en main</strong>
+<span>Démarrage et vérifications avant spectacle.</span>
+</a>
+
+<a class="help-card" href="/help#ableton">
+<strong>Ableton</strong>
+<span>Mode local, distant et AbletonOSC.</span>
+</a>
+
+<a class="help-card" href="/help#mtc">
+<strong>MTC / Logic</strong>
+<span>CL Absolute MTC, bridge et synchronisation Logic.</span>
+</a>
+
+<a class="help-card" href="/help#midi">
+<strong>MIDI / RTP</strong>
+<span>Consoles Yamaha, réseau MIDI et diagnostic.</span>
+</a>
+
+<a class="help-card" href="/help#remote">
+<strong>Télécommande</strong>
+<span>Connexion iPhone, iPad et autres postes.</span>
+</a>
+
+<a class="help-card" href="/help#troubleshooting">
+<strong>Dépannage</strong>
+<span>Problèmes fréquents et procédures de contrôle.</span>
+</a>
+
+</div>
+
+<h2 id="start">Prise en main</h2>
+<p>Documentation à compléter.</p>
+
+<h2 id="ableton">Ableton</h2>
+<p>Documentation à compléter.</p>
+
+<h2 id="mtc">MTC / Logic</h2>
+<p>Documentation à compléter.</p>
+
+<h2 id="midi">MIDI / RTP</h2>
+<p>Documentation à compléter.</p>
+
+<h2 id="remote">Télécommande</h2>
+<p>Documentation à compléter.</p>
+
+<h2 id="troubleshooting">Dépannage</h2>
+<p>Documentation à compléter.</p>
+
+</main>
+</body>
+</html>
+"""
 
 
 if __name__ == "__main__":
