@@ -231,6 +231,10 @@ def read_midi_console_state(expected_agent_host=None):
 
 def find_midi_network_assistant():
     candidates = [
+        # Installation actuelle de la suite d'analyse MIDI.
+        Path.home() / "Applications" / "Analyse - Réseau - MIDI" / "CL MIDI Network Manager.app",
+
+        # Emplacements historiques / alternatifs.
         Path.home() / "Applications" / "CL MIDI Network Manager.app",
         Path("/Applications/CL MIDI Network Manager.app"),
         Path.home() / "Applications" / "CL MIDI Network Assistant.app",
