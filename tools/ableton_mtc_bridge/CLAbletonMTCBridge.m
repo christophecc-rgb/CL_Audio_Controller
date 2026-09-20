@@ -27,6 +27,8 @@ static double gTempo = 120.0;
 static double gPositionSeconds = 0.0;
 static double gPlayStartPositionSeconds = 0.0;
 static double gPlayStartedAt = 0.0;
+/* Décalage de position uniquement : l'horloge et le transport restent intacts. */
+static double gMTCOffsetSeconds = 0.0;
 
 static double gLastClockAt = 0.0;
 static double gClockIntervalEMA = 0.0;
@@ -191,7 +193,7 @@ static double tcToSeconds(
 static void sendFullFrame(double seconds)
 {
     int h, m, s, f;
-    secondsToTC(seconds, &h, &m, &s, &f);
+    secondsToTC(seconds + gMTCOffsetSeconds, &h, &m, &s, &f);
 
     UInt8 hourRate = (UInt8)(h | 0x20); // 25 fps
 
@@ -231,7 +233,7 @@ static void sendQuarterFrame(void)
     int h, m, sec, f;
 
     secondsToTC(
-        gQuarterFrameSnapshotSeconds,
+        gQuarterFrameSnapshotSeconds + gMTCOffsetSeconds,
         &h,
         &m,
         &sec,
@@ -561,6 +563,118 @@ static BOOL extractTimecodeFromUDP(
     return NO;
 }
 
+/* Commande dédiée du device, distincte des positions SMPTE historiques. */
+
+static BOOL extractOffsetFromUDP(
+    const unsigned char *data,
+    ssize_t length,
+    double *offset
+)
+{
+    /* Ancien format texte : "CLMTC_OFFSET 50.0" */
+    const char textPrefix[] = "CLMTC_OFFSET ";
+    const size_t textPrefixLength = sizeof(textPrefix) - 1;
+
+    for (ssize_t i = 0; i + (ssize_t)textPrefixLength < length; i++) {
+        if (memcmp(data + i, textPrefix, textPrefixLength) != 0) continue;
+
+        char number[32];
+        size_t n = 0;
+
+        for (
+            ssize_t j = i + (ssize_t)textPrefixLength;
+            j < length && n < sizeof(number) - 1;
+            j++
+        ) {
+            unsigned char c = data[j];
+
+            if (
+                (c >= '0' && c <= '9') ||
+                c == '-' ||
+                c == '+' ||
+                c == '.'
+            ) {
+                number[n++] = (char)c;
+            } else {
+                break;
+            }
+        }
+
+        number[n] = '\0';
+
+        char *end = NULL;
+        double value = strtod(number, &end);
+
+        if (
+            n &&
+            end == number + n &&
+            isfinite(value) &&
+            value >= -100.0 &&
+            value <= 100.0
+        ) {
+            *offset = value / 1000.0;
+            return YES;
+        }
+    }
+
+    /*
+        Format OSC emis par Max :
+        adresse "CLMTC_OFFSET"
+        typetag ",f"
+        float32 big-endian
+    */
+    const char oscAddress[] = "CLMTC_OFFSET";
+    const size_t addressLength = sizeof(oscAddress) - 1;
+
+    for (ssize_t i = 0; i + (ssize_t)addressLength < length; i++) {
+        if (memcmp(data + i, oscAddress, addressLength) != 0) continue;
+
+        ssize_t p0 = i + (ssize_t)addressLength;
+
+        /* Fin de l'adresse OSC puis padding 4 octets relatif au debut du paquet. */
+        while (p0 < length && data[p0] != '\0') p0++;
+        if (p0 >= length) continue;
+        p0++;
+
+        while ((p0 % 4) != 0 && p0 < length) p0++;
+        if (p0 + 4 > length) continue;
+
+        if (
+            data[p0] != ',' ||
+            data[p0 + 1] != 'f' ||
+            data[p0 + 2] != '\0'
+        ) {
+            continue;
+        }
+
+        p0 += 4;
+        if (p0 + 4 > length) continue;
+
+        uint32_t bits =
+            ((uint32_t)data[p0] << 24) |
+            ((uint32_t)data[p0 + 1] << 16) |
+            ((uint32_t)data[p0 + 2] << 8) |
+            ((uint32_t)data[p0 + 3]);
+
+        float valueFloat = 0.0f;
+        memcpy(&valueFloat, &bits, sizeof(valueFloat));
+
+        double value = (double)valueFloat;
+
+        if (
+            isfinite(value) &&
+            value >= -100.0 &&
+            value <= 100.0
+        ) {
+            *offset = value / 1000.0;
+            return YES;
+        }
+    }
+
+    return NO;
+}
+
+
 static int setupAbsoluteTimeUDP(void)
 {
     int fd = socket(
@@ -618,6 +732,23 @@ static int setupAbsoluteTimeUDP(void)
                 );
 
             if (received <= 0) {
+                return;
+            }
+
+            double offset;
+            if (extractOffsetFromUDP(buffer, received, &offset)) {
+                printf("OFFSET RECU = %+0.3f ms\n", offset * 1000.0);
+                fflush(stdout);
+
+                if (fabs(offset - gMTCOffsetSeconds) > 0.0000001) {
+                    gMTCOffsetSeconds = offset;
+                    printf("OFFSET APPLIQUE = %+0.3f ms\n", gMTCOffsetSeconds * 1000.0);
+                    fflush(stdout);
+                    /* Un seul locate explicite, puis la cadence QF normale. */
+                    sendFullFrame(currentTimeSeconds());
+                    gQuarterFrameIndex = 0;
+                    gQuarterFrameSnapshotValid = NO;
+                }
                 return;
             }
 
