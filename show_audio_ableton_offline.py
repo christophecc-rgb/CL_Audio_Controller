@@ -898,7 +898,13 @@ function openExportDialog() {{
   timing("select_loop:start");
   se.keystroke("l", {{using:["command down", "shift down"]}});
   timing("select_loop:sent");
-  // Le contrôle START BBT après ouverture reste la postcondition obligatoire.
+
+  // Ableton applique la sélection temporelle de façon asynchrone.
+  // Laisser Live stabiliser la sélection avant d'ouvrir Export Audio.
+  delay(0.35);
+  timing("select_loop:settled");
+
+  // Ouvrir Export Audio après stabilisation de la sélection temporelle.
   se.keystroke(
     "r",
     {{using:["command down", "shift down"]}}
@@ -984,14 +990,10 @@ function assertBBT(prefix, values) {{
 }}
 
 function configureExportBBT() {{
-  // Le START est prepare par AbletonOSC via la boucle Live.
-  // Ne jamais tenter de le rejoindre par des milliers d'AXIncrement.
-  timing("configure_bbt:start_assert");
-  assertBBT(
-    "Base.RenderStartBox.RenderStart",
-    spec.start
-  );
-  timing("configure_bbt:done_assert");
+  // Le START est prepare et confirme en beats absolus via AbletonOSC.
+  // Ne pas le comparer a un BBT recalcule en 4/4 :
+  // les changements de signature du Set rendent cette conversion invalide.
+  timing("configure_bbt:start_verified_by_live_loop");
 
   // Seule la duree reste corrigee par actions AX bornees.
   timing("configure_bbt:start_length");
@@ -1003,7 +1005,35 @@ function configureExportBBT() {{
 }}
 
 timing("configure_bbt:start");
-configureExportBBT();
+
+try {{
+  configureExportBBT();
+}} catch (firstBBTError) {{
+  // Export Audio peut exceptionnellement conserver un dialogue ou une
+  // sélection périmée. Le reconstruire une fois avant d'abandonner.
+  timing("configure_bbt:retry_start");
+
+  if (exportDialogIsOpen()) {{
+    live.frontmost = true;
+    se.keyCode(53);
+
+    if (!waitExportDialogClosed(3)) {{
+      throw firstBBTError;
+    }}
+  }}
+
+  delay(0.25);
+  openExportDialog();
+
+  if (!waitExportDialogReady(10)) {{
+    throw firstBBTError;
+  }}
+
+  timing("configure_bbt:retry_dialog_ready");
+  configureExportBBT();
+  timing("configure_bbt:retry_done");
+}}
+
 timing("configure_bbt:done");
 
 timing("export_controls_cache:start");
