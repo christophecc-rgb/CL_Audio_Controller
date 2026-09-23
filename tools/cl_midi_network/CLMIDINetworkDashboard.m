@@ -821,7 +821,10 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
     (void)notification;
     CLInstallApplicationMenu();
-    self.backgroundMonitorOnly = [NSProcessInfo.processInfo.arguments containsObject:@"--background-monitor"];
+    BOOL showControlMonitor = [NSProcessInfo.processInfo.arguments containsObject:@"--show-control-monitor"];
+    self.backgroundMonitorOnly =
+        [NSProcessInfo.processInfo.arguments containsObject:@"--background-monitor"] ||
+        showControlMonitor;
     CLBackgroundMonitorLock = open("/private/tmp/CL_MIDI_Console_Monitor.lock", O_CREAT | O_RDWR, 0600);
     self.ownsPassiveReturnMonitor = CLBackgroundMonitorLock >= 0 && flock(CLBackgroundMonitorLock, LOCK_EX | LOCK_NB) == 0;
     if (self.backgroundMonitorOnly && !self.ownsPassiveReturnMonitor) {
@@ -833,7 +836,7 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     NSString *bundleExecutablePath = NSBundle.mainBundle.executablePath ?: @"";
     BOOL runningFromAppBundle = [bundleExecutablePath containsString:@".app/Contents/MacOS/"];
     BOOL verificationBundle = [NSBundle.mainBundle.bundleIdentifier hasSuffix:@".verification"];
-    if (runningFromAppBundle && !verificationBundle) {
+    if (runningFromAppBundle && !verificationBundle && !showControlMonitor) {
         [self installBackgroundLaunchAgent];
     } else {
         CLAppendDiagnostic(@"background-monitor-not-installed", verificationBundle

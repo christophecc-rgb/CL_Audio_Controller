@@ -542,17 +542,10 @@ if [[ "$INSTALL_MIDI_CONSOLE" == 1 ]]; then
   [[ "$INSTALL_CONTROLLER" != 1 ]] && install_item "$MIDI_TOOLS_SOURCE" "$MIDI_TOOLS_TARGET" "MIDI Console — Outils réseau" "midi-console"
   [[ "$INSTALL_CONTROLLER" != 1 ]] && install_item "$APPLICATIONS_SOURCE/CL MIDI Network Manager.app" "$MIDI_NETWORK_APPS/CL MIDI Network Manager.app" "MIDI Console — Gestionnaire réseau" "midi-console"
 fi
-if [[ ( "$INSTALL_CONTROLLER" == 1 || "$INSTALL_MIDI_CONSOLE" == 1 ) && "$INSTALL_HOME" == "$HOME" && "${CL_SUITE_SKIP_POSTINSTALL:-0}" != "1" ]]; then
-  say ""; say "Télécommande — Activation de la reconnexion RTP au démarrage"
-  /usr/bin/open -gj "$MIDI_NETWORK_APPS/CL MIDI Network Manager.app" --args --background-monitor >/dev/null 2>&1 || true
-  for _ in 1 2 3 4 5; do
-    [[ -f "$HOME/Library/LaunchAgents/com.claudio.midi-network-monitor.plist" ]] && break
-    sleep 1
-  done
-  [[ -f "$HOME/Library/LaunchAgents/com.claudio.midi-network-monitor.plist" ]] \
-    || fail "le démarrage automatique du moniteur réseau MIDI n’a pas été enregistré"
-  say "  ✓ Découverte Bonjour et reconnexion RTP activées à l’ouverture de session"
-fi
+# Le moniteur CoreMIDI est possédé par CL Show Control :
+# il démarre avec Show Control et s'arrête avec lui.
+# Ne pas installer ici de LaunchAgent KeepAlive permanent.
+# Le CL MIDI RTP Agent reste géré séparément par launchd plus haut.
 
 write_install_manifest
 say ""; say "============================================================"; say " INSTALLATION TERMINÉE ET VÉRIFIÉE"; say "============================================================"

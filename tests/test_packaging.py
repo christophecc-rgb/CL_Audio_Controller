@@ -104,8 +104,8 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("l’état réel (processus + LaunchAgent) fait foi", script)
         self.assertIn("pgrep -f -x", script)
         self.assertIn("com.claudio.midi-rtp-agent.plist", script)
-        self.assertIn("com.claudio.midi-network-monitor.plist", script)
-        self.assertIn("--background-monitor", script)
+        self.assertNotIn("com.claudio.midi-network-monitor.plist", script)
+        self.assertNotIn("--background-monitor", script)
         self.assertIn("INSTALL_MIDI_RECEIVER", script)
         self.assertIn("detect_live", script)
         self.assertIn("resolve_user_library", script)
@@ -116,8 +116,12 @@ class PackagingTests(unittest.TestCase):
 
     def test_red_window_button_triggers_a_full_launcher_shutdown(self):
         launcher = (PROJECT_ROOT / "launcher_control.py").read_text(encoding="utf-8")
+        self.assertIn("panel_window.events.closing += quit_when_main_panel_closes", launcher)
         self.assertIn("panel_window.events.closed += quit_when_main_panel_closes", launcher)
         self.assertIn("Fenêtre principale fermée — arrêt complet", launcher)
+        self.assertIn('[str(executable), "--show-control-monitor"]', launcher)
+        self.assertNotIn('[str(executable), "--background-monitor"]', launcher)
+        self.assertIn("stop_midi_console_monitor()", launcher)
 
     def test_desktop_export_includes_full_suite_installer(self):
         script = (

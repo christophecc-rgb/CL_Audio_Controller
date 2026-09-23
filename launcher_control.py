@@ -255,7 +255,7 @@ def ensure_midi_console_monitor():
     if not executable.exists():
         return False
     MIDI_CONSOLE_MONITOR_PROCESS = subprocess.Popen(
-        [str(executable), "--background-monitor"],
+        [str(executable), "--show-control-monitor"],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
@@ -721,6 +721,10 @@ button:active{transform:scale(.985)}
 .jtitle{color:#9fb2cc;font-size:10px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
 #events{font-family:Menlo,monospace;font-size:11px;color:#cbd5e1;line-height:1.30;min-height:28px;max-height:52px;overflow:hidden;padding:6px 7px;border-radius:10px;background:rgba(0,0,0,.16)}
 .footer{margin-top:12px;text-align:center;color:#5fa8ff;font-size:12px}
+
+
+
+
 </style>
 <style>
 .midi-assistant-button{height:28px;padding:0 10px;border-color:#a64f4f;background:#8f3f3f;color:#fff;font-family:inherit;font-weight:760}
@@ -1606,6 +1610,186 @@ body.show-mode .console-title{
   line-height:16px;
   font-weight:750;
 }
+
+/* =========================================================
+   CL SHOW CONTROL — NETWORK / ABLETON VISUAL MAKEUP
+   Vert réservé aux états réellement positifs.
+   ========================================================= */
+
+/* Carte Ableton : graphite sobre, sans halo vert permanent */
+.network-card{
+  position:relative;
+  overflow:hidden;
+  border-width:1px;
+  border-color:#3a424f;
+  background:
+    linear-gradient(145deg,rgba(40,48,59,.96),rgba(21,25,31,.98));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.035),
+    0 10px 24px rgba(0,0,0,.24);
+}
+
+.network-card::before{
+  content:'';
+  position:absolute;
+  left:0;
+  top:0;
+  bottom:0;
+  width:3px;
+  background:#71849a;
+  opacity:.9;
+}
+
+.network-card.local{
+  border-color:#46576b;
+  background:
+    linear-gradient(145deg,rgba(42,53,66,.96),rgba(21,25,31,.98));
+}
+
+.network-card.local::before{
+  background:#6d98bd;
+}
+
+.network-card.remote{
+  border-color:#735d35;
+  background:
+    linear-gradient(145deg,rgba(58,47,30,.72),rgba(24,25,29,.98));
+}
+
+.network-card.remote::before{
+  background:#d49a42;
+}
+
+/* Titre de section */
+.network-card .access-head{
+  color:#aeb8c6;
+}
+
+/* Badge central = identité principale du mode */
+.mode-badge{
+  min-width:138px;
+  padding:7px 15px;
+  border-radius:999px;
+  font-size:11px;
+  font-weight:850;
+  letter-spacing:.075em;
+  text-transform:uppercase;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.08),
+    0 5px 13px rgba(0,0,0,.24);
+}
+
+.network-card.local .mode-badge{
+  color:#f3e7c7;
+  border:1px solid #8d7a52;
+  background:
+    linear-gradient(180deg,#6f6247,#514835);
+}
+
+.network-card.remote .mode-badge{
+  color:#ffe9bf;
+  border:1px solid #b07d35;
+  background:
+    linear-gradient(180deg,#8c622b,#69481f);
+}
+
+/* Le choix de mode devient le contrôle principal */
+.network-grid label:first-child{
+  color:#aeb8c6;
+  font-weight:760;
+  letter-spacing:.055em;
+}
+
+#abletonMode{
+  height:34px;
+  margin-top:4px;
+  border:1px solid #55718e;
+  border-radius:8px;
+  background:
+    linear-gradient(180deg,#202a35,#171d25);
+  color:#eef4fa;
+  font-size:11px;
+  font-weight:790;
+  letter-spacing:.02em;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.035),
+    0 3px 9px rgba(0,0,0,.18);
+}
+
+#abletonMode:focus{
+  outline:none;
+  border-color:#79a6cc;
+  box-shadow:
+    0 0 0 2px rgba(92,143,188,.18),
+    inset 0 1px 0 rgba(255,255,255,.04);
+}
+
+/* Adresse et ports : techniques, neutres */
+.network-grid input,
+.ports-readonly{
+  border-color:#39434f;
+  background:#12171d;
+}
+
+#abletonHost:disabled{
+  color:#8995a3;
+  background:#14191f;
+}
+
+/* LTC : information technique, plus de vert permanent */
+.network-timecode{
+  border-color:#46576b;
+  background:#171d24;
+  color:#b9cce0;
+  box-shadow:none;
+}
+
+.network-timecode.offline{
+  color:#747e8a;
+  border-color:#343b45;
+  background:#15191e;
+}
+
+.ltc-destination{
+  border-color:#3d4a58;
+  background:#151b22;
+  color:#8f9aa8;
+}
+
+.ltc-destination:hover{
+  border-color:#607b98;
+  background:#19222b;
+}
+
+.ltc-destination strong{
+  color:#b6cbe0;
+}
+
+/* Appliquer : action importante mais pas "état OK" */
+.save-network{
+  border-color:#52789c!important;
+  background:
+    linear-gradient(180deg,rgba(72,112,151,.52),rgba(47,76,105,.42))!important;
+  color:#e1edf7!important;
+  box-shadow:0 5px 14px rgba(39,76,112,.18)!important;
+}
+
+/* Badge appareil disponible : neutre */
+.badge{
+  background:#20262e;
+  color:#b9c3cf;
+  border-color:#3d4652;
+}
+
+/* Les détails techniques n'ont pas besoin d'être tous verts */
+.tech-item.on .tech-led{
+  background:#6f91b2;
+  box-shadow:0 0 6px rgba(91,135,177,.42);
+}
+
+/* Le vrai état READY conserve le vert :
+   .system.ready reste volontairement inchangé. */
+
 @media(max-width:520px){
   .app{width:100%;max-width:100%;gap:7px;padding:7px}
   .topbar{display:flex;flex-direction:column;gap:8px}
@@ -1683,7 +1867,7 @@ body.show-mode .console-title{
     <section id="networkCard" class="card network-card local">
       <div class="network-title-row"><div class="access-head">Connexion AbletonOSC</div><span id="modeBadge" class="mode-badge">MODE LOCAL</span><span id="networkLtc" class="network-timecode offline">--:--:--:--</span></div>
       <div class="network-grid">
-        <label>MODE GÉNÉRAL<select id="abletonMode" onchange="updateNetworkFields()"><option value="local">Ableton local</option><option value="remote">Ableton distant</option></select></label>
+        <label>MODE ABLETON<select id="abletonMode" onchange="updateNetworkFields()"><option value="local">Ableton local</option><option value="remote">Ableton distant</option></select></label>
         <label>Adresse Ableton active<input id="abletonHost" value="127.0.0.1"></label>
         <div class="ports-readonly"><span>Ports AbletonOSC fixes</span><strong><span id="abletonSendPort">11000</span> → <span id="abletonReplyPort">11001</span></strong></div>
       </div>
@@ -2161,14 +2345,27 @@ def network_config():
         )
     except AbletonTargetError as exc:
         return jsonify(error=str(exc)), 400
-    if candidate_profiles == previous_profiles:
-        return jsonify(
-            message="Configuration OSC inchangée",
-            target=candidate.to_dict(),
-            profiles=candidate_profiles.to_dict(),
-        )
-
     server_was_running = tcp_ok(WEB_PORT)
+
+    if candidate_profiles == previous_profiles:
+        server_matches_config = False
+        if server_was_running:
+            remote_state, identity = current_identity_status()
+            active_server_target = remote_state.get("ableton_target") or {}
+            server_matches_config = (
+                identity.get("valid")
+                and active_server_target.get("mode") == candidate.mode
+                and str(active_server_target.get("host") or "") == str(candidate.host)
+                and int(active_server_target.get("send_port") or 0) == int(candidate.send_port)
+                and int(active_server_target.get("reply_port") or 0) == int(candidate.reply_port)
+            )
+
+        if not server_was_running or server_matches_config:
+            return jsonify(
+                message="Configuration OSC inchangée",
+                target=candidate.to_dict(),
+                profiles=candidate_profiles.to_dict(),
+            )
     if server_was_running:
         _, identity = current_identity_status()
         if not identity.get("valid"):
@@ -2925,6 +3122,10 @@ if __name__ == "__main__":
             stop_midi_console_monitor()
             os._exit(0)
 
+    # Déclencher le nettoyage AVANT que Cocoa ne détruise la fenêtre.
+    # `closed` reste un filet de sécurité pour les backends qui ne publient
+    # pas correctement l'événement `closing`.
+    panel_window.events.closing += quit_when_main_panel_closes
     panel_window.events.closed += quit_when_main_panel_closes
     webview.start(gui="cocoa", debug=False)
     # Filet de sécurité pour les backends où start() retourne sans événement.
