@@ -761,14 +761,12 @@ body.is-arrangement-paused .card.current {
     let markers = [];
     let markerSignature = '';
     let currentIndex = -1;
-    let nextIndex = 0;
+    let preparedIndex = 0;
     let nextWasManuallySelected = false;
-    let selectedMarkerIndex = null;
     let markerSelectIsOpen = false;
+    let goConfirmationFailed = false;
 
     let arrangementReturnActive = false;
-    let pendingGotoIndex = null;
-    let manualNextIndex = null;
     let latestArrangementTime = 0;
     let lastAcceptedGeneration = -1;
 
@@ -776,12 +774,10 @@ body.is-arrangement-paused .card.current {
       markers = [];
       markerSignature = '';
       currentIndex = -1;
-      nextIndex = -1;
+      preparedIndex = -1;
       nextWasManuallySelected = false;
-      selectedMarkerIndex = null;
       markerSelectIsOpen = false;
-      pendingGotoIndex = null;
-      manualNextIndex = null;
+      goConfirmationFailed = false;
       arrangementReturnActive = false;
 
       currentNameEl.textContent = '—';
@@ -921,10 +917,10 @@ body.is-arrangement-paused .card.current {
     }
 
     function clampIndexes() {
-      if (!markers.length) { currentIndex = -1; nextIndex = -1; return; }
+      if (!markers.length) { currentIndex = -1; preparedIndex = -1; return; }
       if (currentIndex >= markers.length) currentIndex = markers.length - 1;
-      if (nextIndex < 0) nextIndex = 0;
-      if (nextIndex >= markers.length) nextIndex = markers.length - 1;
+      if (preparedIndex < 0) preparedIndex = 0;
+      if (preparedIndex >= markers.length) preparedIndex = markers.length - 1;
     }
 
     function renderConduite() {
@@ -932,9 +928,7 @@ body.is-arrangement-paused .card.current {
 
   const current = currentIndex >= 0 ? markers[currentIndex] : null;
 
-  const displayNextIndex = manualNextIndex !== null
-    ? manualNextIndex
-    : (selectedMarkerIndex !== null ? selectedMarkerIndex : nextIndex);
+  const displayNextIndex = preparedIndex;
 
   const next = displayNextIndex >= 0 ? markers[displayNextIndex] : null;
 
@@ -954,7 +948,7 @@ body.is-arrangement-paused .card.current {
     displayNextIndex
   );
 
-  if (!markerSelectIsOpen && markerSelectEl && markers[displayNextIndex] && pendingGotoIndex === null) {
+  if (!markerSelectIsOpen && markerSelectEl && markers[displayNextIndex]) {
     markerSelectEl.value = String(displayNextIndex);
   }
 
@@ -994,47 +988,32 @@ body.is-arrangement-paused .card.current {
           markerSelectEl.appendChild(option);
         });
 
-        if (pendingGotoIndex !== null && markers[pendingGotoIndex]) {
-          markerSelectEl.value = String(pendingGotoIndex);
-        } else if (markerSelectIsOpen && previousSelectValue !== '' && markers[Number(previousSelectValue)]) {
+        if (markerSelectIsOpen && previousSelectValue !== '' && markers[Number(previousSelectValue)]) {
           markerSelectEl.value = previousSelectValue;
         }
 
-        if (selectedMarkerIndex !== null && selectedMarkerIndex >= markers.length) {
-        selectedMarkerIndex = null;
-        nextWasManuallySelected = false;}
-        if (pendingGotoIndex !== null && pendingGotoIndex >= markers.length) {
-          pendingGotoIndex = null;
-        }
-        if (manualNextIndex !== null && manualNextIndex >= markers.length) {
-          manualNextIndex = null;
+        if (preparedIndex >= markers.length) {
+          preparedIndex = markers.length ? markers.length - 1 : -1;
+          nextWasManuallySelected = false;
         }
       }
 
       const detected = findIndexFromState(state);
-      if (detected >= 0) {
+      if (detected >= 0 && !goConfirmationFailed) {
         currentIndex = detected;
       }
 
       if (!markers.length) {
         currentIndex = -1;
-        nextIndex = -1;
+        preparedIndex = -1;
         return;
       }
 
-      // Ne pas écraser une sélection manuelle faite dans la liste déroulante.
-      // On ne recalcule automatiquement la prochaine scène que si aucune
-      // sélection manuelle n'est active.
-      if (manualNextIndex !== null) {
-        selectedMarkerIndex = manualNextIndex;
-        nextIndex = manualNextIndex;
-        nextWasManuallySelected = true;
-      } else if (pendingGotoIndex === null && !nextWasManuallySelected && selectedMarkerIndex === null) {
-        nextIndex = currentIndex >= 0
+      // Une préparation manuelle reste en place pendant les rafraîchissements.
+      if (!nextWasManuallySelected && !goConfirmationFailed) {
+        preparedIndex = currentIndex >= 0
           ? Math.min(currentIndex + 1, markers.length - 1)
           : 0;
-      } else if (selectedMarkerIndex !== null) {
-        nextIndex = selectedMarkerIndex;
       }
 
       clampIndexes();
@@ -1042,12 +1021,12 @@ body.is-arrangement-paused .card.current {
 
     function advanceNextWhenPlayheadPassed(state) {
       if (!markers.length || !state) return;
-      if (markerSelectIsOpen || pendingGotoIndex !== null || manualNextIndex !== null || nextWasManuallySelected) return;
+      if (markerSelectIsOpen || nextWasManuallySelected || goConfirmationFailed) return;
 
       const playheadTime = Number(state.arrangement_time || 0);
       if (!Number.isFinite(playheadTime)) return;
 
-      let displayNextIndex = selectedMarkerIndex !== null ? selectedMarkerIndex : nextIndex;
+      let displayNextIndex = preparedIndex;
       if (displayNextIndex < 0 || displayNextIndex >= markers.length) return;
 
       let advanced = false;
@@ -1063,9 +1042,7 @@ body.is-arrangement-paused .card.current {
 
       if (!advanced) return;
 
-      selectedMarkerIndex = displayNextIndex;
-      nextIndex = displayNextIndex;
-      nextWasManuallySelected = true;
+      preparedIndex = displayNextIndex;
       renderConduite();
     }
 
@@ -1075,8 +1052,7 @@ body.is-arrangement-paused .card.current {
       if (!marker) return;
 
       if (commit) {
-        selectedMarkerIndex = idx;
-        nextIndex = idx;
+        preparedIndex = idx;
         nextWasManuallySelected = true;
       }
 
@@ -1149,18 +1125,28 @@ body.is-arrangement-paused .card.current {
       catch (_) { setStatus('○ Interface non connectée', false); }
     }
 
-    function setDisabled(value) {
+    function setDisabled(value, keepGoAvailable = false) {
       busy = value;
+
       [...transportButtons, goBtn, previewBtn, nextBtn, gotoBtn]
       .forEach(b => {
-        if (b && b !== pauseToggleBtn) b.disabled = value;
+        if (!b || b === pauseToggleBtn) return;
+
+        if (b === goBtn && keepGoAvailable) {
+          b.disabled = false;
+          return;
+        }
+
+        b.disabled = value;
       });
+
       if (!value) renderConduite();
     }
 
     let arrangementDesiredPlaying = null;
     let pendingArrangementDesired = null;
     let arrangementGoInProgress = false;
+    let activeArrangementAction = null;
 
     function renderArrangementTransport(playing) {
       arrangementDesiredPlaying = Boolean(playing);
@@ -1194,7 +1180,11 @@ body.is-arrangement-paused .card.current {
   if (action === 'arrangement_play_marker') arrangementReturnActive = true;
   if (action === 'arrangement_toggle') arrangementReturnActive = true;
 
-  setDisabled(true);
+  activeArrangementAction = action;
+
+  // Lecture/Pause ne doit jamais neutraliser visuellement le GO.
+  // GO reste une commande indépendante et prioritaire.
+  setDisabled(true, action === 'pause');
   try {
     let data = null;
 
@@ -1222,11 +1212,16 @@ body.is-arrangement-paused .card.current {
     setStatus('○ Commande Arrangement impossible', false);
   } finally {
     setTimeout(() => {
+      if (activeArrangementAction === action) {
+        activeArrangementAction = null;
+      }
+
       setDisabled(false);
 
       if (
         action === 'pause' &&
-        pendingArrangementDesired !== null
+        pendingArrangementDesired !== null &&
+        !arrangementGoInProgress
       ) {
         const queuedDesired = pendingArrangementDesired;
         pendingArrangementDesired = null;
@@ -1239,6 +1234,7 @@ body.is-arrangement-paused .card.current {
           source: 'arrangement-play-pause'
         });
       } else {
+        pendingArrangementDesired = null;
         update();
       }
     }, 80);
@@ -1250,58 +1246,70 @@ body.is-arrangement-paused .card.current {
     }
 
 async function runArrangementGo() {
-  if (busy) return;
-
-  // Un GO est prioritaire et atomique :
-  // aucune ancienne demande Pause/Lecture ne doit pouvoir l'annuler.
+  if (arrangementGoInProgress) return;
   arrangementGoInProgress = true;
   pendingArrangementDesired = null;
 
-  let launchIndex = manualNextIndex !== null ? manualNextIndex : selectedMarkerIndex;
+  // Si une commande Lecture/Pause est encore en vol, le GO est mémorisé
+  // par cet appel et attend sa fin. On évite ainsi deux requêtes transport
+  // concurrentes capables de s'annuler mutuellement côté Ableton.
+  if (busy && activeArrangementAction === 'pause') {
+    const deadline = Date.now() + 2600;
+    while (
+      busy &&
+      activeArrangementAction === 'pause' &&
+      Date.now() < deadline
+    ) {
+      await new Promise(resolve => setTimeout(resolve, 10));
+    }
 
-  if (launchIndex === null || typeof launchIndex === 'undefined') {
-    launchIndex = Number(markerSelectEl && markerSelectEl.value);
+    if (busy) {
+      arrangementGoInProgress = false;
+      setStatus('○ GO en attente : transport occupé', false);
+      return;
+    }
+  } else if (busy) {
+    arrangementGoInProgress = false;
+    return;
   }
 
-  if (Number.isNaN(launchIndex) || launchIndex < 0 || launchIndex >= markers.length) {
-    launchIndex = nextIndex;
-  }
+  // À partir du clic GO, toute ancienne demande Pause/Lecture est annulée.
+
+  const launchIndex = preparedIndex;
 
   const marker = markers[launchIndex];
-  if (!marker) return;
+  if (!marker) {
+    arrangementGoInProgress = false;
+    return;
+  }
 
   arrangementReturnActive = true;
   if (nextCardEl) nextCardEl.classList.remove('is-prepared', 'next-selected');
   setDisabled(true);
-  pendingGotoIndex = null;
-  manualNextIndex = null;
 
   try {
-    await fetchJSON('/action', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({action: 'back_to_arrangement'})
-    }, 2200);
-
-    await fetchJSON('/action', {
+    const result = await fetchJSON('/action', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify(payloadFor(marker, 'arrangement_play_marker'))
-    }, 2200);
+    }, 5000);
+    if (!result || result.go_confirmed !== true) {
+      throw new Error('GO non confirmé par Ableton');
+    }
 
+    goConfirmationFailed = false;
     currentIndex = launchIndex;
-    nextIndex = Math.min(launchIndex + 1, markers.length - 1);
-    selectedMarkerIndex = null;
-    manualNextIndex = null;
+    preparedIndex = Math.min(launchIndex + 1, markers.length - 1);
     nextWasManuallySelected = false;
 
     arrangementReturnActive = true;
     renderArrangementTransport(true);
 
     renderConduite();
-  } catch (_) {
+  } catch (error) {
+    goConfirmationFailed = true;
     if (nextCardEl) nextCardEl.classList.add('is-prepared');
-    setStatus('○ GO Arrangement impossible', false);
+    setStatus('○ ' + (error && error.message || 'GO Arrangement non confirmé'), false);
   } finally {
     setTimeout(() => {
       // Les commandes Pause/Lecture reçues pendant le GO sont volontairement
@@ -1318,20 +1326,14 @@ goBtn.addEventListener('click', runArrangementGo);
 
     previewBtn.addEventListener('click', () => {
       if (!markers.length) return;
-      const baseIndex = selectedMarkerIndex !== null ? selectedMarkerIndex : nextIndex;
-      const idx = Math.max(baseIndex - 1, 0);
+      const idx = Math.max(preparedIndex - 1, 0);
       markerSelectIsOpen = false;
-      pendingGotoIndex = null;
-      manualNextIndex = idx;
       previewSelectedMarker(idx, true, true);
     });
 
     nextBtn.addEventListener('click', () => {
       if (!markers.length) return;
-      const baseIndex = selectedMarkerIndex !== null ? selectedMarkerIndex : nextIndex;
-      const idx = Math.min(baseIndex + 1, markers.length - 1);
-      pendingGotoIndex = null;
-      manualNextIndex = idx;
+      const idx = Math.min(preparedIndex + 1, markers.length - 1);
       previewSelectedMarker(idx, true, true);
     });
 
@@ -1348,36 +1350,22 @@ markerSelectEl.addEventListener('change', () => {
   const idx = Number(markerSelectEl.value || 0);
   markerSelectIsOpen = false;
   if (!markers[idx]) return;
-  pendingGotoIndex = idx;
-  manualNextIndex = null;
-  nextWasManuallySelected = false;
-  nextNameEl.textContent = cleanTitle(markers[idx].name || 'Repère');
-  nextMetaEl.textContent = '';
-  if (nextCardEl) nextCardEl.classList.add('is-prepared');
-  setStatus('● Choix prêt — appuie sur Aller : ' + cleanTitle(markers[idx].name || 'Repère'), true);
+  previewSelectedMarker(idx, true, true);
+  renderConduite();
 });
 
     markerSelectEl.addEventListener('input', () => {
       const idx = Number(markerSelectEl.value || 0);
       if (!markers[idx]) return;
-      pendingGotoIndex = idx;
-      manualNextIndex = null;
-      nextWasManuallySelected = false;
-      nextNameEl.textContent = cleanTitle(markers[idx].name || 'Repère');
-      nextMetaEl.textContent = '';
-      if (nextCardEl) nextCardEl.classList.add('is-prepared');
-      setStatus('● Choix prêt — appuie sur Aller : ' + cleanTitle(markers[idx].name || 'Repère'), true);
+      previewSelectedMarker(idx, false, true);
+      renderConduite();
     });
 
     gotoBtn.addEventListener('click', () => {
-      const idx = pendingGotoIndex !== null ? pendingGotoIndex : Number(markerSelectEl.value || 0);
+      const idx = Number(markerSelectEl.value || 0);
       if (!markers[idx]) return;
-      pendingGotoIndex = null;
-      manualNextIndex = idx;
-      selectedMarkerIndex = idx;
-      nextIndex = idx;
-      nextWasManuallySelected = true;
       previewSelectedMarker(idx, true, true);
+      renderConduite();
     });
 
     function runArrangementPlayPause() {

@@ -2080,6 +2080,93 @@ transport_command_lock = threading.RLock()
 def send(address: str, *args):
     ableton_transport.send(address, *args)
 
+
+def _arrangement_live_value(address: str, generation: int):
+    response = query(address, timeout=0.12, expected_generation=generation,
+                     apply_response=False)
+    if not response:
+        return None
+    return response[-1]
+
+
+def _arrangement_live_playing(generation: int):
+    raw = _arrangement_live_value("/live/song/get/is_playing", generation)
+    if raw is None:
+        return None
+    if isinstance(raw, str):
+        return raw.strip().lower() not in ("0", "false", "off", "no", "")
+    return bool(raw)
+
+
+def _confirmed_arrangement_time(target: float, generation: int, deadline: float,
+                                upper_margin: float = 0.25):
+    while time.monotonic() < deadline:
+        raw = _arrangement_live_value("/live/song/get/current_song_time", generation)
+        value = safe_float(raw)
+        if value is not None and target - 0.25 <= value <= target + upper_margin:
+            return value
+        time.sleep(0.035)
+    return None
+
+
+def execute_arrangement_marker_go(target: float, name: str, cue_index: int,
+                                  generation: int):
+    # Le verrou couvre toute la transaction : Pause et autres GO ne s'intercalent pas.
+    with transport_command_lock:
+        if not generation_is_current(generation):
+            return False, "Live Set modifié pendant GO"
+
+        playing_before = _arrangement_live_playing(generation)
+        if playing_before is None:
+            return False, "État de lecture Ableton indisponible avant GO"
+        if ableton_transport.send("/live/song/set/back_to_arranger", 0) is False:
+            return False, "Ableton inaccessible avant GO"
+
+        # Live mémorise la position de Pause. La reprise doit précéder le saut,
+        # sinon continue_playing peut restaurer A après une confirmation de B.
+        if not playing_before:
+            if ableton_transport.send("/live/song/continue_playing") is False:
+                return False, "Reprise Arrangement non envoyée"
+            resume_deadline = time.monotonic() + 0.85
+            while time.monotonic() < resume_deadline:
+                if _arrangement_live_playing(generation) is True:
+                    break
+                time.sleep(0.035)
+            else:
+                return False, "Ableton n'a pas confirmé la reprise avant le saut"
+
+        if not generation_is_current(generation):
+            return False, "Live Set modifié pendant GO"
+        if ableton_transport.send("/live/song/set/current_song_time", target) is False:
+            return False, "Saut Arrangement non envoyé"
+
+        position = _confirmed_arrangement_time(target, generation,
+                                               time.monotonic() + 0.85,
+                                               upper_margin=2.0)
+        if position is None:
+            return False, "Ableton n'a pas confirmé le locator demandé"
+
+        if not generation_is_current(generation):
+            return False, "Live Set modifié pendant GO"
+        if name:
+            send_midi_monitor_scene_context(generation, cue_index, name)
+
+        confirmed_at = time.monotonic()
+        deadline = confirmed_at + 0.85
+        while time.monotonic() < deadline:
+            playing = _arrangement_live_playing(generation)
+            raw_time = _arrangement_live_value("/live/song/get/current_song_time", generation)
+            played_time = safe_float(raw_time)
+            elapsed = time.monotonic() - confirmed_at
+            if (playing is True and played_time is not None
+                    and target - 0.25 <= played_time <= target + max(2.0, 8.0 * elapsed)):
+                if not generation_is_current(generation):
+                    return False, "Live Set modifié pendant GO"
+                return True, "GO confirmé par Ableton"
+            time.sleep(0.035)
+        return False, "Ableton n'a pas confirmé la lecture depuis le locator"
+
+
 def show_session_view():
     for address in (
         "/live/application/view/show_view",
@@ -7535,26 +7622,11 @@ def action():
             current_mode = str(state.get("play_mode", "stopped"))
 
         if is_playing:
-            print(
-                "PAUSE TRACE : attente verrou transport",
-                "| heure =", time.strftime("%H:%M:%S"),
-                flush=True,
-            )
 
             with transport_command_lock:
-                print(
-                    "PAUSE TRACE : verrou acquis",
-                    "| heure =", time.strftime("%H:%M:%S"),
-                    flush=True,
-                )
 
                 send("/live/song/stop_playing")
 
-                print(
-                    "PAUSE TRACE : stop_playing envoyé",
-                    "| heure =", time.strftime("%H:%M:%S"),
-                    flush=True,
-                )
 
             with lock:
                 deadline = state.get("playback_deadline")
@@ -7611,19 +7683,17 @@ def action():
         except (TypeError, ValueError):
             marker_context_index = -1
 
-        with transport_command_lock:
-            send("/live/song/set/back_to_arranger", 0)
-            set_arrangement_time(seconds, marker_name)
-
-            if play_after_jump:
-                if marker_name:
-                    send_midi_monitor_scene_context(
-                        action_generation,
-                        marker_context_index,
-                        marker_name,
-                    )
-                time.sleep(0.04)
-                send("/live/song/continue_playing")
+        if play_after_jump:
+            ok, message = execute_arrangement_marker_go(
+                seconds, marker_name, marker_context_index, action_generation,
+            )
+            if not ok:
+                return jsonify({"ok": False, "go_confirmed": False,
+                                "message": message}), 409
+        else:
+            with transport_command_lock:
+                send("/live/song/set/back_to_arranger", 0)
+                set_arrangement_time(seconds, marker_name)
 
         if marker_name and not play_after_jump:
             send_midi_monitor_scene_context(action_generation, marker_context_index, marker_name)
@@ -7715,7 +7785,8 @@ def action():
 
     # On ne bloque pas l'action avec un refresh complet.
     with lock:
-        return jsonify({"ok": True, "state": state_snapshot_locked()})
+        return jsonify({"ok": True, "go_confirmed": action_name == "arrangement_play_marker",
+                        "state": state_snapshot_locked()})
 
 
 
