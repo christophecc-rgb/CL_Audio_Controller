@@ -259,7 +259,7 @@ def test_populate_inserts_one_banner_before_first_member_preserving_show_numbers
     banner = app.tree.rows["medley-header-disco"]
     assert "GIGI / NEVER" in banner["values"][3]
     assert app._scene_index_from_iid("medley-header-disco") is None
-    assert app.export_selected_scene_indices == {40, 41}
+    assert app.export_selected_scene_indices == set()
     app.populate_tree()
     assert len(app.tree.rows) == 3
     app.export_medleys_var.set(False)

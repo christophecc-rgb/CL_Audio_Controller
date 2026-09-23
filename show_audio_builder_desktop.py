@@ -1600,6 +1600,53 @@ class ShowAudioBuilderDesktop(tk.Tk):
                 raise ValueError("Medley incomplet, non contigu ou non exportable : "
                                  + ", ".join(sorted(selected_medley_ids)))
 
+            # Injecter les variantes métier fraîches dans les items du plan.
+            # Elles serviront à CL Audio Export pour commuter automatiquement
+            # les playbacks rôle/artiste pendant le rendu.
+            model_items_by_scene = {}
+            for model_item in model.get("items") or []:
+                try:
+                    model_items_by_scene[int(model_item.get("scene_index"))] = model_item
+                except (TypeError, ValueError):
+                    continue
+
+            for plan_item in plan.get("items") or []:
+                if plan_item.get("type") == "medley_full":
+                    merged_variants = []
+                    numbers = {
+                        int(value)
+                        for value in plan_item.get("scene_numbers") or []
+                        if str(value).strip()
+                    }
+
+                    for model_item in model.get("items") or []:
+                        try:
+                            number = int(model_item.get("scene_number"))
+                        except (TypeError, ValueError):
+                            continue
+
+                        if number in numbers:
+                            merged_variants.extend(
+                                dict(value)
+                                for value in model_item.get("variants") or []
+                                if isinstance(value, dict)
+                            )
+
+                    plan_item["variants"] = merged_variants
+
+                else:
+                    try:
+                        scene_index = int(plan_item.get("scene_index"))
+                    except (TypeError, ValueError):
+                        scene_index = None
+
+                    model_item = model_items_by_scene.get(scene_index) or {}
+                    plan_item["variants"] = [
+                        dict(value)
+                        for value in model_item.get("variants") or []
+                        if isinstance(value, dict)
+                    ]
+
             job = build_export_job(plan, settings)
             if selected_medley_ids and not settings.get("export_medleys"):
                 raise ValueError("Activer l'export des medleys sélectionnés dans les réglages")
@@ -1611,6 +1658,15 @@ class ShowAudioBuilderDesktop(tk.Tk):
 
             arrangement = snapshot.get("arrangement") or {}
             set_info = snapshot.get("set") or {}
+
+            # L'inventaire Live sert uniquement à résoudre les groupes
+            # PLAYBACK... / SAISON... pendant l'export.
+            for batch_item in batch_items:
+                batch_item["track_inventory"] = [
+                    dict(track)
+                    for track in snapshot.get("tracks") or []
+                    if isinstance(track, dict)
+                ]
 
             job["batch_items"] = batch_items
             job["tempo"] = float(arrangement.get("tempo"))
@@ -2319,20 +2375,10 @@ class ShowAudioBuilderDesktop(tk.Tk):
         selected_index = None
 
         if not self.export_selection_initialized:
-            initial_selection = set()
-
-            for value in self.model.get("items") or []:
-                if not value.get("exportable"):
-                    continue
-
-                try:
-                    initial_selection.add(
-                        int(value.get("scene_index"))
-                    )
-                except (TypeError, ValueError):
-                    continue
-
-            self.export_selected_scene_indices = initial_selection
+            # Au démarrage, aucune scène n'est présélectionnée.
+            # L'utilisateur choisit explicitement ce qu'il veut exporter.
+            self.export_selected_scene_indices = set()
+            self.export_selected_medley_ids = set()
             self.export_selection_initialized = True
 
         if self.current_item:

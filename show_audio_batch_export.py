@@ -21,6 +21,11 @@ import time
 import uuid
 import wave
 from typing import Any, Callable
+import json
+import urllib.request
+import unicodedata
+
+from show_audio_playback_sources import group_playback_leaf_tracks
 
 from show_audio_ableton_offline import (
     OFFLINE_SUCCESS,
@@ -30,6 +35,262 @@ from show_audio_ableton_offline import (
 
 class BatchExportError(RuntimeError):
     pass
+
+
+_CL_AUDIO_HTTP = "http://127.0.0.1:5050"
+
+
+def _http_json(url: str, *, method: str = "GET", payload=None):
+    data = None
+    headers = {}
+
+    if payload is not None:
+        data = json.dumps(payload).encode("utf-8")
+        headers["Content-Type"] = "application/json"
+
+    request = urllib.request.Request(
+        url,
+        data=data,
+        headers=headers,
+        method=method,
+    )
+
+    with urllib.request.urlopen(request, timeout=3.0) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def _track_state_snapshot(indices):
+    unique = sorted({int(value) for value in indices})
+
+    if not unique:
+        return {}
+
+    query = ",".join(str(value) for value in unique)
+
+    result = _http_json(
+        f"{_CL_AUDIO_HTTP}/show-audio/tracks-bulk"
+        f"?track_indices={query}"
+    )
+
+    if not result.get("ok"):
+        raise BatchExportError(
+            result.get("error") or "lecture états pistes impossible"
+        )
+
+    return {
+        int(track["track_index"]): bool(track["track_mute"])
+        for track in result.get("tracks") or []
+        if track.get("track_mute") is not None
+    }
+
+
+def _set_track_mutes(states):
+    if not states:
+        return
+
+    result = _http_json(
+        f"{_CL_AUDIO_HTTP}/show-audio/tracks-mute",
+        method="POST",
+        payload={
+            "tracks": [
+                {
+                    "track_index": int(index),
+                    "mute": bool(mute),
+                }
+                for index, mute in states.items()
+            ]
+        },
+    )
+
+    if not result.get("ok"):
+        raise BatchExportError(
+            result.get("error") or "écriture états pistes impossible"
+        )
+
+
+def _text(value):
+    return str(value or "").strip()
+
+
+def _normalized_match_text(value):
+    text = _text(value).casefold()
+    text = unicodedata.normalize("NFKD", text)
+    return "".join(
+        char
+        for char in text
+        if not unicodedata.combining(char)
+    )
+
+
+def _token_matches(token, track_name):
+    token = _normalized_match_text(token)
+    track_name = _normalized_match_text(track_name)
+
+    return bool(token and token in track_name)
+
+
+def _automatic_playback_states(item):
+    """
+    Retourne {track_index: mute}.
+
+    Aucun rôle/artiste configuré => {} => mode manuel historique inchangé.
+    """
+    source = item.get("source_item") or {}
+
+    variants = [
+        value
+        for value in source.get("variants") or []
+        if isinstance(value, dict)
+        and _text(value.get("role"))
+        and _text(value.get("artist"))
+    ]
+
+    if not variants:
+        return {}
+
+    artists = {
+        _text(value.get("artist"))
+        for value in variants
+        if _text(value.get("artist"))
+    }
+
+    # Tokens utilisés pour retrouver les playbacks musicaux sous SAISON...
+    #
+    # Cas particulier métier actuel :
+    #   rôle Directrice -> groupes/pistes musicaux nommés "DIR"
+    #
+    # La piste voix sous PLAYBACK... reste, elle, résolue avec le prénom
+    # de l'artiste (par ex. Directrice -> Vénus -> PB VENUS).
+    season_tokens = set()
+
+    for value in variants:
+        role = _text(value.get("role"))
+        artist = _text(value.get("artist"))
+        playback = _text(value.get("playback"))
+
+        if role.casefold() == "directrice":
+            season_tokens.add("DIR")
+            continue
+
+        token = playback or artist
+
+        if token:
+            season_tokens.add(token)
+
+    # La clé reste disponible pour les futures variantes.
+    keys = {
+        _text(value.get("key"))
+        for value in variants
+        if _text(value.get("key"))
+    }
+
+    tracks = [
+        dict(value)
+        for value in item.get("track_inventory") or []
+        if isinstance(value, dict)
+    ]
+
+    if not tracks:
+        # Sécurité : ne rien modifier si l'inventaire n'est pas disponible.
+        return {}
+
+    playback_groups = [
+        track
+        for track in tracks
+        if track.get("is_foldable") is True
+        and _text(track.get("track_name")).casefold().startswith("playback")
+    ]
+
+    season_groups = [
+        track
+        for track in tracks
+        if track.get("is_foldable") is True
+        and _text(track.get("track_name")).casefold().startswith("saison")
+    ]
+
+    changes = {}
+
+    # --------------------------------------------------------
+    # VOIX : groupes PLAYBACK...
+    # --------------------------------------------------------
+    for group in playback_groups:
+        group_name = _text(group.get("track_name"))
+
+        for track in group_playback_leaf_tracks(tracks, group_name):
+            try:
+                index = int(track.get("track_index"))
+            except (TypeError, ValueError):
+                continue
+
+            name = _text(track.get("track_name"))
+
+            selected = any(
+                _token_matches(artist, name)
+                for artist in artists
+            )
+
+            # On ne pilote que les pistes ressemblant effectivement à
+            # des playbacks artistes. Les autres pistes du groupe ne sont
+            # pas modifiées arbitrairement.
+            candidate = (
+                "pb " in (" " + name.casefold())
+                or any(
+                    _token_matches(artist, name)
+                    for artist in artists
+                )
+            )
+
+            if candidate:
+                changes[index] = not selected  # mute = not ON
+
+    # --------------------------------------------------------
+    # MUSIQUE : groupes SAISON...
+    # --------------------------------------------------------
+    for group in season_groups:
+        group_name = _text(group.get("track_name"))
+
+        for track in group_playback_leaf_tracks(tracks, group_name):
+            try:
+                index = int(track.get("track_index"))
+            except (TypeError, ValueError):
+                continue
+
+            name = _text(track.get("track_name"))
+
+            selected = any(
+                _token_matches(token, name)
+                for token in season_tokens
+            )
+
+            # Si une clé est renseignée et apparaît dans le nom,
+            # elle participe naturellement au choix.
+            if selected and keys:
+                matching_keys = [
+                    key for key in keys
+                    if _token_matches(key, name)
+                ]
+
+                # Pas de clé dans le nom = on garde la version unique.
+                # Clé présente = elle doit appartenir aux clés sélectionnées.
+                name_has_any_key_marker = any(
+                    _token_matches(key, name)
+                    for key in keys
+                )
+
+                if name_has_any_key_marker and not matching_keys:
+                    selected = False
+
+            # Ici, on ne mute que les pistes qui correspondent à au moins
+            # une identité de playback connue pour cette scène.
+            candidate = any(
+                _token_matches(token, name)
+                for token in season_tokens
+            )
+
+            if candidate:
+                changes[index] = not selected
+
+    return changes
 
 
 def _ffmpeg_path() -> str:
@@ -307,8 +568,29 @@ def execute_batch_item(
         "outputs": [],
     }
 
+    playback_restore = {}
+
     try:
         result["status"] = "rendering"
+
+        requested_states = _automatic_playback_states(item)
+
+        if requested_states:
+            playback_restore = _track_state_snapshot(
+                requested_states.keys()
+            )
+
+            print(
+                "[AUTO_PLAYBACK] apply "
+                + json.dumps({
+                    str(index): ("OFF" if mute else "ON")
+                    for index, mute in requested_states.items()
+                }, sort_keys=True),
+                flush=True,
+            )
+
+            _set_track_mutes(requested_states)
+            time.sleep(0.20)
 
         render = execute_offline_wav(
             zone=zone,
@@ -402,6 +684,23 @@ def execute_batch_item(
         return result
 
     finally:
+        if playback_restore:
+            try:
+                print(
+                    "[AUTO_PLAYBACK] restore "
+                    + json.dumps({
+                        str(index): ("OFF" if mute else "ON")
+                        for index, mute in playback_restore.items()
+                    }, sort_keys=True),
+                    flush=True,
+                )
+                _set_track_mutes(playback_restore)
+            except Exception as restore_exc:
+                print(
+                    f"[AUTO_PLAYBACK] restauration impossible: {restore_exc}",
+                    flush=True,
+                )
+
         try:
             if master_path.exists():
                 master_path.unlink()

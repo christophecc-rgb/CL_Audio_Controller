@@ -6192,6 +6192,65 @@ def show_audio_tracks():
 
 
 
+@app.route("/show-audio/tracks-mute", methods=["POST"])
+def show_audio_tracks_mute():
+    """Applique explicitement des états mute à une liste de pistes Live."""
+    payload = request.get_json(silent=True) or {}
+    changes = payload.get("tracks") or []
+
+    if not isinstance(changes, list):
+        return jsonify({
+            "ok": False,
+            "error": "tracks doit être une liste",
+        }), 400
+
+    with lock:
+        generation = int(state.get("set_generation", 0))
+        set_ready = bool(state.get("set_ready", False))
+
+    if not set_ready:
+        return jsonify({
+            "ok": False,
+            "error": "Live Set non prêt",
+            "set_generation": generation,
+        }), 409
+
+    applied = []
+
+    for change in changes:
+        if not isinstance(change, dict):
+            continue
+
+        try:
+            track_index = int(change.get("track_index"))
+        except (TypeError, ValueError):
+            continue
+
+        mute = bool(change.get("mute"))
+
+        # query() est déjà le transport OSC centralisé du backend.
+        # Le SET peut ne pas répondre ; l'action OSC est néanmoins envoyée.
+        query(
+            "/live/track/set/mute",
+            track_index,
+            mute,
+            timeout=0.10,
+            expected_generation=generation,
+            apply_response=False,
+        )
+
+        applied.append({
+            "track_index": track_index,
+            "mute": mute,
+        })
+
+    return jsonify({
+        "ok": True,
+        "set_generation": generation,
+        "tracks": applied,
+    })
+
+
 @app.route("/show-audio/scene-clips-bulk")
 def show_audio_scene_clips_bulk():
     """Inventaire read-only des clips de plusieurs scènes en une acquisition.
