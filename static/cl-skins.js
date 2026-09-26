@@ -98,6 +98,8 @@
   }
 
   function createSkinSelector() {
+    // All remote views share the four global presentation skins.
+    if (document.querySelector('.v2-app[data-module]')) return;
     if (document.querySelector('[data-cl-skin-selector]')) return;
 
     const details =
@@ -162,7 +164,12 @@
       saved = localStorage.getItem(STORAGE_KEY) || saved;
     } catch (_) {}
 
-    applySkin(saved);
+    if (document.querySelector('.v2-app[data-module]')) {
+      // Stable reference palette; do not overwrite the legacy preference.
+      document.documentElement.dataset.clSkin = 'skin-broadcast';
+    } else {
+      applySkin(saved);
+    }
     classifyControls();
     createSkinSelector();
 

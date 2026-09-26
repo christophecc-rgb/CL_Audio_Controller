@@ -238,7 +238,7 @@
       ['/', 'Télécommande Session'],
       ['/ab', 'Télécommande A/B'],
       ['/arrangement', 'Arrangement'],
-      ['/show-info', 'CL ShowCue']
+
     ].forEach(([value, label]) => {
       const option = document.createElement('option');
       option.value = value;
@@ -348,4 +348,99 @@
   } else {
     initAdvancedTools();
   }
+})();
+
+/* CL_DESKTOP_REMOTE_MODE_V1 */
+(() => {
+  try {
+    const params = new URLSearchParams(window.location.search);
+
+    if (params.get('desktop') === '1') {
+      document.documentElement.dataset.desktopRemote = '1';
+
+      const apply = () => {
+        if (document.body) {
+          document.body.dataset.desktopRemote = '1';
+        }
+      };
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', apply, {once:true});
+      } else {
+        apply();
+      }
+    }
+  } catch (_) {}
+})();
+
+/* CL_CURRENT_FLOW: Skin presentation; reads accepted UI state. */
+(() => {
+  const install = () => {
+    const current = document.querySelector('.v2-app[data-module] .sc-current');
+    if (!current) return;
+    let layer = current.querySelector('.cl-current-flow-layer');
+    if (!layer) {
+      layer = document.createElement('div');
+      layer.className = 'cl-current-flow-layer';
+      layer.setAttribute('aria-hidden', 'true');
+      current.prepend(layer);
+    }
+    const motion = matchMedia('(prefers-reduced-motion: reduce)');
+    let animation, flash, previousRecall = false;
+    const enabled = () => ['original','broadcast','theatre','show-control','neon','paradis-gold','paradis-silver','paradis-white'].includes(document.body.dataset.skin);
+    const sync = () => {
+      if (!enabled()) {
+        if (animation) animation.pause();
+        if (flash) flash.cancel();
+        return;
+      }
+      if (!animation) {
+        animation = layer.animate([
+          {transform:'translate3d(-12%,0,0) scaleX(.96)'},
+          {transform:'translate3d(12%,0,0) scaleX(1.04)'}
+        ], {
+          duration:9000,
+          iterations:Infinity,
+          direction:'alternate',
+          easing:'ease-in-out'
+        });
+        animation.pause();
+        animation.currentTime = 2600;
+        layer._clFlowAnimation = animation;
+      }
+      const state = current.dataset.uiState;
+      const preference = document.body.dataset.visualAnimation;
+      const speed = preference === 'soft' ? 0.5 : 1;
+      if (animation.playbackRate !== speed) animation.updatePlaybackRate(speed);
+      if (state === 'playing' && preference !== 'off' && !document.hidden && !motion.matches &&
+          !document.body.classList.contains('v2-energy-saver')) animation.play();
+      else animation.pause();
+      // Pause never seeks: resume uses the same Animation and currentTime.
+      if (state === 'stopped' || state === 'offline' || !state) animation.currentTime = 2600;
+      const recalled = current.classList.contains('session-recall-pulse');
+      if (recalled && !previousRecall) pulse();
+      previousRecall = recalled;
+      if (state === 'offline' && flash) flash.cancel();
+    };
+    const pulse = () => {
+      if (!enabled() || current.dataset.uiState === 'offline') return;
+      if (flash) flash.cancel();
+      // Independent one-shot flash never restarts or seeks the moving layer.
+      flash = layer.animate([{filter:'brightness(1)'},{filter:'brightness(2.8)',offset:.18},{filter:'brightness(1)'}],
+        {duration:motion.matches ? 180 : 850,easing:'ease-out'});
+    };
+    new MutationObserver(sync).observe(current,{attributes:true,attributeFilter:['data-ui-state','class']});
+    new MutationObserver(sync).observe(document.body,{attributes:true,attributeFilter:['data-skin','class','data-visual-animation']});
+    document.addEventListener('visibilitychange',sync);
+    motion.addEventListener('change',sync);
+    const go = document.querySelector('.go-button, #abSceneConfirm, #goBtn');
+    if (go) go.addEventListener('click',()=>{if(!go.disabled)pulse();});
+    document.addEventListener('keydown',event=>{
+      if(event.key==='Enter' && event.defaultPrevented && !event.repeat &&
+         !event.target.closest('input,select,textarea,[contenteditable="true"]')) pulse();
+    });
+    sync();
+  };
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',install,{once:true});
+  else install();
 })();

@@ -2080,3 +2080,455 @@ body {
 
   border-color: rgba(205, 100, 106, .82) !important;
 }
+
+/* SESSION FUNCTIONAL PRESENTATION CONTRACT — shared by all four skins.
+   The pre-experiment stylesheet above is preserved byte for byte.
+   No transport state is inferred here: only existing classes are rendered.
+   Important declarations are needed against the template/legacy skins. */
+body[data-skin] .v2-app[data-module="session"] {
+  --session-panel: #111821;
+  --session-edge: #354353;
+  --session-radius: 16px;
+}
+body[data-skin] .v2-app[data-module="session"] .scene-cards .card {
+  min-width: 0;
+  border-radius: var(--session-radius) !important;
+}
+/* Animate outline/filter: legacy !important box-shadows otherwise mask selection. */
+@keyframes session-selection-feedback {
+  0%, 100% { outline: 1px solid transparent; outline-offset: 0; filter: brightness(1); }
+  50% { outline: 3px solid #b9ddff; outline-offset: 2px; filter: brightness(1.22); }
+}
+body[data-skin] .v2-app[data-module="session"] .selected-card.selection-pulse {
+  animation: session-selection-feedback .7s ease-in-out 2 !important;
+}
+/* This animation name was referenced by the original ready state but undefined. */
+@keyframes v2-live-text-breathe {
+  0%, 100% { opacity: .86; }
+  50% { opacity: 1; }
+}
+body[data-skin] .v2-app[data-module="session"] .selected-card.is-prepared .label::after {
+  content: " · PRÊTE";
+  color: #b9ddff;
+}
+body[data-skin] .v2-app[data-module="session"] .pause-button.is-play {
+  color: #eef7ff !important;
+  border-color: #90caf9 !important;
+  background: linear-gradient(180deg, #367cb1, #19486c) !important;
+}
+/* Device IDs/palettes remain supplied by the existing MIDI renderer. */
+body[data-skin] .v2-app[data-module="session"] .midi-return {
+  height: auto;
+  min-height: 70px;
+  padding-bottom: 7px;
+}
+body[data-skin] .v2-app[data-module="session"] .midi-return-state {
+  position: relative;
+  width: auto;
+  height: auto;
+  margin: 3px 0 0;
+  clip: auto;
+  overflow: visible !important;
+  white-space: normal;
+  font-size: 10px;
+  line-height: 1.3;
+  font-weight: 750;
+  color: #e4eaf1;
+}
+body[data-skin] .v2-app[data-module="session"] .midi-return.state-loaded {
+  border-color: var(--console-accent) !important;
+  background: color-mix(in srgb, var(--console-accent) 12%, #15181d) !important;
+  box-shadow: inset 3px 0 0 var(--console-accent) !important;
+}
+body[data-skin] .v2-app[data-module="session"] .midi-return.state-loaded .midi-return-state,
+body[data-skin] .v2-app[data-module="session"] .midi-return.state-idle:not(.device-unavailable) .midi-return-state {
+  font-size: 0;
+}
+body[data-skin] .v2-app[data-module="session"] .state-loaded .midi-return-state::after {
+  content: "✓ Mémorisé";
+  font-size: 10px;
+}
+body[data-skin] .v2-app[data-module="session"] .state-idle:not(.device-unavailable) .midi-return-state::after {
+  content: "Au repos";
+  font-size: 10px;
+  color: #a6afbc;
+}
+body[data-skin] .v2-app[data-module="session"] .midi-return.state-mismatch,
+body[data-skin] .v2-app[data-module="session"] .midi-return.state-timeout {
+  border-color: #ff7c88 !important;
+  border-style: dashed !important;
+}
+body[data-skin] .v2-app[data-module="session"] .state-mismatch .midi-return-state,
+body[data-skin] .v2-app[data-module="session"] .state-timeout .midi-return-state {
+  color: #ffb8bf;
+}
+body[data-skin] .v2-app[data-module="session"] .ltc-display--disconnected .ltc-display__label::after {
+  content: " · ABSENT";
+  color: #e8a7a7;
+}
+body[data-skin] .v2-app[data-module="session"] .ltc-display--connected .ltc-display__label::after {
+  content: " · CONNECTÉ";
+}
+.session-skin-setting { display: flex; align-items: center; gap: 10px; padding: 8px 0; }
+.session-skin-setting label { font-size: 11px; color: #bfcbd9; }
+.session-skin-setting select { flex: 1; min-width: 0; max-width: 260px; }
+/* GO keeps the familiar full-width desktop row; portrait stays unchanged. */
+@media (orientation: landscape) and (max-height: 500px) {
+  body[data-skin] .v2-app[data-module="session"] .v2-workspace > .wrap {
+    grid-template-rows: minmax(112px, auto) auto 58px 44px auto !important;
+  }
+  body[data-skin] .v2-app[data-module="session"] .midi-returns {
+    grid-column: 1 / -1 !important;
+    grid-row: 2 !important;
+    width: 100%;
+  }
+  body[data-skin] .v2-app[data-module="session"] .ltc-display,
+  body[data-skin] .v2-app[data-module="session"] .grid { grid-row: 3 !important; }
+  body[data-skin] .v2-app[data-module="session"] .goto-panel { grid-row: 4 !important; }
+  body[data-skin] .v2-app[data-module="session"] .advanced-options { grid-row: 5 !important; }
+  body[data-skin] .v2-app[data-module="session"] .v2-header {
+    grid-template-columns: minmax(70px, .7fr) minmax(0, 1.8fr) minmax(85px, .7fr) !important;
+  }
+  body[data-skin] .v2-app[data-module="session"] .v2-tabs {
+    grid-row: 1;
+    grid-column: 2;
+    min-width: 0;
+  }
+}
+
+
+
+
+
+
+
+
+/* GLOBAL COMPONENT SYSTEM. Original keeps its existing geometry and effects. */
+.sc-card-header { display: contents; }
+.sc-card-header .sc-role { position: relative; z-index: 2; }
+.sc-time, .sc-card-footer { display: none; }
+
+@keyframes sc-live { 0%,100% { opacity: .55; transform: scaleY(.78); } 50% { opacity: 1; transform: scaleY(1); } }
+@keyframes sc-ready { 0%,100% { opacity: .45; transform: scaleY(.72); } 50% { opacity: 1; transform: scaleY(1); } }
+@keyframes sc-select { 0%,100% { outline-color: transparent; } 50% { outline-color: var(--sc-ready); } }
+@keyframes sc-go { 0% { transform: scaleX(0); visibility: visible; } 35%,80% { transform: scaleX(1); visibility: visible; } 100% { transform: scaleX(1); visibility: hidden; } }
+@keyframes sc-label-flash { 0%,100% { opacity: 0; } 15%,75% { opacity: 1; } }
+@keyframes sc-midi { 0%,100% { outline-color: transparent; } 45% { outline-color: var(--sc-ok); } }
+@keyframes sc-error { 0%,100% { outline-color: color-mix(in srgb, var(--sc-error) 25%, transparent); } 50% { outline-color: var(--sc-error); } }
+
+html body[data-skin]:not([data-skin="original"]) {
+  background: var(--sc-bg) !important;
+  color: var(--sc-text) !important;
+  padding: 0 !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+}
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] {
+  width: min(100%, 1240px) !important;
+  max-width: 1240px !important;
+  min-height: 100dvh !important;
+  height: auto !important;
+  margin: 0 auto;
+  padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)) !important;
+  display: grid !important;
+  grid-template-rows: auto 1fr auto !important;
+  align-content: start !important;
+  gap: 14px !important;
+  overflow: visible !important;
+}
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .v2-header {
+  height: auto !important;
+  min-height: 62px !important;
+  display: grid !important;
+  grid-template-columns: 1fr auto 1fr !important;
+  padding: 10px 12px !important;
+  gap: 12px !important;
+  border-radius: var(--sc-radius) !important;
+  background: var(--sc-surface) !important;
+  border: 1px solid var(--sc-border) !important;
+}
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .v2-brand img { width: 94px !important; height: 36px !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .v2-brand-title { color: var(--sc-text); letter-spacing: .09em; font-size: 11px; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .v2-brand-subtitle { color: var(--sc-muted); font-size: 10px; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .v2-tabs { display: grid !important; grid-template-columns: repeat(4,minmax(0,1fr)) !important; grid-column: auto !important; grid-row: auto !important; gap: 4px !important; padding: 0 !important; height: auto !important; width: auto !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .v2-tabs a { min-height: 42px !important; padding: 0 13px !important; font-size: 10px !important; border-radius: 6px !important; background: transparent !important; border-color: transparent !important; color: var(--sc-muted) !important; text-shadow: none !important; box-shadow: none !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .v2-tabs a[aria-current="page"] { color: var(--sc-text) !important; background: var(--sc-raised) !important; border-color: var(--sc-border) !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .v2-health { min-width: 0 !important; width: auto !important; max-width: none !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .v2-health-copy { width: auto !important; max-width: 160px !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .v2-health-label { font-size: 10px; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .v2-workspace { display: block !important; background: none !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .v2-workspace > .wrap {
+  width: 100% !important; max-width: none !important; min-height: 0 !important; height: auto !important; max-height: none !important;
+  padding: 0 !important; margin: 0 !important; border: 0 !important; border-radius: 0 !important; background: none !important; box-shadow: none !important;
+  display: grid !important; grid-template-columns: repeat(12,minmax(0,1fr)) !important; grid-template-rows: none !important;
+  gap: 12px !important; align-content: start !important; overflow: visible !important;
+}
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .wrap > * { min-width: 0; grid-column: 1 / -1; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .scene-cards, html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .display-stack {
+  grid-template-rows: auto !important; align-items: stretch !important; justify-content: stretch !important; min-height: 0 !important; flex: none !important;
+  width: 100% !important; max-width: none !important; height: auto !important;
+  display: grid !important; grid-template-columns: minmax(0,1.4fr) minmax(0,1fr) !important;
+  gap: 12px !important; margin: 0 !important; padding: 0 !important;
+}
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-card:is(.sc-current,.sc-next) {
+  position: relative !important; flex: none !important; isolation: isolate !important; overflow: hidden !important;
+  display: flex !important; flex-direction: column !important; align-items: stretch !important; justify-content: flex-start !important;
+  width: 100% !important; max-width: none !important; height: auto !important; min-height: var(--sc-card-height) !important;
+  margin: 0 !important; padding: 18px 22px !important; gap: 18px !important;
+  border: 1px solid var(--sc-border) !important; border-radius: var(--sc-radius) !important;
+  background: var(--sc-surface) !important; box-shadow: var(--sc-depth) !important;
+  color: var(--sc-text) !important; text-align: left !important; text-shadow: none !important;
+  transform: none !important; filter: none !important; animation: none !important;
+  outline: 2px solid transparent; outline-offset: 2px;
+}
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-next { background: var(--sc-next-surface) !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-card-header {
+  display: flex !important; align-items: flex-start; justify-content: space-between; flex-wrap: nowrap; gap: 12px;
+  position: relative; z-index: 2;
+}
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-card:is(.sc-current,.sc-next) .sc-role {
+  display: block !important; padding: 0 !important; margin: 3px 0 0 !important;
+  color: var(--sc-muted) !important; font: 750 10px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif !important;
+  letter-spacing: .14em !important; text-transform: uppercase; text-shadow: none !important;
+}
+/* Roles remain actual source text; transport information moves to the explicit badge. */
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-role::before, html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-role::after { content: none !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-time { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; flex-shrink: 0; min-width: 6ch; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-time-label { font: 700 8px/1.2 -apple-system,BlinkMacSystemFont,sans-serif; letter-spacing: .12em; color: var(--sc-muted); }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-time strong { color: var(--sc-text); font: 650 var(--sc-time-size)/1 ui-monospace,SFMono-Regular,Menlo,monospace; font-variant-numeric: tabular-nums; letter-spacing: -.04em; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-card:is(.sc-current,.sc-next) .sc-title {
+  display: block !important; align-self: stretch !important; flex: 1; min-height: 0 !important;
+  font-family: var(--sc-title-font) !important; font-size: clamp(28px,3.2vw,46px) !important; font-weight: var(--sc-title-weight) !important;
+  line-height: 1.08 !important; letter-spacing: -.035em !important; color: var(--sc-text) !important;
+  text-shadow: none !important; white-space: normal !important; word-break: normal !important; overflow-wrap: anywhere !important;
+  overflow: visible !important; text-overflow: clip !important; filter: none !important; animation: none !important;
+}
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-next .sc-title { font-size: clamp(23px,2.6vw,34px) !important; color: var(--sc-secondary) !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-source-time {
+  position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important;
+  overflow: hidden !important; clip: rect(0,0,0,0) !important; white-space: nowrap !important; border: 0 !important;
+}
+/* Arrangement contains both elapsed/remaining and start/duration: retain its full detail. */
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-module="arrangement"] .sc-source-time {
+  position: relative !important; width: auto !important; height: auto !important; margin: -6px 0 0 !important;
+  clip: auto !important; overflow: visible !important; white-space: normal !important;
+  font: 500 11px/1.5 ui-monospace,monospace !important; color: var(--sc-muted) !important;
+}
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-card-footer { display: flex; align-items: center; gap: 12px; position: relative; z-index: 2; min-height: 22px; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-state-badge { display: inline-flex; align-items: center; gap: 7px; padding: 4px 7px; border-radius: 4px; background: var(--sc-raised); color: var(--sc-muted); font: 800 9px/1.2 -apple-system,BlinkMacSystemFont,sans-serif; letter-spacing: .10em; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-state-badge::before { content: ''; width: 5px; height: 5px; background: currentColor; border-radius: 50%; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-channel { color: var(--sc-muted); opacity: .7; font: 600 8px/1.2 ui-monospace,monospace; letter-spacing: .09em; margin-left: auto; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-go-feedback { opacity: 0; color: var(--sc-go); font: 800 9px/1.2 ui-monospace,monospace; }
+/* The animated rail replaces the large original ambient/sweep layers. */
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-card::before { content: '' !important; display: block !important; position: absolute !important; inset: 0 auto 0 0 !important; width: 3px !important; height: auto !important; background: var(--sc-border) !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; filter: none !important; transform: none; opacity: 1 !important; animation: none !important; z-index: 1; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-card::after { content: '' !important; display: block !important; position: absolute !important; inset: auto 0 0 0 !important; height: 2px !important; width: 100% !important; background: var(--sc-go) !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; filter: none !important; opacity: 1 !important; visibility: hidden; animation: none !important; transform-origin: left; z-index: 1; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-current[data-ui-state="playing"]::before { background: var(--sc-playing) !important; animation: sc-live 2.8s ease-in-out infinite !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-current[data-ui-state="playing"] .sc-state-badge { color: var(--sc-playing); }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-current[data-ui-state="playing"] .sc-state-badge::before { animation: sc-live 2.8s ease-in-out infinite; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-current[data-ui-state="paused"]::before { background: var(--sc-paused) !important; animation: sc-live 2.3s ease-in-out infinite !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-current[data-ui-state="paused"] .sc-state-badge { color: var(--sc-paused); }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-current[data-ui-state="stopped"] .sc-state-badge { color: var(--sc-muted); }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-current[data-ui-state="offline"]::before { background: var(--sc-error) !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-current[data-ui-state="offline"] .sc-state-badge { color: var(--sc-error); }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-next::before { background: var(--sc-ready) !important; opacity: .4; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-next[data-ui-state="ready"]::before { opacity: 1; animation: sc-ready 1.65s ease-in-out infinite !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-next[data-ui-state="ready"] .sc-state-badge { color: var(--sc-ready); }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-next[data-ui-state="imminent"]::before { opacity: 1; animation: sc-ready 1.05s ease-in-out infinite !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-next[data-ui-state="imminent"] .sc-state-badge { color: var(--sc-ready); animation: sc-ready 1.05s ease-in-out infinite; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-next:is(.selection-pulse,.next-selected) { animation: sc-select .7s ease-in-out 2 !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-current.session-playing.session-recall-pulse::after { animation: sc-go 2s ease-out 1 !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-current.session-playing.session-recall-pulse .sc-go-feedback { animation: sc-label-flash 2s ease-out 1; }
+
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] button {
+  border: 1px solid var(--sc-border) !important; border-radius: 7px !important; background: var(--sc-raised) !important;
+  color: var(--sc-text) !important; text-shadow: none !important; box-shadow: none !important;
+  min-height: 48px !important; font: 750 12px/1.2 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif !important;
+  padding: 10px 12px !important; transition: border-color .15s,background .15s,transform .12s !important;
+}
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] button:hover:not(:disabled) { border-color: var(--sc-muted) !important; filter: brightness(1.1); }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] button:active:not(:disabled) { transform: translateY(1px); filter: brightness(1.2); }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] button:disabled { opacity: .4; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] :is(button,select,input,a):focus-visible { outline: 2px solid var(--sc-ready) !important; outline-offset: 3px !important; box-shadow: none !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] :is(.go-button,.big-go,.knob-button) { background: var(--sc-go) !important; color: #08140f !important; border-color: var(--sc-go) !important; font-size: 24px !important; font-weight: 850 !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .go-button .go-main { font-size: 28px !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .go-sub { font-size: 7px !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .stop-button { color: var(--sc-error) !important; background: color-mix(in srgb,var(--sc-error) 9%,var(--sc-surface)) !important; border-color: color-mix(in srgb,var(--sc-error) 45%,var(--sc-border)) !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] :is(.pause-button,.button-pause,.transport-toggle) { color: var(--sc-paused) !important; border-color: color-mix(in srgb,var(--sc-paused) 40%,var(--sc-border)) !important; background: var(--sc-raised) !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] :is(.pause-button.is-play,.button-pause.is-paused,.transport-toggle.transport-paused) { color: var(--sc-go) !important; border-color: color-mix(in srgb,var(--sc-go) 50%,var(--sc-border)) !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] :is(.goto-panel,.scene-select-panel,.transport-dock,.buttons-dock,.crossfader-section,.sc-locator>.card) { padding: 10px !important; margin: 0 !important; border: 1px solid var(--sc-border) !important; border-radius: var(--sc-radius) !important; background: var(--sc-surface) !important; box-shadow: none !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] select { min-width: 0 !important; width: 100%; max-width: 100%; min-height: 46px !important; background: var(--sc-bg) !important; color: var(--sc-text) !important; -webkit-text-fill-color: var(--sc-text) !important; border: 1px solid var(--sc-border) !important; border-radius: 6px !important; font: 600 12px/1.2 -apple-system,BlinkMacSystemFont,sans-serif !important; box-shadow: none !important; padding: 8px 30px 8px 12px !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] select option { color: var(--sc-text) !important; -webkit-text-fill-color: var(--sc-text) !important; background: var(--sc-bg); }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .grid { display: grid !important; grid-template-columns: 1fr 1fr 1.3fr 1fr 1fr !important; gap: 8px !important; margin: 0 !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .grid .go-button { grid-column: 3 !important; grid-row: 1 !important; min-height: 60px !important; order: 0 !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .grid button { height: auto !important; min-height: 60px !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .goto-panel { display: grid !important; grid-template-columns: minmax(0,1fr) auto !important; gap: 8px !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .advanced-options { border-top: 1px solid var(--sc-border); color: var(--sc-muted); }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .advanced-options summary { font-size: 11px; padding: 12px 0; min-height: 44px; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .advanced-options__content { padding: 4px 0 12px; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .session-skin-setting { padding: 8px 0 14px; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .v2-statusbar { display: flex !important; justify-content: flex-end; color: var(--sc-muted); font-size: 8px; min-height: 20px; }
+
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .ltc-display { display: flex !important; align-items: center; justify-content: space-between; gap: 14px; padding: 10px 14px !important; height: auto !important; min-height: 54px !important; background: var(--sc-surface) !important; border: 1px solid var(--sc-border) !important; border-radius: var(--sc-radius) !important; box-shadow: none !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .ltc-display__label { font-size: 9px !important; color: var(--sc-muted) !important; margin: 0 !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .ltc-display__value { font-size: clamp(20px,2.6vw,28px) !important; min-width: 0 !important; text-shadow: none !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .ltc-display--connected .ltc-display__value { color: var(--sc-ok) !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .ltc-display--disconnected .ltc-display__value { color: var(--sc-error) !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .ltc-display--connected .ltc-display__label::after { content: " · CONNECTÉ"; color: var(--sc-ok); }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .ltc-display--disconnected .ltc-display__label::after { content: " · ABSENT"; color: var(--sc-error); }
+
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-returns { display: grid !important; grid-template-columns: repeat(2,minmax(0,1fr)) !important; gap: 8px !important; max-height: none; overflow: visible; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-return { height: auto !important; min-height: 75px !important; padding: 10px 12px !important; background: var(--sc-surface) !important; border: 1px solid var(--sc-border) !important; border-radius: 7px !important; box-shadow: none !important; animation: none !important; transform: none !important; outline: 1px solid transparent; outline-offset: 1px; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-return-heading { height: auto; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-return-console { font-size: 12px !important; letter-spacing: .1em !important; line-height: 18px; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-return-memory { font-size: 16px; line-height: 18px; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-return-main-title { color: var(--sc-secondary); font-size: 11px; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-return-state { position: relative; width: auto; height: auto; clip: auto; margin: 5px 0 0; overflow: visible !important; white-space: normal; color: var(--sc-muted); font: 650 9px/1.3 -apple-system,BlinkMacSystemFont,sans-serif; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-return.state-confirmed { animation: sc-midi .65s ease-out 1 !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-return.state-confirmed .midi-return-state { color: var(--sc-ok); }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-return.state-loaded .midi-return-state, html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-return.state-idle:not(.device-unavailable) .midi-return-state { font-size: 0; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-return.state-loaded .midi-return-state::after { content: "✓ MÉMORISÉ"; font-size: 9px; color: var(--sc-ok); }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-return.state-idle:not(.device-unavailable) .midi-return-state::after { content: "AU REPOS"; font-size: 9px; color: var(--sc-muted); }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-return.state-waiting .midi-return-state { color: var(--sc-paused); }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-return.state-mismatch { animation: sc-error .75s ease-in-out infinite !important; border-color: var(--sc-error) !important; border-style: dashed !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-return.state-timeout { border-color: var(--sc-error) !important; border-style: dashed !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-return:is(.state-mismatch,.state-timeout) .midi-return-state { color: var(--sc-error); }
+/* Keep both JS animations: their light is confined to a rail, never the text. */
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-return .global-recall-overlay { inset: auto 0 0 !important; height: 3px !important; border-radius: 0 !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-return .recall-sweep-overlay { top: auto !important; bottom: 0 !important; height: 5px !important; width: 6% !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-return.state-waiting.recall-pulse::after { top: auto !important; bottom: 0 !important; height: 2px !important; }
+
+/* A/B uses the same card components and retains the original fader controls. */
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-module="ab"] .deck-screen { display: block !important; flex: none !important; overflow: visible !important; min-height: 0 !important; padding: 0 !important; border: 0 !important; background: none !important; box-shadow: none !important; grid-column: 1/-1 !important; grid-row: auto !important; height: auto !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-module="ab"] .arrow { display: none !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-module="ab"] .counter { grid-column: 1/-1; font: 11px ui-monospace,monospace !important; color: var(--sc-muted) !important; padding: 0; height: auto; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-module="ab"] .scene-select-panel { grid-column: 1/-1 !important; grid-row: auto !important; height: auto !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-module="ab"] .transport-dock { grid-column: 1/8 !important; grid-row: 3 !important; height: auto !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-module="ab"] .buttons-dock { grid-column: 8/-1 !important; grid-row: 3 !important; height: auto !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .transport-row, html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .buttons-row { display: grid !important; grid-template-columns: 1fr 1fr !important; gap: 8px !important; height: auto !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .transport-row > button { height: auto !important; min-height: 54px !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-module="ab"] .crossfader-section { width: 100% !important; max-width: none !important; height: auto !important; grid-column: 1/-1 !important; grid-row: auto !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .crossfader-label { display: block !important; color: var(--sc-muted) !important; font-size: 9px !important; letter-spacing: .12em; text-align: left; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .crossfader-position { display: block !important; color: var(--sc-text) !important; font: 750 15px ui-monospace,monospace !important; text-align: right; margin-top: -13px; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .slider-panel { width: 100% !important; max-width: none !important; height: auto !important; background: none !important; border: 0 !important; box-shadow: none !important; padding: 10px 6px 0 !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] #xfader { height: 44px !important; width: 100%; background: none !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] #xfader::-webkit-slider-runnable-track { height: 5px; border-radius: 2px; background: linear-gradient(90deg,var(--sc-ready),var(--sc-border) 50%,var(--sc-playing)); box-shadow: none; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] #xfader::-webkit-slider-thumb { width: 24px !important; height: 36px !important; margin-top: -15px !important; border-radius: 4px !important; border: 2px solid var(--sc-muted) !important; background: var(--sc-text) !important; box-shadow: 0 3px 8px #0006 !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .slider-panel .row { color: var(--sc-muted); margin-top: 4px !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-ui-deck="a"] .button-a, html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-ui-deck="b"] .button-b { border-color: var(--sc-ready) !important; background: color-mix(in srgb,var(--sc-ready) 12%,var(--sc-surface)) !important; color: var(--sc-ready) !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-ui-deck="a"] .button-a::after, html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-ui-deck="b"] .button-b::after { content: " · ACTIF"; font-size: 9px; }
+
+/* Arrangement: let its existing groups share the twelve-column workspace. */
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-module="arrangement"] .main, html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-module="arrangement"] .sc-conduite, html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-module="arrangement"] .sc-locator { display: contents !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-module="arrangement"] .sc-current { grid-column: 1/8 !important; grid-row: 2 !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-module="arrangement"] .sc-next { grid-column: 8/-1 !important; grid-row: 2 !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-module="arrangement"] .ltc-display { grid-row: 3 !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-module="arrangement"] .big-go { grid-column: 1/4 !important; grid-row: 4 !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-module="arrangement"] .grid2 { grid-column: 4/8 !important; grid-row: 4 !important; margin: 0 !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-module="arrangement"] .transport-row { grid-column: 8/-1 !important; grid-row: 4 !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-module="arrangement"] .sc-locator > .card { grid-column: 1/-1 !important; grid-row: 5 !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-module="arrangement"] .advanced-options { grid-row: 6 !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .arrangement-indicator { height: auto !important; min-height: 54px !important; padding: 7px !important; background: var(--sc-surface) !important; color: var(--sc-muted) !important; border: 1px solid var(--sc-border) !important; border-radius: 7px; box-shadow: none !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .arrangement-indicator strong { font-size: 9px; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .arrangement-indicator small { font-size: 8px; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .select-row { grid-template-columns: minmax(0,1fr) auto !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-locator .label { font-size: 9px !important; color: var(--sc-muted) !important; }
+
+@media (max-width: 1000px) {
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .v2-header { grid-template-columns: 1fr auto !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .v2-tabs { display: grid !important; grid-template-columns: repeat(4,minmax(0,1fr)) !important; grid-column: 1/-1 !important; grid-row: 2 !important; width: 100% !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .v2-tabs a { flex: 1; padding: 0 8px !important; min-width: 0 !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .v2-brand-copy { display: block; }
+}
+@media (max-width: 600px) {
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] { padding: max(8px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left)) !important; gap: 10px !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .v2-header { padding: 8px !important; gap: 8px !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .v2-brand-copy { display: none; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .v2-health-detail { display: none; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .v2-workspace > .wrap { display: flex !important; flex-direction: column !important; gap: 10px !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .scene-cards, html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .display-stack {
+  grid-template-rows: auto !important; grid-template-columns: minmax(0,1fr) !important; gap: 10px !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-card:is(.sc-current,.sc-next) { min-height: 170px !important; padding: 15px 17px !important; gap: 14px !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-card.sc-next { min-height: 136px !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-card:is(.sc-current,.sc-next) .sc-title { font-size: 30px !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-next .sc-title { font-size: 24px !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-time strong { font-size: 22px; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .grid { grid-template-columns: 1fr 1fr !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .grid .go-button { grid-column: 1/-1 !important; grid-row: 1 !important; min-height: 64px !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .grid button { min-height: 50px !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .goto-panel { grid-template-columns: 1fr !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .ltc-display { gap: 8px; padding: 10px !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .ltc-display__label { max-width: 90px; line-height: 1.5; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-return { padding: 9px !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-module="arrangement"] .main { display: flex !important; flex-direction: column; gap: 10px; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-module="arrangement"] .sc-conduite { display: flex !important; flex-direction: column; gap: 10px !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-module="arrangement"] .sc-locator { display: block !important; }
+}
+@media (orientation: landscape) and (max-height: 500px) and (min-width: 601px) {
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .v2-header { grid-template-columns: 110px minmax(0,1fr) 130px !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .v2-brand-copy { display: none; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .v2-tabs { display: grid !important; grid-template-columns: repeat(4,minmax(0,1fr)) !important; grid-column: 2 !important; grid-row: 1 !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .v2-health-detail { display: none; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-card:is(.sc-current,.sc-next) { min-height: 165px !important; padding: 14px 16px !important; gap: 12px !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-card:is(.sc-current,.sc-next) .sc-title { font-size: 29px !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-next .sc-title { font-size: 24px !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-module="session"] .scene-cards { grid-row: 1 !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-module="session"] .midi-returns { grid-row: 2 !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-module="session"] .ltc-display { grid-column: 1/5 !important; grid-row: 3 !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-module="session"] .grid { grid-column: 5/-1 !important; grid-row: 3 !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-module="session"] .ltc-display { flex-direction: column; justify-content: center; gap: 4px; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-module="session"] .goto-panel { grid-row: 4 !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module][data-module="session"] .advanced-options { grid-row: 5 !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .grid button { font-size: 10px !important; padding: 5px !important; }
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .go-sub { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Preserve information with the lit rail/badge and short one-shot feedback. */
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-current[data-ui-state="playing"]::before,
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-current[data-ui-state="paused"]::before,
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-next[data-ui-state="ready"]::before,
+  html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-next[data-ui-state="imminent"]::before { animation-duration: 6s !important; }
+}
+
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-next.state-paused .sc-title { color: var(--sc-muted) !important; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-next.state-paused::before { background: var(--sc-muted) !important; }
+html body.v2-energy-saver[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-card,
+html body.v2-energy-saver[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-card::before,
+html body.v2-energy-saver[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-card::after,
+html body.v2-energy-saver[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-state-badge,
+html body.v2-energy-saver[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-state-badge::before { animation-play-state: paused !important; }
+
+/* Shared legibility also overrides legacy Arrangement descendant rules. */
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .arrangement-indicator small { color: var(--sc-muted) !important; line-height: 1.4; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-return-heading { display: flex !important; align-items: baseline; justify-content: space-between; gap: 12px; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-return-heading strong { margin-left: auto; }
+html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] input[type="range"]::-webkit-slider-runnable-track { background: var(--sc-raised) !important; box-shadow: none !important; }
+@media (max-width: 600px) { html body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .v2-tabs a { font-size: 9px !important; padding: 0 4px !important; min-height: 44px !important; } }
+
+
+/* CL_DESKTOP_REMOTE_SCROLL_V1
+   Fenêtre native Show Control : ne pas appliquer le verrouillage vertical mobile.
+*/
+html[data-desktop-remote="1"],
+html[data-desktop-remote="1"] body {
+  height: auto !important;
+  min-height: 100% !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+html[data-desktop-remote="1"] .v2-app {
+  height: auto !important;
+  min-height: 100vh !important;
+  overflow: visible !important;
+}
+
+html[data-desktop-remote="1"] .v2-workspace,
+html[data-desktop-remote="1"] .v2-workspace > .wrap {
+  height: auto !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+}
+
+html[data-desktop-remote="1"] .advanced-options[open] {
+  overflow: visible !important;
+}

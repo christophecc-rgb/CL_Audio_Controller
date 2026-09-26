@@ -1,0 +1,37 @@
+/* paradis-gold: palette and finishing only; shared state/layout rules remain authoritative. */
+html body[data-skin="paradis-gold"] {
+  --sc-paused: #f6c274;
+  --sc-error: #ffa6a0;
+  --sc-ok: #94e4b0;
+  --sc-title-font: Georgia,'Times New Roman',serif;
+  --sc-title-weight: 600;
+  --sc-time-size: 28px;
+  --sc-card-height: 235px;
+  --sc-depth: none;
+  --skin-flow-alpha: .5;
+  --skin-go-text: #2c1216;
+  --skin-go-shadow: inset 0 2px 0 #fff8,0 2px 0 #80502b,0 5px 10px #0004;
+  --sc-bg: #19090c;
+  --sc-surface: #30131a;
+  --sc-next-surface: #23191b;
+  --sc-raised: #49252c;
+  --sc-text: #fff2de;
+  --sc-secondary: #e4ccb0;
+  --sc-muted: #cdb69c;
+  --sc-border: #8c6849;
+  --sc-radius: 14px;
+  --sc-playing: #eed39a;
+  --sc-ready: #cfbca0;
+  --sc-go: #efcd8c;
+  --skin-current: #531c29;
+  --skin-flow: #e9c77f;
+}
+html[data-cl-skin] body[data-skin][data-skin="paradis-gold"] .v2-app[data-module] .sc-card-header { border-bottom:1px solid #c6a26166; }
+html[data-cl-skin] body[data-skin][data-skin="paradis-gold"] .v2-app[data-module] .sc-card.sc-current[data-ui-state="playing"] { box-shadow:inset 0 0 0 2px #edcf8b18,inset 0 -22px 45px #1c060b55 !important; }
+html[data-cl-skin] body[data-skin][data-skin="paradis-gold"] .v2-app[data-module] .sc-role { letter-spacing:.2em !important; }
+html[data-cl-skin] body[data-skin][data-skin="paradis-gold"] .v2-app[data-module] .sc-time strong { color:#f2dba8 !important; }
+html[data-cl-skin] body[data-skin][data-skin="paradis-gold"] .v2-app[data-module] .sc-next .sc-title { font-weight:500 !important; }
+html[data-cl-skin] body[data-skin][data-skin="paradis-gold"] .v2-app[data-module] .sc-state-badge { border:1px solid #b59a6570; border-radius:3px; }
+html[data-cl-skin] body[data-skin="paradis-gold"][data-go-relief="default"] .v2-app[data-module] :is(.go-button,#abSceneConfirm,#goBtn) { background:linear-gradient(180deg,#fff1cf,#efd094 46%,#d4a35d) !important; }
+html[data-cl-skin] body[data-skin][data-skin="paradis-gold"] .v2-app[data-module] .cl-arr-xfader-test { background:var(--sc-surface) !important; border-color:var(--sc-border); }
+html[data-cl-skin] body[data-skin][data-skin="paradis-gold"] .v2-app[data-module] .cl-arr-xfader-test-title, html[data-cl-skin] body[data-skin][data-skin="paradis-gold"] .v2-app[data-module] .cl-arr-xfader-test-state { color:var(--sc-muted); }

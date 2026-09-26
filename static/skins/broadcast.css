@@ -1,0 +1,28 @@
+/* broadcast — independent palette and visual identity. */
+html body[data-skin="broadcast"] {
+  --sc-paused: #ffc76b;
+  --sc-error: #ff9e99;
+  --sc-ok: #8be4ac;
+  --sc-title-font: -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --sc-title-weight: 800;
+  --sc-time-size: 34px;
+  --sc-card-height: 235px;
+  --sc-depth: none;
+  --skin-go-text: #101619;
+  --skin-flow-alpha: .38;
+  --skin-go-shadow: none;
+  --sc-bg: #050608;
+  --sc-surface: #121820;
+  --sc-next-surface: #073657;
+  --sc-raised: #263646;
+  --sc-text: #ffffff;
+  --sc-secondary: #ffffff;
+  --sc-muted: #b8cbdb;
+  --sc-border: #728ca3;
+  --sc-radius: 2px;
+  --sc-playing: #ffe054;
+  --sc-ready: #7edbff;
+  --sc-go: #ffe054;
+  --skin-current: #373009;
+  --skin-flow: #fff1a3;
+}

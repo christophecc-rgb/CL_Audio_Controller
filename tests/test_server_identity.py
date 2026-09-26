@@ -1,6 +1,7 @@
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import sys
 import unittest
@@ -73,8 +74,12 @@ class ContextResponse:
 class ServerIdentityTests(unittest.TestCase):
     def test_midi_network_assistant_button_uses_existing_launcher_and_accessible_matte_red_style(self):
         source = (PROJECT_ROOT / "launcher_control.py").read_text(encoding="utf-8")
-        self.assertIn(">CL MIDI Network Manager</button>", source)
-        self.assertIn('aria-label="Ouvrir CL MIDI Network Manager"', source)
+        page = launcher.app.test_client().get("/").get_data(as_text=True)
+        button = re.search(r'<button\b[^>]*id="consoleManager"[^>]*>(.*?)</button>', page, re.S)
+        self.assertIsNotNone(button)
+        self.assertIn("midi-assistant-button", button.group(0))
+        self.assertIn("runAction('/midi-network-assistant'", button.group(0))
+        self.assertIn("CL MIDI NETWORK MANAGER", button.group(1).strip().upper())
         self.assertIn(".midi-assistant-button:focus-visible", source)
         self.assertIn("background:#8f3f3f", source)
         self.assertIn('find_midi_network_assistant()', source)
@@ -533,7 +538,7 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
     def test_panel_integrates_the_published_midi_console_state(self):
         page = launcher.app.test_client().get("/").get_data(as_text=True)
 
-        self.assertIn("MIDI &amp; CONSOLES", page)
+        self.assertIn("CONSOLES / RETOURS PROGRAM CHANGE", page)
         self.assertIn("CONFIGURATION CONSOLES", page)
 
         # Passe 3 : la surface Show consomme désormais devices[] et construit
@@ -546,7 +551,17 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
         # La couche historique reste disponible en compatibilité.
         self.assertIn("s.midi_console", page)
 
-        self.assertIn("consoleSignatures", page)
+        for marker in (
+            "devices=showDevicesForState(s)", "renderConsoleHealth(s,devices)",
+            "renderConsoleDiagnostic(card,item,offsets)",
+            'id="consoleHealth"', 'role="status"',
+            "health.title", "health.detail", "value.expected_midi_program",
+            "value.returned_midi_program", "device.id==='console_a'?'cl5'",
+            "device.id==='console_b'?'ql1'", "consoleAge(stamp,now)",
+            "age>CONSOLE_RETURN_FRESH_SECONDS", "beforeIntent",
+            "Attendu (Ableton)", "Reçu (Retour)",
+        ):
+            self.assertIn(marker, page)
         self.assertIn("s.ltc_connected", page)
         self.assertIn("setInterval(refreshTelemetry,100)", page)
         self.assertIn("ABLETON LOCAL", page)

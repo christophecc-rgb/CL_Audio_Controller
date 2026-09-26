@@ -1,0 +1,28 @@
+/* theatre — independent palette and visual identity. */
+html body[data-skin="theatre"] {
+  --sc-paused: #ffc76b;
+  --sc-error: #ff9e99;
+  --sc-ok: #8be4ac;
+  --sc-title-font: Georgia,'Times New Roman',serif;
+  --sc-title-weight: 600;
+  --sc-time-size: 28px;
+  --sc-card-height: 235px;
+  --sc-depth: 0 12px 30px #0005;
+  --skin-go-text: #101619;
+  --skin-flow-alpha: .65;
+  --skin-go-shadow: inset 0 2px 0 #fff7,0 3px 0 #704918,0 8px 16px #0005;
+  --sc-bg: #15070c;
+  --sc-surface: #2c111b;
+  --sc-next-surface: #21191a;
+  --sc-raised: #49242b;
+  --sc-text: #fff0d7;
+  --sc-secondary: #ecd8ba;
+  --sc-muted: #cfb296;
+  --sc-border: #956746;
+  --sc-radius: 18px;
+  --sc-playing: #f7ba62;
+  --sc-ready: #e6bf87;
+  --sc-go: #e9b66a;
+  --skin-current: #421621;
+  --skin-flow: #e2a957;
+}

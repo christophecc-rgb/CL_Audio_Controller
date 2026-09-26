@@ -1,0 +1,37 @@
+/* paradis-white: palette and finishing only; shared state/layout rules remain authoritative. */
+html body[data-skin="paradis-white"] {
+  --sc-paused: #f6c274;
+  --sc-error: #ffa6a0;
+  --sc-ok: #94e4b0;
+  --sc-title-font: -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --sc-title-weight: 850;
+  --sc-time-size: 28px;
+  --sc-card-height: 235px;
+  --sc-depth: none;
+  --skin-flow-alpha: .22;
+  --skin-go-text: #2c1216;
+  --skin-go-shadow: none;
+  --sc-bg: #240710;
+  --sc-surface: #3d101c;
+  --sc-next-surface: #2b111a;
+  --sc-raised: #591d2b;
+  --sc-text: #fff9f7;
+  --sc-secondary: #f0dce0;
+  --sc-muted: #d7b7bd;
+  --sc-border: #a56371;
+  --sc-radius: 6px;
+  --sc-playing: #fff2ed;
+  --sc-ready: #e0b9c2;
+  --sc-go: #fff4ef;
+  --skin-current: #fff4ef;
+  --skin-flow: #b6475c;
+}
+html[data-cl-skin] body[data-skin][data-skin="paradis-white"] .v2-app[data-module] .sc-card.sc-current[data-ui-state="playing"] :is(.sc-title,.sc-role,.sc-time strong,.sc-time-label,.sc-source-time,.sc-channel) { color:#551426 !important; text-shadow:none !important; }
+html[data-cl-skin] body[data-skin][data-skin="paradis-white"] .v2-app[data-module] .sc-current[data-ui-state="playing"] .sc-state-badge { background:#721a30; color:#fff9f6 !important; border-radius:2px; }
+html[data-cl-skin] body[data-skin][data-skin="paradis-white"] .v2-app[data-module] .sc-current[data-ui-state="playing"] .sc-card-header { border-bottom:2px solid #902b4255; }
+html[data-cl-skin] body[data-skin][data-skin="paradis-white"] .v2-app[data-module] .sc-current[data-ui-state="playing"]::before { background:#a82e49 !important; }
+html[data-cl-skin] body[data-skin][data-skin="paradis-white"] .v2-app[data-module] .sc-title { letter-spacing:-.04em !important; }
+html[data-cl-skin] body[data-skin][data-skin="paradis-white"] .v2-app[data-module] .sc-next .sc-role { letter-spacing:.18em !important; }
+html[data-cl-skin] body[data-skin="paradis-white"][data-go-relief="default"] .v2-app[data-module] :is(.go-button,#abSceneConfirm,#goBtn) { background:linear-gradient(135deg,#fffaf6 55%,#f1cbd1) !important; }
+html[data-cl-skin] body[data-skin][data-skin="paradis-white"] .v2-app[data-module] .cl-arr-xfader-test { background:var(--sc-surface) !important; border-color:var(--sc-border); }
+html[data-cl-skin] body[data-skin][data-skin="paradis-white"] .v2-app[data-module] .cl-arr-xfader-test-title, html[data-cl-skin] body[data-skin][data-skin="paradis-white"] .v2-app[data-module] .cl-arr-xfader-test-state { color:var(--sc-muted); }

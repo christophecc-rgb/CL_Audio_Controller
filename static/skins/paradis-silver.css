@@ -1,0 +1,37 @@
+/* paradis-silver: palette and finishing only; shared state/layout rules remain authoritative. */
+html body[data-skin="paradis-silver"] {
+  --sc-paused: #f6c274;
+  --sc-error: #ffa6a0;
+  --sc-ok: #94e4b0;
+  --sc-title-font: -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --sc-title-weight: 780;
+  --sc-time-size: 30px;
+  --sc-card-height: 235px;
+  --sc-depth: none;
+  --skin-flow-alpha: .5;
+  --skin-go-text: #2c1216;
+  --skin-go-shadow: inset 0 1px 0 #fff,0 2px 0 #616b78;
+  --sc-bg: #140c12;
+  --sc-surface: #251b25;
+  --sc-next-surface: #191e28;
+  --sc-raised: #382c38;
+  --sc-text: #f6f7fb;
+  --sc-secondary: #d7dfe9;
+  --sc-muted: #b6bfce;
+  --sc-border: #768391;
+  --sc-radius: 4px;
+  --sc-playing: #e6edf7;
+  --sc-ready: #b5c8dd;
+  --sc-go: #e1e7f0;
+  --skin-current: #4e1628;
+  --skin-flow: #d4e5f8;
+}
+html[data-cl-skin] body[data-skin][data-skin="paradis-silver"] .v2-app[data-module] .sc-card-header { border-bottom:1px solid #c5d1df66; }
+html[data-cl-skin] body[data-skin][data-skin="paradis-silver"] .v2-app[data-module] .sc-time { border-left:2px solid #d6e0ec; padding-left:10px; }
+html[data-cl-skin] body[data-skin][data-skin="paradis-silver"] .v2-app[data-module] .sc-role { font-family:ui-monospace,Menlo,monospace !important; letter-spacing:.14em !important; }
+html[data-cl-skin] body[data-skin][data-skin="paradis-silver"] .v2-app[data-module] .sc-card.sc-current[data-ui-state="playing"] { box-shadow:inset 0 1px 0 #fff5,inset 0 -1px 0 #0009 !important; }
+html[data-cl-skin] body[data-skin][data-skin="paradis-silver"] .v2-app[data-module] .sc-state-badge { border:1px solid #d6e0ec77; border-radius:0; }
+html[data-cl-skin] body[data-skin][data-skin="paradis-silver"] .v2-app[data-module] .v2-header { background-image:linear-gradient(110deg,transparent,#ffffff08,transparent); }
+html[data-cl-skin] body[data-skin="paradis-silver"][data-go-relief="default"] .v2-app[data-module] :is(.go-button,#abSceneConfirm,#goBtn) { background:linear-gradient(175deg,#fff,#c4cbd6 45%,#eef3fa 51%,#aeb8c6) !important; }
+html[data-cl-skin] body[data-skin][data-skin="paradis-silver"] .v2-app[data-module] .cl-arr-xfader-test { background:var(--sc-surface) !important; border-color:var(--sc-border); }
+html[data-cl-skin] body[data-skin][data-skin="paradis-silver"] .v2-app[data-module] .cl-arr-xfader-test-title, html[data-cl-skin] body[data-skin][data-skin="paradis-silver"] .v2-app[data-module] .cl-arr-xfader-test-state { color:var(--sc-muted); }

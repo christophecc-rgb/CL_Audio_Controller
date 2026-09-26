@@ -1,0 +1,28 @@
+/* show-control — independent palette and visual identity. */
+html body[data-skin="show-control"] {
+  --sc-paused: #ffc76b;
+  --sc-error: #ff9e99;
+  --sc-ok: #8be4ac;
+  --sc-title-font: ui-monospace,'SFMono-Regular',Menlo,monospace;
+  --sc-title-weight: 800;
+  --sc-time-size: 32px;
+  --sc-card-height: 235px;
+  --sc-depth: none;
+  --skin-go-text: #101619;
+  --skin-flow-alpha: .65;
+  --skin-go-shadow: none;
+  --sc-bg: #031518;
+  --sc-surface: #07282e;
+  --sc-next-surface: #18223b;
+  --sc-raised: #16424b;
+  --sc-text: #e9ffff;
+  --sc-secondary: #d2edff;
+  --sc-muted: #9bc4cb;
+  --sc-border: #347c87;
+  --sc-radius: 4px;
+  --sc-playing: #61e6f3;
+  --sc-ready: #c6b5ff;
+  --sc-go: #9ff28a;
+  --skin-current: #063842;
+  --skin-flow: #64e7f4;
+}

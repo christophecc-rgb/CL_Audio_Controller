@@ -1,0 +1,1364 @@
+/* Shared presentation options. Original's default palette/geometry is untouched. */
+.cl-visual-settings { margin:12px 0; padding:14px; border:1px solid #718396; border-radius:10px; background:#151e29; color:#eef5fc; min-width:0; }
+.cl-visual-settings legend { padding:0 6px; font:700 13px/1.4 system-ui,sans-serif; }
+html body .v2-app[data-module] .cl-visual-settings .session-skin-setting { display:grid; grid-template-columns:minmax(120px,1fr) minmax(140px,1.6fr); align-items:center; gap:12px; margin:8px 0; }
+html body .v2-app[data-module] .cl-visual-settings label { color:#e2edf7; font:600 12px/1.4 system-ui,sans-serif; }
+html body .v2-app[data-module] .cl-visual-settings select { width:100% !important; min-width:0 !important; min-height:44px !important; height:auto !important; padding:10px !important; font:600 14px/1.4 system-ui,sans-serif !important; background:#0c131d !important; color:#f3f8ff !important; border:1px solid #7e92a7 !important; border-radius:6px !important; }
+html body .v2-app[data-module] .cl-visual-settings .cl-visual-reset { min-height:44px !important; width:auto; padding:10px !important; margin-top:8px; font:600 12px/1.4 system-ui,sans-serif !important; color:#f0f6ff !important; background:#314359 !important; }
+.cl-visual-settings p { font:11px/1.5 system-ui,sans-serif; color:#bdcedf; margin:12px 0 0; }
+@media(max-width:480px) { html body .v2-app[data-module] .cl-visual-settings .session-skin-setting { grid-template-columns:1fr; gap:4px; } }
+/* Allow the open preferences panel to remain reachable, including desktop A/B. */
+html:has(.cl-visual-settings):has(.advanced-options[open]),
+html body:has(.cl-visual-settings):has(.advanced-options[open]) { height:auto !important; overflow-y:auto !important; }
+html body:has(.advanced-options[open]) .v2-app[data-module],
+html body:has(.advanced-options[open]) .v2-workspace,
+html body:has(.advanced-options[open]) .v2-workspace > .wrap { height:auto !important; max-height:none !important; overflow:visible !important; }
+/* Modern skins share state semantics, not palettes. */
+html[data-cl-skin] body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-card.sc-current[data-ui-state] { background:var(--skin-current) !important; border-color:var(--sc-playing) !important; }
+html[data-cl-skin] body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-card.sc-next { background:var(--sc-next-surface) !important; border-color:var(--sc-ready) !important; }
+html[data-cl-skin] body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-card.sc-current > * { position:relative; z-index:2; }
+html[data-cl-skin] body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-current .cl-current-flow-layer { display:block !important; position:absolute !important; inset:0 auto 0 -10% !important; width:120% !important; pointer-events:none; z-index:1 !important; opacity:var(--skin-flow-alpha); background:linear-gradient(115deg,transparent 5%,color-mix(in srgb,var(--skin-flow) 10%,transparent) 30%,color-mix(in srgb,var(--skin-flow) 48%,transparent) 50%,transparent 85%); }
+html[data-cl-skin] body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-card.sc-current[data-ui-state="paused"] { background:color-mix(in srgb,var(--sc-paused) 14%,var(--sc-surface)) !important; border-color:var(--sc-paused) !important; }
+html[data-cl-skin] body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-current[data-ui-state="paused"] .cl-current-flow-layer { background:linear-gradient(115deg,transparent 5%,color-mix(in srgb,var(--sc-paused) 36%,transparent) 50%,transparent 85%); }
+html[data-cl-skin] body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-card.sc-current[data-ui-state="stopped"] { background:var(--sc-surface) !important; border-color:var(--sc-muted) !important; }
+html[data-cl-skin] body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-current[data-ui-state="stopped"] .cl-current-flow-layer { opacity:.15; }
+html[data-cl-skin] body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-card.sc-current[data-ui-state="offline"] { background:#22262b !important; border-color:#737d89 !important; box-shadow:none !important; }
+html[data-cl-skin] body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-current[data-ui-state="offline"] .sc-state-badge { color:#c1c8d2 !important; }
+html[data-cl-skin] body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-current[data-ui-state="paused"]::before, html[data-cl-skin] body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-current[data-ui-state="paused"] .sc-state-badge::before { animation:none !important; }
+html[data-cl-skin] body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-current[data-ui-state="offline"]::before { background:#737d89 !important; }
+html[data-cl-skin] body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-next[data-ui-state="ready"]::before, html[data-cl-skin] body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .sc-next[data-ui-state="imminent"]::before { animation-duration:4s !important; }
+html[data-cl-skin] body[data-skin]:not([data-skin="original"]) .v2-app[data-module] :is(.go-button,#abSceneConfirm,#goBtn) { background:var(--sc-go) !important; color:var(--skin-go-text) !important; border-color:var(--sc-go) !important; border-radius:var(--sc-radius) !important; box-shadow:var(--skin-go-shadow) !important; }
+html[data-cl-skin] body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-return[data-device-id="console_a"] { --console-text:#ff9dd9 !important; --console-accent:#ed56b6 !important; }
+html[data-cl-skin] body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-return[data-device-id="console_b"] { --console-text:#88e9fa !important; --console-accent:#37cce9 !important; }
+html[data-cl-skin] body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-return[data-device-id] { background:color-mix(in srgb,var(--console-accent) 12%,var(--sc-surface)) !important; border-color:var(--console-accent) !important; box-shadow:inset 3px 0 0 var(--console-accent) !important; animation:none !important; }
+html[data-cl-skin] body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-return[data-device-id]::before, html[data-cl-skin] body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-return[data-device-id]::after { animation:none !important; }
+html[data-cl-skin] body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-return :is(.global-recall-overlay,.recall-sweep-overlay) { display:none !important; }
+/* Identity beyond hue: square broadcast, theatre typography, technical grid, neon glow. */
+html body[data-skin="broadcast"] .v2-app[data-module] .sc-current[data-ui-state="playing"] .sc-state-badge { background:#ffe054; color:#121212 !important; border-radius:0; }
+html body[data-skin="broadcast"] .v2-app[data-module] .sc-card-header { border-bottom:2px solid var(--sc-border); padding-bottom:12px; }
+html body[data-skin="theatre"] .v2-app[data-module] .sc-card-header { border-bottom:1px solid #b08a5055; padding-bottom:10px; }
+html body[data-skin="theatre"] .v2-app[data-module] .sc-role { letter-spacing:.23em !important; }
+html body[data-skin="show-control"] .v2-app[data-module] .sc-card-footer { border-top:1px solid #4cc1ce66; padding-top:12px; }
+html body[data-skin="show-control"] .v2-app[data-module] .sc-time { border-left:3px solid var(--sc-playing); padding-left:14px; }
+html body[data-skin="show-control"] .v2-app[data-module] .v2-header { background-image:linear-gradient(90deg,#63ddea09 1px,transparent 1px); background-size:16px 100%; }
+html[data-cl-skin] body[data-skin="neon"] .v2-app[data-module] .sc-card.sc-current[data-ui-state="playing"] { box-shadow:inset 0 0 32px #a57fff18,0 0 22px #7b52ff36 !important; }
+html body[data-skin="neon"] .v2-app[data-module] .sc-state-badge { border:1px solid currentColor; border-radius:20px; }
+/* Optional user overrides, higher specificity than legacy Original experiments. */
+html[data-cl-skin] body[data-skin][data-flow-intensity="low"] .v2-app[data-module] .sc-current.sc-current[data-ui-state] .cl-current-flow-layer { opacity:.25 !important; }
+html[data-cl-skin] body[data-skin][data-flow-intensity="medium"] .v2-app[data-module] .sc-current.sc-current[data-ui-state] .cl-current-flow-layer { opacity:.6 !important; }
+html[data-cl-skin] body[data-skin][data-flow-intensity="high"] .v2-app[data-module] .sc-current.sc-current[data-ui-state] .cl-current-flow-layer { opacity:1 !important; }
+html[data-cl-skin] body[data-skin] .v2-app[data-module] { --visual-flow-color:var(--skin-flow,#e5c88e); }
+html[data-cl-skin] body[data-skin][data-current-style="sober"] .v2-app[data-module] .sc-current.sc-current[data-ui-state] .cl-current-flow-layer { background:linear-gradient(110deg,transparent 20%,color-mix(in srgb,var(--visual-flow-color) 20%,transparent) 50%,transparent 80%) !important; filter:none !important; }
+html[data-cl-skin] body[data-skin][data-current-style="halo"] .v2-app[data-module] .sc-current.sc-current[data-ui-state] .cl-current-flow-layer { background:radial-gradient(ellipse at center,color-mix(in srgb,var(--visual-flow-color) 65%,transparent),transparent 72%) !important; filter:blur(8px) !important; }
+html[data-cl-skin] body[data-skin][data-current-style="wave"] .v2-app[data-module] .sc-current.sc-current[data-ui-state] .cl-current-flow-layer { background:radial-gradient(ellipse at 40% 80%,color-mix(in srgb,var(--visual-flow-color) 55%,transparent),transparent 65%),linear-gradient(115deg,transparent 20%,color-mix(in srgb,var(--visual-flow-color) 25%,transparent) 60%,transparent 85%) !important; filter:blur(3px) !important; }
+html[data-cl-skin] body[data-skin][data-current-style="luminous"] .v2-app[data-module] .sc-current.sc-current[data-ui-state] .cl-current-flow-layer { background:linear-gradient(110deg,transparent,color-mix(in srgb,var(--visual-flow-color) 80%,transparent),transparent) !important; filter:none !important; }
+html[data-cl-skin] body[data-skin] .v2-app[data-module] .sc-current.sc-current[data-ui-state="paused"] { --visual-flow-color:#e8bd75; }
+html[data-cl-skin] body[data-skin] .v2-app[data-module] .sc-current.sc-current[data-ui-state="offline"] .cl-current-flow-layer { opacity:0 !important; }
+html[data-cl-skin] body[data-skin][data-visual-animation="off"] .v2-app[data-module] .sc-card.sc-card, html[data-cl-skin] body[data-skin][data-visual-animation="off"] .v2-app[data-module] .sc-card.sc-card::before, html[data-cl-skin] body[data-skin][data-visual-animation="off"] .v2-app[data-module] .sc-card.sc-card::after, html[data-cl-skin] body[data-skin][data-visual-animation="off"] .v2-app[data-module] .sc-state-badge::before { animation:none !important; }
+html[data-cl-skin] body[data-skin][data-go-relief="flat"] .v2-app[data-module] :is(.go-button,#abSceneConfirm,#goBtn) { background:var(--sc-go,#8fd5cb) !important; box-shadow:none !important; transform:none !important; }
+html[data-cl-skin] body[data-skin][data-go-relief="light"] .v2-app[data-module] :is(.go-button,#abSceneConfirm,#goBtn) { background:var(--sc-go,#8fd5cb) !important; box-shadow:inset 0 1px 0 #fff7,0 2px 3px #0006 !important; transform:none !important; }
+html[data-cl-skin] body[data-skin][data-go-relief="3d"] .v2-app[data-module] :is(.go-button,#abSceneConfirm,#goBtn) { background:linear-gradient(#ffffff66,#ffffff00 45%,#00000033),var(--sc-go,#8fd5cb) !important; box-shadow:inset 0 2px 1px #fffa,inset 0 -3px 4px #0002,0 3px 0 color-mix(in srgb,var(--sc-go,#8fd5cb) 50%,#000),0 6px 8px #0005 !important; }
+html[data-cl-skin] body[data-skin][data-go-relief="3d"] .v2-app[data-module] :is(.go-button,#abSceneConfirm,#goBtn):active:not(:disabled) { transform:translateY(2px) !important; }
+@media(prefers-reduced-motion:reduce) { html[data-cl-skin] body[data-skin] .v2-app[data-module] .sc-card.sc-card::before, html[data-cl-skin] body[data-skin] .v2-app[data-module] .sc-card.sc-card::after, html[data-cl-skin] body[data-skin] .v2-app[data-module] .sc-state-badge::before { animation:none !important; } }
+/* Console identity remains readable over every palette. */
+html[data-cl-skin] body[data-skin]:not([data-skin="original"]) .v2-app[data-module] .midi-return[data-device-id] :is(.midi-return-console,.midi-return-memory) { color:var(--console-text) !important; text-shadow:none !important; }
+
+
+/* ==========================================================
+   CL ARRANGEMENT - HIERARCHIE CURRENT / NEXT
+   ========================================================== */
+
+body.cl-arrangement-view .v2-app[data-module] .sc-time {
+  display: none !important;
+}
+
+/* CURRENT = information principale */
+body.cl-arrangement-view .sc-current {
+  min-height: 205px !important;
+  padding: 24px 28px 22px !important;
+  justify-content: center !important;
+}
+
+body.cl-arrangement-view .sc-current .sc-card-header {
+  justify-content: center !important;
+}
+
+body.cl-arrangement-view .sc-current .sc-role {
+  width: 100% !important;
+  text-align: center !important;
+  font-size: 16px !important;
+  letter-spacing: .15em !important;
+  margin-bottom: 14px !important;
+}
+
+body.cl-arrangement-view .sc-current .sc-title {
+  font-size: clamp(42px, 5vw, 62px) !important;
+  line-height: 1.02 !important;
+  font-weight: 800 !important;
+  text-align: center !important;
+  margin: 2px 0 10px !important;
+}
+
+body.cl-arrangement-view .sc-current .sc-source-time {
+  display: block !important;
+  text-align: center !important;
+  font-size: 19px !important;
+  line-height: 1.15 !important;
+  font-weight: 650 !important;
+  margin-top: 5px !important;
+}
+
+/* NEXT = secondaire et plus compact */
+body.cl-arrangement-view .sc-next {
+  min-height: 130px !important;
+  padding: 16px 24px 14px !important;
+}
+
+body.cl-arrangement-view .sc-next .sc-card-header {
+  justify-content: center !important;
+}
+
+body.cl-arrangement-view .sc-next .sc-role {
+  width: 100% !important;
+  text-align: center !important;
+  font-size: 13px !important;
+  letter-spacing: .16em !important;
+  margin-bottom: 8px !important;
+}
+
+body.cl-arrangement-view .sc-next .sc-title {
+  font-size: clamp(28px, 3.4vw, 38px) !important;
+  line-height: 1.05 !important;
+  font-weight: 750 !important;
+  text-align: center !important;
+  margin: 0 0 7px !important;
+}
+
+body.cl-arrangement-view .sc-next .sc-source-time {
+  display: block !important;
+  text-align: center !important;
+  font-size: 16px !important;
+  line-height: 1.1 !important;
+  margin-top: 2px !important;
+}
+
+
+
+/* ==========================================================
+   CL SESSION - HIERARCHIE CURRENT / NEXT
+   Même logique visuelle que la vue Arrangement
+   ========================================================== */
+
+/* Suppression du gros compteur latéral dans Session */
+body.cl-session-view .v2-app[data-module] .sc-time {
+  display: none !important;
+}
+
+/* CURRENT = scène réellement en cours */
+body.cl-session-view .sc-current {
+  min-height: 205px !important;
+  padding: 24px 28px 22px !important;
+  justify-content: center !important;
+}
+
+body.cl-session-view .sc-current .sc-card-header {
+  justify-content: center !important;
+}
+
+body.cl-session-view .sc-current .sc-role {
+  width: 100% !important;
+  text-align: center !important;
+  font-size: 16px !important;
+  letter-spacing: .15em !important;
+  margin-bottom: 14px !important;
+}
+
+body.cl-session-view .sc-current .sc-title {
+  font-size: clamp(42px, 5vw, 62px) !important;
+  line-height: 1.02 !important;
+  font-weight: 800 !important;
+  text-align: center !important;
+  margin: 2px 0 10px !important;
+}
+
+body.cl-session-view .sc-current .sc-source-time {
+  display: block !important;
+  text-align: center !important;
+  font-size: 19px !important;
+  line-height: 1.15 !important;
+  font-weight: 650 !important;
+  margin-top: 5px !important;
+}
+
+/* NEXT = scène secondaire */
+body.cl-session-view .sc-next {
+  min-height: 130px !important;
+  padding: 16px 24px 14px !important;
+}
+
+body.cl-session-view .sc-next .sc-card-header {
+  justify-content: center !important;
+}
+
+body.cl-session-view .sc-next .sc-role {
+  width: 100% !important;
+  text-align: center !important;
+  font-size: 13px !important;
+  letter-spacing: .16em !important;
+  margin-bottom: 8px !important;
+}
+
+body.cl-session-view .sc-next .sc-title {
+  font-size: clamp(28px, 3.4vw, 38px) !important;
+  line-height: 1.05 !important;
+  font-weight: 750 !important;
+  text-align: center !important;
+  margin: 0 0 7px !important;
+}
+
+body.cl-session-view .sc-next .sc-source-time {
+  display: block !important;
+  text-align: center !important;
+  font-size: 16px !important;
+  line-height: 1.1 !important;
+  margin-top: 2px !important;
+}
+
+
+
+/* ==========================================================
+   CL REMOTE — SUPPRESSION DOUBLE AFFICHAGE TEMPS
+   Session + Arrangement :
+   conserver uniquement le temps sous le titre.
+   ========================================================== */
+
+html body.cl-session-view
+.v2-app[data-module]
+.sc-current .sc-time,
+html body.cl-session-view
+.v2-app[data-module]
+.sc-next .sc-time,
+html body.cl-arrangement-view
+.v2-app[data-module]
+.sc-current .sc-time,
+html body.cl-arrangement-view
+.v2-app[data-module]
+.sc-next .sc-time {
+  display: none !important;
+  visibility: hidden !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+
+
+/* ==========================================================
+   FIX ARRANGEMENT — garder le temps sous le titre,
+   masquer uniquement le compteur de droite
+   ========================================================== */
+
+/* Réaffiche la ligne temps sous les titres Arrangement */
+html body.cl-arrangement-view
+.v2-app[data-module]
+.sc-current .sc-source-time,
+html body.cl-arrangement-view
+.v2-app[data-module]
+.sc-next .sc-source-time {
+  display: block !important;
+  visibility: visible !important;
+  width: auto !important;
+  height: auto !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  overflow: visible !important;
+}
+
+/* Masque seulement le compteur latéral de l'en-tête */
+html body.cl-arrangement-view
+.v2-app[data-module]
+.sc-card-header > .sc-time {
+  display: none !important;
+  visibility: hidden !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+
+
+/* ==========================================================
+   FIX ARRANGEMENT — garder le temps sous le titre,
+   masquer uniquement le compteur de droite
+   ========================================================== */
+
+/* Réaffiche la ligne temps sous les titres Arrangement */
+html body.cl-arrangement-view
+.v2-app[data-module]
+.sc-current .sc-source-time,
+html body.cl-arrangement-view
+.v2-app[data-module]
+.sc-next .sc-source-time {
+  display: block !important;
+  visibility: visible !important;
+  width: auto !important;
+  height: auto !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  overflow: visible !important;
+}
+
+/* Masque seulement le compteur latéral de l'en-tête */
+html body.cl-arrangement-view
+.v2-app[data-module]
+.sc-card-header > .sc-time {
+  display: none !important;
+  visibility: hidden !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+
+
+/* ==========================================================
+   FIX DEFINITIF TEMPS ARRANGEMENT
+   Cible directe du module, indépendante de la classe body.
+   ========================================================== */
+
+/* Temps sous le titre : toujours visible dans Arrangement */
+html body
+.v2-app[data-module="arrangement"]
+.sc-current .sc-source-time,
+html body
+.v2-app[data-module="arrangement"]
+.sc-next .sc-source-time {
+  display: block !important;
+  position: relative !important;
+
+  visibility: visible !important;
+  opacity: 1 !important;
+
+  width: auto !important;
+  min-width: 0 !important;
+  max-width: none !important;
+
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+
+  margin: 4px 0 0 !important;
+  padding: 0 !important;
+
+  clip: auto !important;
+  clip-path: none !important;
+  overflow: visible !important;
+
+  white-space: normal !important;
+
+  font-size: 18px !important;
+  line-height: 1.2 !important;
+  font-weight: 650 !important;
+  text-align: center !important;
+}
+
+/* NEXT un peu plus compact */
+html body
+.v2-app[data-module="arrangement"]
+.sc-next .sc-source-time {
+  font-size: 16px !important;
+}
+
+/* Gros compteur à droite : masqué uniquement dans Arrangement */
+html body
+.v2-app[data-module="arrangement"]
+.sc-card-header > .sc-time {
+  display: none !important;
+  visibility: hidden !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+
+
+/* ==========================================================
+   ARRANGEMENT — PROTOTYPE VISUEL X-FADER
+   Aucun contrôle Ableton à ce stade.
+   ========================================================== */
+
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test {
+  min-height: 78px;
+  padding: 8px 12px 9px;
+  border: 2px solid #416b86;
+  border-radius: 18px;
+  background:
+    linear-gradient(180deg, #182432 0%, #0d1721 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.08),
+    0 3px 9px rgba(0,0,0,.30);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+}
+
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test-title {
+  text-align: center;
+  color: #afbecd;
+  font: 800 9px/1 -apple-system,BlinkMacSystemFont,sans-serif;
+  letter-spacing: .18em;
+}
+
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test-line {
+  display: grid;
+  grid-template-columns: 76px minmax(80px,1fr) 112px;
+  align-items: center;
+  gap: 8px;
+}
+
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test-a,
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test-b {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test-a {
+  text-align: right;
+  color: #68ceff;
+}
+
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test-b {
+  text-align: left;
+  color: #ffd06e;
+}
+
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test-a strong,
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test-b strong {
+  font-size: 19px;
+  font-weight: 900;
+}
+
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test-a span,
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test-b span {
+  margin-top: 3px;
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  white-space: nowrap;
+}
+
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test-range {
+  width: 100%;
+  margin: 0;
+  cursor: pointer;
+  accent-color: #8fe7dc;
+}
+
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test-state {
+  text-align: center;
+  color: #a9b7c4;
+  font: 750 9px/1 -apple-system,BlinkMacSystemFont,sans-serif;
+  letter-spacing: .10em;
+}
+
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test[data-zone="a"] {
+  border-color: #379ed0;
+}
+
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test[data-zone="mix"] {
+  border-color: #73c9be;
+}
+
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test[data-zone="b"] {
+  border-color: #d7a538;
+}
+
+
+
+/* ==========================================================
+   ARRANGEMENT — X-FADER LARGE
+   ========================================================== */
+
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test {
+  padding: 10px 16px 11px !important;
+  gap: 7px !important;
+}
+
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test-line {
+  display: grid !important;
+  grid-template-columns: 92px minmax(0, 1fr) 132px !important;
+  align-items: center !important;
+  gap: 12px !important;
+  width: 100% !important;
+}
+
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test-range {
+  width: 100% !important;
+  min-width: 0 !important;
+  margin: 0 !important;
+  cursor: pointer !important;
+  accent-color: #8fe7dc !important;
+  transform: scaleY(1.22);
+  transform-origin: center;
+}
+
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test-a,
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test-b {
+  transition:
+    opacity .16s ease,
+    filter .16s ease,
+    transform .16s ease,
+    color .16s ease;
+}
+
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test[data-zone="a"]
+.cl-arr-xfader-test-a {
+  opacity: 1 !important;
+  filter: brightness(1.2);
+  transform: scale(1.04);
+}
+
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test[data-zone="a"]
+.cl-arr-xfader-test-b {
+  opacity: .34 !important;
+  filter: brightness(.58);
+  transform: scale(.96);
+}
+
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test[data-zone="b"]
+.cl-arr-xfader-test-a {
+  opacity: .34 !important;
+  filter: brightness(.58);
+  transform: scale(.96);
+}
+
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test[data-zone="b"]
+.cl-arr-xfader-test-b {
+  opacity: 1 !important;
+  filter: brightness(1.2);
+  transform: scale(1.04);
+}
+
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test[data-zone="mix"]
+.cl-arr-xfader-test-a,
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test[data-zone="mix"]
+.cl-arr-xfader-test-b {
+  opacity: .78 !important;
+  filter: brightness(.9);
+  transform: scale(1);
+}
+
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test-state {
+  margin-top: 1px !important;
+  font-size: 10px !important;
+  letter-spacing: .11em !important;
+}
+
+
+
+/* ==========================================================
+   ARRANGEMENT — X-FADER PLEINE LARGEUR
+   ========================================================== */
+
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test {
+  padding: 10px 16px 11px !important;
+  gap: 7px !important;
+}
+
+/* Le conteneur devient une grille sur 3 lignes */
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test-line {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  grid-template-rows: auto auto !important;
+  column-gap: 12px !important;
+  row-gap: 7px !important;
+  width: 100% !important;
+  align-items: end !important;
+}
+
+/* A en haut à gauche */
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test-a {
+  grid-column: 1 !important;
+  grid-row: 1 !important;
+
+  text-align: left !important;
+  align-items: flex-start !important;
+
+  transform-origin: left center !important;
+}
+
+/* B en haut à droite */
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test-b {
+  grid-column: 2 !important;
+  grid-row: 1 !important;
+
+  text-align: right !important;
+  align-items: flex-end !important;
+
+  transform-origin: right center !important;
+}
+
+/* Le slider prend toute la largeur */
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test-range {
+  grid-column: 1 / -1 !important;
+  grid-row: 2 !important;
+
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: none !important;
+
+  margin: 0 !important;
+  padding: 0 !important;
+
+  transform: scaleY(1.35) !important;
+  transform-origin: center !important;
+
+  cursor: pointer !important;
+  accent-color: #8fe7dc !important;
+}
+
+/* Libellés */
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test-a strong,
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test-b strong {
+  font-size: 20px !important;
+  line-height: 1 !important;
+}
+
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test-a span,
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test-b span {
+  margin-top: 3px !important;
+  font-size: 9px !important;
+  line-height: 1 !important;
+}
+
+/* A actif */
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test[data-zone="a"]
+.cl-arr-xfader-test-a {
+  opacity: 1 !important;
+  filter: brightness(1.25) !important;
+  transform: scale(1.05) !important;
+}
+
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test[data-zone="a"]
+.cl-arr-xfader-test-b {
+  opacity: .24 !important;
+  filter: brightness(.45) !important;
+  transform: scale(.96) !important;
+}
+
+/* B actif */
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test[data-zone="b"]
+.cl-arr-xfader-test-a {
+  opacity: .24 !important;
+  filter: brightness(.45) !important;
+  transform: scale(.96) !important;
+}
+
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test[data-zone="b"]
+.cl-arr-xfader-test-b {
+  opacity: 1 !important;
+  filter: brightness(1.25) !important;
+  transform: scale(1.05) !important;
+}
+
+/* Mélange */
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test[data-zone="mix"]
+.cl-arr-xfader-test-a,
+.v2-app[data-module="arrangement"] .cl-arr-xfader-test[data-zone="mix"]
+.cl-arr-xfader-test-b {
+  opacity: .72 !important;
+  filter: brightness(.85) !important;
+  transform: scale(1) !important;
+}
+
+
+/* Paradis: keep the existing duration/remaining source line legible under titles.
+   Scoped to the additions; no changes to the existing skins or transport. */
+html[data-cl-skin] body[data-skin^="paradis-"] .v2-app[data-module] .sc-card.sc-card .sc-source-time {
+  display:block !important; position:relative !important; visibility:visible !important;
+  clip:auto !important; clip-path:none !important; width:auto !important; height:auto !important;
+  margin:4px 0 0 !important; padding:0 !important; overflow:visible !important;
+  font-size:16px !important; line-height:1.3 !important; color:var(--sc-secondary) !important;
+}
+html[data-cl-skin] body[data-skin="paradis-white"] .v2-app[data-module] .sc-card.sc-current[data-ui-state="playing"] .sc-source-time { color:#551426 !important; }
+/* Keep the inactive X-Fader caption readable; active/mix logic is unchanged. */
+html[data-cl-skin] body[data-skin^="paradis-"] .v2-app[data-module="arrangement"] .cl-arr-xfader-test[data-zone="a"] .cl-arr-xfader-test-b,
+html[data-cl-skin] body[data-skin^="paradis-"] .v2-app[data-module="arrangement"] .cl-arr-xfader-test[data-zone="b"] .cl-arr-xfader-test-a { opacity:.65 !important; filter:brightness(.95) !important; }
+
+
+/* ==========================================================
+   SESSION DESKTOP — COMPACT VERTICAL
+   Uniquement fenêtre desktop ?desktop=1
+   ========================================================== */
+
+body.desktop-embed
+.v2-app[data-module="session"] {
+  gap: 8px !important;
+}
+
+/* CURRENT : beaucoup moins haut */
+body.desktop-embed
+.v2-app[data-module="session"]
+.sc-current {
+  min-height: 150px !important;
+  padding: 15px 22px 13px !important;
+}
+
+/* Libellé EN COURS */
+body.desktop-embed
+.v2-app[data-module="session"]
+.sc-current .sc-role {
+  font-size: 14px !important;
+  margin-bottom: 4px !important;
+}
+
+/* Titre courant */
+body.desktop-embed
+.v2-app[data-module="session"]
+.sc-current .sc-title {
+  font-size: clamp(38px, 4.5vw, 52px) !important;
+  line-height: 1.02 !important;
+  margin: 1px 0 3px !important;
+}
+
+/* Temps restant */
+body.desktop-embed
+.v2-app[data-module="session"]
+.sc-current .sc-source-time {
+  font-size: 17px !important;
+  margin-top: 3px !important;
+}
+
+
+/* NEXT : plus compact */
+body.desktop-embed
+.v2-app[data-module="session"]
+.sc-next {
+  min-height: 105px !important;
+  padding: 11px 20px 10px !important;
+}
+
+body.desktop-embed
+.v2-app[data-module="session"]
+.sc-next .sc-role {
+  font-size: 12px !important;
+  margin-bottom: 3px !important;
+}
+
+body.desktop-embed
+.v2-app[data-module="session"]
+.sc-next .sc-title {
+  font-size: clamp(28px, 3vw, 36px) !important;
+  line-height: 1.02 !important;
+  margin: 0 0 2px !important;
+}
+
+body.desktop-embed
+.v2-app[data-module="session"]
+.sc-next .sc-source-time {
+  font-size: 15px !important;
+  margin-top: 2px !important;
+}
+
+
+/* LTC plus fin */
+body.desktop-embed
+.v2-app[data-module="session"]
+.ltc-panel,
+body.desktop-embed
+.v2-app[data-module="session"]
+.ltc-display {
+  min-height: 54px !important;
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+}
+
+
+/* GO moins haut mais toujours très présent */
+body.desktop-embed
+.v2-app[data-module="session"]
+.big-go,
+body.desktop-embed
+.v2-app[data-module="session"]
+.go {
+  min-height: 86px !important;
+  height: auto !important;
+}
+
+
+/* PREV / NEXT plus compacts */
+body.desktop-embed
+.v2-app[data-module="session"]
+.grid2 {
+  gap: 8px !important;
+  margin-bottom: 6px !important;
+}
+
+body.desktop-embed
+.v2-app[data-module="session"]
+.grid2 button {
+  min-height: 58px !important;
+}
+
+
+/* PAUSE / STOP plus compacts */
+body.desktop-embed
+.v2-app[data-module="session"]
+.transport-row button,
+body.desktop-embed
+.v2-app[data-module="session"]
+.transport-dock button {
+  min-height: 58px !important;
+}
+
+
+/* Réduit légèrement les espacements verticaux généraux */
+body.desktop-embed
+.v2-app[data-module="session"]
+.card,
+body.desktop-embed
+.v2-app[data-module="session"]
+.scene-select-panel,
+body.desktop-embed
+.v2-app[data-module="session"]
+.goto-panel {
+  margin-top: 6px !important;
+}
+
+
+/* Sécurité : la fenêtre desktop doit rester scrollable
+   même si la hauteur devient vraiment petite */
+html,
+body.desktop-embed {
+  overflow-y: auto !important;
+}
+
+body.desktop-embed
+.v2-app[data-module="session"] {
+  overflow: visible !important;
+}
+
+
+
+/* ==========================================================
+   SESSION DESKTOP — COMPACT VERTICAL
+   Uniquement fenêtre desktop ?desktop=1
+   ========================================================== */
+
+body.desktop-embed
+.v2-app[data-module="session"] {
+  gap: 8px !important;
+}
+
+/* CURRENT : beaucoup moins haut */
+body.desktop-embed
+.v2-app[data-module="session"]
+.sc-current {
+  min-height: 150px !important;
+  padding: 15px 22px 13px !important;
+}
+
+/* Libellé EN COURS */
+body.desktop-embed
+.v2-app[data-module="session"]
+.sc-current .sc-role {
+  font-size: 14px !important;
+  margin-bottom: 4px !important;
+}
+
+/* Titre courant */
+body.desktop-embed
+.v2-app[data-module="session"]
+.sc-current .sc-title {
+  font-size: clamp(38px, 4.5vw, 52px) !important;
+  line-height: 1.02 !important;
+  margin: 1px 0 3px !important;
+}
+
+/* Temps restant */
+body.desktop-embed
+.v2-app[data-module="session"]
+.sc-current .sc-source-time {
+  font-size: 17px !important;
+  margin-top: 3px !important;
+}
+
+
+/* NEXT : plus compact */
+body.desktop-embed
+.v2-app[data-module="session"]
+.sc-next {
+  min-height: 105px !important;
+  padding: 11px 20px 10px !important;
+}
+
+body.desktop-embed
+.v2-app[data-module="session"]
+.sc-next .sc-role {
+  font-size: 12px !important;
+  margin-bottom: 3px !important;
+}
+
+body.desktop-embed
+.v2-app[data-module="session"]
+.sc-next .sc-title {
+  font-size: clamp(28px, 3vw, 36px) !important;
+  line-height: 1.02 !important;
+  margin: 0 0 2px !important;
+}
+
+body.desktop-embed
+.v2-app[data-module="session"]
+.sc-next .sc-source-time {
+  font-size: 15px !important;
+  margin-top: 2px !important;
+}
+
+
+/* LTC plus fin */
+body.desktop-embed
+.v2-app[data-module="session"]
+.ltc-panel,
+body.desktop-embed
+.v2-app[data-module="session"]
+.ltc-display {
+  min-height: 54px !important;
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+}
+
+
+/* GO moins haut mais toujours très présent */
+body.desktop-embed
+.v2-app[data-module="session"]
+.big-go,
+body.desktop-embed
+.v2-app[data-module="session"]
+.go {
+  min-height: 86px !important;
+  height: auto !important;
+}
+
+
+/* PREV / NEXT plus compacts */
+body.desktop-embed
+.v2-app[data-module="session"]
+.grid2 {
+  gap: 8px !important;
+  margin-bottom: 6px !important;
+}
+
+body.desktop-embed
+.v2-app[data-module="session"]
+.grid2 button {
+  min-height: 58px !important;
+}
+
+
+/* PAUSE / STOP plus compacts */
+body.desktop-embed
+.v2-app[data-module="session"]
+.transport-row button,
+body.desktop-embed
+.v2-app[data-module="session"]
+.transport-dock button {
+  min-height: 58px !important;
+}
+
+
+/* Réduit légèrement les espacements verticaux généraux */
+body.desktop-embed
+.v2-app[data-module="session"]
+.card,
+body.desktop-embed
+.v2-app[data-module="session"]
+.scene-select-panel,
+body.desktop-embed
+.v2-app[data-module="session"]
+.goto-panel {
+  margin-top: 6px !important;
+}
+
+
+/* Sécurité : la fenêtre desktop doit rester scrollable
+   même si la hauteur devient vraiment petite */
+html,
+body.desktop-embed {
+  overflow-y: auto !important;
+}
+
+body.desktop-embed
+.v2-app[data-module="session"] {
+  overflow: visible !important;
+}
+
+
+
+/* ==========================================================
+   SESSION DESKTOP — ULTRA COMPACT
+   Objectif : scène + bouton d'envoi entièrement visibles
+   ========================================================== */
+
+body.desktop-embed
+.v2-app[data-module="session"] {
+  gap: 5px !important;
+}
+
+
+/* CURRENT */
+body.desktop-embed
+.v2-app[data-module="session"]
+.sc-current {
+  min-height: 112px !important;
+  padding: 10px 18px 9px !important;
+}
+
+body.desktop-embed
+.v2-app[data-module="session"]
+.sc-current .sc-role {
+  font-size: 12px !important;
+  line-height: 1 !important;
+  margin: 0 0 3px !important;
+}
+
+body.desktop-embed
+.v2-app[data-module="session"]
+.sc-current .sc-title {
+  font-size: clamp(34px, 4vw, 46px) !important;
+  line-height: .98 !important;
+  margin: 0 !important;
+}
+
+body.desktop-embed
+.v2-app[data-module="session"]
+.sc-current .sc-source-time {
+  font-size: 15px !important;
+  line-height: 1 !important;
+  margin-top: 4px !important;
+}
+
+
+/* NEXT */
+body.desktop-embed
+.v2-app[data-module="session"]
+.sc-next {
+  min-height: 78px !important;
+  padding: 8px 16px 7px !important;
+}
+
+body.desktop-embed
+.v2-app[data-module="session"]
+.sc-next .sc-role {
+  font-size: 10px !important;
+  line-height: 1 !important;
+  margin: 0 0 3px !important;
+}
+
+body.desktop-embed
+.v2-app[data-module="session"]
+.sc-next .sc-title {
+  font-size: clamp(25px, 2.8vw, 32px) !important;
+  line-height: 1 !important;
+  margin: 0 !important;
+}
+
+body.desktop-embed
+.v2-app[data-module="session"]
+.sc-next .sc-source-time {
+  font-size: 13px !important;
+  line-height: 1 !important;
+  margin-top: 3px !important;
+}
+
+
+/* LTC */
+body.desktop-embed
+.v2-app[data-module="session"]
+.ltc-panel,
+body.desktop-embed
+.v2-app[data-module="session"]
+.ltc-display {
+  min-height: 42px !important;
+  height: auto !important;
+  padding-top: 3px !important;
+  padding-bottom: 3px !important;
+}
+
+
+/* GO */
+body.desktop-embed
+.v2-app[data-module="session"]
+.big-go,
+body.desktop-embed
+.v2-app[data-module="session"]
+.go {
+  min-height: 68px !important;
+  height: 68px !important;
+  padding-top: 5px !important;
+  padding-bottom: 5px !important;
+}
+
+
+/* PREV / NEXT */
+body.desktop-embed
+.v2-app[data-module="session"]
+.grid2 {
+  gap: 6px !important;
+  margin-bottom: 5px !important;
+}
+
+body.desktop-embed
+.v2-app[data-module="session"]
+.grid2 button {
+  min-height: 46px !important;
+  height: 46px !important;
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+}
+
+
+/* PAUSE / STOP */
+body.desktop-embed
+.v2-app[data-module="session"]
+.transport-row,
+body.desktop-embed
+.v2-app[data-module="session"]
+.transport-dock {
+  gap: 6px !important;
+}
+
+body.desktop-embed
+.v2-app[data-module="session"]
+.transport-row button,
+body.desktop-embed
+.v2-app[data-module="session"]
+.transport-dock button {
+  min-height: 46px !important;
+  height: 46px !important;
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+}
+
+
+/* Sélecteur de scène : compact mais bien utilisable */
+body.desktop-embed
+.v2-app[data-module="session"]
+.scene-select-panel,
+body.desktop-embed
+.v2-app[data-module="session"]
+.goto-panel {
+  margin-top: 4px !important;
+  padding: 7px !important;
+}
+
+
+/* Petit filet de sécurité : contenu scrollable si la fenêtre
+   devient réellement trop petite */
+html,
+body.desktop-embed {
+  overflow-y: auto !important;
+}
+
+body.desktop-embed
+.v2-app[data-module="session"] {
+  overflow: visible !important;
+}
+
+
+
+/* ==========================================================
+   SESSION — VRAI MODE DESKTOP COMPACT
+   remote-v2.js pose html[data-desktop-remote="1"]
+   ========================================================== */
+
+html[data-desktop-remote="1"]
+body.cl-session-view
+.v2-app[data-module="session"] {
+  gap: 5px !important;
+}
+
+
+/* CURRENT */
+html[data-desktop-remote="1"]
+body.cl-session-view
+.v2-app[data-module="session"]
+.sc-current {
+  min-height: 112px !important;
+  padding: 10px 18px 9px !important;
+}
+
+html[data-desktop-remote="1"]
+body.cl-session-view
+.v2-app[data-module="session"]
+.sc-current .sc-role {
+  font-size: 12px !important;
+  line-height: 1 !important;
+  margin: 0 0 3px !important;
+}
+
+html[data-desktop-remote="1"]
+body.cl-session-view
+.v2-app[data-module="session"]
+.sc-current .sc-title {
+  font-size: clamp(34px, 4vw, 46px) !important;
+  line-height: .98 !important;
+  margin: 0 !important;
+}
+
+html[data-desktop-remote="1"]
+body.cl-session-view
+.v2-app[data-module="session"]
+.sc-current .sc-source-time {
+  font-size: 15px !important;
+  line-height: 1 !important;
+  margin-top: 4px !important;
+}
+
+
+/* NEXT */
+html[data-desktop-remote="1"]
+body.cl-session-view
+.v2-app[data-module="session"]
+.sc-next {
+  min-height: 78px !important;
+  padding: 8px 16px 7px !important;
+}
+
+html[data-desktop-remote="1"]
+body.cl-session-view
+.v2-app[data-module="session"]
+.sc-next .sc-role {
+  font-size: 10px !important;
+  line-height: 1 !important;
+  margin: 0 0 3px !important;
+}
+
+html[data-desktop-remote="1"]
+body.cl-session-view
+.v2-app[data-module="session"]
+.sc-next .sc-title {
+  font-size: clamp(25px, 2.8vw, 32px) !important;
+  line-height: 1 !important;
+  margin: 0 !important;
+}
+
+html[data-desktop-remote="1"]
+body.cl-session-view
+.v2-app[data-module="session"]
+.sc-next .sc-source-time {
+  font-size: 13px !important;
+  line-height: 1 !important;
+  margin-top: 3px !important;
+}
+
+
+/* LTC */
+html[data-desktop-remote="1"]
+body.cl-session-view
+.v2-app[data-module="session"]
+.ltc-panel,
+html[data-desktop-remote="1"]
+body.cl-session-view
+.v2-app[data-module="session"]
+.ltc-display {
+  min-height: 42px !important;
+  height: auto !important;
+  padding-top: 3px !important;
+  padding-bottom: 3px !important;
+}
+
+
+/* GO */
+html[data-desktop-remote="1"]
+body.cl-session-view
+.v2-app[data-module="session"]
+.big-go,
+html[data-desktop-remote="1"]
+body.cl-session-view
+.v2-app[data-module="session"]
+.go {
+  min-height: 68px !important;
+  height: 68px !important;
+}
+
+
+/* PREV / NEXT */
+html[data-desktop-remote="1"]
+body.cl-session-view
+.v2-app[data-module="session"]
+.grid2 {
+  gap: 6px !important;
+  margin-bottom: 5px !important;
+}
+
+html[data-desktop-remote="1"]
+body.cl-session-view
+.v2-app[data-module="session"]
+.grid2 button {
+  min-height: 46px !important;
+  height: 46px !important;
+}
+
+
+/* PAUSE / STOP */
+html[data-desktop-remote="1"]
+body.cl-session-view
+.v2-app[data-module="session"]
+.transport-row,
+html[data-desktop-remote="1"]
+body.cl-session-view
+.v2-app[data-module="session"]
+.transport-dock {
+  gap: 6px !important;
+}
+
+html[data-desktop-remote="1"]
+body.cl-session-view
+.v2-app[data-module="session"]
+.transport-row button,
+html[data-desktop-remote="1"]
+body.cl-session-view
+.v2-app[data-module="session"]
+.transport-dock button {
+  min-height: 46px !important;
+  height: 46px !important;
+}
+
+
+/* Sélecteur scène */
+html[data-desktop-remote="1"]
+body.cl-session-view
+.v2-app[data-module="session"]
+.scene-select-panel,
+html[data-desktop-remote="1"]
+body.cl-session-view
+.v2-app[data-module="session"]
+.goto-panel {
+  margin-top: 4px !important;
+  padding: 7px !important;
+}
+
+
+/* Scroll de secours */
+html[data-desktop-remote="1"],
+html[data-desktop-remote="1"] body {
+  overflow-y: auto !important;
+}

@@ -859,7 +859,7 @@
   <link rel="stylesheet" href="/static/cl-skins.css?v=20260829-ql1-cyan-pulse">
 </head>
 
-<body>
+<body class="cl-session-view">
   <main class="wrap">
     <div class="status disconnected" id="status">Connexion…</div>
     <div class="osc-meter" id="oscMeter" data-active="0">
@@ -875,16 +875,18 @@
     <section class="midi-returns" id="sessionDevices" aria-label="Devices MIDI"></section>
 
     <div class="scene-cards">
-      <section class="card current-card" id="currentCard" aria-live="polite">
-        <div class="label">En cours</div>
-        <div class="title" id="current">—</div>
-        <div class="scene-countdown" id="currentTimer">Temps restant · --:--</div>
+      <section class="sc-card sc-current card current-card" id="currentCard" aria-live="polite">
+        <div class="sc-card-header current-card-header"><div class="sc-role label">En cours</div><div class="sc-time current-card-timer" aria-hidden="true" data-time-source="currentTimer"><span class="sc-time-label">TEMPS</span><strong>--:--</strong></div></div>
+        <div class="sc-title title" id="current">—</div>
+        <div class="sc-source-time scene-countdown" id="currentTimer">Temps restant · --:--</div>
+        <div class="sc-card-footer"><span class="sc-state-badge current-state-badge">—</span><span class="sc-channel">01 / CURRENT</span><span class="sc-go-feedback" aria-hidden="true">GO</span></div>
       </section>
 
-      <section class="card selected-card" id="selectedCard" aria-live="polite">
-        <div class="label">Prochaine scène sélectionnée</div>
-        <div class="selected-title" id="selected">—</div>
-        <div class="selected-duration" id="selectedDuration"></div>
+      <section class="sc-card sc-next card selected-card" id="selectedCard" aria-live="polite">
+        <div class="sc-card-header current-card-header"><div class="sc-role label">Prochaine scène sélectionnée</div><div class="sc-time current-card-timer" aria-hidden="true" data-time-source="selectedDuration"><span class="sc-time-label">TEMPS</span><strong>--:--</strong></div></div>
+        <div class="sc-title selected-title" id="selected">—</div>
+        <div class="sc-source-time selected-duration" id="selectedDuration"></div>
+        <div class="sc-card-footer"><span class="sc-state-badge current-state-badge">—</span><span class="sc-channel">02 / NEXT</span><span class="sc-go-feedback" aria-hidden="true">GO</span></div>
       </section>
     </div>
 
@@ -914,6 +916,15 @@
 
 <!-- Removed temporary test banner -->
   </main>
+
+  <!-- Skins follow the functional stylesheet injected into the head by app.py. -->
+  <link rel="stylesheet" href="/static/skins/original.css?v=20260925-skins">
+  <link rel="stylesheet" href="/static/skins/broadcast.css?v=20260925-skins">
+  <link rel="stylesheet" href="/static/skins/theatre.css?v=20260925-skins">
+  <link rel="stylesheet" href="/static/skins/show-control.css?v=20260925-skins">
+  <link rel="stylesheet" href="/static/skins/neon.css?v=20260925">
+  <link rel="stylesheet" href="/static/skins/visual-settings.css?v=20260925">
+
 
   <script src="/static/midi-return-visual.js?v=20260829-visual-recall-4s"></script>
   <script>
@@ -1881,5 +1892,33 @@ gotoInput.addEventListener('blur', () => {
     }, { once: true });
   </script>
   <script src="/static/cl-skins.js?v=20260829-animation-audit" defer></script>
+  <script src="/static/skins/skin-switcher.js?v=20260925-skins" defer></script>
+  <script src="/static/skins/presentation.js?v=20260925-skins" defer></script>
+
+<script id="cl-desktop-advanced-options-autoscroll">
+(() => {
+  const details = document.querySelector('details.advanced-options');
+  if (!details) return;
+
+  details.addEventListener('toggle', () => {
+    if (!details.open) return;
+
+    const desktop =
+      document.documentElement.dataset.desktopRemote === '1' ||
+      document.body.dataset.desktopRemote === '1';
+
+    if (!desktop) return;
+
+    /* Laisse le panneau finir de s'ouvrir avant de déplacer la vue */
+    setTimeout(() => {
+      window.scrollTo({
+        top: document.documentElement.scrollHeight,
+        behavior: 'smooth'
+      });
+    }, 120);
+  });
+})();
+</script>
+
 </body>
 </html>

@@ -1,0 +1,28 @@
+/* neon — independent palette and visual identity. */
+html body[data-skin="neon"] {
+  --sc-paused: #ffc76b;
+  --sc-error: #ff9e99;
+  --sc-ok: #8be4ac;
+  --sc-title-font: -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  --sc-title-weight: 800;
+  --sc-time-size: 28px;
+  --sc-card-height: 235px;
+  --sc-depth: 0 10px 32px #0005;
+  --skin-go-text: #101619;
+  --skin-flow-alpha: .65;
+  --skin-go-shadow: 0 0 20px #a9ff4533,inset 0 2px 0 #fff9;
+  --sc-bg: #100728;
+  --sc-surface: #23113f;
+  --sc-next-surface: #111e50;
+  --sc-raised: #352159;
+  --sc-text: #f8f1ff;
+  --sc-secondary: #d6e5ff;
+  --sc-muted: #c1afd9;
+  --sc-border: #8364b8;
+  --sc-radius: 22px;
+  --sc-playing: #d7a0ff;
+  --sc-ready: #8cbdff;
+  --sc-go: #c0ff6b;
+  --skin-current: #391758;
+  --skin-flow: #ac8dff;
+}

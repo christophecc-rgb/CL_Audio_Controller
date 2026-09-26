@@ -249,6 +249,31 @@
           return 'waiting';
         }
 
+        /*
+         * Une mémoire déjà réellement confirmée reste MÉMORISÉE tant que
+         * l'EXPECTED courant ne change pas.
+         *
+         * Le backend peut ensuite qualifier le même retour de stale/timeout
+         * simplement parce que son timestamp vieillit. Ce vieillissement ne
+         * signifie pas que la console a quitté la mémoire chargée.
+         *
+         * Une nouvelle demande produit un nouvel expectedKey et repasse par
+         * startWaiting(), donc une absence de retour sur le prochain recall
+         * reste bien détectable.
+         */
+        if (
+          backendState === 'timeout' &&
+          completedConfirmationKey &&
+          finalKey &&
+          finalKey === completedConfirmationKey
+        ) {
+          pendingFinalState = 'confirmed';
+          pendingFinalKey = finalKey;
+          phase = 'loaded';
+          applyState('loaded');
+          return phase;
+        }
+
         rememberFinal(backendState, finalKey);
         showFinalState();
         return phase;

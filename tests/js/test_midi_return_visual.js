@@ -111,7 +111,10 @@ function scenario(interfaceName) {
   advanceTo(3499);
   assert.equal(states.at(-1).state, 'confirmed', `${interfaceName}: confirmation fixe pendant 2,5 s`);
   advanceTo(3500);
-  assert.equal(states.at(-1).state, 'idle', `${interfaceName}: retour automatique au repos`);
+  // 44e999f introduced the persistent loaded phase after confirmation.
+  assert.equal(states.at(-1).state, 'loaded', `${interfaceName}: confirmation mémorisée après le pulse`);
+  controller.update({expectedKey:'program-114', hasExpected:true, backendState:'confirmed', finalKey:`program-114:return-114:${interfaceName}`});
+  assert.equal(states.at(-1).state, 'loaded', `${interfaceName}: un statut identique ne relance pas le pulse`);
 }
 
 scenario('session');
@@ -254,7 +257,7 @@ for (const [label, firstKey, secondKey] of [
   assert.equal(states.at(-1), 'confirmed', 'retour à 3 s : confirmation encore fixe à 2,499 s');
   now = 5500;
   timers.filter(timer => timer.at <= now).forEach(timer => timer.callback());
-  assert.equal(states.at(-1), 'idle', 'retour à 3 s : retour au repos après 2,5 s');
+  assert.equal(states.at(-1), 'loaded', 'retour à 3 s : confirmation mémorisée après 2,5 s');
 }
 
 // Un état backend stale ne neutralise pas un nouvel EXPECTED : la nouvelle

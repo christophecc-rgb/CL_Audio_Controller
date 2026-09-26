@@ -1,0 +1,576 @@
+/* Original: existing geometry, console identities and state-driven flow. */
+body[data-skin="original"] { --cl-skin-current: #ff812b; --cl-skin-nav: #249cff; --cl-skin-next: #249cff; }
+/* Stable device identifiers supplied by the existing renderer. */
+html body[data-skin="original"] .midi-return[data-device-id="console_a"] {
+  --console-text: #ff9dd9 !important;
+  --console-accent: #ed56b6 !important;
+}
+html body[data-skin="original"] .midi-return[data-device-id="console_b"] {
+  --console-text: #88e9fa !important;
+  --console-accent: #37cce9 !important;
+}
+/* Cartouches MIDI / Control Change :
+   identité console conservée, mais sans aplat coloré ni scintillement */
+html[data-cl-skin] body[data-skin="original"] .v2-app[data-module] .midi-return[data-device-id] {
+  background:
+    linear-gradient(
+      110deg,
+      #171b23 0%,
+      #1b2029 100%
+    ) !important;
+  border-color:
+    color-mix(in srgb,var(--console-accent) 58%,#596273) !important;
+  box-shadow:
+    inset 3px 0 0 color-mix(in srgb,var(--console-accent) 82%,transparent),
+    0 0 5px color-mix(in srgb,var(--console-accent) 10%,transparent) !important;
+  animation: none !important;
+  transition: none !important;
+}
+
+html[data-cl-skin] body[data-skin="original"] .v2-app[data-module] .midi-return[data-device-id] *,
+html[data-cl-skin] body[data-skin="original"] .v2-app[data-module] .midi-return[data-device-id]::before,
+html[data-cl-skin] body[data-skin="original"] .v2-app[data-module] .midi-return[data-device-id]::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+html[data-cl-skin] body[data-skin="original"] .v2-app[data-module] .midi-return[data-device-id] :is(.midi-return-console,.midi-return-memory) {
+  color: var(--console-text) !important;
+  text-shadow: none !important;
+}
+
+/* Etats métier : couleurs uniquement sur l'information d'état */
+html[data-cl-skin] body[data-skin="original"] .v2-app[data-module] .midi-return.state-waiting .midi-return-state {
+  color: #e7ba6a !important;
+}
+
+html[data-cl-skin] body[data-skin="original"] .v2-app[data-module] .midi-return:is(.state-confirmed,.state-loaded) .midi-return-state {
+  color: #8ddca9 !important;
+}
+
+html[data-cl-skin] body[data-skin="original"] .v2-app[data-module] .midi-return.state-loaded .midi-return-state {
+  font-size: 0;
+}
+
+html[data-cl-skin] body[data-skin="original"] .v2-app[data-module] .midi-return.state-loaded .midi-return-state::after {
+  content: "✓ MÉMORISÉ";
+  font-size: 10px;
+  color: #8ddca9;
+}
+
+html[data-cl-skin] body[data-skin="original"] .v2-app[data-module] .midi-return:is(.state-mismatch,.state-timeout) .midi-return-state {
+  color: #ef9b91 !important;
+}
+
+/* GO : accent fonctionnel, pas cyan/QL */
+html[data-cl-skin] body[data-skin="original"] .v2-app[data-module] :is(.go-button,#abSceneConfirm,#goBtn) {
+  background: linear-gradient(180deg,#a45722,#7d3d18) !important;
+  border-color: #c87538 !important;
+  color: #fff7f1 !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.12),
+    0 0 7px rgba(202,117,56,.14) !important;
+}
+
+
+/* Suppress JS-driven decorative overlays too; state labels remain visible. */
+html[data-cl-skin] body[data-skin="original"] .v2-app[data-module] .midi-return[data-device-id] :is(.global-recall-overlay,.recall-sweep-overlay) { display:none !important; }
+html[data-cl-skin] body[data-skin="original"] .v2-app[data-module] .midi-return[data-device-id]::before, html[data-cl-skin] body[data-skin="original"] .v2-app[data-module] .midi-return[data-device-id]::after { content:none !important; }
+html[data-cl-skin] body[data-skin="original"] .v2-app[data-module] .sc-current.sc-current[data-ui-state] {
+  position:relative !important; overflow:hidden !important; isolation:isolate !important;
+  background:#191d25 !important; border-color:#68758a !important;
+  animation:none !important; filter:none !important; transform:none !important;
+  box-shadow:inset 0 0 20px #a0b6d009,0 0 10px #91aac015 !important;
+}
+html[data-cl-skin] body[data-skin="original"] .v2-app[data-module] .sc-current.sc-current[data-ui-state]::before,
+html[data-cl-skin] body[data-skin="original"] .v2-app[data-module] .sc-current.sc-current[data-ui-state]::after { content:none !important; animation:none !important; }
+html[data-cl-skin] body[data-skin="original"] .v2-app[data-module] .sc-current > * { position:relative; z-index:2; }
+/* Hidden outside Original so the shared script cannot alter other skins. */
+.cl-current-flow-layer { display:none; }
+html[data-cl-skin] body[data-skin="original"] .v2-app[data-module] .cl-current-flow-layer {
+  display:block; position:absolute !important; inset:0 auto 0 0 !important;
+  width:32% !important; z-index:1 !important; pointer-events:none !important;
+  background:linear-gradient(100deg,transparent,#c2d4e214 18%,#bdcfdf55 45%,#e0ebf36b 55%,#a5b9c92e 70%,transparent) !important;
+  opacity:.85; will-change:transform;
+}
+html[data-cl-skin] body[data-skin="original"] .v2-app[data-module] .sc-current.sc-current[data-ui-state="paused"] { background:#29251f !important; border-color:#b89a69 !important; }
+html[data-cl-skin] body[data-skin="original"] .v2-app[data-module] .sc-current.sc-current[data-ui-state="paused"] .cl-current-flow-layer {
+  background:linear-gradient(100deg,transparent,#d8bd8e14 18%,#dec39155 45%,#f0dcac6b 55%,#d5b6792e 70%,transparent) !important;
+}
+html[data-cl-skin] body[data-skin="original"] .v2-app[data-module] .sc-current.sc-current[data-ui-state="stopped"] .cl-current-flow-layer { opacity:.22; }
+html[data-cl-skin] body[data-skin="original"] .v2-app[data-module] .sc-current.sc-current[data-ui-state="offline"] { background:#202226 !important; border-color:#60646b !important; box-shadow:none !important; }
+html[data-cl-skin] body[data-skin="original"] .v2-app[data-module] .sc-current.sc-current[data-ui-state="offline"] .cl-current-flow-layer { opacity:0; }
+html[data-cl-skin] body[data-skin="original"] .v2-app[data-module] .sc-current[data-ui-state] .sc-title { color:#f5f6f8 !important; text-shadow:0 1px 3px #0008 !important; }
+
+/* CL_FLOW_EFFECT_VARIANTS */
+
+/* Base commune */
+html[data-cl-skin] body[data-skin="original"] .cl-current-flow-layer {
+  transition: opacity .25s ease, filter .25s ease !important;
+}
+
+/* 1. HALO LARGE */
+html[data-cl-skin] body[data-skin="original"].flow-halo .cl-current-flow-layer {
+  width: 48% !important;
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(120,205,235,.42) 0%,
+      rgba(185,95,175,.24) 34%,
+      rgba(90,150,200,.10) 58%,
+      transparent 78%
+    ) !important;
+  filter: blur(10px) !important;
+  opacity: .95 !important;
+}
+
+/* 2. DOUBLE BANDE */
+html[data-cl-skin] body[data-skin="original"].flow-double .cl-current-flow-layer {
+  width: 44% !important;
+  background:
+    linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(220,90,180,.08) 15%,
+      rgba(220,90,180,.38) 28%,
+      transparent 43%,
+      rgba(80,190,225,.10) 55%,
+      rgba(80,190,225,.42) 70%,
+      transparent 88%
+    ) !important;
+  filter: blur(4px) !important;
+  opacity: .9 !important;
+}
+
+/* 3. VAGUE / NAPPE */
+html[data-cl-skin] body[data-skin="original"].flow-wave .cl-current-flow-layer {
+  width: 62% !important;
+  background:
+    radial-gradient(
+      ellipse at 42% 50%,
+      rgba(105,200,225,.32) 0%,
+      rgba(170,95,180,.22) 30%,
+      rgba(100,130,180,.10) 54%,
+      transparent 76%
+    ),
+    linear-gradient(
+      100deg,
+      transparent 0%,
+      rgba(110,180,220,.08) 30%,
+      rgba(220,110,185,.14) 50%,
+      rgba(100,200,225,.10) 68%,
+      transparent 100%
+    ) !important;
+  filter: blur(7px) !important;
+  opacity: .95 !important;
+}
+
+/* TEST TEMPORAIRE : HALO */
+html[data-cl-skin] body[data-skin="original"] .cl-current-flow-layer {
+  width: 48% !important;
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(120,205,235,.42) 0%,
+      rgba(185,95,175,.24) 34%,
+      rgba(90,150,200,.10) 58%,
+      transparent 78%
+    ) !important;
+  filter: blur(10px) !important;
+  opacity: .95 !important;
+}
+
+/* TEST VISUEL HALO LARGE VRAIMENT PRIORITAIRE */
+html[data-cl-skin] body[data-skin="original"]
+.v2-app[data-module]
+.sc-current.sc-current[data-ui-state]
+.cl-current-flow-layer {
+  width: 60% !important;
+
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(210,230,245,.52) 0%,
+      rgba(110,195,225,.40) 22%,
+      rgba(155,105,180,.26) 44%,
+      rgba(75,115,155,.10) 64%,
+      transparent 82%
+    ) !important;
+
+  filter: blur(12px) !important;
+  opacity: .95 !important;
+}
+
+/* Pause : même forme, mais chaude */
+html[data-cl-skin] body[data-skin="original"]
+.v2-app[data-module]
+.sc-current.sc-current[data-ui-state="paused"]
+.cl-current-flow-layer {
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(245,225,185,.52) 0%,
+      rgba(215,175,110,.34) 30%,
+      rgba(150,115,75,.16) 55%,
+      transparent 82%
+    ) !important;
+
+  opacity: .85 !important;
+}
+
+/* STOP : visible mais fixe */
+html[data-cl-skin] body[data-skin="original"]
+.v2-app[data-module]
+.sc-current.sc-current[data-ui-state="stopped"]
+.cl-current-flow-layer {
+  opacity: .45 !important;
+}
+
+/* OFFLINE reste neutre */
+html[data-cl-skin] body[data-skin="original"]
+.v2-app[data-module]
+.sc-current.sc-current[data-ui-state="offline"]
+.cl-current-flow-layer {
+  opacity: 0 !important;
+}
+
+
+/* TEST VISUEL : LUMIERE QUI GLISSE SUR UNE VITRE */
+
+html[data-cl-skin] body[data-skin="original"]
+.v2-app[data-module]
+.sc-current.sc-current[data-ui-state]
+.cl-current-flow-layer {
+  width: 52% !important;
+
+  background:
+    linear-gradient(
+      112deg,
+      transparent 0%,
+      transparent 18%,
+      rgba(255,255,255,.03) 28%,
+      rgba(205,230,245,.12) 36%,
+      rgba(225,242,252,.34) 46%,
+      rgba(155,205,230,.24) 54%,
+      rgba(185,130,190,.10) 62%,
+      rgba(255,255,255,.025) 70%,
+      transparent 82%,
+      transparent 100%
+    ) !important;
+
+  filter: blur(6px) !important;
+  opacity: .95 !important;
+
+  mix-blend-mode: screen !important;
+}
+
+/* Petit reflet secondaire pour donner une impression de vitre */
+html[data-cl-skin] body[data-skin="original"]
+.v2-app[data-module]
+.sc-current.sc-current[data-ui-state]
+.cl-current-flow-layer::after {
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+
+  background:
+    linear-gradient(
+      112deg,
+      transparent 0%,
+      transparent 42%,
+      rgba(255,255,255,.16) 48%,
+      rgba(255,255,255,.04) 54%,
+      transparent 62%
+    ) !important;
+
+  filter: blur(2px) !important;
+}
+
+/* PAUSE : reflet figé et légèrement plus chaud */
+html[data-cl-skin] body[data-skin="original"]
+.v2-app[data-module]
+.sc-current.sc-current[data-ui-state="paused"]
+.cl-current-flow-layer {
+  background:
+    linear-gradient(
+      112deg,
+      transparent 0%,
+      transparent 18%,
+      rgba(255,245,225,.04) 28%,
+      rgba(245,220,180,.16) 38%,
+      rgba(240,205,145,.34) 48%,
+      rgba(205,165,105,.18) 58%,
+      transparent 78%
+    ) !important;
+
+  opacity: .88 !important;
+}
+
+/* STOP : reflet fixe discret */
+html[data-cl-skin] body[data-skin="original"]
+.v2-app[data-module]
+.sc-current.sc-current[data-ui-state="stopped"]
+.cl-current-flow-layer {
+  opacity: .28 !important;
+}
+
+/* OFFLINE */
+html[data-cl-skin] body[data-skin="original"]
+.v2-app[data-module]
+.sc-current.sc-current[data-ui-state="offline"]
+.cl-current-flow-layer {
+  opacity: 0 !important;
+}
+
+
+/* CL_ORIGINAL_LIGHT_SHEET_V7
+   Grande nappe lumineuse diffuse : aucune barre / aucun scanner.
+*/
+
+html[data-cl-skin] body[data-skin="original"]
+.v2-app[data-module]
+.sc-current.sc-current[data-ui-state]
+.cl-current-flow-layer {
+  left: -22% !important;
+  top: -15% !important;
+  bottom: -15% !important;
+
+  width: 145% !important;
+
+  background:
+    radial-gradient(
+      ellipse 52% 80% at 38% 48%,
+      rgba(225,240,250,.20) 0%,
+      rgba(120,190,220,.15) 27%,
+      rgba(130,105,175,.10) 50%,
+      rgba(90,120,155,.04) 65%,
+      transparent 78%
+    ),
+    radial-gradient(
+      ellipse 42% 68% at 68% 56%,
+      rgba(140,205,225,.11) 0%,
+      rgba(190,125,185,.07) 38%,
+      transparent 73%
+    ) !important;
+
+  filter: blur(18px) !important;
+  mix-blend-mode: screen !important;
+
+  opacity: .78 !important;
+}
+
+/* Supprime le reflet secondaire des essais précédents */
+html[data-cl-skin] body[data-skin="original"]
+.v2-app[data-module]
+.sc-current .cl-current-flow-layer::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* PLAY : nappe présente et mobile */
+html[data-cl-skin] body[data-skin="original"]
+.v2-app[data-module]
+.sc-current.sc-current[data-ui-state="playing"]
+.cl-current-flow-layer {
+  opacity: .82 !important;
+}
+
+/* PAUSE : même nappe figée, légèrement chaude */
+html[data-cl-skin] body[data-skin="original"]
+.v2-app[data-module]
+.sc-current.sc-current[data-ui-state="paused"]
+.cl-current-flow-layer {
+  background:
+    radial-gradient(
+      ellipse 52% 80% at 38% 48%,
+      rgba(245,225,185,.19) 0%,
+      rgba(215,175,110,.13) 30%,
+      rgba(155,120,80,.07) 54%,
+      transparent 78%
+    ) !important;
+
+  opacity: .72 !important;
+}
+
+/* STOP : nappe fixe très discrète */
+html[data-cl-skin] body[data-skin="original"]
+.v2-app[data-module]
+.sc-current.sc-current[data-ui-state="stopped"]
+.cl-current-flow-layer {
+  opacity: .24 !important;
+}
+
+/* OFFLINE */
+html[data-cl-skin] body[data-skin="original"]
+.v2-app[data-module]
+.sc-current.sc-current[data-ui-state="offline"]
+.cl-current-flow-layer {
+  opacity: 0 !important;
+}
+
+
+/* CL_CURRENT_CHAMPAGNE_IDENTITY
+   Identité permanente de la scène EN COURS.
+*/
+
+html[data-cl-skin] body[data-skin="original"]
+.v2-app[data-module]
+.sc-current.sc-current[data-ui-state]:not([data-ui-state="offline"]) {
+  border-color: #b89a69 !important;
+
+  box-shadow:
+    inset 0 0 20px rgba(196,160,95,.08),
+    0 0 10px rgba(184,154,105,.12) !important;
+}
+
+html[data-cl-skin] body[data-skin="original"]
+.v2-app[data-module]
+.sc-current.sc-current[data-ui-state]:not([data-ui-state="offline"])
+.sc-title {
+  color: #e6cf9a !important;
+
+  text-shadow:
+    0 1px 2px rgba(0,0,0,.72),
+    0 0 8px rgba(230,207,154,.12) !important;
+}
+
+html[data-cl-skin] body[data-skin="original"]
+.v2-app[data-module]
+.sc-current.sc-current[data-ui-state]:not([data-ui-state="offline"])
+.sc-role {
+  color: #bfa66f !important;
+}
+
+/* PLAY : champagne + flow existant */
+html[data-cl-skin] body[data-skin="original"]
+.v2-app[data-module]
+.sc-current.sc-current[data-ui-state="playing"] {
+  border-color: #c2a66e !important;
+}
+
+/* PAUSE : même identité, fond légèrement plus chaud */
+html[data-cl-skin] body[data-skin="original"]
+.v2-app[data-module]
+.sc-current.sc-current[data-ui-state="paused"] {
+  background: #29251f !important;
+  border-color: #b89a69 !important;
+}
+
+/* STOP : toujours champagne, plus sobre */
+html[data-cl-skin] body[data-skin="original"]
+.v2-app[data-module]
+.sc-current.sc-current[data-ui-state="stopped"] {
+  border-color: #927b55 !important;
+}
+
+/* OFFLINE reste neutre */
+html[data-cl-skin] body[data-skin="original"]
+.v2-app[data-module]
+.sc-current.sc-current[data-ui-state="offline"] .sc-title {
+  color: #aeb4bc !important;
+  text-shadow: none !important;
+}
+
+
+/* CL_GO_AQUA_3D
+   Grand GO : vert d'eau clair, bombé, relief physique.
+*/
+
+html[data-cl-skin] body[data-skin="original"]
+.v2-app[data-module]
+:is(.go-button,#abSceneConfirm,#goBtn) {
+
+  color: #173c3a !important;
+
+  background:
+    linear-gradient(
+      180deg,
+      #d8fff5 0%,
+      #b8eee3 18%,
+      #8fd5cb 52%,
+      #69b8b0 82%,
+      #559f99 100%
+    ) !important;
+
+  border:
+    1px solid #79c9bf !important;
+
+  border-bottom-color:
+    #3e817d !important;
+
+  border-radius:
+    12px !important;
+
+  text-shadow:
+    0 1px 0 rgba(255,255,255,.58) !important;
+
+  box-shadow:
+    inset 0 2px 1px rgba(255,255,255,.75),
+    inset 0 -3px 5px rgba(38,105,101,.20),
+    0 3px 0 #397975,
+    0 5px 9px rgba(0,0,0,.28) !important;
+
+  transform:
+    translateY(0) !important;
+
+  transition:
+    transform .08s ease,
+    box-shadow .08s ease,
+    filter .12s ease !important;
+}
+
+/* Survol : juste un peu plus lumineux */
+html[data-cl-skin] body[data-skin="original"]
+.v2-app[data-module]
+:is(.go-button,#abSceneConfirm,#goBtn):hover:not(:disabled) {
+
+  filter:
+    brightness(1.06) !important;
+}
+
+/* Appui : le bouton s'enfonce réellement */
+html[data-cl-skin] body[data-skin="original"]
+.v2-app[data-module]
+:is(.go-button,#abSceneConfirm,#goBtn):active:not(:disabled) {
+
+  transform:
+    translateY(3px) !important;
+
+  box-shadow:
+    inset 0 2px 4px rgba(30,90,86,.24),
+    inset 0 -1px 1px rgba(255,255,255,.40),
+    0 1px 0 #397975,
+    0 2px 4px rgba(0,0,0,.20) !important;
+}
+
+
+/* CL_ORIGINAL_RESTORE_TIMERS
+   Restaure les affichages TEMPS / RESTANT / DUREE du skin Original.
+*/
+
+html[data-cl-skin] body[data-skin="original"]
+.v2-app[data-module] .sc-time {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-end !important;
+  gap: 3px !important;
+  flex-shrink: 0 !important;
+  min-width: 6ch !important;
+}
+
+html[data-cl-skin] body[data-skin="original"]
+.v2-app[data-module] .sc-time-label {
+  display: block !important;
+  color: #9ea7b3 !important;
+  font: 700 8px/1.2 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif !important;
+  letter-spacing: .12em !important;
+}
+
+html[data-cl-skin] body[data-skin="original"]
+.v2-app[data-module] .sc-time strong {
+  display: block !important;
+  color: #e6cf9a !important;
+  font: 650 22px/1 ui-monospace,SFMono-Regular,Menlo,monospace !important;
+  font-variant-numeric: tabular-nums !important;
+  letter-spacing: -.04em !important;
+}
