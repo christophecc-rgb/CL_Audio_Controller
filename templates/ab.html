@@ -1701,16 +1701,18 @@
 
     <section class="card deck-screen" id="abNowCard" aria-live="polite">
       <div class="display-stack">
-        <div class="title-box title-box-current" id="currentTitleCard">
-          <div class="now-label">TITRE EN COURS</div>
-          <div class="now-title" id="abCurrentTitle">—</div>
-          <div class="current-remaining" id="abRemaining">Temps restant · --:--</div>
+        <div class="sc-card sc-current title-box title-box-current" id="currentTitleCard">
+        <div class="sc-card-header current-card-header"><div class="sc-role now-label">TITRE EN COURS</div><div class="sc-time current-card-timer" aria-hidden="true" data-time-source="abRemaining"><span class="sc-time-label">TEMPS</span><strong>--:--</strong></div></div>
+        <div class="sc-title now-title" id="abCurrentTitle">—</div>
+        <div class="sc-source-time current-remaining" id="abRemaining">Temps restant · --:--</div>
+        <div class="sc-card-footer"><span class="sc-state-badge current-state-badge">—</span><span class="sc-channel">01 / CURRENT</span><span class="sc-go-feedback" aria-hidden="true">GO</span></div>
         </div>
         <div class="arrow" aria-hidden="true">↓</div>
-        <div class="title-box title-box-next" id="nextTitleCard">
-          <div class="now-label">PROCHAIN</div>
-          <div class="next-title" id="abNextTitle">—</div>
-          <div class="next-duration" id="abNextDuration">Durée · --:--</div>
+        <div class="sc-card sc-next title-box title-box-next" id="nextTitleCard">
+        <div class="sc-card-header current-card-header"><div class="sc-role now-label">PROCHAIN</div><div class="sc-time current-card-timer" aria-hidden="true" data-time-source="abNextDuration"><span class="sc-time-label">TEMPS</span><strong>--:--</strong></div></div>
+        <div class="sc-title next-title" id="abNextTitle">—</div>
+        <div class="sc-source-time next-duration" id="abNextDuration">Durée · --:--</div>
+        <div class="sc-card-footer"><span class="sc-state-badge current-state-badge">—</span><span class="sc-channel">02 / NEXT</span><span class="sc-go-feedback" aria-hidden="true">GO</span></div>
         </div>
         <div class="counter" id="abCounter" style="display:none;">—</div>
       </div>
@@ -1747,7 +1749,15 @@
 
 
     <div class="small">Interface verrouillée : A / B / sélection titre uniquement.</div>
-  </main>
+    <details class="advanced-options"><summary>Options avancées</summary></details>
+</main>
+  <link rel="stylesheet" href="/static/skins/original.css?v=20260925-skins">
+  <link rel="stylesheet" href="/static/skins/broadcast.css?v=20260925-skins">
+  <link rel="stylesheet" href="/static/skins/theatre.css?v=20260925-skins">
+  <link rel="stylesheet" href="/static/skins/show-control.css?v=20260925-skins">
+  <link rel="stylesheet" href="/static/skins/neon.css?v=20260925">
+  <link rel="stylesheet" href="/static/skins/visual-settings.css?v=20260925">
+
 
   <script>
     document.body.classList.toggle('desktop-embed', new URLSearchParams(window.location.search).get('desktop') === '1');
@@ -2520,5 +2530,7 @@
     }, { once: true });
   </script>
   <script src="/static/cl-skins.js?v=20260827-142046" defer></script>
+  <script src="/static/skins/skin-switcher.js?v=20260925-skins" defer></script>
+  <script src="/static/skins/presentation.js?v=20260925-skins" defer></script>
 </body>
 </html>

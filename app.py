@@ -546,7 +546,6 @@ def decorate_remote_page_html(response):
         for key, href, label in (
             ("session", "/", "Session"),
             ("arrangement", "/arrangement", "Arrangement"),
-            ("showcue", "/show-info", "ShowCue"),
         )
     )
     header_html = f"""
@@ -2576,7 +2575,7 @@ def refresh_arrangement_time():
         generation = int(state.get("set_generation", 0))
     res = query(
         "/live/song/get/current_song_time",
-        timeout=0.035,
+        timeout=0.20,
         expected_generation=generation,
     )
     if not res:
@@ -2617,6 +2616,15 @@ def refresh_arrangement_time():
 
         state["last_arrangement_time"] = previous_time
         state["arrangement_time"] = float(value)
+
+        # current_song_time Ableton est en beats.
+        # Valeur séparée uniquement destinée à l'affichage du temps musical absolu.
+        state["arrangement_time_seconds"] = (
+            float(value) * 60.0 / float(tempo)
+            if tempo is not None and tempo > 0
+            else None
+        )
+
         state["arrangement_time_label"] = format_time_label(value)
         # Ne pas recalculer les cue points ici : cela peut déclencher des appels OSC
         # dans le thread de fond et finir par bloquer /status après quelques minutes.
@@ -2661,6 +2669,23 @@ def refresh_arrangement_time():
             elapsed_seconds = (
                 elapsed_beats * 60.0 / float(tempo)
             )
+
+            # Compteur dédié à l'affichage Arrangement.
+            # La durée vient du nom du locator courant
+            # ex: "32. Supreme ; BPM ; KEY ; 3:40".
+            # Aucun calcul avec le locator suivant.
+            arrangement_duration_seconds = parse_scene_duration_seconds(current_marker)
+
+            if arrangement_duration_seconds is not None:
+                arrangement_duration_seconds = float(arrangement_duration_seconds)
+                state["arrangement_remaining_seconds"] = max(
+                    0.0,
+                    arrangement_duration_seconds - elapsed_seconds,
+                )
+                state["arrangement_duration_seconds"] = arrangement_duration_seconds
+            else:
+                state["arrangement_remaining_seconds"] = None
+                state["arrangement_duration_seconds"] = None
 
             next_marker_time = None
 

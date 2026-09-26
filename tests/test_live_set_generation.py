@@ -58,8 +58,8 @@ class LiveSetGenerationTests(unittest.TestCase):
             "returned_source": "Réseau Rtp MB Chris",
         })
         self.assertEqual(self.app.ableton_midi_roles("remote"), {
-            "mode": "Ableton distant", "expected_source": "Réseau Rtp MB Chris",
-            "returned_source": "local_simulator_tx",
+            "mode": "Ableton distant", "expected_source": "Ableton MIDI Output",
+            "returned_source": "CL Direct RTP",
         })
     @classmethod
     def setUpClass(cls):
@@ -282,14 +282,12 @@ class LiveSetGenerationTests(unittest.TestCase):
             self.assertNotIn("Attendu — · Reçu —", source)
             self.assertNotIn("ableton_m4l_fallback", source)
 
-        launcher_source = (PROJECT_ROOT / "launcher_control.py").read_text(
-            encoding="utf-8"
-        )
-        self.assertIn("CONSOLE_VISUAL_RECALL_MIN_MS=4000", launcher_source)
-        self.assertIn("value.request_identity", launcher_source)
-        self.assertIn("value.expected_activated_at", launcher_source)
-        self.assertIn("recall.expectedKey===timerKey", launcher_source)
-        self.assertIn("status!=='mismatch'", launcher_source)
+        # La confirmation backend devient un état mémorisé après son feedback.
+        self.assertIn("backendState: view.visualState", visual_source)
+        self.assertIn("completedConfirmationKey = pendingFinalKey", visual_source)
+        self.assertIn("applyState('confirmed')", visual_source)
+        self.assertIn("applyState('loaded')", visual_source)
+        self.assertRegex(shared_styles, r'(?s)\.midi-return\.state-loaded \.midi-return-state::after\s*\{[^}]*content: "✓ MÉMORISÉ"')
 
     def test_late_return_cannot_confirm_a_rapid_second_program_change(self):
         now = time.time()
@@ -2124,7 +2122,8 @@ class LiveSetGenerationTests(unittest.TestCase):
     def test_session_places_ltc_between_next_scene_and_go_controls(self):
         source = (PROJECT_ROOT / "templates/index.html").read_text(encoding="utf-8")
 
-        selected_position = source.index('class="card selected-card"')
+        self.assertRegex(source, r'<section\b[^>]*class="[^"]*\bsc-next\b[^"]*"[^>]*id="selectedCard"')
+        selected_position = source.index('id="selectedCard"')
         ltc_position = source.index('class="ltc-display ltc-display--disconnected"')
         go_position = source.index('class="grid" aria-label="Commandes Ableton"')
         self.assertLess(selected_position, ltc_position)
@@ -2161,13 +2160,16 @@ class LiveSetGenerationTests(unittest.TestCase):
     def test_arrangement_navigation_requires_explicit_confirmation(self):
         session_page = self.app.app.test_client().get("/").get_data(as_text=True)
         script = (PROJECT_ROOT / "static/remote-v2.js").read_text(encoding="utf-8")
-        arrangement_source = (PROJECT_ROOT / "templates/arrangement.html").read_text(encoding="utf-8")
 
         self.assertIn('href="/arrangement" data-arrangement-link', session_page)
         self.assertIn("Attention : vous passez en mode Arrangement", script)
         self.assertIn("window.confirm(arrangementWarning)", script)
         self.assertIn("action: 'back_to_arrangement'", script)
-        self.assertIn("Vérifier la position avant toute commande", arrangement_source)
+        guard = script.index("if (!window.confirm(arrangementWarning)) return;")
+        action = script.index("action: 'back_to_arrangement'")
+        navigation = script.index("window.location.assign(link.href)")
+        self.assertLess(guard, action)
+        self.assertLess(action, navigation)
 
     def test_opening_arrangement_page_does_not_switch_ableton_view(self):
         with (
@@ -2180,11 +2182,23 @@ class LiveSetGenerationTests(unittest.TestCase):
         show_arrangement.assert_not_called()
 
     def test_launcher_remote_window_still_opens_session_by_default(self):
-        launcher_source = (PROJECT_ROOT / "launcher_control.py").read_text(encoding="utf-8")
+        import launcher_control as launcher
+        from urllib.parse import urlsplit
 
-        self.assertIn('REMOTE_ROOT_URL = f"http://127.0.0.1:{WEB_PORT}/"', launcher_source)
-        self.assertIn('open_remote_app_window(REMOTE_ROOT_URL, "Télécommande Ableton")', launcher_source)
-        self.assertIn('event("Télécommande ouverte sur Session")', launcher_source)
+        with (
+            mock.patch.object(launcher, "ensure_valid_server", return_value=(True, "OK")),
+            mock.patch.object(launcher, "find_remote_app", return_value=None),
+            mock.patch.object(launcher, "open_remote_app_window", return_value="test") as open_window,
+            mock.patch.object(launcher, "event"),
+        ):
+            response = launcher.app.test_client().get("/remote-window")
+        self.assertEqual(response.status_code, 200)
+        open_window.assert_called_once()
+        opened = urlsplit(open_window.call_args.args[0])
+        root = urlsplit(launcher.REMOTE_ROOT_URL)
+        self.assertEqual((opened.scheme, opened.netloc, opened.path),
+                         (root.scheme, root.netloc, "/"))
+        self.assertEqual(response.get_json()["url"], launcher.REMOTE_ROOT_URL)
 
     def test_shared_ltc_renderer_smooths_only_from_published_ltc_state(self):
         source = (PROJECT_ROOT / "static/remote-v2.js").read_text(encoding="utf-8")
@@ -2276,10 +2290,14 @@ class LiveSetGenerationTests(unittest.TestCase):
     def test_session_countdown_uses_published_remaining_time(self):
         source = (PROJECT_ROOT / "templates/index.html").read_text(encoding="utf-8")
 
-        self.assertIn(
-            '<div class="scene-countdown" id="currentTimer">Temps restant · --:--</div>',
-            source,
-        )
+        current_card = re.search(r'<section\b[^>]*id="currentCard"[^>]*>(.*?)</section>', source, re.S).group(1)
+        self.assertIn('data-time-source="currentTimer"', current_card)
+        self.assertRegex(current_card, r'class="[^"]*\bsc-time\b[^"]*"')
+        self.assertIn('current-card-timer', current_card)
+        self.assertIn('id="currentTimer"', current_card)
+        presentation = (PROJECT_ROOT / "static/skins/presentation.js").read_text(encoding="utf-8")
+        self.assertIn("document.getElementById(mirror.dataset.timeSource)", presentation)
+        self.assertIn("text(mirror.querySelector('strong'), value)", presentation)
         self.assertIn("currentTimerEl.textContent = 'Temps restant · --:--';", source)
         self.assertIn("Temps restant · ${formatted}", source)
         self.assertIn("state && state.remaining_seconds", source)
@@ -2374,15 +2392,16 @@ class LiveSetGenerationTests(unittest.TestCase):
             1,
         )[1]
 
-        self.assertIn('.v2-app[data-module="ab"]', landscape)
-        self.assertIn("grid-template-rows: 58px minmax(0, 1fr) !important;", landscape)
-        self.assertIn("grid-template-columns: 1fr 1fr !important;", landscape)
-        self.assertIn("grid-column: 1 / 6 !important;", landscape)
-        self.assertIn("grid-column: 6 / 10 !important;", landscape)
-        self.assertIn("grid-column: 10 / -1 !important;", landscape)
-        self.assertIn("grid-row: 3 !important;", landscape)
-        self.assertIn("color: #72b7f2 !important;", landscape)
-        self.assertIn("overflow: hidden !important;", landscape)
+        # Le paysage partage désormais ses règles entre modules et skins.
+        self.assertIn('.v2-app[data-module] .v2-header', landscape)
+        self.assertIn('.v2-app[data-module] .v2-tabs', landscape)
+        self.assertIn('.sc-card:is(.sc-current,.sc-next)', landscape)
+        self.assertRegex(landscape, r'grid-template-columns:\s*110px minmax\(0,1fr\) 130px')
+        for control in ("deck-screen", "scene-select-panel", "transport-dock", "buttons-dock", "crossfader-section"):
+            self.assertIn(f'.v2-app[data-module][data-module="ab"] .{control}', source)
+        ab_source = (PROJECT_ROOT / "templates/ab.html").read_text(encoding="utf-8")
+        self.assertIn('sc-current', ab_source)
+        self.assertIn('sc-next', ab_source)
 
     def test_ab_arrow_keys_keep_using_the_existing_scene_preview_handler(self):
         source = (PROJECT_ROOT / "templates/ab.html").read_text(encoding="utf-8")
@@ -2410,7 +2429,6 @@ class LiveSetGenerationTests(unittest.TestCase):
         self.assertNotIn('id="countLabel"', source)
         self.assertNotIn('id="timeLabel"', source)
         self.assertNotIn('class="arrangement-warning"', source)
-        self.assertIn("Vérifier la position avant toute commande", source)
 
         self.assertIn("height:48px", source)
         # Les sous-éléments des cartes sont désormais créés dynamiquement

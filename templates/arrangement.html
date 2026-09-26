@@ -678,7 +678,7 @@ body.is-arrangement-paused .card.current {
 </style>
   <link rel="stylesheet" href="/static/cl-skins.css?v=20260829-ql1-cyan-pulse">
 </head>
-<body>
+<body class="cl-arrangement-view">
   <main class="wrap">
     <div class="status disconnected" id="status">Connexion…</div>
     <nav class="topnav"><a href="/">Session</a><a href="/ab">A/B</a><a href="/arrangement" class="active">Arrangement</a></nav>
@@ -691,17 +691,19 @@ body.is-arrangement-paused .card.current {
     </section>
 
   <div class="main">
-  <section style="display:flex; flex-direction:column; gap:8px">
-    <section class="card current" id="currentCard" aria-live="polite">
-      <div class="label" id="currentModeLabel">MODE ARRANGEMENT</div>
-      <div class="scene-name" id="currentName">—</div>
-      <div class="meta" id="currentMeta">Aucun repère lancé</div>
+  <section class="sc-conduite" style="display:flex; flex-direction:column; gap:8px">
+    <section class="sc-card sc-current card current" id="currentCard" aria-live="polite">
+        <div class="sc-card-header current-card-header"><div class="sc-role label" id="currentModeLabel">MODE ARRANGEMENT</div><div class="sc-time current-card-timer" aria-hidden="true" data-time-source="currentMeta"><span class="sc-time-label">TEMPS</span><strong>--:--</strong></div></div>
+        <div class="sc-title scene-name" id="currentName">—</div>
+        <div class="sc-source-time meta" id="currentMeta">Aucun repère lancé</div>
+        <div class="sc-card-footer"><span class="sc-state-badge current-state-badge">—</span><span class="sc-channel">01 / CURRENT</span><span class="sc-go-feedback" aria-hidden="true">GO</span></div>
     </section>
 
-    <section class="card next" aria-live="polite">
-      <div class="label">Prochaine scène sélectionnée</div>
-      <div class="scene-name" id="nextName">—</div>
-      <div class="meta" id="nextMeta">—</div>
+    <section class="sc-card sc-next card next" aria-live="polite">
+        <div class="sc-card-header current-card-header"><div class="sc-role label">Prochaine scène sélectionnée</div><div class="sc-time current-card-timer" aria-hidden="true" data-time-source="nextMeta"><span class="sc-time-label">TEMPS</span><strong>--:--</strong></div></div>
+        <div class="sc-title scene-name" id="nextName">—</div>
+        <div class="sc-source-time meta" id="nextMeta">—</div>
+        <div class="sc-card-footer"><span class="sc-state-badge current-state-badge">—</span><span class="sc-channel">02 / NEXT</span><span class="sc-go-feedback" aria-hidden="true">GO</span></div>
     </section>
 
     <button class="go big-go" id="goBtn" type="button">GO</button>
@@ -714,11 +716,41 @@ body.is-arrangement-paused .card.current {
     <div class="transport-row" aria-label="Transport Arrangement">
       <button class="grey transport-toggle" id="pauseToggleBtn" data-action="arrangement_toggle" type="button">
       </button>
-      <div class="arrangement-indicator" id="arrangementIndicator" role="status"><strong id="arrangementIndicatorTitle">ARRANGEMENT ACTIF</strong><small>Vérifier la position avant toute commande</small></div>
+      <div class="cl-arr-xfader-test" id="arrangementXfaderTest">
+        <div class="cl-arr-xfader-test-title">X-FADER VOIX</div>
+
+        <div class="cl-arr-xfader-test-line">
+          <div class="cl-arr-xfader-test-a">
+            <strong>A</strong>
+            <span>MUSIQUE</span>
+          </div>
+
+          <input
+            class="cl-arr-xfader-test-range"
+            type="range"
+            min="-1"
+            max="1"
+            value="-1"
+            step="0.01"
+            aria-label="Crossfader voix — prototype visuel"
+          >
+
+          <div class="cl-arr-xfader-test-b">
+            <strong>B</strong>
+            <span>MUSIQUE + VOIX</span>
+          </div>
+        </div>
+
+        <div class="cl-arr-xfader-test-state" id="arrangementXfaderTestState">
+          PLAYBACK SEUL
+        </div>
+
+        <span id="arrangementIndicatorTitle" hidden>ARRANGEMENT ACTIF</span>
+      </div>
     </div>
   </section>
 
-  <section style="display:flex; flex-direction:column; gap:10px">
+  <section class="sc-locator" style="display:flex; flex-direction:column; gap:10px">
 
     <section class="card">
       <div class="label">Scène — aller à</div>
@@ -733,7 +765,15 @@ body.is-arrangement-paused .card.current {
 
 
 
+  <details class="advanced-options"><summary>Options avancées</summary></details>
 </main>
+  <link rel="stylesheet" href="/static/skins/original.css?v=20260925-skins">
+  <link rel="stylesheet" href="/static/skins/broadcast.css?v=20260925-skins">
+  <link rel="stylesheet" href="/static/skins/theatre.css?v=20260925-skins">
+  <link rel="stylesheet" href="/static/skins/show-control.css?v=20260925-skins">
+  <link rel="stylesheet" href="/static/skins/neon.css?v=20260925">
+  <link rel="stylesheet" href="/static/skins/visual-settings.css?v=20260925">
+
 
 
   <script src="/static/midi-return-visual.js?v=20260829-visual-recall-4s"></script>
@@ -768,6 +808,8 @@ body.is-arrangement-paused .card.current {
 
     let arrangementReturnActive = false;
     let latestArrangementTime = 0;
+    let latestArrangementRemainingSeconds = null;
+    let latestArrangementTimeSeconds = 0;
     let lastAcceptedGeneration = -1;
 
     function resetArrangementUiForGeneration() {
@@ -879,38 +921,114 @@ body.is-arrangement-paused .card.current {
         : null;
     }
 
-    function renderConduiteTimes(current, currentIdx, next, nextIdx) {
-      const playhead = Math.max(0, Number(latestArrangementTime) || 0);
+    function normalizeDurationName(value) {
+      return String(value || '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/\bcancans\b/g, 'cancan')
+        .replace(/\btraditionnel(?:le)?\b/g, 'tradi')
+        .replace(/\btraditional\b/g, 'tradi')
+        .replace(/\b\d+\b/g, ' ')
+        .replace(/\b(?:bpm|key|db)\b/g, ' ')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
 
-      if (current && currentIdx >= 0) {
-        const start = Number(current.time || 0);
-        const elapsed = Math.max(0, playhead - start);
+    function durationFromMappedTitle(value) {
+      const raw = String(value || '');
+      const match = raw.match(/(?:^|[;\s])(\d{1,2}):(\d{2})\s*$/);
+      if (!match) return null;
 
-        let remaining = null;
+      const minutes = Number(match[1]);
+      const seconds = Number(match[2]);
 
-        if (markers[currentIdx + 1]) {
-          const end = Number(markers[currentIdx + 1].time || 0);
-          remaining = Math.max(0, end - playhead);
+      if (!Number.isFinite(minutes) || !Number.isFinite(seconds) || seconds >= 60) {
+        return null;
+      }
+
+      return minutes * 60 + seconds;
+    }
+
+    function mappedDurationForMarker(marker) {
+      if (!marker || !lastState) return null;
+
+      const wanted = normalizeDurationName(marker.name);
+      if (!wanted) return null;
+
+      const wantedTokens = wanted.split(' ').filter(Boolean);
+      const sceneMap = lastState.console_scene_map || {};
+
+      let best = null;
+
+      for (const consoleMap of Object.values(sceneMap)) {
+        if (!consoleMap || typeof consoleMap !== 'object') continue;
+
+        for (const entries of Object.values(consoleMap)) {
+          if (!Array.isArray(entries)) continue;
+
+          for (const entry of entries) {
+            const duration = durationFromMappedTitle(entry && entry.title);
+            if (duration === null) continue;
+
+            const candidate = normalizeDurationName(entry.title);
+            if (!candidate) continue;
+
+            const candidateTokens = candidate.split(' ').filter(Boolean);
+
+            let score = 0;
+            for (const token of wantedTokens) {
+              if (candidateTokens.includes(token)) score += 1;
+            }
+
+            if (candidate === wanted) score += 10;
+            else if (candidate.includes(wanted) || wanted.includes(candidate)) score += 5;
+
+            if (!best || score > best.score) {
+              best = { score, duration, title: entry.title };
+            }
+          }
         }
+      }
+
+      return best && best.score >= Math.max(1, Math.ceil(wantedTokens.length * 0.6))
+        ? best.duration
+        : null;
+    }
+
+    function renderConduiteTimes(current, currentIdx, next, nextIdx) {
+      const currentDuration = mappedDurationForMarker(current);
+
+      if (
+        current &&
+        currentIdx >= 0 &&
+        currentDuration !== null
+      ) {
+        const markerStartSeconds =
+          Number(current.time || 0) / 2;
+
+        const elapsed =
+          Math.max(0, latestArrangementTimeSeconds - markerStartSeconds);
+
+        const remaining =
+          Math.max(0, currentDuration - elapsed);
 
         currentMetaEl.textContent =
-          'Temps en cours ' + formatConduiteDuration(elapsed) +
-          (remaining !== null
-            ? '  ·  Restant ' + formatConduiteDuration(remaining)
-            : '');
+          'Restant ' + formatConduiteDuration(remaining);
       } else {
         currentMetaEl.textContent = '';
       }
 
-      if (next && nextIdx >= 0) {
-        const start = Number(next.time || 0);
-        const duration = markerDuration(nextIdx);
+      const nextDuration = mappedDurationForMarker(next);
 
+      if (
+        next &&
+        nextIdx >= 0 &&
+        nextDuration !== null
+      ) {
         nextMetaEl.textContent =
-          'Début ' + formatConduiteDuration(start) +
-          (duration !== null
-            ? '  ·  Durée ' + formatConduiteDuration(duration)
-            : '');
+          'Durée ' + formatConduiteDuration(nextDuration);
       } else {
         nextMetaEl.textContent = '';
       }
@@ -1111,6 +1229,18 @@ body.is-arrangement-paused .card.current {
       latestArrangementTime = Math.max(
         0,
         Number(state && state.arrangement_time || 0)
+      );
+
+      latestArrangementRemainingSeconds =
+        state &&
+        state.arrangement_remaining_seconds !== null &&
+        state.arrangement_remaining_seconds !== undefined
+          ? Math.max(0, Number(state.arrangement_remaining_seconds))
+          : null;
+
+      latestArrangementTimeSeconds = Math.max(
+        0,
+        Number(state && state.arrangement_time_seconds || 0)
       );
 
       setMarkers(state && state.arrangement_markers, state);
@@ -1526,5 +1656,183 @@ markerSelectEl.addEventListener('change', () => {
     }, { once: true });
   </script>
   <script src="/static/cl-skins.js?v=20260829-animation-audit" defer></script>
+  <script src="/static/skins/skin-switcher.js?v=20260925-skins" defer></script>
+  <script src="/static/skins/presentation.js?v=20260925-skins" defer></script>
+
+<script id="cl-arrangement-xfader-test-script">
+(() => {
+  const box = document.getElementById('arrangementXfaderTest');
+  if (!box) return;
+
+  const slider = box.querySelector('.cl-arr-xfader-test-range');
+  const stateEl = document.getElementById('arrangementXfaderTestState');
+
+  if (!slider || !stateEl) return;
+
+  let dragging = false;
+  let sendTimer = null;
+  let lastSentValue = null;
+  let lastRemoteValue = null;
+
+  function clamp(value) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) return -1;
+    return Math.max(-1, Math.min(1, number));
+  }
+
+  function percentFromValue(value) {
+    return Math.round(((clamp(value) + 1) / 2) * 100);
+  }
+
+  function render(value) {
+    const v = clamp(value);
+    const pct = percentFromValue(v);
+
+    slider.value = String(v);
+    slider.setAttribute('aria-valuenow', String(v));
+
+    box.dataset.value = String(v);
+
+    if (v <= -0.95) {
+      box.dataset.zone = 'a';
+      stateEl.textContent = 'A · PLAYBACK';
+    } else if (v >= 0.95) {
+      box.dataset.zone = 'b';
+      stateEl.textContent = 'B · PLAYBACK + VOIX';
+    } else {
+      box.dataset.zone = 'mix';
+      stateEl.textContent = 'VOIX ' + pct + ' %';
+    }
+  }
+
+  async function sendValue(value) {
+    const v = clamp(value);
+
+    if (
+      lastSentValue !== null &&
+      Math.abs(v - lastSentValue) < 0.0001
+    ) {
+      return;
+    }
+
+    lastSentValue = v;
+
+    try {
+      const response = await fetch('/action', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        cache: 'no-store',
+        body: JSON.stringify({
+          action: 'xfade_value',
+          value: v
+        })
+      });
+
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok) {
+        throw new Error(
+          data && data.message
+            ? data.message
+            : 'Commande X-Fader refusée'
+        );
+      }
+
+      if (
+        !dragging &&
+        data &&
+        data.state &&
+        typeof data.state.crossfader !== 'undefined'
+      ) {
+        const confirmed = clamp(data.state.crossfader);
+        lastRemoteValue = confirmed;
+        render(confirmed);
+      }
+    } catch (error) {
+      console.warn('[ARRANGEMENT X-FADER] envoi impossible', error);
+    }
+  }
+
+  function queueSend(value) {
+    const v = clamp(value);
+
+    clearTimeout(sendTimer);
+
+    sendTimer = setTimeout(() => {
+      sendValue(v);
+    }, 70);
+  }
+
+  slider.addEventListener('pointerdown', () => {
+    dragging = true;
+  });
+
+  window.addEventListener('pointerup', () => {
+    if (!dragging) return;
+
+    dragging = false;
+
+    clearTimeout(sendTimer);
+    sendValue(slider.value);
+  });
+
+  slider.addEventListener('input', () => {
+    const value = clamp(slider.value);
+
+    render(value);
+    queueSend(value);
+  });
+
+  slider.addEventListener('change', () => {
+    clearTimeout(sendTimer);
+    sendValue(slider.value);
+  });
+
+  async function syncFromStatus() {
+    if (dragging) return;
+
+    try {
+      const response = await fetch('/status', {
+        cache: 'no-store'
+      });
+
+      if (!response.ok) return;
+
+      const state = await response.json();
+
+      if (
+        typeof state.crossfader === 'undefined' ||
+        state.crossfader === null
+      ) {
+        return;
+      }
+
+      const remoteValue = clamp(state.crossfader);
+
+      if (
+        lastRemoteValue === null ||
+        Math.abs(remoteValue - lastRemoteValue) >= 0.001
+      ) {
+        lastRemoteValue = remoteValue;
+        render(remoteValue);
+      }
+    } catch (_) {
+      // Le reste de la télécommande gère déjà l'état de connexion.
+    }
+  }
+
+  render(slider.value);
+  syncFromStatus();
+
+  window.setInterval(syncFromStatus, 500);
+
+  console.info(
+    '[ARRANGEMENT X-FADER] vrai contrôle Ableton actif'
+  );
+})();
+</script>
+
 </body>
 </html>
