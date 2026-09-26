@@ -73,8 +73,7 @@ def import_session(data, root, registry):
             raise ValueError('Archive ShowCue invalide') from exc
         document = load_show_document(staging / 'show_cues.json')
         save_show_document(staging / 'show_cues.json', document)
-        if (staging / 'showcue_builder.json').exists():
-            save_builder_document(staging / 'showcue_builder.json', load_builder_document(staging / 'showcue_builder.json'))
+        save_builder_document(staging / 'showcue_builder.json', load_builder_document(staging / 'showcue_builder.json'))
         for cue in document['cues']:
             if cue.get('audio') and not (staging / 'show_cues_audio' / cue['audio']['filename']).is_file():
                 raise ValueError('Audio référencé absent de l’archive')

@@ -180,6 +180,14 @@ def initialize_show_cue_sessions(data_directory: Path, historical_directories=()
         load_show_document(active_directory / "show_cues.json")
         return registry
 
+    # A missing registry must not hide existing sessions behind a new initial one.
+    sessions_directory = data_directory / "Sessions"
+    if sessions_directory.exists() and any(sessions_directory.iterdir()):
+        raise ValueError(f"Registre absent : {registry_path}. Sessions existantes conservées ; restauration du registre nécessaire.")
+    for historical in historical_directories:
+        if (Path(historical) / "sessions.json").exists():
+            raise ValueError(f"Registre historique trouvé dans {historical}. Migration des sessions nécessaire ; aucune réinitialisation effectuée.")
+
     legacy_path, _ = initialize_show_cue_storage(data_directory, historical_directories)
     initial_id = "session_initiale"
     initial_directory = session_directory(data_directory, initial_id)

@@ -6768,33 +6768,6 @@ header.top > details:not(.cue-v2-menu):not(.cue-v2-status-details){
 
 </body></html>
 
-<script id="cl-transport-resources">
-(async function(){
-    const panel=document.createElement('details');
-    panel.className='validation';
-    panel.innerHTML='<summary>RESSOURCES CL</summary><div id="cl-libraries"></div><div id="cl-sessions"></div><a href="/show-info/builder/sessions/export">EXPORTER LA SESSION</a> <label>IMPORTER UNE SESSION <input id="cl-session-upload" type="file" accept=".showcue.zip"></label><div id="cl-import-result"></div>';
-    document.querySelector('header.top').append(panel);
-    async function importArchive(body){
-        try{
-            await save();
-            const result=await api('/show-info/builder/sessions/import',{method:'POST',body});
-            const output=document.getElementById('cl-import-result');
-            output.textContent='Session importée : '+result.imported_session.name+'. La session active est conservée. ';
-            const button=document.createElement('button');button.textContent='OUVRIR CETTE SESSION';
-            button.onclick=async()=>{try{await save();await api('/show-info/sessions/'+result.imported_session.id+'/activate',{method:'POST',body:'{}'});location.reload()}catch(error){output.textContent=error.message}};
-            output.append(button);
-        }catch(error){document.getElementById('cl-import-result').textContent=error.message}
-    }
-    document.getElementById('cl-session-upload').onchange=event=>{if(!event.target.files.length)return;const form=new FormData();form.append('file',event.target.files[0]);importArchive(form);event.target.value=''};
-    try{
-        const data=await api('/show-info/builder/resources');
-        for(const [consoleName,value] of Object.entries(data.libraries)){
-            const row=document.createElement('div');row.textContent=consoleName.toUpperCase()+' — '+value.count+' entrées — '+value.source+' — '+value.path;document.getElementById('cl-libraries').append(row);
-        }
-        const sessions=document.getElementById('cl-sessions');sessions.textContent='Sessions ShowCue : '+data.sessions.length+' disponibles';
-        for(const item of data.sessions){const row=document.createElement('div'),button=document.createElement('button');row.textContent=item.name+' — '+item.source+' ';button.textContent='IMPORTER';button.onclick=()=>importArchive(JSON.stringify(item));row.append(button);sessions.append(row)}
-    }catch(error){document.getElementById('cl-import-result').textContent=error.message}
-})();
-</script>
+<script src="/static/showcue-sessions.js"></script>
 
 <script src="/static/showcue-editor.js?v=phase1"></script>

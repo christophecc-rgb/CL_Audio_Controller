@@ -197,6 +197,15 @@ def normalize_builder_document(document):
 def save_builder_document(path: Path, document):
     normalized = normalize_builder_document(document)
     path = Path(path)
+    if not normalized["cues"]:
+        existing = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+        show_path = path.parent / "show_cues.json"
+        show = json.loads(show_path.read_text(encoding="utf-8")) if show_path.exists() else {}
+        if existing.get("cues"):
+            raise ValueError("Builder vide refusé : une conduite existe dans cette session.")
+        if show.get("cues"):
+            from show_cues import load_document_data
+            normalized = recover_builder_document(normalized, load_document_data(show))
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
     try:
@@ -217,9 +226,16 @@ def save_builder_document(path: Path, document):
 
 def load_builder_document(path: Path):
     path = Path(path)
-    if not path.exists():
-        return empty_builder_document()
-    return normalize_builder_document(json.loads(path.read_text(encoding="utf-8")))
+    document = (normalize_builder_document(json.loads(path.read_text(encoding="utf-8")))
+                if path.exists() else empty_builder_document())
+    show_path = path.parent / "show_cues.json"
+    if not document["cues"] and show_path.is_file():
+        from show_cues import load_show_document
+        recovered = recover_builder_document(document, load_show_document(show_path))
+        if recovered["cues"]:
+            # Persist once; subsequent reads retain stable IDs and revision.
+            return save_builder_document(path, recovered)
+    return document
 
 
 def validate_builder_document(document):
@@ -1237,3 +1253,30 @@ def normalize_builder_document(document):
     )
 
     return result
+
+
+def recover_builder_document(document, show_document):
+    """Recover only an empty Builder; never change the source ShowCue document."""
+    document = normalize_builder_document(document)
+    if document["cues"]:
+        return document
+    cues, used = [], set()
+    for index, source in enumerate(show_document.get("cues", []), 1):
+        metadata = source.get("builder") or {}
+        cue_id = metadata.get("builder_id") or "builder_showcue_" + source["id"]
+        if cue_id in used or not re.fullmatch(r"builder_[A-Za-z0-9_-]+", cue_id):
+            cue_id = "builder_recovered_" + source["id"]
+        used.add(cue_id)
+        cue = {key: metadata.get(key, "") for key in
+               ("source", "type", "role", "origin", "notes", "role_assignments")}
+        cue.update({"id": cue_id, "number": metadata.get("number") or str(source.get("order", index)),
+                    "text": source.get("text", ""), "timecode": source.get("timecode", ""),
+                    "section": metadata.get("section") or source.get("section", "")})
+        for key in ("artist", "microphone", "iem", "equipment"):
+            cue[key] = metadata.get(key + "_override") or metadata.get("resolved_" + key, "")
+        for key, post in zip(("foh", "ret", "plt", "lum"), ("FOH", "RETOURS", "PLATEAU", "LUMIERE")):
+            cue[key] = post in source.get("posts", [])
+        cue["origin"] = cue["origin"] or "SHOWCUE"
+        cue["type"] = cue["type"] or "AUTRE"
+        cues.append(cue)
+    return normalize_builder_document({**document, "cues": cues})

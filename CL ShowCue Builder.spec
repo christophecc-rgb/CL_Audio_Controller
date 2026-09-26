@@ -2,7 +2,7 @@
 
 a = Analysis(
     ['showcue_builder_desktop.py'],
-    pathex=[], binaries=[], datas=[],
+    pathex=[], binaries=[], datas=[('static/showcue-sessions.js', 'static')],
     hiddenimports=['webview'], hookspath=[], hooksconfig={}, runtime_hooks=[],
     excludes=['markupsafe._speedups', 'PIL'], noarchive=False, optimize=0,
 )
