@@ -39,16 +39,32 @@ class XfaderMaxDeviceTests(unittest.TestCase):
     def check_stable_remote_mapping(self, payload):
         boxes, lines = graph(payload)
 
-        self.assertEqual(boxes["remote"], "live.remote~")
-        self.assertEqual(boxes["lp"], "live.path live_set master_track mixer_device crossfader")
+        self.assertEqual(boxes["remote"], "live.object")
+        self.assertEqual(
+            boxes["lp"],
+            "live.path live_set master_track mixer_device crossfader",
+        )
+        self.assertEqual(boxes["set_value"], "prepend set value")
+
         self.assertIn(("lp", 0, "remote", 1), lines)
-        self.assertIn(("clip", 0, "sig", 0), lines)
-        self.assertIn(("sig", 0, "remote", 0), lines)
+        self.assertIn(("clip", 0, "set_value", 0), lines)
+        self.assertIn(("set_value", 0, "remote", 0), lines)
+        self.assertIn(("clip", 0, "pval", 0), lines)
+
+        self.assertNotIn(("sig", 0, "remote", 0), lines)
+        self.assertFalse(
+            any("live.remote" in value for value in boxes.values())
+        )
 
         self.assertNotIn("id 0", boxes.values())
         self.assertNotIn("delay 450", boxes.values())
         self.assertNotIn("t b b f", boxes.values())
-        self.assertFalse(any(source == "clip" and destination == "lp" for source, _, destination, _ in lines))
+        self.assertFalse(
+            any(
+                source == "clip" and destination == "lp"
+                for source, _, destination, _ in lines
+            )
+        )
 
     def test_editable_source_maps_once_on_load(self):
         self.check_stable_remote_mapping(json.loads(SOURCE.read_text(encoding="utf-8")))

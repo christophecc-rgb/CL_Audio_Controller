@@ -31,54 +31,10 @@ def write_amxd(path: Path, header: bytes, payload: dict) -> None:
 
 
 def synchronize_graph(compiled: dict, source: dict) -> None:
-    source_boxes = {
-        item["box"]["id"]: item["box"] for item in source["patcher"]["boxes"]
-    }
-    obsolete = {"idreg", "trig", "f", "dval", "rel", "id0"}
-    compiled_boxes = compiled["patcher"]["boxes"]
-    compiled["patcher"]["boxes"] = [
-        item for item in compiled_boxes if item["box"]["id"] not in obsolete
-    ]
+    """Use the editable live.object patch as the canonical device graph."""
+    compiled.clear()
+    compiled.update(json.loads(json.dumps(source)))
 
-    for item in compiled["patcher"]["boxes"]:
-        box_id = item["box"]["id"]
-        if box_id in {"note", "pulse", "value_note"}:
-            item["box"]["text"] = source_boxes[box_id]["text"]
-
-    kept_lines = []
-    for item in compiled["patcher"]["lines"]:
-        source_id = item["patchline"]["source"][0]
-        destination_id = item["patchline"]["destination"][0]
-        if source_id in obsolete or destination_id in obsolete:
-            continue
-        kept_lines.append(item)
-
-    required = [
-        ("lp", 0, "remote", 1),
-        ("clip", 0, "sig", 0),
-        ("clip", 0, "pval", 0),
-    ]
-    existing = {
-        (
-            item["patchline"]["source"][0],
-            item["patchline"]["source"][1],
-            item["patchline"]["destination"][0],
-            item["patchline"]["destination"][1],
-        )
-        for item in kept_lines
-    }
-    for source_id, source_outlet, destination_id, destination_inlet in required:
-        edge = (source_id, source_outlet, destination_id, destination_inlet)
-        if edge not in existing:
-            kept_lines.append(
-                {
-                    "patchline": {
-                        "source": [source_id, source_outlet],
-                        "destination": [destination_id, destination_inlet],
-                    }
-                }
-            )
-    compiled["patcher"]["lines"] = kept_lines
 
 
 def main() -> None:
