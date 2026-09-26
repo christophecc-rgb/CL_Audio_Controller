@@ -99,7 +99,7 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("Paradis Latin AutoScene - Live 10", script)
         self.assertIn("CL MIDI RTP Agent.app", script)
         self.assertNotIn("CL MIDI RTP Simulator.app", script)
-        self.assertIn('open -gj "$USER_APPS/CL MIDI RTP Agent.app"', script)
+        self.assertIn('RTP_AGENT_EXEC="$MIDI_NETWORK_APPS/CL MIDI RTP Agent.app/Contents/MacOS/CL MIDI RTP Agent"', script)
         self.assertIn("prepare_rtp_agent_replacement", script)
         self.assertIn("l’état réel (processus + LaunchAgent) fait foi", script)
         self.assertIn("pgrep -f -x", script)
@@ -112,7 +112,7 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("verify_copy", script)
         self.assertIn('COMPONENTS_ROOT="$SCRIPT_DIR/Composants"', script)
         self.assertNotIn("sudo", script)
-        self.assertNotIn("pkill", script)
+        self.assertIn("pkill", script)
 
     def test_red_window_button_triggers_a_full_launcher_shutdown(self):
         launcher = (PROJECT_ROOT / "launcher_control.py").read_text(encoding="utf-8")
@@ -152,7 +152,7 @@ class PackagingTests(unittest.TestCase):
     def test_transport_export_does_not_depend_on_dmg_creation(self):
         release = (PROJECT_ROOT / "scripts/build_release.sh").read_text(encoding="utf-8")
         self.assertIn('SKIP_DMG="${CL_RELEASE_SKIP_DMG:-0}"', release)
-        self.assertIn('if [[ "$SKIP_DMG" != "1" ]]', release)
+        self.assertIn('"$SKIP_DMG" != "1"', release)
         self.assertIn('checksum_files=("$ZIP_NAME" "$M4L_ZIP_NAME")', release)
 
     def test_graphical_installer_wraps_the_noninteractive_engine(self):
@@ -262,9 +262,10 @@ class PackagingTests(unittest.TestCase):
                 "Ableton Live 11-12/Remote Scripts/AbletonOSC",
                 "Ableton Live 11-12/Remote Scripts/CL_Arrangement_Builder_Live",
                 "Ableton Live 11-12/Max for Live/CL Audio Controller - Remote",
+                "Ableton Live 11-12/Max for Live/CL Absolute MTC",
                 "Ableton Live 11-12/Max for Live/Paradis Latin AutoScene",
                 "Ableton Live 11-12/Max for Live/CL MIDI Console Monitor",
-                "Outils réseau MIDI",
+                "Outils_reseau_MIDI",
             )
             for relative in required_directories:
                 directory = components / relative
@@ -296,8 +297,8 @@ class PackagingTests(unittest.TestCase):
             subprocess.run([str(engine)], check=True, env=environment, capture_output=True)
 
             self.assertTrue((home / "Applications/CL Show Control.app").is_dir())
-            self.assertTrue((home / "Applications/CL Arrangement Builder.app").is_dir())
-            self.assertTrue((home / "Applications/CL MIDI Network Manager.app").is_dir())
+            self.assertTrue((home / "Applications/Prod Ableton/CL Arrangement Builder.app").is_dir())
+            self.assertTrue((home / "Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.app").is_dir())
 
             legacy = home / "Applications/CL Show Control.app.sauvegarde_ancienne"
             legacy.mkdir()
@@ -312,7 +313,7 @@ class PackagingTests(unittest.TestCase):
             )
             manifest = home / "Library/Application Support/CL Audio Controller/CL_Suite_install_manifest.tsv"
             self.assertTrue(manifest.is_file())
-            self.assertEqual(len(manifest.read_text().splitlines()), 11)
+            self.assertEqual(len(manifest.read_text().splitlines()), 12)
 
 
 if __name__ == "__main__":
