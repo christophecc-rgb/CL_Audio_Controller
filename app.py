@@ -33,12 +33,6 @@ from flask import Flask, jsonify, render_template, request, send_from_directory
 from show_audio_print_engine import PrintEngineError, capture_clean
 from build_identity import BUILD_ID, IDENTITY_PROTOCOL_VERSION, SERVICE_NAME
 from ableton_targets import DEFAULT_CONFIG_PATH, load_target
-from dataclasses import replace as dataclass_replace
-
-try:
-    from bonjour_remote import discover_ableton_remote
-except Exception:
-    discover_ableton_remote = None
 from server_ownership import OwnershipRecordError, write_record
 from cl_transport import available_sessions, session_file, load_library, transport_roots
 from showcue_session_archive import export_session, import_session, MAX_ARCHIVE_BYTES
@@ -363,36 +357,8 @@ GENERATION_DEBUG = os.environ.get("CL_AUDIO_GENERATION_DEBUG", "0").strip().lowe
 app = Flask(__name__)
 ableton_target = load_target()
 
-if ableton_target.mode == "remote" and discover_ableton_remote is not None:
-    try:
-        _bonjour_remote = discover_ableton_remote()
-        _bonjour_ip = str(_bonjour_remote.get("ip") or "").strip()
-
-        if _bonjour_ip:
-            _configured_host = str(ableton_target.host)
-            ableton_target = dataclass_replace(
-                ableton_target,
-                host=_bonjour_ip,
-            )
-            print(
-                "[Ableton Remote] Bonjour : "
-                f"{_bonjour_remote.get('service_name') or 'CL Ableton Distant'} "
-                f"-> {_bonjour_remote.get('host') or '?'} "
-                f"-> {_bonjour_ip} "
-                f"(config précédente : {_configured_host})"
-            )
-        else:
-            print(
-                "[Ableton Remote] Bonjour non résolu ; "
-                f"fallback configuration : {ableton_target.host}"
-            )
-
-    except Exception as _bonjour_exc:
-        print(
-            "[Ableton Remote] Découverte Bonjour indisponible ; "
-            f"fallback configuration : {ableton_target.host} "
-            f"({_bonjour_exc})"
-        )
+# La cible enregistrée est autoritaire. OSCTransport résout son nom éventuel ;
+# une découverte RTP/Bonjour ne doit jamais sélectionner une autre machine.
 ableton_transport = OSCTransport(
     host=ableton_target.host,
     send_port=ableton_target.send_port,

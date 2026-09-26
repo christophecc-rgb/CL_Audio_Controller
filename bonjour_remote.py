@@ -50,28 +50,22 @@ def save_config(cfg):
     )
 
 
-def resolve_ipv4(host):
+def resolve_ipv4_addresses(host):
+    """Toutes les adresses Bonjour, afin de choisir la bonne interface."""
     host = (host or "").rstrip(".")
-
     if not host:
-        return None
-
+        return []
     try:
-        infos = socket.getaddrinfo(
-            host,
-            None,
-            socket.AF_INET,
-            socket.SOCK_DGRAM,
-        )
+        infos = socket.getaddrinfo(host, None, socket.AF_INET, socket.SOCK_DGRAM)
+        return list(dict.fromkeys(info[4][0] for info in infos
+                                 if info[4][0] and not info[4][0].startswith("127.")))
+    except OSError:
+        return []
 
-        for info in infos:
-            ip = info[4][0]
-            if ip and not ip.startswith("127."):
-                return ip
-    except Exception:
-        pass
 
-    return None
+def resolve_ipv4(host):
+    addresses = resolve_ipv4_addresses(host)
+    return addresses[0] if addresses else None
 
 
 def discover_service(service_name, service_type, timeout=4):

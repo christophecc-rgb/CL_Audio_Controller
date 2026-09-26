@@ -1,6 +1,9 @@
 import socket, subprocess, webbrowser, threading, os, time, sys, importlib.util, json, uuid, secrets, functools
 import urllib.request
 import urllib.error
+import ipaddress
+from dataclasses import replace
+from bonjour_remote import resolve_ipv4_addresses
 
 try:
     import webview
@@ -388,6 +391,133 @@ def current_identity_status():
     return payload, validation
 
 
+# Le serveur CL et la destination AbletonOSC sont deux choix indépendants.
+PARADIS_SERVER_HOST = "iMac-Record-Blue.local"
+PARADIS_SERVER_IP = "192.168.3.64"
+cl_discovery_lock = threading.RLock()
+cl_discovery_cache = {}
+
+
+def is_paradis_server_machine():
+    names = [socket.gethostname(), socket.getfqdn()]
+    if sys.platform == "darwin":
+        try:
+            result = subprocess.run(["scutil", "--get", "LocalHostName"],
+                                    capture_output=True, text=True, timeout=1)
+            if result.returncode == 0:
+                names.append(result.stdout.strip())
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+    return any(name.lower().rstrip(".").removesuffix(".local") == "imac-record-blue"
+               for name in names)
+
+
+def cl_server_is_remote(profiles=None):
+    profiles = profiles or load_profiles()
+    return profiles.cl_server_mode == "manual" or (
+        profiles.cl_server_mode == "paradis" and not is_paradis_server_machine())
+
+
+def cl_network_label(host):
+    if host == "127.0.0.1":
+        return "Local"
+    if host.startswith("192.168.3."):
+        return "Contrôle câblé"
+    if host.startswith("192.168.1."):
+        return "Wi-Fi"
+    return "Réseau distant"
+
+
+def discover_cl_server(profiles):
+    """Résout le nom avant le fallback, puis valide chaque candidat via /status."""
+    hostname = PARADIS_SERVER_HOST if profiles.cl_server_mode == "paradis" else profiles.cl_server_host
+    key = (profiles.cl_server_mode, hostname)
+    with cl_discovery_lock:
+        cached = cl_discovery_cache.get(key)
+        if cached and time.monotonic() - cached[0] < 3:
+            return cached[1]
+        addresses = resolve_ipv4_addresses(hostname)
+        # Aucun choix automatique Dante/Auto-IP, même via un hostname multicarte.
+        addresses = [ip for ip in addresses if usable_cl_address(ip)]
+        addresses.sort(key=lambda ip: not ip.startswith("192.168.3."))
+        candidates = [(ip, "Nom résolu") for ip in addresses]
+        if profiles.cl_server_mode == "paradis":
+            candidates = [(ip, source) for ip, source in candidates if ip.startswith("192.168.3.")]
+            if PARADIS_SERVER_IP not in [ip for ip, _ in candidates]:
+                candidates.append((PARADIS_SERVER_IP, "Adresse connue de secours"))
+            candidates += [(ip, "Nom résolu") for ip in addresses if not ip.startswith("192.168.3.")]
+        payload = {}
+        identity = {"valid": False, "code": "offline", "message": "Serveur CL introuvable"}
+        diagnostic = {"mode": profiles.cl_server_mode, "server": "iMac Record Blue" if profiles.cl_server_mode == "paradis" else "Serveur manuel",
+                      "hostname": hostname, "address": "", "discovery": "Aucune adresse utilisable",
+                      "network": "—", "remote": True, "url": ""}
+        for address, source in candidates:
+            url = f"http://{address}:{WEB_PORT}/"
+            diagnostic.update(address=address, discovery=source, network=cl_network_label(address), url=url)
+            try:
+                # Pas de proxy ni de redirection vers une autre machine.
+                opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), CLNoRedirect())
+                with opener.open(url + "status", timeout=0.6) as response:
+                    payload = json.loads(response.read(262145).decode("utf-8"))
+                identity = validate_server_identity(payload)
+                if identity["valid"]:
+                    identity = {**identity, "code": "remote-valid", "message": "Serveur CL distant validé"}
+                    break
+            except (OSError, ValueError, urllib.error.URLError) as exc:
+                payload = {}
+                identity = {"valid": False, "code": "offline", "message": "Serveur CL injoignable"}
+        if not isinstance(payload, dict):
+            payload = {}
+        diagnostic.update(validation=identity["message"], server_valid=identity["valid"])
+        result = (payload, identity, diagnostic)
+        cl_discovery_cache[key] = (time.monotonic(), result)
+        return result
+
+
+class CLNoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def usable_cl_address(address):
+    try:
+        ip = ipaddress.ip_address(address)
+        return ip.version == 4 and not (ip.is_link_local or ip.is_loopback or ip.is_multicast or ip.is_unspecified or str(ip) == "255.255.255.255")
+    except ValueError:
+        return False
+
+
+def selected_cl_status(profiles=None):
+    profiles = profiles or load_profiles()
+    if cl_server_is_remote(profiles):
+        return discover_cl_server(profiles)
+    if tcp_ok(WEB_PORT):
+        payload, identity = current_identity_status()
+    else:
+        payload, identity = {}, {"valid": False, "code": "offline", "message": "Serveur HTTP absent"}
+    return payload, identity, {"mode": profiles.cl_server_mode, "server": "iMac Record Blue" if profiles.cl_server_mode == "paradis" else "Ce Mac",
+        "hostname": PARADIS_SERVER_HOST if profiles.cl_server_mode == "paradis" else "localhost",
+        "address": "127.0.0.1", "network": "Local", "discovery": "Serveur local",
+        "validation": identity["message"], "server_valid": identity["valid"],
+        "remote": False, "url": REMOTE_ROOT_URL}
+
+
+def ensure_selected_cl_server():
+    if not cl_server_is_remote():
+        return ensure_valid_server()
+    _, identity, _ = selected_cl_status()
+    return identity["valid"], identity["message"]
+
+
+def selected_cl_url():
+    if not cl_server_is_remote():
+        return REMOTE_ROOT_URL
+    _, identity, diagnostic = selected_cl_status()
+    if not identity["valid"]:
+        raise AbletonTargetError(identity["message"])
+    return diagnostic["url"]
+
+
 def run_embedded_server():
     """Exécute le serveur inclus dans le bundle, sans Python externe ni Terminal."""
     spec = importlib.util.spec_from_file_location("cl_audio_embedded_server", APP)
@@ -432,6 +562,9 @@ def serialized_server_lifecycle(function):
 
 @serialized_server_lifecycle
 def start_web_server(timeout=6.0):
+    if cl_server_is_remote():
+        return False, "Commande locale indisponible : un serveur CL distant est sélectionné"
+
     """Lance et valide exactement le processus enfant créé par ce launcher."""
     global owned_server
     with server_ownership_lock:
@@ -549,6 +682,8 @@ def start_web_server(timeout=6.0):
 
 
 def auto_start_web_server(attempts=5, retry_delay=1.0):
+    if cl_server_is_remote():
+        return ensure_selected_cl_server()
     """Démarre 5050 en arrière-plan et absorbe les courses de fin d'installation."""
     last_message = "Démarrage automatique non exécuté"
     for attempt in range(1, max(1, int(attempts)) + 1):
@@ -855,6 +990,9 @@ def port_used(port):
 
 @serialized_server_lifecycle
 def stop_owned_server(graceful_timeout=6.0, terminate_timeout=2.0):
+    if cl_server_is_remote():
+        return False, "Commande locale indisponible : un serveur CL distant est sélectionné"
+
     """Arrête une instance prouvée, sans action globale ni terminaison forcée."""
     global owned_server
     with server_ownership_lock:
@@ -961,6 +1099,9 @@ def stop_owned_server(graceful_timeout=6.0, terminate_timeout=2.0):
 
 @serialized_server_lifecycle
 def ensure_valid_server():
+    if cl_server_is_remote():
+        return False, "Commande locale indisponible : un serveur CL distant est sélectionné"
+
     payload, validation = current_identity_status() if tcp_ok(WEB_PORT) else ({}, {"valid": False})
     if validation.get("valid"):
         return True, validation["message"]
@@ -981,6 +1122,9 @@ def ensure_valid_server():
 
 
 def adopt_claimable_server():
+    if cl_server_is_remote():
+        return False, "Commande locale indisponible : un serveur CL distant est sélectionné"
+
     """Adopte explicitement une instance après une nouvelle preuve complète."""
     global owned_server, claimable_server, ignored_orphan_instance_id
     payload, validation = current_identity_status()
@@ -1002,6 +1146,9 @@ def adopt_claimable_server():
 
 
 def stop_claimable_server():
+    if cl_server_is_remote():
+        return False, "Commande locale indisponible : un serveur CL distant est sélectionné"
+
     """Arrête explicitement une instance orpheline après revérification."""
     global owned_server, claimable_server
     payload, validation = current_identity_status()
@@ -1839,36 +1986,23 @@ body.show-mode .console-title{
     </div>
   </section>
 
-  <div class="content-grid">
-    <section class="card access-card">
-      <div class="remote-mtc-grid">
-
-        <div class="remote-access-main">
-
-          <div class="remote-inline-title">ACCÈS DISTANT</div>
-          <div id="remoteAddress" class="address remote-address-full">—</div>
-
-          <div class="remote-access-actions">
-            <button class="mini" onclick="copyAddress()">Copier</button>
-            <button class="mini" onclick="runAction('/local-page','Ouverture locale')">Ouvrir</button>
-          </div>
-
-          <div class="device-row remote-device-row">
-            <span>Télécommande iPhone / iPad</span>
-          </div>
-
-        </div>
-
-        <div id="cl-mtc-native-slot"></div>
-
+<div class="desktop-grid">
+<div class="operation-column"><div class="column-label">EXPLOITATION</div>
+    <section class="card server-card">
+      <div class="access-head">Serveur CL Audio</div>
+      <div class="network-grid">
+        <label>Connexion serveur<select id="clServerMode" onchange="clServerDirty=true;document.getElementById('clServerHost').disabled=this.value!=='manual'"><option value="local">Local</option><option value="paradis">Paradis Latin</option><option value="manual">Distant manuel</option></select></label>
+        <label>Adresse manuelle<input id="clServerHost" disabled placeholder="Nom du Mac ou adresse IP" oninput="clServerDirty=true"></label>
       </div>
+      <button class="action" onclick="saveCLServer()">Appliquer / Rechercher</button>
+      <div id="clServerDiagnostic" role="status" style="white-space:pre-line;overflow-wrap:anywhere;font-size:12px;margin-top:8px">Serveur local</div>
     </section>
 
     <section id="networkCard" class="card network-card local">
-      <div class="network-title-row"><div class="access-head">Connexion AbletonOSC</div><span id="modeBadge" class="mode-badge">MODE LOCAL</span><span id="networkLtc" class="network-timecode offline">--:--:--:--</span></div>
+      <div class="network-title-row"><div class="access-head">Connexion AbletonOSC</div><span id="modeBadge" class="mode-badge" hidden aria-hidden="true"></span><span id="networkLtc" class="network-timecode offline">--:--:--:--</span></div>
       <div class="network-grid">
         <label>MODE ABLETON<select id="abletonMode" onchange="updateNetworkFields()"><option value="local">Ableton local</option><option value="remote">Ableton distant</option></select></label>
-        <label>Adresse Ableton active<input id="abletonHost" value="127.0.0.1"></label>
+        <label>Adresse Ableton enregistrée<input id="abletonHost" value="127.0.0.1"></label>
         <div class="ports-readonly"><span>Ports AbletonOSC fixes</span><strong><span id="abletonSendPort">11000</span> → <span id="abletonReplyPort">11001</span></strong></div>
       </div>
       <div class="network-buttons">
@@ -1906,6 +2040,8 @@ body.show-mode .console-title{
 </main>
 <script>
 let latestState=null;
+let clServerDirty=false;
+let clServerInitialized=false;
 let networkFormInitialized=false;
 let networkFormDirty=false;
 let networkVisibleMode=null;
@@ -1974,6 +2110,21 @@ function syncShowDeviceDom(devices,offsets){
   Array.from(offsetPanel.querySelectorAll('.offset-control')).forEach(control=>{if(!retained.has(control.dataset.deviceId))control.remove();});
 }
 
+async function saveCLServer(){
+  const payload={cl_server:{mode:el('clServerMode').value,host:el('clServerHost').value.trim()}};
+  el('clServerDiagnostic').textContent='Recherche du serveur CL…';
+  try{const response=await fetch('/network-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const r=await response.json();if(!response.ok)throw new Error(r.error);clServerDirty=false;clServerInitialized=false;networkFormInitialized=false;networkFormDirty=false;await refresh();}catch(e){el('clServerDiagnostic').textContent=String(e);}
+}
+function renderCLServer(s){
+  const c=s.cl_server||{};
+  if(!clServerDirty&&!clServerInitialized){el('clServerMode').value=c.mode||'local';el('clServerHost').value=c.mode==='manual'?(c.hostname||''):'';el('clServerHost').disabled=c.mode!=='manual';clServerInitialized=true;}
+  const target=s.server_valid?s.ableton_server_target:null;
+  const ableton=target?target.host+':'+target.send_port:null;
+  const diagnostic=el('clServerDiagnostic');diagnostic.replaceChildren();
+  ['Serveur recherché : '+(c.server||'—'),'Nom : '+(c.hostname||'—'),'Adresse retenue : '+(c.address||'—'),'Découverte : '+(c.discovery||'—'),'Validation : '+(c.validation||'—'),'Réseau : '+(c.network||'—'),...(ableton?['Cible Ableton du backend actif : '+ableton]:[])].forEach(text=>{const row=document.createElement('div');row.className='diagnostic-row';const split=text.indexOf(' : ');const label=document.createElement('span'),value=document.createElement('strong');label.textContent=text.slice(0,split);value.textContent=text.slice(split+3);row.append(label,value);diagnostic.appendChild(row);});
+  el('networkCard').querySelectorAll('input,select,button').forEach(node=>node.disabled=!!c.remote);
+  if(!c.remote)el('abletonHost').disabled=el('abletonMode').value==='local';
+}
 function render(s){
   latestState=s;const card=el('systemCard'),title=el('stateTitle'),detail=el('stateDetail');
   if(s.system_ready){card.className='card system ready';title.textContent='SYSTÈME PRÊT';detail.textContent='Serveur validé · Live Set prêt · OSC retour disponible';}
@@ -1989,14 +2140,6 @@ function render(s){
   el('orphanCard').className='card orphan '+(s.orphan_actions_available?'show':'');
   if(s.orphan_actions_available)el('orphanDetail').textContent='Instance '+s.orphan_instance_id+' · PID '+s.orphan_process_id+' · '+s.build_id;
   if(!networkFormInitialized&&s.ableton_profiles)initializeNetworkForm(s);
-  const activeTarget=s.ableton_server_target||{};
-  const activeMode=activeTarget.mode||s.ableton_active_mode||'local';
-  const activeHost=activeTarget.host||'';
-  if(!networkFormDirty){
-    el('abletonHost').value=activeMode==='remote'
-      ? (activeHost||'')
-      : '127.0.0.1';
-  }
   if(s.ableton_config){el('techAbletonMode').textContent='Ableton · '+(s.ableton_config.mode==='local'?'Local':'Distant');el('techAbletonAddress').textContent=s.ableton_config.host+':'+s.ableton_config.send_port+' → '+s.ableton_config.reply_port;el('techOscLabel').textContent='OSC aller · '+s.ableton_config.send_port;el('techReturnLabel').textContent='OSC retour · '+s.ableton_config.reply_port;}
   el('ltcDestination').textContent=s.ltc_destination+':'+s.ltc_port;
   if(s.osc_transport){el('techAbletonLatency').textContent='Dernière réponse · '+(s.osc_transport.last_latency_ms==null?'—':Math.round(s.osc_transport.last_latency_ms)+' ms');el('techAbletonTimeouts').textContent='Timeouts · '+s.osc_transport.timeout_count;}
@@ -2033,6 +2176,7 @@ function render(s){
   const ltc=s.ltc_connected?s.ltc_timecode:'--:--:--:--';
   el('systemLtc').textContent=ltc;el('systemLtc').className='system-ltc'+(s.ltc_connected?'':' offline');
   el('networkLtc').textContent=ltc;el('networkLtc').className='network-timecode'+(s.ltc_connected?'':' offline');
+  renderCLServer(s);
 }
 async function refresh(){try{render(await(await fetch('/state')).json());}catch(e){el('systemCard').className='card system error';el('stateTitle').textContent='PANNEAU HORS LIGNE';el('stateDetail').textContent=String(e);}}
 async function changeTitleOffset(consoleName,delta,reset=false){const current=Number(latestState?.console_title_offsets?.[consoleName]||0),offset=reset?0:current+delta;try{const response=await fetch('/console-title-offset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({console:consoleName,offset})});const result=await response.json();if(!response.ok)throw new Error(result.error||result.message||'Réglage refusé');el('actionStatus').textContent='✓ '+result.message;await refresh();}catch(error){el('actionStatus').textContent='! '+error;}}
@@ -2144,13 +2288,16 @@ def paradis_logo():
 
 @app.route("/state")
 def state():
-    web_ready = tcp_ok(WEB_PORT)
-    if web_ready:
-        remote_state, identity = current_identity_status()
-    else:
+    try:
+        remote_state, identity, cl_server = selected_cl_status()
+    except AbletonTargetError as exc:
         remote_state = {}
-        identity = {"valid": False, "code": "offline", "message": "Serveur HTTP absent"}
+        identity = {"valid": False, "code": "invalid-config", "message": str(exc)}
+        cl_server = {"remote": False, "validation": str(exc), "server_valid": False}
+    web_ready = bool(remote_state) if cl_server["remote"] else tcp_ok(WEB_PORT)
     server_valid = bool(identity["valid"])
+    if not server_valid and cl_server["remote"]:
+        remote_state = {}
     try:
         configured_profiles = load_profiles()
         configured_target = configured_profiles.active_target().to_dict()
@@ -2163,20 +2310,27 @@ def state():
         public_profiles = None
         active_mode = None
         network_config_error = str(exc)
-    ltc_destination = "127.0.0.1" if active_mode == "local" else get_lan_ip()
+    if cl_server["remote"]:
+        configured_target = remote_state.get("ableton_target") or {}
+        active_mode = configured_target.get("mode")
+    ltc_destination = cl_server.get("address", "") if cl_server["remote"] else ("127.0.0.1" if active_mode == "local" else get_lan_ip())
     live_set_ready = bool(remote_state.get("set_ready")) if server_valid else False
     reply_port = int((configured_target or {}).get("reply_port", RETURN_PORT))
     send_port = int((configured_target or {}).get("send_port", OSC_PORT))
-    osc_return_ready = port_used(reply_port)
+    osc_return_ready = port_used(reply_port) if not cl_server["remote"] else False
     transport_connected = bool((remote_state.get("osc_transport") or {}).get("connected"))
-    osc_send_ready = port_used(send_port) if (configured_target or {}).get("mode", "local") == "local" else transport_connected
+    osc_send_ready = port_used(send_port) if not cl_server["remote"] and (configured_target or {}).get("mode", "local") == "local" else transport_connected
+    if cl_server["remote"]:
+        osc_return_ready = server_valid and transport_connected
+        osc_send_ready = server_valid and transport_connected
     system_ready = server_valid and live_set_ready and osc_return_ready
     response_payload = dict(
+        cl_server=cl_server,
         web=web_ready,
         osc=osc_send_ready,
         ret=osc_return_ready,
-        local_url=REMOTE_ROOT_URL,
-        lan_url=REMOTE_ROOT_LAN_URL(),
+        local_url=cl_server.get("url", REMOTE_ROOT_URL),
+        lan_url=cl_server.get("url") if cl_server["remote"] else REMOTE_ROOT_LAN_URL(),
         events=events[-5:],
         set_ready=remote_state.get("set_ready"),
         set_generation=remote_state.get("set_generation"),
@@ -2211,7 +2365,7 @@ def state():
         ltc_timecode=remote_state.get("ltc_timecode", "--:--:--:--"),
         ltc_destination=ltc_destination,
         ltc_port=LTC_PORT,
-        midi_console=remote_state.get("midi_console") or read_midi_console_state((configured_target or {}).get("host")),
+        midi_console=remote_state.get("midi_console") or ({} if cl_server["remote"] else read_midi_console_state((configured_target or {}).get("host"))),
         devices=remote_state.get("devices"),
         console_title_offsets=remote_state.get("console_title_offsets") or {"cl5": 0, "ql1": 0},
         console_title_offset_range=remote_state.get("console_title_offset_range") or {"min": -20, "max": 20},
@@ -2247,6 +2401,10 @@ def state():
 @app.route("/console-title-offset", methods=["POST"])
 def console_title_offset():
     """Relaye la calibration d'affichage au serveur sans dupliquer sa logique."""
+    if cl_server_is_remote():
+        ok, message = ensure_selected_cl_server()
+        if not ok:
+            return jsonify(error=message), 409
     payload = request.get_json(silent=True) or {}
     console = str(payload.get("console") or "").strip().lower()
     try:
@@ -2261,7 +2419,7 @@ def console_title_offset():
         "offset": offset,
     }).encode("utf-8")
     remote_request = urllib.request.Request(
-        f"{REMOTE_ROOT_URL}action",
+        f"{selected_cl_url()}action",
         data=body,
         headers={"Content-Type": "application/json"},
         method="POST",
@@ -2283,7 +2441,12 @@ def console_title_offset():
 @app.route("/telemetry")
 def telemetry():
     """Relais minimal et non bloquant pour l'affichage fluide du LTC."""
-    remote_state = read_remote_state_diagnostic(timeout=0.12)
+    if cl_server_is_remote():
+        remote_state, identity, _ = selected_cl_status()
+        if not identity["valid"]:
+            remote_state = {}
+    else:
+        remote_state = read_remote_state_diagnostic(timeout=0.12)
     return jsonify(
         ltc_connected=bool(remote_state.get("ltc_connected")),
         ltc_timecode=remote_state.get("ltc_timecode", "--:--:--:--"),
@@ -2326,6 +2489,22 @@ def network_config():
         except AbletonTargetError as exc:
             return jsonify(error=str(exc)), 409
 
+    payload = request.get_json(silent=True)
+    if isinstance(payload, dict) and "cl_server" in payload:
+        try:
+            if set(payload) != {"cl_server"} or not isinstance(payload["cl_server"], dict) or set(payload["cl_server"]) != {"mode", "host"}:
+                raise AbletonTargetError("configuration serveur CL invalide")
+            choice = payload["cl_server"]
+            profiles = replace(load_profiles(), cl_server_mode=choice["mode"], cl_server_host=choice["host"])
+            save_profiles(profiles)
+            with cl_discovery_lock:
+                cl_discovery_cache.clear()
+            _, identity, diagnostic = selected_cl_status(profiles)
+            return jsonify(message="Choix du serveur CL enregistré", cl_server=diagnostic)
+        except AbletonTargetError as exc:
+            return jsonify(error=str(exc)), 400
+    if cl_server_is_remote():
+        return jsonify(error="Réglez AbletonOSC sur le poste serveur CL"), 409
     payload = request.get_json(silent=True)
     try:
         previous_profiles = load_profiles()
@@ -2396,10 +2575,10 @@ def network_config():
 
 @app.route("/test-ableton", methods=["POST"])
 def test_ableton():
-    ok, message = ensure_valid_server()
+    ok, message = ensure_selected_cl_server()
     if not ok:
         return jsonify(error=message), 409
-    request_test = urllib.request.Request(f"{REMOTE_ROOT_URL}transport/test", method="POST")
+    request_test = urllib.request.Request(f"{selected_cl_url()}transport/test", method="POST")
     try:
         with urllib.request.urlopen(request_test, timeout=1.5) as response:
             payload = json.loads(response.read().decode("utf-8"))
@@ -2415,7 +2594,7 @@ def test_ableton():
 
 @app.route("/start")
 def start():
-    ok, message = ensure_valid_server()
+    ok, message = ensure_selected_cl_server()
     if not ok:
         event(f"Démarrage refusé : {message}")
         return jsonify(error=message), 409
@@ -2472,29 +2651,29 @@ def restart():
 
 @app.route("/open")
 def open_web():
-    ok, message = ensure_valid_server()
+    ok, message = ensure_selected_cl_server()
     if not ok:
         return jsonify(error=message), 409
-    mode = open_remote_app_window(REMOTE_ROOT_URL, "Télécommande Ableton — Session")
+    mode = open_remote_app_window(f"{selected_cl_url()}?desktop=1", "Télécommande Ableton — Session")
     event("Onglet Session ouvert")
-    return jsonify(message=f"Onglet Session ouvert en {mode}", url=REMOTE_ROOT_URL)
+    return jsonify(message=f"Onglet Session ouvert en {mode}", url=selected_cl_url())
 
 
 @app.route("/local-page")
 def local_page():
-    ok, message = ensure_valid_server()
+    ok, message = ensure_selected_cl_server()
     if not ok:
         return jsonify(error=message), 409
-    webbrowser.open(REMOTE_ROOT_URL)
+    webbrowser.open(selected_cl_url())
     event("Page locale ouverte")
-    return jsonify(message="Page locale ouverte dans le navigateur", url=REMOTE_ROOT_URL)
+    return jsonify(message="Page locale ouverte dans le navigateur", url=selected_cl_url())
 
 @app.route("/open-ab")
 def open_ab():
-    ok, message = ensure_valid_server()
+    ok, message = ensure_selected_cl_server()
     if not ok:
         return jsonify(error=message), 409
-    desktop_url = f"{REMOTE_AB_URL}?desktop=1&v=2.0.1"
+    desktop_url = f"{selected_cl_url()}ab?desktop=1&v=2.0.1"
     mode = open_remote_app_window(desktop_url, "Télécommande Ableton — A/B")
     event("Onglet A/B ouvert")
     return jsonify(message=f"Onglet A/B ouvert en {mode}", url=desktop_url)
@@ -2502,32 +2681,32 @@ def open_ab():
 
 @app.route("/open-arrangement")
 def open_arrangement():
-    ok, message = ensure_valid_server()
+    ok, message = ensure_selected_cl_server()
     if not ok:
         return jsonify(error=message), 409
-    mode = open_remote_app_window(REMOTE_ARRANGEMENT_URL, "Télécommande Ableton — Arrangement")
+    mode = open_remote_app_window(f"{selected_cl_url()}arrangement?desktop=1", "Télécommande Ableton — Arrangement")
     event("Onglet Arrangement ouvert")
-    return jsonify(message=f"Onglet Arrangement ouvert en {mode}", url=REMOTE_ARRANGEMENT_URL)
+    return jsonify(message=f"Onglet Arrangement ouvert en {mode}", url=selected_cl_url() + "arrangement")
 
 @app.route("/remote-window")
 def remote_window():
-    ok, message = ensure_valid_server()
+    ok, message = ensure_selected_cl_server()
     if not ok:
         return jsonify(error=message), 409
 
     remote_app = find_remote_app()
-    if remote_app is not None:
+    if remote_app is not None and not cl_server_is_remote():
         subprocess.Popen(["/usr/bin/open", str(remote_app)])
         event("Télécommande desktop ouverte sur Session")
         return jsonify(
             message="Télécommande desktop ouverte sur Session",
             app=str(remote_app),
-            url=REMOTE_ROOT_URL,
+            url=selected_cl_url(),
         )
 
-    mode = open_remote_app_window(REMOTE_ROOT_URL, "Télécommande Ableton")
+    mode = open_remote_app_window(f"{selected_cl_url()}?desktop=1", "Télécommande Ableton")
     event("Télécommande ouverte sur Session")
-    return jsonify(message=f"Télécommande ouverte sur Session en {mode}", url=REMOTE_ROOT_URL)
+    return jsonify(message=f"Télécommande ouverte sur Session en {mode}", url=selected_cl_url())
 
 
 @app.route("/midi-network-assistant")

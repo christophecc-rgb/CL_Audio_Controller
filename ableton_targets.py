@@ -51,6 +51,8 @@ class AbletonProfiles:
     local: AbletonTarget
     remote: Optional[AbletonTarget] = None
     remote_name: Optional[str] = None
+    cl_server_mode: str = "local"
+    cl_server_host: str = ""
 
     def active_target(self) -> AbletonTarget:
         if self.active_mode == "local":
@@ -65,6 +67,8 @@ class AbletonProfiles:
             remote = _profile_dict(self.remote)
             remote["name"] = self.remote_name
         return {
+            **({"cl_server": {"mode": self.cl_server_mode, "host": self.cl_server_host}}
+               if self.cl_server_mode != "local" or self.cl_server_host else {}),
             "active_mode": self.active_mode,
             "profiles": {
                 "local": _profile_dict(self.local),
@@ -195,10 +199,19 @@ def _profiles_from_v1(payload: Dict[str, Any]) -> AbletonProfiles:
 def _validate_profile_payload(payload: Any) -> AbletonProfiles:
     if not isinstance(payload, dict):
         raise AbletonTargetError("configuration réseau invalide")
-    if set(payload) != {"schema_version", "active_mode", "profiles"}:
+    if set(payload) - {"cl_server"} != {"schema_version", "active_mode", "profiles"}:
         raise AbletonTargetError("schéma de configuration V2 invalide")
     if payload.get("schema_version") != SCHEMA_VERSION:
         raise AbletonTargetError("version de configuration inconnue")
+    cl_server = payload.get("cl_server", {"mode": "local", "host": ""})
+    if not isinstance(cl_server, dict) or set(cl_server) != {"mode", "host"}:
+        raise AbletonTargetError("configuration serveur CL invalide")
+    if not isinstance(cl_server["mode"], str) or cl_server["mode"] not in {"local", "paradis", "manual"}:
+        raise AbletonTargetError("mode serveur CL invalide")
+    if not isinstance(cl_server["host"], str):
+        raise AbletonTargetError("adresse serveur CL invalide")
+    if cl_server["mode"] == "manual":
+        validate_target({"mode": "remote", "host": cl_server["host"]})
     active_mode = payload.get("active_mode")
     if active_mode not in {"local", "remote"}:
         raise AbletonTargetError("profil actif invalide")
@@ -231,6 +244,8 @@ def _validate_profile_payload(payload: Any) -> AbletonProfiles:
         raise AbletonTargetError("profil Distant actif mais non configuré")
     return AbletonProfiles(
         active_mode=active_mode,
+        cl_server_mode=cl_server["mode"],
+        cl_server_host=cl_server["host"],
         local=local,
         remote=remote,
         remote_name=remote_name,
