@@ -414,6 +414,7 @@ class LiveSetGenerationTests(unittest.TestCase):
             mock.patch.object(self.app, "show_session_view"),
             mock.patch.object(self.app, "send", side_effect=lambda address, *args: sent.append((address, args))),
             mock.patch.object(self.app, "_query_with_query_lock_held", side_effect=confirm_selected),
+            mock.patch.object(self.app, "schedule_selected_scene_duration_refresh"),
             mock.patch.object(self.app, "resolve_scene_clip_duration_async"),
             mock.patch.object(self.app, "send_midi_monitor_scene_context"),
         ):
@@ -429,6 +430,45 @@ class LiveSetGenerationTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertIn("Ableton Web Remote", response.get_data(as_text=True))
+
+    def test_remote_page_is_passive(self):
+        self.assertFalse(self.app.SCAN_PLAYING_SCENE_FROM_TRACKS)
+        with mock.patch.object(self.app, "send") as send:
+            response = self.app.app.test_client().get("/")
+        self.assertEqual(response.status_code, 200)
+        send.assert_not_called()
+
+    def test_phone_go_preserves_live_selection_for_external_controller(self):
+        # Simulate external selection between two phone GO commands.
+        # Hardware button handling itself requires a Live/LioBox integration check.
+        live_selection = 7
+        fired = []
+
+        def send(address, *args):
+            nonlocal live_selection
+            if address == "/live/view/set/selected_scene":
+                live_selection = args[0]
+            elif address == "/live/scene/fire_as_selected":
+                fired.append(args[0])
+            else:
+                self.fail(f"Unexpected Live mutation: {address}")
+
+        with (
+            mock.patch.object(self.app, "send", side_effect=send),
+            mock.patch.object(self.app, "_query_with_query_lock_held",
+                              side_effect=lambda *a, **kw: (live_selection,)),
+            mock.patch.object(self.app, "send_midi_monitor_scene_context"),
+            mock.patch.object(self.app, "record_go_midi_expectations"),
+            mock.patch.object(self.app, "schedule_selected_scene_duration_refresh"),
+            mock.patch.object(self.app.threading, "Thread"),
+        ):
+            for request_id in ("phone-1", "phone-2"):
+                ok, _ = self.app.execute_go_transaction(request_id, 3, 8)
+                self.assertTrue(ok)
+                self.assertEqual(live_selection, 7)
+                self.assertEqual(self.app.state["next_scene"], 8)
+                live_selection = 8  # External controller takes over.
+        self.assertEqual(fired, [7, 7])
 
     def test_midi_monitor_scene_context_uses_active_ableton_target(self):
         with (

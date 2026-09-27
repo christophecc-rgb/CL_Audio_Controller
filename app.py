@@ -334,7 +334,7 @@ mido = None
 # Réglages de scan pour retrouver la scène réellement en lecture.
 # Aucun scan de durée/temps de clip n’est effectué.
 MAX_TRACKS_TO_SCAN = 32
-SCAN_PLAYING_SCENE_FROM_TRACKS = True
+SCAN_PLAYING_SCENE_FROM_TRACKS = False
 PLAYING_SCAN_SECONDS = 0.5
 TRACK_COUNT_CACHE_SECONDS = 10.0
 CHECK_MUTE_DURING_PLAYING_SCAN = False
@@ -1376,6 +1376,12 @@ _cue_points_cache: Tuple[float, list, str] = (0.0, [], "JSON")
 _bootstrap_generation: Optional[int] = None
 _selected_duration_request: Optional[Tuple[int, int]] = None
 _NOT_RECEIVED = object()
+_playing_listener_generation: Optional[int] = None
+_playing_listener_token: Optional[str] = None
+_playing_listener_tracks: Dict[int, Optional[int]] = {}
+_playing_listener_install_lock = threading.Lock()
+_playing_listener_shutdown = False
+
 
 
 @dataclass
@@ -1825,10 +1831,126 @@ def generation_log(event: str, **details: Any) -> None:
     print(f"[SET_GENERATION] {event}{' ' + suffix if suffix else ''}", flush=True)
 
 
+def stop_playing_scene_listeners_locked() -> None:
+    """Invalidate callbacks before removing this process's subscriptions."""
+    global _playing_listener_generation, _playing_listener_token
+    token = _playing_listener_token
+    tracks = tuple(_playing_listener_tracks)
+    _playing_listener_generation = None
+    _playing_listener_token = None
+    _playing_listener_tracks.clear()
+    if token is not None:
+        for track in tracks:
+            ableton_transport.send("/live/track/stop_listen/playing_slot_index", track, token)
+
+
+def stop_playing_scene_listeners() -> None:
+    global _playing_listener_shutdown
+    with lock:
+        _playing_listener_shutdown = True
+        stop_playing_scene_listeners_locked()
+
+
+atexit.register(stop_playing_scene_listeners)
+
+
+def ensure_playing_scene_listeners() -> None:
+    """One read of track count per Set; no recurring track/clip scan.
+
+    AbletonOSC echoes extra start_listen parameters BEFORE the property value.
+    The opaque token therefore identifies the actual subscription on the wire,
+    including across server restarts, rather than tagging arrivals retroactively.
+    """
+    global _playing_listener_generation, _playing_listener_token
+    if not _playing_listener_install_lock.acquire(blocking=False):
+        return
+    try:
+        with lock:
+            generation = int(state.get("set_generation", 0))
+            if (_playing_listener_shutdown or not state.get("set_ready")
+                    or _playing_listener_generation == generation):
+                return
+        response = query("/live/song/get/num_tracks", expected_generation=generation,
+                         apply_response=False)
+        if not response:
+            return  # Retry only at the next normal identity/transport refresh.
+        try:
+            count = int(response[0])
+        except (ValueError, TypeError):
+            return
+        if count < 0:
+            return
+        with lock:
+            if (_playing_listener_shutdown or generation != int(state.get("set_generation", 0))
+                    or not state.get("set_ready")):
+                return
+            stop_playing_scene_listeners_locked()
+            _playing_listener_generation = generation
+            _playing_listener_token = f"{SERVER_INSTANCE_ID}:{generation}:{uuid.uuid4()}"
+            for track in range(count):
+                _playing_listener_tracks[track] = None
+                if ableton_transport.send("/live/track/start_listen/playing_slot_index",
+                                          track, _playing_listener_token) is False:
+                    stop_playing_scene_listeners_locked()
+                    return
+    finally:
+        _playing_listener_install_lock.release()
+
+
+def receive_playing_slot_event(args, source_host=None) -> None:
+    """Observe Session clip starts; never select, fire or change a Live view."""
+    if len(args) != 3:
+        return  # Untagged get replies are not subscription events.
+    track, token, slot = args
+    if not isinstance(track, int) or not isinstance(slot, int):
+        return
+    with lock:
+        generation = int(state.get("set_generation", 0))
+        if (not state.get("set_ready") or generation != _playing_listener_generation
+                or token != _playing_listener_token or track not in _playing_listener_tracks
+                or (source_host is not None and source_host != ableton_transport.resolved_host)):
+            return
+        previous = _playing_listener_tracks[track]
+        _playing_listener_tracks[track] = slot
+        if slot < 0:
+            # Do not fall back to an old clip still playing on another track.
+            if (_playing_listener_tracks
+                    and all(value is not None and value < 0
+                            for value in _playing_listener_tracks.values())
+                    and state.get("play_mode") == "session"):
+                state.update(playing_scene=-1, playing_scene_name="—", current_scene=None,
+                             play_mode="stopped", remaining_seconds=None, playback_deadline=None)
+            return
+        if slot not in state.get("scenes", {}) or slot == previous:
+            return
+        initial = previous is None
+        if initial and (not state.get("is_playing") or state.get("play_mode") == "arrangement"):
+            return
+        if slot == state.get("playing_scene") and state.get("play_mode") == "session":
+            return  # Multiple tracks of the same scene must not restart the countdown.
+        name = state["scenes"][slot]
+        duration = parse_scene_duration_seconds(name)
+        now = time.time()
+        state.update(
+            playing_scene=slot, playing_scene_name=name, current_scene=slot,
+            last_fired_scene=slot, last_fired_scene_name=name, has_show_started=True,
+            play_mode="session", is_playing=True, is_paused=False,
+            scene_duration_seconds=duration, scene_duration_is_clip=False,
+            # Initial listener values cannot tell us when playback began.
+            remaining_seconds=None if initial else duration,
+            playback_deadline=(now + duration) if duration is not None and not initial else None,
+            expected_scene_signature=(generation, "session", slot), expected_activated_at=now,
+            sync_source="Ableton événement", arrangement_marker="—",
+        )
+        # Existing context publication only; no Program Change interpretation/emission.
+        send_midi_monitor_scene_context(generation, slot, name)
+
+
 def reset_live_set_state_locked(set_id: Optional[str], reason: str) -> int:
     """Ouvre atomiquement une génération et efface tout état propre au Set précédent."""
     global _track_count_cache, _cue_points_cache, _bootstrap_generation, _selected_duration_request
 
+    stop_playing_scene_listeners_locked()
     previous_generation = int(state.get("set_generation", 0))
     previous_set_id = state.get("current_set_id")
     generation = previous_generation + 1
@@ -1935,6 +2057,9 @@ def start_midi_expected_udp_listener():
 
 
 def osc_reply(address, *args, source_host=None):
+    if address == "/live/track/get/playing_slot_index":
+        receive_playing_slot_event(args, source_host=source_host)
+        return
     if address.startswith(MIDI_OUTGOING_OSC_PREFIX):
         console_name = address[len(MIDI_OUTGOING_OSC_PREFIX):].strip().lower()
         if args and record_ableton_midi_output(console_name, args[0]):
@@ -3689,7 +3814,6 @@ def scan_playing_scene_from_tracks():
         if scene_context is not None:
             send_midi_monitor_scene_context(*scene_context)
         if selection_to_advance is not None:
-            send("/live/view/set/selected_scene", selection_to_advance)
             schedule_selected_scene_duration_refresh(selection_to_advance, generation)
         # Nom réel demandé hors verrou.
         if should_query_name:
@@ -3736,6 +3860,7 @@ def background_refresh():
                 last_playing_scan = now
 
             if full_refresh_due:
+                ensure_playing_scene_listeners()
                 refresh_arrangement_time()
                 publish_current_midi_monitor_scene_context()
                 last_full_refresh = now
@@ -3886,10 +4011,6 @@ def info():
 
 @app.route("/")
 def index():
-    try:
-        show_session_view()
-    except OSError as exc:
-        print(f"OSC Session view unavailable while opening remote: {exc}")
     return render_template("index.html")
 
 
@@ -6884,6 +7005,7 @@ def shutdown():
     def stop_process():
         # Laisse au serveur HTTP le temps d'envoyer le 200 au launcher.
         time.sleep(0.35)
+        stop_playing_scene_listeners()
         if callable(shutdown_callback):
             shutdown_callback()
         else:
@@ -7255,7 +7377,6 @@ def execute_go_transaction(request_id: str, expected_generation: int, scene_numb
         if requested_name is None:
             return False, "Scène absente du Live Set courant"
 
-        show_session_view()
         confirmed = False
         confirmation_deadline = time.monotonic() + 0.8
 
@@ -7305,7 +7426,7 @@ def execute_go_transaction(request_id: str, expected_generation: int, scene_numb
             send("/live/scene/fire_as_selected", scene_index)
 
             next_scene = scene_index + 1 if (scene_index + 1) in scenes_snapshot else scene_index
-            send("/live/view/set/selected_scene", next_scene)
+            # La prochaine scène reste locale : ne pas déplacer la sélection Live.
 
         now = intent_started_at
         with lock:

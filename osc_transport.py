@@ -157,6 +157,9 @@ class OSCTransport:
         request_args: Tuple[Any, ...],
         response_args: Tuple[Any, ...],
     ) -> bool:
+        # Tagged playing-slot listener notifications must not satisfy a get query.
+        if address == "/live/track/get/playing_slot_index" and len(response_args) == 3:
+            return False
         if not request_args:
             return True
         if address.startswith("/live/scene/") or address.startswith("/live/track/"):
