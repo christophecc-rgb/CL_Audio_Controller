@@ -1893,6 +1893,7 @@ def ensure_playing_scene_listeners() -> None:
                                           track, _playing_listener_token) is False:
                     stop_playing_scene_listeners_locked()
                     return
+
     finally:
         _playing_listener_install_lock.release()
 
@@ -1924,7 +1925,11 @@ def receive_playing_slot_event(args, source_host=None) -> None:
         if slot not in state.get("scenes", {}) or slot == previous:
             return
         initial = previous is None
-        if initial and (not state.get("is_playing") or state.get("play_mode") == "arrangement"):
+        # Une valeur initiale positive de playing_slot_index signifie qu'une
+        # scène Session est déjà active au moment où le listener s'installe.
+        # Ne pas la jeter simplement parce que is_playing n'a pas encore été
+        # rafraîchi. Seul le mode Arrangement doit rester prioritaire.
+        if initial and state.get("play_mode") == "arrangement":
             return
         if slot == state.get("playing_scene") and state.get("play_mode") == "session":
             return  # Multiple tracks of the same scene must not restart the countdown.
@@ -1942,8 +1947,36 @@ def receive_playing_slot_event(args, source_host=None) -> None:
             expected_scene_signature=(generation, "session", slot), expected_activated_at=now,
             sync_source="Ableton événement", arrangement_marker="—",
         )
+
+        # Une scène lancée directement dans Ableton doit recaler le
+        # pointeur LOCAL de la télécommande sur la scène suivante,
+        # sans déplacer la sélection Live.
+        selection_to_advance = None
+        scenes = state.get("scenes", {})
+
+        if (slot + 1) in scenes:
+            selection_to_advance = slot + 1
+            next_name = str(scenes.get(selection_to_advance, "") or "").strip()
+
+            state["selected_scene"] = selection_to_advance
+            state["next_scene"] = selection_to_advance
+            state["selected_scene_name"] = (
+                next_name or f"Scène {selection_to_advance + 1}"
+            )
+            state["selected_scene_duration_seconds"] = (
+                parse_scene_duration_seconds(next_name)
+            )
+            state["selected_scene_duration_index"] = selection_to_advance
+            state["selected_scene_duration_is_clip"] = False
+
         # Existing context publication only; no Program Change interpretation/emission.
         send_midi_monitor_scene_context(generation, slot, name)
+
+    if selection_to_advance is not None:
+        schedule_selected_scene_duration_refresh(
+            selection_to_advance,
+            generation,
+        )
 
 
 def reset_live_set_state_locked(set_id: Optional[str], reason: str) -> int:
@@ -2122,8 +2155,12 @@ def apply_osc_response_locked(address: str, args: Tuple[Any, ...], expected_gene
         return
 
     if address == "/live/view/get/selected_scene" and args:
-        state["selected_scene"] = int(args[0])
-        state["next_scene"] = int(args[0])
+        # Avant le début du show, la sélection Live initialise la télécommande.
+        # Une fois le show démarré, selected_scene / next_scene sont un pointeur
+        # LOCAL : une sélection dans Live ne doit plus les écraser.
+        if not state.get("has_show_started"):
+            state["selected_scene"] = int(args[0])
+            state["next_scene"] = int(args[0])
 
     elif address == "/live/scene/get/name" and len(args) >= 2:
         scene_index = int(args[0])
@@ -3587,22 +3624,31 @@ def refresh_names_and_transport() -> bool:
             with lock:
                 if int(state.get("set_generation", 0)) != generation:
                     return
-                selection_changed = int(state.get("selected_scene", -1)) != selected
-                state["selected_scene"] = selected
-                state["next_scene"] = selected
-                if selection_changed:
-                    selected_name = str(state.get("scenes", {}).get(selected, "") or "")
-                    state["selected_scene_duration_seconds"] = parse_scene_duration_seconds(selected_name)
-                    state["selected_scene_duration_index"] = selected
-                    state["selected_scene_duration_is_clip"] = False
-                should_refresh_selected_duration = (
-                    selection_changed
-                    or int(state.get("selected_scene_duration_index", -1)) != selected
-                    or not bool(state.get("selected_scene_duration_is_clip", False))
-                )
-            query("/live/scene/get/name", selected, expected_generation=generation)
-            if should_refresh_selected_duration:
-                schedule_selected_scene_duration_refresh(selected, generation)
+
+                # La sélection Live n'est autoritaire qu'avant le début du show.
+                # Pendant le show, selected_scene / next_scene restent locaux.
+                sync_live_selection = not bool(state.get("has_show_started"))
+                if sync_live_selection:
+                    selection_changed = int(state.get("selected_scene", -1)) != selected
+                    state["selected_scene"] = selected
+                    state["next_scene"] = selected
+                    if selection_changed:
+                        selected_name = str(state.get("scenes", {}).get(selected, "") or "")
+                        state["selected_scene_duration_seconds"] = parse_scene_duration_seconds(selected_name)
+                        state["selected_scene_duration_index"] = selected
+                        state["selected_scene_duration_is_clip"] = False
+                    should_refresh_selected_duration = (
+                        selection_changed
+                        or int(state.get("selected_scene_duration_index", -1)) != selected
+                        or not bool(state.get("selected_scene_duration_is_clip", False))
+                    )
+                else:
+                    should_refresh_selected_duration = False
+
+            if sync_live_selection:
+                query("/live/scene/get/name", selected, expected_generation=generation)
+                if should_refresh_selected_duration:
+                    schedule_selected_scene_duration_refresh(selected, generation)
 
         query("/live/song/get/is_playing", expected_generation=generation)
 
@@ -3610,6 +3656,17 @@ def refresh_names_and_transport() -> bool:
             if int(state.get("set_generation", 0)) != generation:
                 return
             playing = int(state.get("playing_scene", -1))
+            transport_playing = bool(state.get("is_playing"))
+
+        # Rattrapage d'hydratation uniquement au démarrage :
+        # si Ableton joue déjà mais qu'aucune scène Session n'est encore connue,
+        # faire une lecture ponctuelle des playing_slot_index.
+        if transport_playing and playing < 0:
+            scan_playing_scene_from_tracks()
+            with lock:
+                if int(state.get("set_generation", 0)) != generation:
+                    return
+                playing = int(state.get("playing_scene", -1))
 
         with lock:
             show_started = bool(state.get("has_show_started"))
