@@ -12,6 +12,27 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('@"source": @"local_simulator_tx"', source)
         self.assertIn('@"local_simulator_tx": self.lastCL5SimulatorTX', source)
         self.assertIn('@"local_simulator_tx": self.lastQL1SimulatorTX', source)
+    def test_show_control_network_endpoint_is_not_console_return(self):
+        source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
+        predicate = source.split(
+            "static BOOL CLIsRTPReturnEndpointName", 1
+        )[1].split(
+            "static BOOL CLIsProtectedDeviceTestEndpoint", 1
+        )[0]
+
+        self.assertIn('@"Réseau CL Show Control"', predicate)
+        self.assertIn("return NO;", predicate)
+        self.assertIn("CLRTPReturnEndpointName", predicate)
+        self.assertIn('rangeOfString:@"RTP"', predicate)
+        self.assertNotIn('rangeOfString:@"Réseau"', predicate)
+
+        preferred = source.split(
+            "static NSString *CLPreferredConsoleReturnEndpoint", 1
+        )[1].split(
+            "static NSArray<NSString *> *CLLocalRTPEndpointNames", 1
+        )[0]
+        self.assertIn("CLIsRTPReturnEndpointName(saved)", preferred)
+
     def test_guardian_uses_bonjour_and_coremidi(self):
         source = (TOOLS / "CLMIDINetworkGuardian.m").read_text()
         self.assertIn("MIDINetworkSession", source)

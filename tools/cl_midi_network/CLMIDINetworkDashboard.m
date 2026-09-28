@@ -462,8 +462,20 @@ static NSString *CLDeviceConfigurationPath(void) {
 static BOOL CLIsRTPReturnEndpointName(NSString *name) {
     if (!name.length || [name isEqualToString:CLExpectedEndpointName] ||
         [name isEqualToString:CLLocalReturnEndpointName]) return NO;
-    return [name rangeOfString:@"RTP" options:NSCaseInsensitiveSearch].location != NSNotFound ||
-        [name rangeOfString:@"Réseau" options:NSCaseInsensitiveSearch].location != NSNotFound;
+
+    // "Réseau CL Show Control" transporte le MIDI du show et ne constitue
+    // pas un retour console. Le mot générique "Réseau" ne suffit donc pas
+    // à qualifier un endpoint RETURNED.
+    if ([name caseInsensitiveCompare:@"Réseau CL Show Control"] == NSOrderedSame) {
+        return NO;
+    }
+
+    if ([name caseInsensitiveCompare:CLRTPReturnEndpointName] == NSOrderedSame) {
+        return YES;
+    }
+
+    return [name rangeOfString:@"RTP"
+                        options:NSCaseInsensitiveSearch].location != NSNotFound;
 }
 
 static BOOL CLIsProtectedDeviceTestEndpoint(NSString *name) {
@@ -538,7 +550,9 @@ static void CLDeviceTestMIDINotify(const MIDINotification *message, void *refCon
 
 static NSString *CLPreferredConsoleReturnEndpoint(NSArray<NSString *> *sources) {
     NSString *saved = [NSUserDefaults.standardUserDefaults stringForKey:CLConsoleReturnEndpointPreference];
-    if (saved.length && [sources containsObject:saved]) return saved;
+    if (saved.length &&
+        [sources containsObject:saved] &&
+        CLIsRTPReturnEndpointName(saved)) return saved;
     for (NSString *name in sources) {
         if ([name caseInsensitiveCompare:CLRTPReturnEndpointName] == NSOrderedSame) return name;
     }
