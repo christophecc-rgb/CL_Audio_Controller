@@ -33,3 +33,6 @@ pypdf>=5.0
 
 # Génération des icônes pendant le build uniquement
 Pillow==12.3.0
+
+# QR SVG sans Pillow au runtime
+qrcode==8.2

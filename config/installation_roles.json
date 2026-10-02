@@ -1,0 +1,618 @@
+{
+  "schema": 1,
+  "components": {
+    "show_control": {
+      "source": "Applications/CL Show Control.app",
+      "target": "Applications/CL Show Control.app",
+      "owner": "launcher",
+      "dependencies": [
+        "python_runtime_bundled"
+      ],
+      "network_transports": [
+        "http",
+        "ableton_osc",
+        "scene_backup",
+        "bonjour"
+      ],
+      "ports": [
+        "5050/TCP",
+        "5055/TCP loopback",
+        "8443/TCP optional TLS",
+        "11001/UDP",
+        "9001/UDP",
+        "9002/UDP",
+        "63123/UDP",
+        "50023/UDP",
+        "12042/UDP TX",
+        "5353/UDP"
+      ],
+      "permissions": [
+        "Local Network",
+        "MIDI/IAC"
+      ]
+    },
+    "network_manager": {
+      "source": "Applications/CL MIDI Network Manager.app",
+      "target": "Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.app",
+      "owner": "interactive",
+      "network_transports": [
+        "http",
+        "rtp_midi",
+        "bonjour"
+      ],
+      "ports": [
+        "5050/TCP outbound",
+        "5055/TCP outbound loopback",
+        "5353/UDP"
+      ],
+      "permissions": [
+        "Local Network",
+        "MIDI/IAC"
+      ]
+    },
+    "network_tools": {
+      "source": "Outils_reseau_MIDI",
+      "target": "Library/Application Support/CL MIDI Console/Network Tools",
+      "owner": "interactive",
+      "network_transports": [
+        "rtp_midi",
+        "mtc"
+      ],
+      "ports": [
+        "CoreMIDI configured session pairs"
+      ],
+      "permissions": [
+        "MIDI/IAC"
+      ]
+    },
+    "ableton_osc": {
+      "source": "Ableton Live 11-12/Remote Scripts/AbletonOSC",
+      "target": "@LIVE/Remote Scripts/AbletonOSC",
+      "dependencies": [
+        "Ableton Live 11/12"
+      ],
+      "network_transports": [
+        "ableton_osc",
+        "bonjour"
+      ],
+      "ports": [
+        "11000/UDP",
+        "5353/UDP"
+      ],
+      "permissions": [
+        "Local Network"
+      ]
+    },
+    "live_devices": {
+      "source": "Ableton Live 11-12/Max for Live/CL Audio Controller - Remote",
+      "target": "@LIVE/Presets/Audio Effects/Max Audio Effect/CL Audio Controller - Remote",
+      "dependencies": [
+        "Max for Live"
+      ],
+      "network_transports": [
+        "ableton_osc",
+        "mtc"
+      ],
+      "ports": [
+        "63123/UDP TX",
+        "9001/UDP TX",
+        "9002/UDP TX"
+      ],
+      "permissions": [
+        "Local Network",
+        "MIDI/IAC"
+      ]
+    },
+    "absolute_mtc": {
+      "source": "Ableton Live 11-12/Max for Live/CL Absolute MTC",
+      "target": "@LIVE/Presets/MIDI Effects/Max MIDI Effect/CL Absolute MTC",
+      "dependencies": [
+        "Max for Live"
+      ],
+      "network_transports": [
+        "mtc"
+      ],
+      "ports": [
+        "20809/UDP TX loopback"
+      ],
+      "permissions": [
+        "MIDI/IAC"
+      ]
+    },
+    "mtc_bridge": {
+      "source": "Applications/CL MTC Bridge.app",
+      "target": "Applications/Analyse - Réseau - MIDI/CL MTC Bridge.app",
+      "owner": "interactive",
+      "network_transports": [
+        "mtc"
+      ],
+      "ports": [
+        "20809/UDP loopback",
+        "20810/UDP loopback"
+      ],
+      "permissions": [
+        "MIDI/IAC CL MTC"
+      ]
+    },
+    "sync_meter": {
+      "source": "Applications/CL Sync Meter.app",
+      "target": "Applications/Analyse - Réseau - MIDI/CL Sync Meter.app",
+      "owner": "interactive",
+      "network_transports": [
+        "mtc"
+      ],
+      "ports": [
+        "20810/UDP loopback"
+      ],
+      "permissions": [
+        "MIDI/IAC"
+      ]
+    },
+    "rtp_agent": {
+      "source": "Applications/CL MIDI RTP Agent.app",
+      "target": "Applications/Analyse - Réseau - MIDI/CL MIDI RTP Agent.app",
+      "owner": "launchd",
+      "service": "com.claudio.midi-rtp-agent",
+      "network_transports": [
+        "rtp_midi",
+        "bonjour"
+      ],
+      "ports": [
+        "50021/UDP",
+        "50022/UDP",
+        "CoreMIDI configured session pairs",
+        "5353/UDP"
+      ],
+      "permissions": [
+        "Local Network",
+        "MIDI/IAC"
+      ]
+    },
+    "show_backup": {
+      "source": "Applications/CL Show Backup.app",
+      "target": "Applications/CL Show Backup.app",
+      "owner": "interactive",
+      "external": true,
+      "network_transports": [
+        "scene_backup",
+        "ableton_osc"
+      ],
+      "ports": [
+        "12042/UDP RX",
+        "11000/UDP outbound loopback"
+      ],
+      "permissions": [
+        "Local Network"
+      ]
+    },
+    "control_client": {
+      "target": "Applications/CL Show Control Client.app",
+      "generated": true,
+      "owner": "interactive",
+      "network_transports": [
+        "http"
+      ],
+      "ports": [
+        "8443/TCP outbound TLS"
+      ],
+      "permissions": [
+        "Local Network"
+      ]
+    },
+    "analyzer": {
+      "source": "Applications/CL MIDI Analyzer.app",
+      "target": "Applications/Analyse - Réseau - MIDI/CL MIDI Analyzer.app",
+      "owner": "interactive",
+      "network_transports": [
+        "rtp_midi"
+      ],
+      "ports": [
+        "CoreMIDI configured sessions when explicitly tested"
+      ],
+      "permissions": [
+        "MIDI/IAC"
+      ]
+    },
+    "performance_monitor": {
+      "source": "Applications/CL MIDI Performance Monitor.app",
+      "target": "Applications/Analyse - Réseau - MIDI/CL MIDI Performance Monitor.app",
+      "owner": "interactive",
+      "network_transports": [
+        "rtp_midi"
+      ],
+      "ports": [
+        "CoreMIDI configured sessions when explicitly tested"
+      ],
+      "permissions": [
+        "MIDI/IAC"
+      ]
+    },
+    "rtp_diagnostic": {
+      "source": "Applications/CL MIDI & RTP Diagnostic.app",
+      "target": "Applications/Analyse - Réseau - MIDI/CL MIDI & RTP Diagnostic.app",
+      "owner": "interactive",
+      "network_transports": [
+        "rtp_midi"
+      ],
+      "ports": [
+        "CoreMIDI configured sessions when explicitly tested"
+      ],
+      "permissions": [
+        "Local Network",
+        "MIDI/IAC"
+      ]
+    }
+  },
+  "roles": {
+    "show_server": {
+      "role": "show_server",
+      "components": [
+        "show_control",
+        "network_manager",
+        "network_tools"
+      ],
+      "services": [],
+      "permissions": [
+        "Local Network",
+        "MIDI/IAC console endpoints"
+      ],
+      "network_transports": [
+        "http",
+        "ableton_osc",
+        "scene_backup",
+        "bonjour"
+      ],
+      "ports": [
+        "5050/TCP",
+        "5055/TCP loopback",
+        "11001/UDP",
+        "9001/UDP",
+        "9002/UDP",
+        "63123/UDP",
+        "12042/UDP TX",
+        "5353/UDP",
+        "8443/TCP optional TLS remote listener",
+        "50023/UDP"
+      ],
+      "dependencies": [
+        "console libraries bundled",
+        "Scene Backup TX owned by backend"
+      ],
+      "visible_tools": [
+        "show_control",
+        "network_manager",
+        "network_tools"
+      ],
+      "forbidden_components": [
+        "ableton_osc",
+        "absolute_mtc",
+        "analyzer",
+        "control_client",
+        "live_devices",
+        "mtc_bridge",
+        "performance_monitor",
+        "rtp_agent",
+        "rtp_diagnostic",
+        "show_backup",
+        "sync_meter"
+      ],
+      "forbidden_services": [
+        "com.claudio.midi-network-monitor",
+        "com.claudio.midi-rtp-agent"
+      ],
+      "network_configuration": "explicit targets; preserve Local/Paradis/Distant; no transport fallback"
+    },
+    "ableton_reader": {
+      "role": "ableton_reader",
+      "components": [
+        "ableton_osc",
+        "live_devices",
+        "absolute_mtc"
+      ],
+      "services": [],
+      "permissions": [
+        "Local Network",
+        "MIDI/IAC"
+      ],
+      "network_transports": [
+        "ableton_osc",
+        "mtc",
+        "bonjour"
+      ],
+      "ports": [
+        "11000/UDP",
+        "20809/UDP TX loopback",
+        "63123/UDP TX",
+        "9001/UDP TX",
+        "9002/UDP TX",
+        "5353/UDP"
+      ],
+      "dependencies": [
+        "Ableton Live 11/12",
+        "Max for Live"
+      ],
+      "visible_tools": [
+        "ableton_osc",
+        "live_devices",
+        "absolute_mtc"
+      ],
+      "forbidden_components": [
+        "analyzer",
+        "control_client",
+        "mtc_bridge",
+        "network_manager",
+        "network_tools",
+        "performance_monitor",
+        "rtp_agent",
+        "rtp_diagnostic",
+        "show_backup",
+        "show_control",
+        "sync_meter"
+      ],
+      "forbidden_services": [
+        "com.claudio.midi-network-monitor",
+        "com.claudio.midi-rtp-agent"
+      ],
+      "network_configuration": "explicit targets; preserve Local/Paradis/Distant; no transport fallback"
+    },
+    "mtc_logic": {
+      "role": "mtc_logic",
+      "components": [
+        "mtc_bridge",
+        "sync_meter"
+      ],
+      "services": [],
+      "permissions": [
+        "MIDI/IAC CL MTC"
+      ],
+      "network_transports": [
+        "mtc"
+      ],
+      "ports": [
+        "20809/UDP loopback",
+        "20810/UDP loopback"
+      ],
+      "dependencies": [
+        "Logic or other MTC reader; IAC created by bridge on explicit start"
+      ],
+      "visible_tools": [
+        "mtc_bridge",
+        "sync_meter"
+      ],
+      "forbidden_components": [
+        "ableton_osc",
+        "absolute_mtc",
+        "analyzer",
+        "control_client",
+        "live_devices",
+        "network_manager",
+        "network_tools",
+        "performance_monitor",
+        "rtp_agent",
+        "rtp_diagnostic",
+        "show_backup",
+        "show_control"
+      ],
+      "forbidden_services": [
+        "com.claudio.midi-network-monitor",
+        "com.claudio.midi-rtp-agent"
+      ],
+      "network_configuration": "explicit targets; preserve Local/Paradis/Distant; no transport fallback"
+    },
+    "control_station": {
+      "role": "control_station",
+      "components": [
+        "control_client"
+      ],
+      "services": [],
+      "permissions": [
+        "Local Network"
+      ],
+      "network_transports": [
+        "http",
+        "bonjour"
+      ],
+      "ports": [
+        "5050/TCP outbound",
+        "5353/UDP discovery optional",
+        "8443/TCP outbound TLS"
+      ],
+      "dependencies": [
+        "browser",
+        "explicit HTTPS server URL or initial QR"
+      ],
+      "visible_tools": [
+        "control_client"
+      ],
+      "forbidden_components": [
+        "ableton_osc",
+        "absolute_mtc",
+        "analyzer",
+        "live_devices",
+        "mtc_bridge",
+        "network_manager",
+        "network_tools",
+        "performance_monitor",
+        "rtp_agent",
+        "rtp_diagnostic",
+        "show_backup",
+        "show_control",
+        "sync_meter"
+      ],
+      "forbidden_services": [
+        "com.claudio.midi-network-monitor",
+        "com.claudio.midi-rtp-agent"
+      ],
+      "network_configuration": "explicit targets; preserve Local/Paradis/Distant; no transport fallback"
+    },
+    "show_backup": {
+      "role": "show_backup",
+      "components": [
+        "show_backup",
+        "ableton_osc"
+      ],
+      "services": [],
+      "permissions": [
+        "Local Network"
+      ],
+      "network_transports": [
+        "scene_backup",
+        "ableton_osc"
+      ],
+      "ports": [
+        "12042/UDP RX",
+        "11000/UDP loopback"
+      ],
+      "dependencies": [
+        "Ableton Live 11/12",
+        "external CL Show Backup signed receiver integration required"
+      ],
+      "visible_tools": [
+        "show_backup",
+        "ableton_osc"
+      ],
+      "forbidden_components": [
+        "absolute_mtc",
+        "analyzer",
+        "control_client",
+        "live_devices",
+        "mtc_bridge",
+        "network_manager",
+        "network_tools",
+        "performance_monitor",
+        "rtp_agent",
+        "rtp_diagnostic",
+        "show_control",
+        "sync_meter"
+      ],
+      "forbidden_services": [
+        "com.claudio.midi-network-monitor",
+        "com.claudio.midi-rtp-agent"
+      ],
+      "network_configuration": "explicit targets; preserve Local/Paradis/Distant; no transport fallback"
+    },
+    "diagnostics": {
+      "role": "diagnostics",
+      "components": [
+        "network_manager",
+        "network_tools",
+        "analyzer",
+        "performance_monitor",
+        "rtp_diagnostic"
+      ],
+      "services": [],
+      "permissions": [
+        "Local Network",
+        "MIDI/IAC"
+      ],
+      "network_transports": [
+        "rtp_midi",
+        "mtc",
+        "http",
+        "bonjour"
+      ],
+      "ports": [
+        "5050/TCP outbound optional",
+        "5055/TCP outbound loopback optional",
+        "5353/UDP optional",
+        "CoreMIDI dynamic UDP when explicitly tested"
+      ],
+      "dependencies": [
+        "no Live requirement; simulators are tools launched explicitly"
+      ],
+      "visible_tools": [
+        "network_manager",
+        "network_tools",
+        "analyzer",
+        "performance_monitor",
+        "rtp_diagnostic"
+      ],
+      "forbidden_components": [
+        "ableton_osc",
+        "absolute_mtc",
+        "control_client",
+        "live_devices",
+        "mtc_bridge",
+        "rtp_agent",
+        "show_backup",
+        "show_control",
+        "sync_meter"
+      ],
+      "forbidden_services": [
+        "com.claudio.midi-network-monitor",
+        "com.claudio.midi-rtp-agent"
+      ],
+      "network_configuration": "explicit targets; preserve Local/Paradis/Distant; no transport fallback"
+    },
+    "custom": {
+      "role": "custom",
+      "components": [],
+      "services": [],
+      "permissions": [],
+      "network_transports": [],
+      "ports": [],
+      "dependencies": [],
+      "visible_tools": [],
+      "forbidden_components": [
+        "ableton_osc",
+        "absolute_mtc",
+        "analyzer",
+        "control_client",
+        "live_devices",
+        "mtc_bridge",
+        "network_manager",
+        "network_tools",
+        "performance_monitor",
+        "rtp_agent",
+        "rtp_diagnostic",
+        "show_backup",
+        "show_control",
+        "sync_meter"
+      ],
+      "forbidden_services": [
+        "com.claudio.midi-network-monitor",
+        "com.claudio.midi-rtp-agent"
+      ],
+      "network_configuration": "explicit targets; preserve Local/Paradis/Distant; no transport fallback"
+    }
+  },
+  "optional_features": {
+    "rtp": {
+      "roles": [
+        "ableton_reader",
+        "custom"
+      ],
+      "components": [
+        "rtp_agent"
+      ],
+      "services": [
+        "com.claudio.midi-rtp-agent"
+      ],
+      "network_transports": [
+        "rtp_midi"
+      ],
+      "ports": [
+        "50021/UDP",
+        "50022/UDP",
+        "CoreMIDI session pair configured explicitly"
+      ]
+    },
+    "mtc_bridge": {
+      "roles": [
+        "ableton_reader",
+        "custom"
+      ],
+      "components": [
+        "mtc_bridge"
+      ],
+      "services": [],
+      "network_transports": [
+        "mtc"
+      ],
+      "ports": [
+        "20809/UDP loopback",
+        "20810/UDP loopback"
+      ]
+    }
+  }
+}

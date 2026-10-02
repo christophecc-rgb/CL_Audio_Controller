@@ -5,7 +5,7 @@ a = Analysis(
     pathex=[],
     binaries=[
         (
-            'tools/ableton_mtc_bridge/CLAbletonMTCBridge',
+            __import__('os').environ.get('CL_MTC_BRIDGE_BINARY', 'tools/ableton_mtc_bridge/CLAbletonMTCBridge'),
             'tools/ableton_mtc_bridge',
         ),
     ],
@@ -29,7 +29,7 @@ a = Analysis(
         ('show_cues.json', '.'),
         ('show_cues_audio', 'show_cues_audio'),
     ],
-    hiddenimports=['app', 'pypdf', 'showcue_pdf_import', 'showcue_session_archive', 'cl_transport', 'show_audio_print_engine', 'osc_transport', 'bonjour_remote', 'ltc_receiver', 'show_cues', 'showcue_builder', 'device_profiles', 'pythonosc.dispatcher', 'pythonosc.osc_server', 'pythonosc.udp_client'],
+    hiddenimports=['security_recovery', 'security_http', 'remote_security', 'scene_backup_protocol', 'qrcode', 'qrcode.image.svg', 'app', 'pypdf', 'showcue_pdf_import', 'showcue_session_archive', 'cl_transport', 'show_audio_print_engine', 'osc_transport', 'bonjour_remote', 'ltc_receiver', 'show_cues', 'showcue_builder', 'device_profiles', 'pythonosc.dispatcher', 'pythonosc.osc_server', 'pythonosc.udp_client'],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

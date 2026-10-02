@@ -149,10 +149,10 @@ static void CLInstallApplicationMenu(void) {
     ]];
 
     NSMutableArray<NSView *> *mainViews = [NSMutableArray arrayWithObject:header];
-    if (!self.uninstaller) {
+    {
         NSTextField *roleTitle = [self label:@"1. Choisissez l’usage de ce Mac" size:14 weight:NSFontWeightSemibold color:NSColor.whiteColor];
         [mainViews addObject:roleTitle];
-        self.roleSelector = [NSSegmentedControl segmentedControlWithLabels:@[@"Mac Télécommande", @"Mac Ableton Lecteur", @"Simulateur console", @"Personnalisé"]
+        self.roleSelector = [NSSegmentedControl segmentedControlWithLabels:@[@"Serveur", @"Ableton", @"MTC / Logic", @"Contrôle", @"Backup", @"Diagnostic", @"Personnalisé"]
                                                                trackingMode:NSSegmentSwitchTrackingSelectOne
                                                                      target:self
                                                                      action:@selector(roleChanged:)];
@@ -160,20 +160,6 @@ static void CLInstallApplicationMenu(void) {
         self.roleSelector.segmentStyle = NSSegmentStyleRounded;
         [self.roleSelector.heightAnchor constraintEqualToConstant:36].active = YES;
         [mainViews addObject:self.roleSelector];
-        NSTextField *liveTitle = [self label:@"2. Choisissez la version d’Ableton Live" size:14 weight:NSFontWeightSemibold color:NSColor.whiteColor];
-        self.liveSelector = [NSSegmentedControl segmentedControlWithLabels:@[@"Ableton Live 12", @"Ableton Live 10"]
-                                                               trackingMode:NSSegmentSwitchTrackingSelectOne
-                                                                     target:self
-                                                                     action:@selector(liveChanged:)];
-        self.liveSelector.selectedSegment = 0;
-        self.liveSelector.segmentStyle = NSSegmentStyleRounded;
-        [self.liveSelector.heightAnchor constraintEqualToConstant:34].active = YES;
-        NSStackView *liveSection = [NSStackView stackViewWithViews:@[liveTitle, self.liveSelector]];
-        liveSection.orientation = NSUserInterfaceLayoutOrientationVertical;
-        liveSection.alignment = NSLayoutAttributeLeading;
-        liveSection.spacing = 7;
-        self.liveSection = liveSection;
-        [mainViews addObject:liveSection];
     }
 
     NSTextField *componentsTitle = [self label:(self.uninstaller ? @"Éléments à retirer" : @"Composants inclus") size:14 weight:NSFontWeightSemibold color:NSColor.whiteColor];
@@ -182,25 +168,21 @@ static void CLInstallApplicationMenu(void) {
     NSStackView *componentStack = [[NSStackView alloc] initWithFrame:NSZeroRect];
     componentStack.orientation = NSUserInterfaceLayoutOrientationVertical;
     componentStack.spacing = 8;
-    NSArray<NSArray<NSString *> *> *components = self.uninstaller ? @[
-        @[@"autoscene", @"Paradis Latin AutoScene — Live 11/12", @"Périphérique Max for Live AutoScene.", @"ParadisLatin.jpg"],
-        @[@"autoscene-live10", @"Paradis Latin AutoScene — Live 10", @"Variante dédiée à Ableton Live 10.", @"ParadisLatin.jpg"],
-        @[@"controller", @"Mac Télécommande — RTP émetteur-récepteur", @"Show Control, ShowCue et Cue Editor, ressources CL, découverte Bonjour et liaison RTP-MIDI bidirectionnelle avec retours consoles.", @"Controller.png"],
-        @[@"ableton-reader", @"Mac Ableton Lecteur — RTP émetteur-récepteur", @"AbletonOSC, LTC, X-Fader et agent RTP-MIDI bidirectionnel à démarrage automatique.", @"Controller.png"],
-        @[@"builder", @"CL Arrangement Builder", @"Application Builder et Remote Script Ableton.", @"Builder.png"],
-        @[@"showcue", @"CL ShowCue + Cue Editor", @"Conduite du spectacle et éditeur, sessions transportables et bibliothèques CL5 / QL1.", @"ShowCue.png"],
-        @[@"show-audio-builder", @"CL Audio Export", @"Export audio WAV/MP3 par scène et medleys.", @"AudioExport.png"],
-        @[@"midi-console", @"CL MIDI Network Manager + simulateur", @"Diagnostic MIDI, retours consoles et simulateur intégré IAC/RTP.", @"MIDIConsole.png"],
-        @[@"diagnostic-tools", @"Outils de diagnostic CL", @"MIDI & RTP Diagnostic, MIDI Analyzer et Performance Monitor.", @"Diagnostic.png"]
-    ] : @[
-        @[@"autoscene", @"Paradis Latin AutoScene", @"Périphérique Max for Live pour Ableton Live 11 et 12.", @"ParadisLatin.jpg"],
-        @[@"controller", @"Mac Télécommande", @"Show Control, ShowCue et Cue Editor, ressources CL et serveur web.", @"Controller.png"],
-        @[@"ableton-reader", @"Mac Ableton Lecteur", @"AbletonOSC, LTC, X-Fader et agent RTP léger.", @"Controller.png"],
-        @[@"builder", @"CL Arrangement Builder", @"Application Builder et Remote Script Ableton.", @"Builder.png"],
-        @[@"showcue", @"CL ShowCue + Cue Editor", @"Conduite du spectacle et éditeur, sessions transportables et bibliothèques CL5 / QL1.", @"ShowCue.png"],
-        @[@"show-audio-builder", @"CL Audio Export", @"Export audio WAV/MP3 par scène et medleys.", @"AudioExport.png"],
-        @[@"midi-console", @"CL MIDI Network Manager + simulateur", @"Diagnostic, retours consoles et tests IAC/RTP dans une seule application.", @"MIDIConsole.png"],
-        @[@"diagnostic-tools", @"Outils de diagnostic CL", @"MIDI & RTP Diagnostic, MIDI Analyzer et Performance Monitor.", @"Diagnostic.png"]
+    NSArray<NSArray<NSString *> *> *components = @[
+        @[@"show_control", @"CL Show Control — serveur", @"Backend, launcher, bibliothèques et Scene Backup TX ; aucun agent RTP implicite.", @"Controller.png"],
+        @[@"control_client", @"Client Show Control / ShowQ", @"Navigateur vers le serveur HTTPS, aucun backend ou daemon local.", @"ShowCue.png"],
+        @[@"ableton_osc", @"AbletonOSC", @"Extension Live 11/12 pour les commandes OSC.", @"Controller.png"],
+        @[@"live_devices", @"Devices Live LTC / X-Fader", @"Max for Live requis uniquement pour ces devices.", @"Controller.png"],
+        @[@"absolute_mtc", @"CL Absolute MTC", @"Device Live de synchronisation temporelle.", @"MIDIConsole.png"],
+        @[@"mtc_bridge", @"MTC Bridge", @"Application de synchro ouverte explicitement.", @"MIDIConsole.png"],
+        @[@"sync_meter", @"Sync Meter", @"Diagnostic de synchro MTC.", @"Diagnostic.png"],
+        @[@"show_backup", @"CL Show Backup — externe", @"Installation bloquée jusqu’à validation du récepteur HMAC.", @"Controller.png"],
+        @[@"network_manager", @"Network Manager", @"Diagnostic interactif et moniteur possédé par Show Control.", @"MIDIConsole.png"],
+        @[@"network_tools", @"Helpers et simulateurs", @"Outils ponctuels, aucun LaunchAgent permanent.", @"MIDIConsole.png"],
+        @[@"analyzer", @"MIDI Analyzer", @"Analyse ponctuelle.", @"Diagnostic.png"],
+        @[@"performance_monitor", @"Performance Monitor", @"Mesures ponctuelles.", @"Diagnostic.png"],
+        @[@"rtp_diagnostic", @"MIDI & RTP Diagnostic", @"Diagnostic ponctuel.", @"Diagnostic.png"],
+        @[@"rtp_agent", @"Option agent RTP", @"Lecteur Ableton seulement, ou choix personnalisé explicite ; propriétaire launchd.", @"MIDIConsole.png"]
     ];
     for (NSArray<NSString *> *item in components) {
         [componentStack addArrangedSubview:[self componentCard:item[0] title:item[1] subtitle:item[2] iconName:item[3]]];
@@ -290,36 +272,27 @@ static void CLInstallApplicationMenu(void) {
     ]];
     [self.window makeKeyAndOrderFront:nil];
     [NSApp activateIgnoringOtherApps:YES];
-    if (!self.uninstaller) [self roleChanged:self.roleSelector];
+    [self roleChanged:self.roleSelector];
 }
 
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender { return YES; }
 
-- (void)liveChanged:(id)sender {
-    BOOL live10 = self.liveSelector.selectedSegment == 1;
-    self.checks[@"autoscene"].title = live10 ? @"Paradis Latin AutoScene — Live 10" : @"Paradis Latin AutoScene";
-}
-
 - (void)roleChanged:(id)sender {
     (void)sender;
     NSInteger role = self.roleSelector.selectedSegment;
-    if (role == 3) {
-        [self.checks enumerateKeysAndObjectsUsingBlock:^(NSString *key, NSButton *check, BOOL *stop) { check.enabled = YES; }];
-        [self.cards enumerateKeysAndObjectsUsingBlock:^(NSString *key, NSView *card, BOOL *stop) { card.alphaValue = 1.0; }];
-        self.liveSelector.enabled = YES;
-        self.liveSection.hidden = NO;
-        return;
-    }
+    NSArray *roles = @[@[@"show_control", @"network_manager", @"network_tools"],
+        @[@"ableton_osc", @"live_devices", @"absolute_mtc"], @[@"mtc_bridge", @"sync_meter"],
+        @[@"control_client"], @[@"show_backup", @"ableton_osc"],
+        @[@"network_manager", @"network_tools", @"analyzer", @"performance_monitor", @"rtp_diagnostic"], @[]];
     [self.checks enumerateKeysAndObjectsUsingBlock:^(NSString *key, NSButton *check, BOOL *stop) {
-        BOOL selected = (role == 0 && ([key isEqualToString:@"controller"] || [key isEqualToString:@"diagnostic-tools"])) ||
-                        (role == 1 && ([key isEqualToString:@"ableton-reader"] || [key isEqualToString:@"builder"] || [key isEqualToString:@"autoscene"])) ||
-                        (role == 2 && [key isEqualToString:@"midi-console"]);
+        BOOL selected = role < 6 && [roles[role] containsObject:key];
         check.state = selected ? NSControlStateValueOn : NSControlStateValueOff;
-        check.enabled = NO;
-        self.cards[key].alphaValue = selected ? 1.0 : 0.28;
+        check.enabled = role == 6 || (role == 1 && ([key isEqualToString:@"rtp_agent"] || [key isEqualToString:@"mtc_bridge"]));
+        self.cards[key].alphaValue = selected || check.enabled ? 1.0 : 0.28;
     }];
-    self.liveSelector.enabled = role == 1;
-    self.liveSection.hidden = role != 1;
+    self.liveSelector.enabled = role == 1 || role == 4 || role == 6;
+    self.liveSection.hidden = !self.liveSelector.enabled;
+
 }
 
 - (void)cancelPressed:(id)sender { [NSApp terminate:nil]; }
@@ -384,12 +357,50 @@ static void CLInstallApplicationMenu(void) {
     task.arguments = @[engine];
     NSMutableDictionary *environment = [NSProcessInfo.processInfo.environment mutableCopy];
     environment[@"CL_SUITE_NONINTERACTIVE"] = @"1";
-    if (self.uninstaller) {
-        environment[@"CL_SUITE_UNINSTALL_COMPONENTS"] = [selected componentsJoinedByString:@","];
-    } else {
-        BOOL live10 = self.liveSelector.selectedSegment == 1;
-        environment[@"CL_SUITE_LIVE_FAMILY"] = live10 ? @"10" : @"12";
-        environment[@"CL_SUITE_COMPONENTS"] = [selected componentsJoinedByString:@","];
+    NSArray *roleNames = @[@"show_server", @"ableton_reader", @"mtc_logic", @"control_station", @"show_backup", @"diagnostics", @"custom"];
+    NSInteger role = self.roleSelector.selectedSegment;
+    environment[@"CL_SUITE_ROLE"] = roleNames[role];
+    if (role == 6) environment[@"CL_SUITE_ROLE_COMPONENTS"] = [selected componentsJoinedByString:@","];
+    if (role == 1) {
+        NSMutableArray *features = [NSMutableArray array];
+        if ([selected containsObject:@"rtp_agent"]) [features addObject:@"rtp"];
+        if ([selected containsObject:@"mtc_bridge"]) [features addObject:@"mtc_bridge"];
+        environment[@"CL_SUITE_ROLE_FEATURES"] = [features componentsJoinedByString:@","];
+    }
+    if (!self.uninstaller) {
+        NSAlert *migration = [[NSAlert alloc] init];
+        migration.messageText = @"Migration de l’installation existante";
+        NSString *auditSummary = @"Audit indisponible : consulter le rapport avant remplacement.";
+        @try {
+            NSTask *auditTask = [[NSTask alloc] init];
+            auditTask.executableURL = [NSURL fileURLWithPath:@"/usr/bin/env"];
+            auditTask.arguments = @[@"python3", [[self.resources URLByAppendingPathComponent:@"role_install.py"] path], @"audit", roleNames[role]];
+            auditTask.environment = environment;
+            NSPipe *pipe = [NSPipe pipe]; auditTask.standardOutput = pipe; auditTask.standardError = pipe;
+            [auditTask launch];
+            NSData *auditData = [pipe.fileHandleForReading readDataToEndOfFile]; [auditTask waitUntilExit];
+            NSArray *entries = [NSJSONSerialization JSONObjectWithData:auditData options:0 error:nil];
+            if ([entries isKindOfClass:NSArray.class]) {
+                NSMutableArray *lines = [NSMutableArray array];
+                for (NSDictionary *entry in entries) {
+                    [lines addObject:[NSString stringWithFormat:@"• %@ : %@", entry[@"kind"], [entry[@"path"] lastPathComponent]]];
+                }
+                auditSummary = lines.count ? [lines componentsJoinedByString:@"\n"] : @"Aucun ancien composant détecté.";
+            }
+        } @catch (NSException *exception) { (void)exception; }
+
+        migration.informativeText = @"Le moteur audite les apps, anciens agents, sauvegardes et configurations. Migrer ou supprimer les anciens composants les déplace dans la Corbeille et retire leurs services. Conserver laisse les éléments en place et signale les écarts. Les configurations utilisateur sont toujours conservées.";
+        migration.informativeText = [NSString stringWithFormat:@"%@\n\n%@", auditSummary, migration.informativeText];
+        [migration addButtonWithTitle:@"Migrer"]; [migration addButtonWithTitle:@"Supprimer anciens composants"]; [migration addButtonWithTitle:@"Conserver"];
+        NSInteger choice = [migration runModal] - NSAlertFirstButtonReturn;
+        environment[@"CL_SUITE_MIGRATION"] = @[@"migrate", @"remove", @"keep"][MAX(0, MIN(2, choice))];
+        if ([selected containsObject:@"control_client"]) {
+            NSAlert *destination = [[NSAlert alloc] init]; destination.messageText = @"Serveur Show Control";
+            destination.informativeText = @"Adresse HTTPS explicite du serveur. Cette adresse est conservée dans le client ; aucun service local n’est installé.";
+            NSTextField *url = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 400, 28)]; url.placeholderString = @"https://serveur.local:8443"; destination.accessoryView = url;
+            [destination addButtonWithTitle:@"Continuer"]; [destination runModal];
+            environment[@"CL_SUITE_SERVER_URL"] = url.stringValue;
+        }
     }
     task.environment = environment;
     task.standardOutput = output;
@@ -407,16 +418,9 @@ static void CLInstallApplicationMenu(void) {
             selfRef.actionButton.enabled = YES;
             if (finished.terminationStatus == 0) {
                 selfRef.statusLabel.stringValue = @"Opération terminée";
-                BOOL installedController = !selfRef.uninstaller && [selected containsObject:@"controller"];
-                BOOL installedAbletonReader = !selfRef.uninstaller && [selected containsObject:@"ableton-reader"];
-                BOOL installedNetworkAssistant = !selfRef.uninstaller && [selected containsObject:@"midi-console"];
-                NSString *successMessage = installedController
-                    ? @"Le rôle Mac Télécommande est installé. Les versions remplacées sont dans la Corbeille. La liaison RTP-MIDI, la découverte Bonjour et les retours consoles démarrent automatiquement à l’ouverture de session."
-                    : (installedAbletonReader
-                       ? @"Le rôle Mac Ableton Lecteur est installé. Son agent RTP-MIDI émetteur-récepteur démarre automatiquement à l’ouverture de session. Fermez puis relancez Ableton Live s’il était ouvert."
-                       : (installedNetworkAssistant
-                          ? @"CL MIDI Network Manager et son simulateur IAC/RTP intégré ont été installés. Acceptez l’autorisation Accessibilité si macOS la demande."
-                          : (selfRef.uninstaller ? @"Les éléments retirés restent récupérables dans la Corbeille." : @"Fermez complètement Ableton Live si celui-ci était ouvert, puis relancez-le.")));
+                NSString *successMessage = selfRef.uninstaller
+                    ? @"Les composants et services du rôle ont été retirés. Les configurations sont conservées et les anciens composants restent récupérables dans la Corbeille."
+                    : @"Les composants du rôle choisi sont installés et vérifiés. Aucun service RTP n’est ajouté sans sélection explicite. Consultez le rapport puis effectuez la checklist du rôle ; relancez Ableton uniquement si des extensions Live ont été installées.";
                 [selfRef showAlert:(selfRef.uninstaller ? @"Désinstallation terminée" : @"Installation terminée")
                               message:successMessage
                                 style:NSAlertStyleInformational];

@@ -61,11 +61,16 @@ class PassiveSceneListenerTests(unittest.TestCase):
                 self.assertEqual(snapshot["current_scene"], slot)
                 self.assertEqual(snapshot["playing_scene_name"], self.a.state["scenes"][slot])
                 self.assertEqual(snapshot["play_mode"], "session")
-                self.assertEqual(self.a.state["selected_scene"], 0)
-                self.assertEqual(self.a.state["next_scene"], 0)
+                expected_next = slot + 1 if (slot + 1) in self.a.state["scenes"] else self.a.state["selected_scene"]
+                self.assertEqual(self.a.state["selected_scene"], expected_next)
+                self.assertEqual(self.a.state["next_scene"], expected_next)
         self.context.assert_called_with(10, 0, "Intro ; 1:00")
         self.send.assert_not_called()
-        self.query.assert_called_once()
+        self.query.assert_any_call(
+            "/live/song/get/num_tracks",
+            expected_generation=10,
+            apply_response=False,
+        )
 
     def test_track_fanout_does_not_restart_countdown(self):
         self.prime_stopped()
@@ -165,13 +170,14 @@ class PassiveSceneListenerTests(unittest.TestCase):
         self.query.assert_called_once()
         self.assertEqual(self.send.call_count, 2)
 
-    def test_stopped_initial_snapshot_does_not_claim_playback(self):
+    def test_initial_positive_snapshot_reports_existing_session_playback(self):
         self.install()
         self.event(0, 1)
         self.event(1, 1)
-        self.assertEqual(self.a.state["playing_scene"], -1)
-        self.assertFalse(self.a.state["is_playing"])
-        self.context.assert_not_called()
+        self.assertEqual(self.a.state["playing_scene"], 1)
+        self.assertTrue(self.a.state["is_playing"])
+        self.assertEqual(self.a.state["play_mode"], "session")
+        self.context.assert_called()
 
     def test_all_tracks_are_subscribed_without_historical_32_track_cap(self):
         self.query.return_value = (67,)

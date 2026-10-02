@@ -1,3 +1,4 @@
+#import "../shared/CLMIDIEndpointNames.h"
 #import <Foundation/Foundation.h>
 #import <CoreMIDI/CoreMIDI.h>
 #import <objc/runtime.h>
@@ -9,11 +10,28 @@
 #include <unistd.h>
 #include <mach/mach_time.h>
 
-static const char *INPUT_NAME  = "Gestionnaire IAC Ableton Clock";
-static const char *OUTPUT_NAME = "Gestionnaire IAC MTC vers Logic";
+static const char *INPUT_NAME  = CL_MIDI_CLOCK_IAC;
+static const char *OUTPUT_NAME = CL_MIDI_MTC_IAC;
 
 static const int ABSOLUTE_TIME_UDP_PORT = 20809;
-static const double ABSOLUTE_LOCATE_THRESHOLD = 0.120;
+
+/*
+    Flux diagnostic CL Sync.
+    V1 : localhost uniquement.
+    Ce flux n'intervient jamais dans la génération MTC.
+*/
+static const int SYNC_REF_UDP_PORT = 20810;
+/* Quantification Live à 40 ms : confirmer un écart, jamais suivre le jitter. */
+static const double ABSOLUTE_DRIFT_THRESHOLD = 0.200;
+static const double ABSOLUTE_LOCATE_THRESHOLD = 0.500;
+static unsigned gAbsoluteCandidateCount = 0;
+static double gAbsoluteCandidateError = 0, gAbsoluteCandidateSince = 0;
+static double gAbsoluteCandidateLastAt = 0, gLastDriftLogAt = -5.0;
+
+static void resetAbsoluteCandidate(void)
+{
+    gAbsoluteCandidateCount = 0;
+}
 
 static MIDIClientRef gClient = 0;
 static MIDIPortRef gInputPort = 0;
@@ -22,6 +40,16 @@ static MIDIEndpointRef gInputSource = 0;
 static MIDIEndpointRef gOutputDestination = 0;
 
 static BOOL gRunning = NO;
+
+static int gSyncRefSocket = -1;
+static struct sockaddr_in gSyncRefAddress;
+static struct sockaddr_in gSyncRefRemoteAddress;
+static BOOL gSyncRefRemoteEnabled = NO;
+static uint64_t gSyncInstance = 0;
+static double gLastAbsoluteRawSeconds = 0;
+static BOOL absoluteTimeFresh(void);
+static uint64_t gSyncRefSequence = 0;
+static double gLastSyncRefAt = 0.0;
 
 static double gTempo = 120.0;
 static double gPositionSeconds = 0.0;
@@ -39,10 +67,18 @@ static double gLastAbsoluteTimeAt = 0.0;
 static int gQuarterFrameIndex = 0;
 static double gQuarterFrameSnapshotSeconds = 0.0;
 static BOOL gQuarterFrameSnapshotValid = NO;
+static double gDiagnosticSnapshotMono = 0;
+static uint64_t gDiagnosticCycle = 0;
+static uint64_t gDiagnosticEpoch = 1, gDiagnosticSnapshotEpoch = 0;
+static double gDiagnosticQF0Send = 0, gDiagnosticOffset = 0;
 
 
 static double monotonicSeconds(void)
 {
+#ifdef CL_MTC_BRIDGE_TEST
+    extern double clTestNow;
+    return clTestNow;
+#endif
     static mach_timebase_info_data_t timebase = {0, 0};
 
     if (timebase.denom == 0) {
@@ -74,42 +110,21 @@ static NSString *endpointName(MIDIEndpointRef endpoint)
 
 static MIDIEndpointRef findSource(const char *wanted)
 {
-    NSString *target = [NSString stringWithUTF8String:wanted];
-
-    ItemCount count = MIDIGetNumberOfSources();
-
-    for (ItemCount i = 0; i < count; i++) {
-        MIDIEndpointRef ep = MIDIGetSource(i);
-
-        if ([[endpointName(ep) lowercaseString]
-             isEqualToString:[target lowercaseString]]) {
-            return ep;
-        }
-    }
-
-    return 0;
+    return CLMIDIFindEndpoint(YES, [NSString stringWithUTF8String:wanted]);
 }
 
 static MIDIEndpointRef findDestination(const char *wanted)
 {
-    NSString *target = [NSString stringWithUTF8String:wanted];
-
-    ItemCount count = MIDIGetNumberOfDestinations();
-
-    for (ItemCount i = 0; i < count; i++) {
-        MIDIEndpointRef ep = MIDIGetDestination(i);
-
-        if ([[endpointName(ep) lowercaseString]
-             isEqualToString:[target lowercaseString]]) {
-            return ep;
-        }
-    }
-
-    return 0;
+    return CLMIDIFindEndpoint(NO, [NSString stringWithUTF8String:wanted]);
 }
 
 static void sendBytes(const UInt8 *bytes, UInt16 length)
 {
+#ifdef CL_MTC_BRIDGE_TEST
+    extern void clTestSend(const UInt8 *, UInt16);
+    clTestSend(bytes, length);
+    return;
+#endif
     Byte buffer[1024];
 
     MIDIPacketList *packetList = (MIDIPacketList *)buffer;
@@ -154,6 +169,176 @@ static double currentTimeSeconds(void)
 }
 
 
+
+/*
+    Initialise uniquement la SORTIE UDP diagnostic.
+    Aucun bind : le bridge reste seul propriétaire de 20809.
+*/
+static int setupSyncRefUDP(void)
+{
+    gSyncRefSocket =
+        socket(
+            AF_INET,
+            SOCK_DGRAM,
+            0
+        );
+
+    if (gSyncRefSocket < 0) {
+        perror("socket CL Sync Ref");
+        return -1;
+    }
+
+    memset(
+        &gSyncRefAddress,
+        0,
+        sizeof(gSyncRefAddress)
+    );
+
+    gSyncRefAddress.sin_family =
+        AF_INET;
+
+    gSyncRefAddress.sin_port =
+        htons(SYNC_REF_UDP_PORT);
+
+    gSyncRefAddress.sin_addr.s_addr =
+        htonl(INADDR_LOOPBACK);
+
+    /*
+        Destination réseau facultative pour le futur Remote MTC Bridge.
+        Le localhost reste toujours actif pour CL Sync Meter.
+    */
+    const char *remoteIP =
+        getenv("CL_SYNC_REMOTE_IP");
+
+    if (remoteIP && remoteIP[0]) {
+        memset(
+            &gSyncRefRemoteAddress,
+            0,
+            sizeof(gSyncRefRemoteAddress)
+        );
+
+        gSyncRefRemoteAddress.sin_family =
+            AF_INET;
+
+        gSyncRefRemoteAddress.sin_port =
+            htons(SYNC_REF_UDP_PORT);
+
+        if (
+            inet_pton(
+                AF_INET,
+                remoteIP,
+                &gSyncRefRemoteAddress.sin_addr
+            ) == 1
+        ) {
+            gSyncRefRemoteEnabled = YES;
+
+            printf(
+                "CL Sync Remote : UDP %s:%d\n",
+                remoteIP,
+                SYNC_REF_UDP_PORT
+            );
+        } else {
+            fprintf(
+                stderr,
+                "CL Sync Remote : IP invalide '%s' — distant désactivé\n",
+                remoteIP
+            );
+        }
+    }
+
+    return 0;
+}
+
+
+static void sendSyncReference(void)
+{
+    if (gSyncRefSocket < 0) {
+        return;
+    }
+
+    const double now =
+        monotonicSeconds();
+
+    /*
+        50 Hz suffisent largement pour la mesure.
+        La génération MTC reste, elle, inchangée à 10 ms/QF.
+    */
+    if (
+        gLastSyncRefAt > 0.0 &&
+        (now - gLastSyncRefAt) < 0.020
+    ) {
+        return;
+    }
+
+    gLastSyncRefAt = now;
+
+    if (!gSyncInstance) { arc4random_buf(&gSyncInstance, sizeof(gSyncInstance)); if (!gSyncInstance) gSyncInstance=1; }
+    const double bridgeSeconds = currentTimeSeconds();
+    double intendedMTCSeconds =
+        bridgeSeconds +
+        gMTCOffsetSeconds;
+
+    while (intendedMTCSeconds < 0.0) {
+        intendedMTCSeconds += 86400.0;
+    }
+
+    while (intendedMTCSeconds >= 86400.0) {
+        intendedMTCSeconds -= 86400.0;
+    }
+
+    char packet[512];
+
+    int length =
+        snprintf(
+            packet,
+            sizeof(packet),
+            "CLSYNC2 %llu %llx %.9f %.9f %.9f %.6f %d %d %.9f %d 25 %.9f\n",
+            (unsigned long long)(++gSyncRefSequence),
+            (unsigned long long)gSyncInstance,
+            gLastAbsoluteRawSeconds,
+            fmod(fmod(bridgeSeconds,86400.0)+86400.0,86400.0),
+            intendedMTCSeconds, gMTCOffsetSeconds * 1000.0,
+            gHasAbsoluteTime ? 1 : 0, absoluteTimeFresh() ? 1 : 0,
+            gHasAbsoluteTime ? fmax(0.0,now-gLastAbsoluteTimeAt) : 0.0,
+            gRunning ? 1 : 0, now
+        );
+
+    if (
+        length <= 0 ||
+        length >= (int)sizeof(packet)
+    ) {
+        return;
+    }
+
+    /*
+        Copie locale : utilisée par CL Sync Meter.
+    */
+    sendto(
+        gSyncRefSocket,
+        packet,
+        (size_t)length,
+        MSG_DONTWAIT,
+        (struct sockaddr *)&gSyncRefAddress,
+        sizeof(gSyncRefAddress)
+    );
+
+    /*
+        Copie réseau facultative.
+        Le réseau transporte une référence de temps, pas les Quarter Frames.
+    */
+    if (gSyncRefRemoteEnabled) {
+        sendto(
+            gSyncRefSocket,
+            packet,
+            (size_t)length,
+            MSG_DONTWAIT,
+            (struct sockaddr *)&gSyncRefRemoteAddress,
+            sizeof(gSyncRefRemoteAddress)
+        );
+    }
+}
+
+
 static void secondsToTC(
     double seconds,
     int *hours,
@@ -192,6 +377,15 @@ static double tcToSeconds(
 
 static void sendFullFrame(double seconds)
 {
+    ++gDiagnosticEpoch;
+    if (gSyncRefSocket>=0 && gSyncInstance) {
+        char boundary[160];
+        int n=snprintf(boundary,sizeof(boundary),"CLSYNCB1 %llx %llu %.9f %.6f %d\n",
+            (unsigned long long)gSyncInstance,(unsigned long long)gDiagnosticEpoch,
+            monotonicSeconds(),gMTCOffsetSeconds*1000.0,gRunning?1:0);
+        if (n>0 && n<(int)sizeof(boundary)) sendto(gSyncRefSocket,boundary,(size_t)n,MSG_DONTWAIT,
+            (struct sockaddr *)&gSyncRefAddress,sizeof(gSyncRefAddress));
+    }
     int h, m, s, f;
     secondsToTC(seconds + gMTCOffsetSeconds, &h, &m, &s, &f);
 
@@ -220,12 +414,17 @@ static void sendFullFrame(double seconds)
 
 static void sendQuarterFrame(void)
 {
+    if (!gRunning) return;
     if (
         gQuarterFrameIndex == 0 ||
         !gQuarterFrameSnapshotValid
     ) {
         gQuarterFrameSnapshotSeconds =
             currentTimeSeconds();
+        gDiagnosticSnapshotMono = monotonicSeconds();
+        ++gDiagnosticCycle;
+        gDiagnosticSnapshotEpoch=gDiagnosticEpoch;
+        gDiagnosticOffset=gMTCOffsetSeconds;
 
         gQuarterFrameSnapshotValid = YES;
     }
@@ -293,7 +492,23 @@ static void sendQuarterFrame(void)
         )
     };
 
+    // Diagnostic only: no change to MIDI bytes, schedule or offset.
+    const double diagnosticEnd = monotonicSeconds();
+    if (gQuarterFrameIndex==0) gDiagnosticQF0Send=diagnosticEnd;
     sendBytes(msg, 2);
+    if (gQuarterFrameIndex == 7 && gSyncRefSocket >= 0 && gSyncInstance
+        && gDiagnosticSnapshotEpoch==gDiagnosticEpoch && gDiagnosticOffset==gMTCOffsetSeconds) {
+        char diagnostic[256];
+        int n=snprintf(diagnostic,sizeof(diagnostic),
+            "CLSYNCQ2 %llx %llu %llu %.9f %.9f %.9f %.9f %.9f %.6f\n",
+            (unsigned long long)gSyncInstance,(unsigned long long)gDiagnosticEpoch,(unsigned long long)gDiagnosticCycle,
+            tcToSeconds(h,m,sec,f),
+            fmod(fmod(gQuarterFrameSnapshotSeconds+gMTCOffsetSeconds,86400.0)+86400.0,86400.0),
+            gDiagnosticSnapshotMono,gDiagnosticQF0Send,diagnosticEnd,gDiagnosticOffset*1000.0);
+        if (n>0 && n<(int)sizeof(diagnostic))
+            sendto(gSyncRefSocket,diagnostic,(size_t)n,MSG_DONTWAIT,
+                (struct sockaddr *)&gSyncRefAddress,sizeof(gSyncRefAddress));
+    }
 
     gQuarterFrameIndex++;
 
@@ -342,20 +557,22 @@ static void setAbsoluteTime(
     const double before =
         currentTimeSeconds();
 
-    const double error =
-        newSeconds - before;
+    /* SMPTE reboucle à 24 h : ne pas confondre minuit et un locate. */
+    const double error = remainder(newSeconds - before, 86400.0);
 
     const BOOL firstAbsolute =
         !gHasAbsoluteTime;
 
     gHasAbsoluteTime = YES;
     gLastAbsoluteTimeAt = now;
+    gLastAbsoluteRawSeconds = newSeconds;
 
     /*
         A L'ARRET :
         Max donne notre position absolue de référence.
     */
     if (!gRunning) {
+        resetAbsoluteCandidate();
 
         const BOOL moved =
             firstAbsolute ||
@@ -385,40 +602,48 @@ static void setAbsoluteTime(
         return;
     }
 
-    /*
-        EN LECTURE :
-        Le timecode local est notre horloge maître entre
-        deux vrais repositionnements.
-
-        On ne suit PAS les +/- 40 ms de quantification et
-        de jitter du Live API.
-    */
-
-    if (
-        firstAbsolute ||
-        fabs(error) >
-            ABSOLUTE_LOCATE_THRESHOLD
-    ) {
-
-        gPositionSeconds =
-            newSeconds;
-
-        gPlayStartPositionSeconds =
-            newSeconds;
-
-        gPlayStartedAt = now;
-
-        printf(
-            "ABS LOCATE %02d:%02d:%02d:%02d"
-            " correction=%+.3f s\n",
-            h, m, sec, f, error
-        );
-
-        sendFullFrame(newSeconds);
-
-        gQuarterFrameIndex = 0;
-        gQuarterFrameSnapshotValid = NO;
+    /* Référence locale inchangée tant que plusieurs ABS ne concordent pas.
+       Grand saut : 2 mesures / >=30 ms (normalement 40 ms).
+       Dérive moyenne : 6 mesures / >=200 ms.
+       Une interruption >200 ms ou une incohérence relance la confirmation. */
+    if (fabs(error) < ABSOLUTE_DRIFT_THRESHOLD) {
+        resetAbsoluteCandidate();
+        if (fabs(error) >= 0.040 && now - gLastDriftLogAt >= 5.0) {
+            printf("ABS DRIFT %+.3f s ignored\n", error);
+            gLastDriftLogAt = now;
+        }
+        return;
     }
+
+    if (!gAbsoluteCandidateCount ||
+        now - gAbsoluteCandidateLastAt > 0.200 ||
+        error * gAbsoluteCandidateError <= 0 ||
+        fabs(error - gAbsoluteCandidateError) > 0.120 ||
+        (fabs(error) > ABSOLUTE_LOCATE_THRESHOLD) !=
+            (fabs(gAbsoluteCandidateError) > ABSOLUTE_LOCATE_THRESHOLD)) {
+        gAbsoluteCandidateCount = 1;
+        gAbsoluteCandidateSince = now;
+        gAbsoluteCandidateError = error;
+    } else {
+        ++gAbsoluteCandidateCount;
+    }
+    gAbsoluteCandidateLastAt = now;
+
+    const BOOL large = fabs(error) > ABSOLUTE_LOCATE_THRESHOLD;
+    if (gAbsoluteCandidateCount < (large ? 2u : 6u) ||
+        now - gAbsoluteCandidateSince + 1e-9 < (large ? 0.030 : 0.200)) {
+        return;
+    }
+
+    gPositionSeconds = newSeconds;
+    gPlayStartPositionSeconds = newSeconds;
+    gPlayStartedAt = now;
+    resetAbsoluteCandidate();
+    printf("ABS LOCATE confirmed %+.3f s %02d:%02d:%02d:%02d\n",
+           error, h, m, sec, f);
+    sendFullFrame(newSeconds);
+    gQuarterFrameIndex = 0;
+    gQuarterFrameSnapshotValid = NO;
 }
 
 
@@ -808,8 +1033,10 @@ static void setSongPosition(UInt16 spp)
     double secondsPerSPP =
         secondsPerQuarter / 4.0;
 
-    gPositionSeconds =
-        spp * secondsPerSPP;
+    const double seconds = spp * secondsPerSPP;
+    if (fabs(seconds - currentTimeSeconds()) < 0.020) return;
+    resetAbsoluteCandidate();
+    gPositionSeconds = seconds;
 
     if (gRunning) {
         gPlayStartPositionSeconds =
@@ -828,6 +1055,8 @@ static void setSongPosition(UInt16 spp)
     );
 
     sendFullFrame(gPositionSeconds);
+    gQuarterFrameIndex = 0;
+    gQuarterFrameSnapshotValid = NO;
 }
 
 static void handleClock(void)
@@ -869,76 +1098,51 @@ static void handleClock(void)
 }
 
 
-static void handleStart(void)
+static void handlePlay(BOOL start)
 {
-    /*
-        Si Max vient de nous donner une vraie position,
-        FA ne remet PAS le TC à zéro.
-    */
-    if (!absoluteTimeFresh()) {
+    const BOOL fresh = absoluteTimeFresh();
+    if (fresh) {
+        /* La dernière ABS reçue, pas l'ancienne référence de lecture. */
+        gPositionSeconds = gLastAbsoluteRawSeconds;
+        int h, m, s, f;
+        secondsToTC(gPositionSeconds, &h, &m, &s, &f);
+        printf("ABS LOCK %02d:%02d:%02d:%02d\n", h, m, s, f);
+    } else if (start) {
+        /* FA conserve sa sémantique MIDI : départ à zéro sans ABS. */
         gPositionSeconds = 0.0;
     }
-
+    resetAbsoluteCandidate();
     gRunning = YES;
-
-    gPlayStartPositionSeconds =
-        gPositionSeconds;
-
-    gPlayStartedAt =
-        monotonicSeconds();
-
+    gPlayStartPositionSeconds = gPositionSeconds;
+    gPlayStartedAt = monotonicSeconds();
     gQuarterFrameIndex = 0;
     gQuarterFrameSnapshotValid = NO;
-
-    printf(
-        "START %.3f s%s\n",
-        gPositionSeconds,
-        absoluteTimeFresh()
-            ? " [ABS]"
-            : " [FALLBACK]"
-    );
-
-    sendFullFrame(
-        gPositionSeconds
-    );
+    printf("%s %.3f s [%s]\n", start ? "START" : "CONTINUE",
+           gPositionSeconds, fresh ? "ABS" : "FALLBACK");
+    sendFullFrame(gPositionSeconds);
 }
 
-
-static void handleContinue(void)
-{
-    gRunning = YES;
-
-    gPlayStartPositionSeconds =
-        gPositionSeconds;
-
-    gPlayStartedAt =
-        monotonicSeconds();
-
-    gQuarterFrameIndex = 0;
-    gQuarterFrameSnapshotValid = NO;
-
-    printf(
-        "CONTINUE %.3f s%s\n",
-        gPositionSeconds,
-        absoluteTimeFresh()
-            ? " [ABS]"
-            : " [FALLBACK]"
-    );
-
-    sendFullFrame(
-        gPositionSeconds
-    );
-}
+static void handleStart(void) { handlePlay(YES); }
+static void handleContinue(void) { handlePlay(NO); }
 
 
 static void handleStop(void)
 {
-    if (gRunning) {
-        gPositionSeconds =
-            currentTimeSeconds();
+    /*
+        Un STOP répété alors que le bridge est déjà arrêté
+        ne doit pas renvoyer une rafale de MTC Full Frame.
+        Les vrais repositionnements à l'arrêt restent gérés
+        par setAbsoluteTime().
+    */
+    if (!gRunning) {
+        return;
     }
 
+    gPositionSeconds =
+        currentTimeSeconds();
+
     gRunning = NO;
+    resetAbsoluteCandidate();
 
     gPlayStartPositionSeconds =
         gPositionSeconds;
@@ -1032,19 +1236,23 @@ static void midiRead(
         i < packetList->numPackets;
         i++
     ) {
-        parsePacket(
-            packet->data,
-            packet->length
-        );
+        /* CoreMIDI appelle sur son thread : copier avant le retour, puis
+           sérialiser transport, ABS et QF sur la même queue. */
+        NSData *bytes = [NSData dataWithBytes:packet->data length:packet->length];
+        dispatch_async(dispatch_get_main_queue(), ^{
+            parsePacket(bytes.bytes, (UInt16)bytes.length);
+        });
 
         packet =
             MIDIPacketNext(packet);
     }
 }
 
+#ifndef CL_MTC_BRIDGE_TEST
 int main(int argc, const char * argv[])
 {
     @autoreleasepool {
+        setvbuf(stdout, NULL, _IOLBF, 0);
 
         printf("\n");
         printf("========================================\n");
@@ -1152,6 +1360,14 @@ int main(int argc, const char * argv[])
             return 7;
         }
 
+        if (setupSyncRefUDP() < 0) {
+            fprintf(
+                stderr,
+                "CL Sync Ref indisponible sur UDP localhost:%d\n",
+                SYNC_REF_UDP_PORT
+            );
+        }
+
         dispatch_source_t timer =
             dispatch_source_create(
                 DISPATCH_SOURCE_TYPE_TIMER,
@@ -1176,6 +1392,8 @@ int main(int argc, const char * argv[])
                 if (gRunning) {
                     sendQuarterFrame();
                 }
+
+                sendSyncReference();
             }
         );
 
@@ -1204,3 +1422,5 @@ int main(int argc, const char * argv[])
 
     return 0;
 }
+
+#endif /* CL_MTC_BRIDGE_TEST */

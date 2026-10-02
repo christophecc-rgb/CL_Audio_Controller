@@ -857,6 +857,7 @@
 
 </style>
   <link rel="stylesheet" href="/static/cl-skins.css?v=20260829-ql1-cyan-pulse">
+<script src="/static/remote-auth.js"></script>
 </head>
 
 <body class="cl-session-view">
@@ -926,7 +927,7 @@
   <link rel="stylesheet" href="/static/skins/visual-settings.css?v=20260925">
 
 
-  <script src="/static/midi-return-visual.js?v=20260829-visual-recall-4s"></script>
+  <script src="/static/midi-return-visual.js?v=20260928-current-pc-2"></script>
   <script>
     const statusEl = document.getElementById('status');
     const oscMeterEl = document.getElementById('oscMeter');
@@ -1314,6 +1315,7 @@
     function applyStatus(rawState) {
       const state = rawState && rawState.state ? rawState.state : rawState;
       if (!acceptStateGeneration(state)) return;
+      statusEl.dataset.abletonHost = String(state?.ableton_target?.host || '').trim();
       if (window.CLRemoteLTC) window.CLRemoteLTC.render(ltcTimecodeEl, state);
       window.CLMidiReturnVisual.renderDeviceCards(sessionDevices, window.CLMidiReturnVisual.devicesFromState(state), {
         surface: 'remote', idPrefix: 'webDevice'

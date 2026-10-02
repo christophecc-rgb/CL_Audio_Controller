@@ -5,6 +5,7 @@ import unittest
 import zipfile
 from pathlib import Path
 from unittest.mock import patch
+from security_test_helper import prepare_security, admin_client
 
 import cl_transport
 from console_title_library import ConsoleLibraryStore
@@ -24,6 +25,8 @@ class TransportTests(unittest.TestCase):
         self.roots.start()
         self.addCleanup(self.roots.stop)
         self.store = ConsoleLibraryStore(self.root / 'legacy')
+        import app
+        prepare_security(self, app)
 
     def library(self, root, console):
         root.mkdir(parents=True, exist_ok=True)
@@ -93,7 +96,7 @@ class TransportTests(unittest.TestCase):
         sessions=self.transport/'ShowCue_Sessions';sessions.mkdir(parents=True)
         (sessions/'OP.showcue').write_bytes(data)
         with patch.object(app,'SHOW_CUES_DATA_DIRECTORY',root):
-            client=app.app.test_client()
+            client=admin_client(app)
             response=client.post('/show-info/builder/sessions/import',json={'source':str(self.transport),'name':'OP.showcue'})
             self.assertEqual(response.status_code,201,response.data)
             self.assertEqual(response.json['imported_session']['name'],'Session actuelle (2)')
@@ -121,7 +124,7 @@ class TransportTests(unittest.TestCase):
             patch.object(app, 'SHOW_CUES_DATA_DIRECTORY', root),
             patch.object(app, 'transport_roots', return_value=[self.transport]),
         ):
-            client = app.app.test_client()
+            client = admin_client(app)
 
             response = client.post(
                 '/show-info/builder/sessions/save-transport'

@@ -1,6 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
+# New roles use the symmetric engine. Historical component selections remain explicit.
+if [[ -n "${CL_SUITE_ROLE:-}" ]]; then
+  ROLE_ENGINE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  exec "${CL_SUITE_PYTHON:-python3}" "$ROLE_ENGINE_DIR/role_install.py" install "$CL_SUITE_ROLE"
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPONENTS_ROOT="$SCRIPT_DIR/Composants"
 INTEGRITY_MANIFEST="$SCRIPT_DIR/COMPONENTS_SHA256.txt"
@@ -196,6 +202,13 @@ prepare_controller_replacement() {
   fail "CL Show Control fonctionne encore sur 5050 ou 5055 après la demande d’arrêt propre. Quittez-le complètement (ou redémarrez le Mac), puis relancez l’installation. Rien n’a été remplacé."
 }
 
+retire_legacy_network_monitor() {
+  # Migration only: the monitor now belongs to Show Control, not launchd.
+  [[ "$INSTALL_HOME" == "$HOME" && "${CL_SUITE_SKIP_POSTINSTALL:-0}" != "1" ]] || return 0
+  /bin/launchctl bootout "gui/$(id -u)/com.claudio.midi-network-monitor" >/dev/null 2>&1 || true
+  rm -f "$INSTALL_HOME/Library/LaunchAgents/com.claudio.midi-network-monitor.plist"
+}
+
 prepare_rtp_agent_replacement() {
   local new_executable="$MIDI_NETWORK_APPS/CL MIDI RTP Agent.app/Contents/MacOS/CL MIDI RTP Agent"
   local legacy_executable="$USER_APPS/CL MIDI RTP Agent.app/Contents/MacOS/CL MIDI RTP Agent"
@@ -301,7 +314,6 @@ verify_selected_components() {
       "Composants/Applications/CL Arrangement Builder.app/"*|"Composants/Ableton Live 11-12/Remote Scripts/CL_Arrangement_Builder_Live/"*) [[ "$INSTALL_BUILDER" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Applications/CL Audio Export.app/"*) [[ "$INSTALL_SHOW_AUDIO_BUILDER" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Ableton Live 11-12/Max for Live/Paradis Latin AutoScene/"*) [[ "$INSTALL_AUTOSCENE" == 1 ]] && echo "$line" >> "$selected" ;;
-      "Composants/Ableton Live 10/Max for Live/Paradis Latin AutoScene - Live 10/"*) [[ "$INSTALL_AUTOSCENE_LIVE10" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Applications/CL MIDI Network Manager.app/"*|"Composants/Outils_reseau_MIDI/"*) [[ "$INSTALL_MIDI_CONSOLE" == 1 || "$INSTALL_CONTROLLER" == 1 ]] && echo "$line" >> "$selected" ;;
       "Composants/Ableton Live 11-12/Max for Live/CL MIDI Console Monitor/"*) [[ "$INSTALL_MIDI_CONSOLE" == 1 ]] && echo "$line" >> "$selected" ;;
     esac
@@ -359,7 +371,7 @@ M4L_MTC_TARGET="$ABLETON_LIBRARY/Presets/MIDI Effects/Max MIDI Effect/CL Absolut
 MIDI_TOOLS_TARGET="$INSTALL_HOME/Library/Application Support/CL MIDI Console/Network Tools"
 say ""; say "User Library retenue : $ABLETON_LIBRARY"
 
-INSTALL_SHOWCUE=0; INSTALL_REMOTE=0; INSTALL_CONTROLLER=0; INSTALL_ABLETON_READER=0; INSTALL_BUILDER=0; INSTALL_SHOW_AUDIO_BUILDER=0; INSTALL_AUTOSCENE=0; INSTALL_AUTOSCENE_LIVE10=0; INSTALL_MIDI_CONSOLE=0; INSTALL_MIDI_RECEIVER=0; INSTALL_DIAGNOSTIC_TOOLS=0
+INSTALL_SHOWCUE=0; INSTALL_REMOTE=0; INSTALL_CONTROLLER=0; INSTALL_ABLETON_READER=0; INSTALL_BUILDER=0; INSTALL_SHOW_AUDIO_BUILDER=0; INSTALL_AUTOSCENE=0; INSTALL_MIDI_CONSOLE=0; INSTALL_MIDI_RECEIVER=0; INSTALL_DIAGNOSTIC_TOOLS=0
 CHOICE="${CL_SUITE_COMPONENTS:-}"
 if [[ -z "$CHOICE" ]]; then
   echo; echo "Rôle ou composant à installer :"; echo "  1 — Suite complète"; echo "  2 — Télécommande CL Audio uniquement"; echo "  3 — Arrangement Builder uniquement"; echo "  4 — AutoScene uniquement"; echo "  5 — CL MIDI Console uniquement"; echo "  6 — Mac Ableton Lecteur — RTP émetteur-récepteur"; echo "  7 — Simulateur de console RTP"; echo "  8 — Annuler"
@@ -394,7 +406,6 @@ esac
 
 if [[ "$INSTALL_AUTOSCENE" == 1 ]]; then
   [[ "$HAS_CURRENT" == 1 ]] || INSTALL_AUTOSCENE=0
-  [[ "$HAS10" == 1 ]] && INSTALL_AUTOSCENE_LIVE10=1
 fi
 if [[ "$HAS_CURRENT" != 1 && ( "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 || "$INSTALL_ABLETON_READER" == 1 || "$INSTALL_BUILDER" == 1 || "$INSTALL_MIDI_CONSOLE" == 1 ) ]]; then
   fail "les composants sélectionnés nécessitent Live 11 ou Live 12 ; seul Live 10 a été détecté"
@@ -404,6 +415,7 @@ say ""; say "Vérification de l'intégrité du kit…"
 verify_selected_components
 mkdir -p "$USER_APPS" "$PROD_APPS" "$MIDI_NETWORK_APPS" "$REMOTE_SCRIPTS" "$ABLETON_LIBRARY/Presets"
 
+[[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 || "$INSTALL_SHOWCUE" == 1 || "$INSTALL_MIDI_CONSOLE" == 1 ]] && retire_legacy_network_monitor
 [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 || "$INSTALL_SHOWCUE" == 1 ]] && prepare_controller_replacement
 [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 || "$INSTALL_SHOWCUE" == 1 ]] && install_item "$APPLICATIONS_SOURCE/CL Show Control.app" "$USER_APPS/CL Show Control.app" "Centre de contrôle — CL Show Control" "controller"
 if [[ "$INSTALL_REMOTE" == 1 || "$INSTALL_CONTROLLER" == 1 || "$INSTALL_SHOWCUE" == 1 ]]; then
@@ -536,7 +548,6 @@ if [[ "$INSTALL_SHOW_AUDIO_BUILDER" == 1 ]]; then
   install_item "$APPLICATIONS_SOURCE/CL Ableton Remote.app" "$PROD_APPS/CL Ableton Remote.app" "Ableton — Télécommande" "controller"
 fi
 [[ "$INSTALL_AUTOSCENE" == 1 ]] && install_item "$LIVE_CURRENT_SOURCE/Max for Live/Paradis Latin AutoScene" "$M4L_AUTOSCENE_TARGET" "AutoScene — Version Live 11/12" "autoscene"
-[[ "$INSTALL_AUTOSCENE_LIVE10" == 1 ]] && install_item "$LIVE10_SOURCE_ROOT/Max for Live/Paradis Latin AutoScene - Live 10" "$M4L_LIVE10_TARGET" "AutoScene — Version Live 10" "autoscene-live10"
 if [[ "$INSTALL_MIDI_CONSOLE" == 1 ]]; then
   install_item "$LIVE_CURRENT_SOURCE/Max for Live/CL MIDI Console Monitor" "$M4L_MIDI_CONSOLE_TARGET" "MIDI Console — Périphérique Max for Live" "midi-console"
   [[ "$INSTALL_CONTROLLER" != 1 ]] && install_item "$MIDI_TOOLS_SOURCE" "$MIDI_TOOLS_TARGET" "MIDI Console — Outils réseau" "midi-console"

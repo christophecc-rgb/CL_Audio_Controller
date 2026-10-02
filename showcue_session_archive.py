@@ -22,7 +22,21 @@ def export_session(root, registry, session_id):
     output = io.BytesIO()
     with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as archive:
         archive.writestr('manifest.json', json.dumps({'format': 'CL ShowCue', 'version': 1, 'name': session['name']}))
-        archive.writestr('show_cues.json', json.dumps(document, ensure_ascii=False))
+        public_document = {
+            "version": 1,
+            "cues": [
+                {
+                    key: value
+                    for key, value in cue.items()
+                    if not key.startswith("_")
+                }
+                for cue in document["cues"]
+            ],
+        }
+        archive.writestr(
+            'show_cues.json',
+            json.dumps(public_document, ensure_ascii=False),
+        )
         if (directory / 'showcue_builder.json').is_file():
             archive.writestr('showcue_builder.json', json.dumps(load_builder_document(directory / 'showcue_builder.json'), ensure_ascii=False))
         for cue in document['cues']:

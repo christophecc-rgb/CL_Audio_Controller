@@ -192,7 +192,15 @@ class NoGlobalTerminationTests(unittest.TestCase):
         self.assertNotIn("pkill", source)
         self.assertNotIn("killall", source)
         self.assertNotIn("lsof -t", source)
-        self.assertNotIn(".kill()", source)
+        # Exact owned child handles may escalate; the backend still never does.
+        import ast
+        tree = ast.parse(source)
+        functions = {n.name: n for n in tree.body if isinstance(n, ast.FunctionDef)}
+        killers = [name for name, node in functions.items() if any(
+            isinstance(call, ast.Call) and isinstance(call.func, ast.Attribute)
+            and call.func.attr == "kill" for call in ast.walk(node))]
+        self.assertEqual(killers, ["stop_owned_child"])
+        self.assertNotIn(".kill()", ast.unparse(functions["stop_owned_server"]))
 
 
 if __name__ == "__main__":

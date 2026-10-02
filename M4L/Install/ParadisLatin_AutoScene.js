@@ -7,6 +7,7 @@ var selectedIndex = -1;
 var selectedId = 0;
 var armed = false;
 var fired = false;
+var testRunning = false;
 var targetHour = 19;
 var targetMinute = 30;
 var targetSecond = 0;
@@ -16,7 +17,6 @@ var lastCountdownText = "";
 
 function loadbang() {
     post("Paradis Latin AutoScene: script charge\n");
-    refresh();
     emitState("NON ARME");
 }
 
@@ -95,11 +95,29 @@ function reset() {
 }
 
 function test() {
+    if (testRunning) {
+        try {
+            var song = new LiveAPI(null, "live_set");
+            song.call("stop_playing");
+            testRunning = false;
+            outlet(2, "test_stopped");
+            emitState("TEST ARRETE");
+        } catch (error) {
+            emitState("ERREUR - ARRET TEST");
+            post("Paradis Latin AutoScene: " + error + "\n");
+        }
+        return;
+    }
+
     if (armed) {
         emitState("TEST REFUSE - DESARMER D'ABORD");
         return;
     }
-    launchSelected("TEST");
+
+    if (launchSelected("TEST")) {
+        testRunning = true;
+        outlet(2, "test_started");
+    }
 }
 
 function fire() {

@@ -1,0 +1,393 @@
+{
+  "devices" => [
+    0 => {
+      "apple.midi.audiomidisetup.widget.xPosition" => 190
+      "apple.midi.audiomidisetup.widget.yPosition" => 260
+      "apple.midirtp.errors" => {length = 0, bytes = 0x}
+      "driver" => "com.apple.AppleMIDINetworkDriver"
+      "entities" => [
+        0 => {
+          "apple.midirtp.session" => {
+            "dns-sd-name" => "MacBook Pro de Mb"
+            "flags" => 1
+            "join-policy" => 2
+            "peers" => [
+            ]
+            "port" => 5010
+          }
+          "destinations" => [
+            0 => {
+              "uniqueID" => 812879448
+            }
+          ]
+          "embedded" => 1
+          "name" => "CL Show Control"
+          "offline" => 0
+          "protocol" => 1
+          "service-type" => "_apple-midi._udp"
+          "sources" => [
+            0 => {
+              "uniqueID" => 1418576320
+            }
+          ]
+          "uniqueID" => 2019525226
+        }
+        1 => {
+          "apple.midirtp.session" => {
+            "dns-sd-name" => "CL Ableton Clock"
+            "flags" => 1
+            "join-policy" => 0
+            "peers" => [
+            ]
+            "port" => 5012
+            "ump-endpoint-name" => "CL Ableton Clock"
+          }
+          "destinations" => [
+            0 => {
+              "uniqueID" => -92470108
+            }
+          ]
+          "embedded" => 1
+          "name" => "CL Ableton Clock"
+          "offline" => 0
+          "protocol" => 1
+          "service-type" => "_apple-midi._udp"
+          "sources" => [
+            0 => {
+              "uniqueID" => 1465022093
+            }
+          ]
+          "uniqueID" => 1016962330
+        }
+        2 => {
+          "apple.midirtp.session" => {
+            "dns-sd-name" => "CL MTC"
+            "flags" => 1
+            "join-policy" => 0
+            "peers" => [
+            ]
+            "port" => 5014
+            "ump-endpoint-name" => "CL MTC"
+          }
+          "destinations" => [
+            0 => {
+              "uniqueID" => -1649952904
+            }
+          ]
+          "embedded" => 1
+          "name" => "CL MTC"
+          "offline" => 0
+          "protocol" => 1
+          "service-type" => "_apple-midi._udp"
+          "sources" => [
+            0 => {
+              "uniqueID" => -421896984
+            }
+          ]
+          "uniqueID" => 719293349
+        }
+      ]
+      "image" => "/System/Library/Extensions/AppleMIDINetworkDriver.plugin/Contents/Resources/NetworkDriverIcon.tiff"
+      "manufacturer" => ""
+      "model" => ""
+      "name" => "Réseau"
+      "offline" => 0
+      "scheduleAheadMuSec" => 50000
+      "ump enabled" => 0
+      "uniqueID" => 234177278
+    }
+    1 => {
+      "apple.midi.audiomidisetup.widget.xPosition" => 48
+      "apple.midi.audiomidisetup.widget.yPosition" => 128
+      "driver" => "com.apple.AppleMIDINetworkDriver"
+      "entities" => [
+      ]
+      "image" => "/System/Library/Extensions/AppleMIDINetworkDriver.plugin/Contents/Resources/NetworkMIDI2Icon.tiff"
+      "manufacturer" => ""
+      "model" => ""
+      "name" => "Réseau UMP"
+      "offline" => 0
+      "scheduleAheadMuSec" => 50000
+      "ump enabled" => 1
+      "uniqueID" => 917563195
+    }
+    2 => {
+      "apple.midi.audiomidisetup.widget.xPosition" => 34
+      "apple.midi.audiomidisetup.widget.yPosition" => 27
+      "driver" => "com.apple.AppleMIDIIACDriver"
+      "entities" => [
+        0 => {
+          "destinations" => [
+            0 => {
+              "uniqueID" => -1481201180
+            }
+          ]
+          "embedded" => 1
+          "maxSysExSpeed" => 3125
+          "name" => "CL MIDI Return Test"
+          "protocol" => 2
+          "sources" => [
+            0 => {
+              "uniqueID" => 563240882
+            }
+          ]
+          "uniqueID" => -1301817448
+        }
+        1 => {
+          "destinations" => [
+            0 => {
+              "uniqueID" => -1350477559
+            }
+          ]
+          "embedded" => 1
+          "maxSysExSpeed" => 3125
+          "name" => "MTC vers Logic"
+          "protocol" => 2
+          "sources" => [
+            0 => {
+              "uniqueID" => 1754550848
+            }
+          ]
+          "uniqueID" => 1584152258
+        }
+        2 => {
+          "destinations" => [
+            0 => {
+              "uniqueID" => -1735572229
+            }
+          ]
+          "embedded" => 1
+          "maxSysExSpeed" => 3125
+          "name" => "Ableton Clock"
+          "protocol" => 2
+          "sources" => [
+            0 => {
+              "uniqueID" => 987028535
+            }
+          ]
+          "uniqueID" => 2019146189
+        }
+        3 => {
+          "destinations" => [
+            0 => {
+              "uniqueID" => -1612638664
+            }
+          ]
+          "embedded" => 1
+          "maxSysExSpeed" => 3125
+          "name" => "Bus 1"
+          "protocol" => 2
+          "sources" => [
+            0 => {
+              "uniqueID" => 2006808751
+            }
+          ]
+          "uniqueID" => 1512299011
+        }
+      ]
+      "image" => "/System/Library/Extensions/AppleMIDIIACDriver.plugin/Contents/Resources/IACDriverIcon.tiff"
+      "manufacturer" => "Apple Inc."
+      "model" => "Gestionnaire IAC"
+      "name" => "Gestionnaire IAC"
+      "offline" => 0
+      "receiveChannels" => 65535
+      "receives clock" => 0
+      "receives MTC" => 0
+      "supports General MIDI" => 0
+      "supports MMC" => 0
+      "transmitChannels" => 65535
+      "transmits clock" => 0
+      "transmits MTC" => 0
+      "uniqueID" => 128160395
+    }
+    3 => {
+      "Bluetooth Advertising Name" => "macOS"
+      "driver" => "com.apple.AppleMIDIBluetoothDriver"
+      "entities" => [
+      ]
+      "image" => "/System/Library/Extensions/AppleMIDIBluetoothDriver.plugin/Contents/Resources/BluetoothDeviceSetupIcon.tif"
+      "is BLE MIDI null device" => 1
+      "manufacturer" => "Apple Inc."
+      "model" => "Pilote Bluetooth MIDI"
+      "name" => "Bluetooth"
+      "offline" => 0
+      "uniqueID" => 1284614610
+    }
+    4 => {
+      "apple.midi.audiomidisetup.widget.xPosition" => 44
+      "apple.midi.audiomidisetup.widget.yPosition" => 251
+      "BLE MIDI Device UUID" => "CD752670-E3EE-6716-C951-5ECB35B525BC"
+      "driver" => "com.apple.AppleMIDIBluetoothDriver"
+      "entities" => [
+        0 => {
+          "destinations" => [
+            0 => {
+              "uniqueID" => -190473448
+            }
+          ]
+          "embedded" => 1
+          "maxSysExSpeed" => 3125
+          "name" => "Bluetooth"
+          "protocol" => 1
+          "sources" => [
+            0 => {
+              "uniqueID" => 1240084909
+            }
+          ]
+          "uniqueID" => -535084762
+        }
+      ]
+      "image" => "/System/Library/Extensions/AppleMIDIBluetoothDriver.plugin/Contents/Resources/BluetoothDeviceIcon.tif"
+      "manufacturer" => "Apple Inc."
+      "MIDI Input Supported" => 1
+      "MIDI Local Peripheral" => 0
+      "MIDI Output Supported" => 1
+      "MIDI Remote Peripheral" => 1
+      "model" => "MacBookPro15,2"
+      "name" => "MacBook Pro"
+      "offline" => 1
+      "uniqueID" => 1845853522
+    }
+    5 => {
+      "apple.midi.audiomidisetup.widget.xPosition" => 338
+      "apple.midi.audiomidisetup.widget.yPosition" => 50
+      "driver" => "com.apple.AppleMIDIUSBDriver"
+      "entities" => [
+        0 => {
+          "Cable" => 0
+          "destinations" => [
+            0 => {
+              "uniqueID" => 1613088069
+            }
+          ]
+          "embedded" => 0
+          "In Endpoint" => 131
+          "maxSysExSpeed" => 3125
+          "name" => "UMC404HD 192k"
+          "Out Endpoint" => 2
+          "protocol" => 1
+          "sources" => [
+            0 => {
+              "uniqueID" => 1210562274
+            }
+          ]
+          "uniqueID" => 1979113118
+        }
+      ]
+      "manufacturer" => "BEHRINGER"
+      "model" => "UMC404HD 192k"
+      "name" => "UMC404HD 192k"
+      "offline" => 1
+      "UMP Enabled" => 0
+      "uniqueID" => -1050098478
+      "USBLocationID" => 17903616
+      "USBVendorProduct" => 328664329
+    }
+    6 => {
+      "apple.midi.audiomidisetup.widget.xPosition" => 184
+      "apple.midi.audiomidisetup.widget.yPosition" => 165
+      "driver" => "com.apple.AppleMIDIUSBDriver"
+      "entities" => [
+        0 => {
+          "Cable" => 0
+          "destinations" => [
+            0 => {
+              "uniqueID" => -334193805
+            }
+          ]
+          "embedded" => 0
+          "In Endpoint" => 129
+          "maxSysExSpeed" => 3125
+          "name" => "USB MIDI Interface"
+          "Out Endpoint" => 1
+          "protocol" => 1
+          "sources" => [
+            0 => {
+              "uniqueID" => -956094634
+            }
+          ]
+          "uniqueID" => -221446952
+        }
+      ]
+      "manufacturer" => "Funs-tech.com"
+      "model" => "USB MIDI Interface"
+      "name" => "USB MIDI Interface"
+      "offline" => 1
+      "SerialNumber" => "USB MIDI Interface"
+      "UMP Enabled" => 0
+      "uniqueID" => -1478435105
+      "USBLocationID" => 17899520
+      "USBVendorProduct" => 445019437
+    }
+    7 => {
+      "apple.midi.audiomidisetup.widget.xPosition" => 184
+      "apple.midi.audiomidisetup.widget.yPosition" => 51
+      "driver" => "com.apple.AppleMIDIUSBDriver"
+      "entities" => [
+        0 => {
+          "Cable" => 0
+          "destinations" => [
+            0 => {
+              "uniqueID" => -1414553801
+            }
+          ]
+          "embedded" => 0
+          "In Endpoint" => 129
+          "maxSysExSpeed" => 3125
+          "name" => "MIDI"
+          "Out Endpoint" => 2
+          "protocol" => 1
+          "sources" => [
+            0 => {
+              "uniqueID" => -1333356316
+            }
+          ]
+          "uniqueID" => 1468174083
+        }
+        1 => {
+          "Cable" => 1
+          "destinations" => [
+            0 => {
+              "uniqueID" => -2083305439
+            }
+          ]
+          "embedded" => 0
+          "In Endpoint" => 129
+          "maxSysExSpeed" => 3125
+          "name" => "HyperControl"
+          "Out Endpoint" => 2
+          "protocol" => 1
+          "sources" => [
+            0 => {
+              "uniqueID" => -1928045025
+            }
+          ]
+          "uniqueID" => 382401072
+        }
+      ]
+      "image" => "/System/Library/Audio/MIDI Devices/Generic/Images/MidSizeController.tiff"
+      "manufacturer" => "M-Audio"
+      "model" => "Axiom A.I.R. Mini32"
+      "name" => "Axiom A.I.R. Mini32"
+      "offline" => 1
+      "receiveChannels" => 65535
+      "receives clock" => 0
+      "receives MTC" => 0
+      "supports General MIDI" => 0
+      "supports MMC" => 0
+      "transmitChannels" => 65535
+      "transmits clock" => 0
+      "transmits MTC" => 0
+      "UMP Enabled" => 0
+      "uniqueID" => 989617667
+      "USBLocationID" => 1245184
+      "USBVendorProduct" => 123936823
+    }
+  ]
+  "thruConnections" => [
+    0 => {
+      "data" => {length = 204, bytes = 0x00000000010000001a918b1240529468 ... 0000000000000000}
+      "owner" => "com.apple.midi.netsetup"
+    }
+  ]
+}

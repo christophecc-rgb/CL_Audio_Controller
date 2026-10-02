@@ -1,0 +1,92 @@
+ M "CL Audio Controller.spec"
+ M INSTALLER_AbletonOSC/README_AbletonOSC.txt
+ D "M4L/Devices/Paradis Latin AutoScene/Paradis Latin AutoScene - Live 10.amxd"
+ D "M4L/Devices/Paradis Latin AutoScene/Paradis Latin AutoScene - Live 10.maxpat"
+ M "M4L/Devices/Paradis Latin AutoScene/Paradis Latin AutoScene.amxd"
+ M "M4L/Devices/Paradis Latin AutoScene/Paradis Latin AutoScene.maxpat"
+ M "M4L/Devices/Paradis Latin AutoScene/ParadisLatin_AutoScene.js"
+ M M4L/Devices/README.md
+ D "M4L/Install/Paradis Latin AutoScene - Live 10.amxd"
+ D "M4L/Install/Paradis Latin AutoScene - Live 10.maxpat"
+ M "M4L/Install/Paradis Latin AutoScene.amxd"
+ M M4L/Install/ParadisLatin_AutoScene.js
+ M M4L/Install/README.md
+ M M4L/Install/SHA256SUMS.txt
+ M "M4L/LTC Display v2.0 Remote Config.maxpat"
+ M app.py
+ M launcher_control.py
+ M osc_transport.py
+ M packaging/CLSuiteInstallerApp.m
+ M packaging/Desinstaller_La_Suite_CL.app.sh
+ M packaging/Desinstaller_La_Suite_CL.command
+ D packaging/INSTALLATION_AUTOSCENE_LIVE_10.txt
+ M packaging/INSTALLATION_NOUVEAU_MAC.txt
+ M packaging/Installer_La_Suite_CL.app.sh
+ M packaging/Installer_Toute_La_Suite_CL.command
+ D packaging/SHA256_AUTOSCENE_LIVE_10.txt
+ M scripts/build_release.sh
+ M scripts/export_transport_kit.command
+ M static/midi-return-visual.js
+ M static/remote-v2.css
+ M static/remote-v2.js
+ M templates/ab.html
+ M templates/arrangement.html
+ M templates/index.html
+ M tests/test_configuration_checker.py
+ M tests/test_live_set_generation.py
+ M tests/test_m4l_distribution.py
+ M tests/test_midi_console_packaging.py
+ M tests/test_midi_network_tools.py
+ M tests/test_packaging.py
+ M tools/ableton_mtc_bridge/CLAbletonMTCBridge.m
+ M tools/cl_midi_network/CLConfigurationProfile.m
+ M tools/cl_midi_network/CLConfigurationValidator.m
+ M tools/cl_midi_network/CLMIDIDirectBridge.m
+ M tools/cl_midi_network/CLMIDINetworkDashboard.m
+ M tools/cl_midi_network/CLMIDINetworkGuardian.m
+ M tools/cl_midi_network/CLMIDIRTPAgent.m
+ M tools/cl_midi_network/CLMIDIRoundTripTester.m
+ M tools/cl_midi_network/CLYamahaConsoleSimulator.m
+?? INSTALLER_AbletonOSC/cl_bonjour.py
+?? INSTALLER_AbletonOSC/install_bonjour.py
+?? "M4L/LTC Display v2.0 Remote Config - 63124 TEST.maxpat"
+?? ableton_discovery.py
+?? docs/ABLETON_BONJOUR.md
+?? docs/HOT_BACKUP_EVENT_SYNC_AUDIT.md
+?? docs/HOT_BACKUP_EVENT_SYNC_V1.md
+?? docs/LOCAL_SIMULATOR_LIFECYCLE.md
+?? docs/MIDI_RTP_NAMING.md
+?? hot_backup_sync.py
+?? midi_endpoint_names.py
+?? tests/js/test_ableton_discovery.cjs
+?? tests/js/test_remote_current_state.cjs
+?? tests/native/sync_test_helpers.h
+?? tests/native/test_local_simulator_supervisor.m
+?? tests/native/test_midi_endpoint_names.m
+?? tests/native/test_midi_endpoint_roles.m
+?? tests/native/test_mtc_bridge.m
+?? tests/native/test_sync_correlation.c
+?? tests/native/test_sync_meter.c
+?? tests/native/test_sync_phase.c
+?? tests/test_ableton_bonjour_publisher.py
+?? tests/test_ableton_discovery.py
+?? tests/test_crossfader_target.py
+?? tests/test_hot_backup_sync.py
+?? tests/test_local_simulator_lifecycle.py
+?? tests/test_midi_endpoint_names.py
+?? tests/test_mtc_bridge_control.py
+?? tests/test_remote_passive_feedback.py
+?? tools/ableton_mtc_bridge/.gitignore
+?? tools/ableton_mtc_bridge/CLSyncMIDIClock.h
+?? tools/ableton_mtc_bridge/CLSyncMeter.m
+?? tools/ableton_mtc_bridge/CLSyncMeterCore.h
+?? tools/ableton_mtc_bridge/CLSyncProbe
+?? tools/ableton_mtc_bridge/CLSyncProbe.m
+?? tools/ableton_mtc_bridge/CLSyncProtocol.h
+?? tools/ableton_mtc_bridge/CLSyncTimecode.h
+?? tools/ableton_mtc_bridge/CL_SYNC_METER.md
+?? tools/ableton_mtc_bridge/MTC_STABILITY.md
+?? tools/ableton_mtc_bridge/build_sync_meter.command
+?? tools/cl_midi_network/CLLocalSimulatorSupervisor.h
+?? tools/cl_midi_network/CLSimulatorProcessLease.h
+?? tools/shared/

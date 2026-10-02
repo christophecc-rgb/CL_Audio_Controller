@@ -28,3 +28,13 @@ au projet AbletonOSC. Le script d'installation officiel ci-dessus ne l'applique
 pas automatiquement : vérifier la version amont avant toute réinstallation.
 Le patch enregistre uniquement les deux routes de lecture ; il n'ajoute ni route
 d'écriture, ni listener LOM pour ces propriétés non observables.
+
+Découverte Bonjour optionnelle pour CL Show Control (macOS) :
+- Fermer Live puis exécuter : python3 install_bonjour.py
+- Pour une User Library personnalisée, ajouter --target '/chemin/AbletonOSC'.
+- Relancer Live avec AbletonOSC actif ; le lecteur annonce _cl-ableton._udp.
+- Dans Show Control : Distant → sélectionner → Appliquer → Tester la connexion.
+- L'installeur conserve manager.py et les extensions existantes ; il sauvegarde
+  __init__.py avant de modifier uniquement l'import de Manager.
+- Une réinstallation officielle complète retire cette extension optionnelle.
+- Procédure complète et validation deux Macs : docs/ABLETON_BONJOUR.md dans le repo.

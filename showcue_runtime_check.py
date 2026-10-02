@@ -2,16 +2,30 @@
 def run():
     import io
     import json
+    import os
     import tempfile
     from pathlib import Path
-    import app as server
     import pypdf
     from pypdf.generic import DictionaryObject, NameObject, DecodedStreamObject
     from cl_transport import load_library
     from showcue_session_archive import export_session, import_session
     with tempfile.TemporaryDirectory() as temporary:
-        server.SHOW_CUES_DATA_DIRECTORY = Path(temporary)
+        temporary = Path(temporary)
+        os.environ['CL_SECURITY_DIRECTORY'] = str(temporary / 'security')
+        import app as server
+
+        server.SHOW_CUES_DATA_DIRECTORY = temporary
         client = server.app.test_client()
+
+        password = 'CL-Runtime-Check-2026'
+        setup = client.post('/security/admin/setup', json={'password': password})
+        assert setup.status_code == 200, setup.data
+
+        unlock = client.post('/security/admin/unlock', json={'password': password})
+        assert unlock.status_code == 200, unlock.data
+
+        development = client.post('/security/admin/mode', json={'mode': 'development'})
+        assert development.status_code == 200, development.data
         for route in ['/show-info', '/show-info/builder', '/show-info/builder/resources',
                       '/show-info/builder/document', '/show-info/builder/export.xlsx',
                       '/show-info/builder/export.csv', '/assets/paradis%20latin.jpg']:

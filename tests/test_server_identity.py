@@ -7,6 +7,7 @@ import sys
 import unittest
 import urllib.error
 import uuid
+import tempfile
 from pathlib import Path
 from unittest import mock
 
@@ -71,10 +72,27 @@ class ContextResponse:
         return False
 
 
+def authenticated_launcher(test):
+    temporary=tempfile.TemporaryDirectory(prefix='cl-admin-test-');test.addCleanup(temporary.cleanup)
+    manager=launcher.launcher_security
+    state=dict(manager.__dict__)
+    from remote_security import RemoteSecurity
+    fresh=RemoteSecurity(Path(temporary.name)/'Security',namespace='launcher')
+    manager.__dict__.clear();manager.__dict__.update(fresh.__dict__)
+    def restore():
+        manager.__dict__.clear();manager.__dict__.update(state)
+    test.addCleanup(restore)
+    manager.set_password('Phase2 local test password')
+    client=launcher.app.test_client()
+    client.post('/security/admin/unlock',json={'password':'Phase2 local test password'})
+    client.post('/security/admin/mode',json={'mode':'development'})
+    return client
+
+
 class ServerIdentityTests(unittest.TestCase):
     def test_midi_network_assistant_button_uses_existing_launcher_and_accessible_matte_red_style(self):
         source = (PROJECT_ROOT / "launcher_control.py").read_text(encoding="utf-8")
-        page = launcher.app.test_client().get("/").get_data(as_text=True)
+        page = self.client.get("/").get_data(as_text=True)
         button = re.search(r'<button\b[^>]*id="consoleManager"[^>]*>(.*?)</button>', page, re.S)
         self.assertIsNotNone(button)
         self.assertIn("midi-assistant-button", button.group(0))
@@ -86,6 +104,7 @@ class ServerIdentityTests(unittest.TestCase):
         self.assertNotIn(">Diagnostic</button>", source)
     def setUp(self):
         launcher.owned_server = None
+        self.client = authenticated_launcher(self)
 
     def tearDown(self):
         launcher.owned_server = None
@@ -293,7 +312,7 @@ class ServerIdentityTests(unittest.TestCase):
             mock.patch.object(launcher, "stop_owned_server", return_value=(True, "stopped")) as stop,
             mock.patch.object(launcher, "start_web_server", return_value=(True, "started")) as start,
         ):
-            response = launcher.app.test_client().get("/restart")
+            response = self.client.get("/restart")
         self.assertEqual(response.status_code, 200)
         stop.assert_called_once_with()
         start.assert_called_once_with()
@@ -311,7 +330,7 @@ class ServerIdentityTests(unittest.TestCase):
             mock.patch.object(launcher, "port_used", return_value=True),
             mock.patch.object(launcher, "read_remote_state_diagnostic", return_value=valid_status(set_ready=False)),
         ):
-            payload = launcher.app.test_client().get("/state").get_json()
+            payload = self.client.get("/state").get_json()
         self.assertTrue(payload["server_valid"])
         self.assertFalse(payload["live_set_ready"])
         self.assertFalse(payload["system_ready"])
@@ -329,7 +348,7 @@ class ServerIdentityTests(unittest.TestCase):
             mock.patch.object(launcher, "port_used", return_value=True),
             mock.patch.object(launcher, "read_remote_state_diagnostic", return_value=valid_status(set_ready=True)),
         ):
-            payload = launcher.app.test_client().get("/state").get_json()
+            payload = self.client.get("/state").get_json()
         self.assertTrue(payload["server_valid"])
         self.assertTrue(payload["live_set_ready"])
         self.assertTrue(payload["system_ready"])
@@ -433,6 +452,8 @@ class ServerStatusContractTests(unittest.TestCase):
 
 
 class NetworkConfigurationRouteTests(unittest.TestCase):
+    def setUp(self):
+        self.client = authenticated_launcher(self)
     @staticmethod
     def remote_profiles(host="192.168.50.10", name="Mac Blue"):
         return ableton_targets.update_profile(
@@ -450,7 +471,7 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
             mock.patch.object(launcher, "tcp_ok", return_value=False),
             mock.patch.object(launcher, "start_web_server") as start,
         ):
-            response = launcher.app.test_client().post(
+            response = self.client.post(
                 "/network-config",
                 json={"mode": "local", "host": "192.168.50.99", "send_port": 11000, "reply_port": 11001},
             )
@@ -472,7 +493,7 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
             mock.patch.object(launcher, "stop_owned_server", return_value=(True, "stopped")) as stop,
             mock.patch.object(launcher, "start_web_server", return_value=(True, "started")) as start,
         ):
-            response = launcher.app.test_client().post(
+            response = self.client.post(
                 "/network-config",
                 json={"mode": "remote", "host": "192.168.50.10", "send_port": 11000, "reply_port": 11001},
             )
@@ -491,7 +512,7 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
             mock.patch.object(launcher, "tcp_ok", return_value=True),
             mock.patch.object(launcher, "current_identity_status", return_value=(valid_status(), {"valid": False})),
         ):
-            response = launcher.app.test_client().post(
+            response = self.client.post(
                 "/network-config",
                 json={"mode": "remote", "host": "192.168.50.10", "send_port": 11000, "reply_port": 11001},
             )
@@ -508,7 +529,7 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
             mock.patch.object(launcher, "save_profiles") as save,
             mock.patch.object(launcher, "tcp_ok", return_value=False),
         ):
-            response = launcher.app.test_client().post(
+            response = self.client.post(
                 "/network-config",
                 json={"mode": "remote", "name": "Régie", "host": "192.168.50.20", "send_port": 13000, "reply_port": 13001},
             )
@@ -521,7 +542,7 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
     def test_get_configuration_exposes_profiles_and_active_target(self):
         profiles = self.remote_profiles()
         with mock.patch.object(launcher, "load_profiles", return_value=profiles):
-            response = launcher.app.test_client().get("/network-config")
+            response = self.client.get("/network-config")
         payload = response.get_json()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(payload["active_mode"], "remote")
@@ -529,14 +550,14 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
         self.assertEqual(payload["active_target"]["host"], "192.168.50.10")
 
     def test_panel_contains_two_non_destructive_drafts(self):
-        page = launcher.app.test_client().get("/").get_data(as_text=True)
+        page = self.client.get("/").get_data(as_text=True)
         self.assertIn("networkDrafts={local:null,remote:null}", page)
         self.assertIn("captureVisibleNetworkDraft();", page)
         self.assertIn("restoreNetworkDraft(networkVisibleMode);", page)
         self.assertNotIn("if(local)el('abletonHost').value='127.0.0.1'", page)
 
     def test_panel_integrates_the_published_midi_console_state(self):
-        page = launcher.app.test_client().get("/").get_data(as_text=True)
+        page = self.client.get("/").get_data(as_text=True)
 
         self.assertIn("CONSOLES / RETOURS PROGRAM CHANGE", page)
         self.assertIn("CONFIGURATION CONSOLES", page)
@@ -553,13 +574,13 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
 
         for marker in (
             "devices=showDevicesForState(s)", "renderConsoleHealth(s,devices)",
-            "renderConsoleDiagnostic(card,item,offsets)",
+            "renderConsoleDiagnostic(card,item,offsets,s)",
             'id="consoleHealth"', 'role="status"',
             "health.title", "health.detail", "value.expected_midi_program",
             "value.returned_midi_program", "device.id==='console_a'?'cl5'",
             "device.id==='console_b'?'ql1'", "consoleAge(stamp,now)",
             "age>CONSOLE_RETURN_FRESH_SECONDS", "beforeIntent",
-            "Attendu (Ableton)", "Reçu (Retour)",
+            "Attendu ·", "Reçu ·",
         ):
             self.assertIn(marker, page)
         self.assertIn("s.ltc_connected", page)
@@ -572,14 +593,14 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
         self.assertNotIn('type="number" value="11000"', page)
 
     def test_panel_uses_the_requested_top_to_bottom_command_order(self):
-        page = launcher.app.test_client().get("/").get_data(as_text=True)
+        page = self.client.get("/").get_data(as_text=True)
         self.assertIn('class="product-copy"', page)
         self.assertNotIn("Panneau de contrôle serveur", page)
         self.assertLess(page.index("Démarrer"), page.index("OUVRIR LA TÉLÉCOMMANDE"))
         self.assertLess(page.index("Relancer"), page.index("OUVRIR LA TÉLÉCOMMANDE"))
 
     def test_ableton_mode_badge_is_visually_prominent(self):
-        page = launcher.app.test_client().get("/").get_data(as_text=True)
+        page = self.client.get("/").get_data(as_text=True)
         self.assertIn(".mode-badge{justify-self:center;min-width:102px", page)
         self.assertIn('id="networkLtc"', page)
         self.assertNotIn('id="consoleLtc"', page)
@@ -599,7 +620,7 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
             "ok": True, "message": "Offset titres CL5 : +1",
         }).encode("utf-8")
         with mock.patch.object(launcher.urllib.request, "urlopen", return_value=remote_response) as urlopen:
-            response = launcher.app.test_client().post(
+            response = self.client.post(
                 "/console-title-offset", json={"console": "cl5", "offset": 1},
             )
         self.assertEqual(response.status_code, 200)
@@ -612,7 +633,7 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
             "read_remote_state_diagnostic",
             return_value={"ltc_connected": True, "ltc_timecode": "12:34:56:12", "scenes": [1, 2]},
         ):
-            response = launcher.app.test_client().get("/telemetry")
+            response = self.client.get("/telemetry")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json(), {
             "ltc_connected": True,
@@ -626,7 +647,7 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
         self.assertIn('id="systemLtc"', launcher.PANEL_HTML_V2)
         self.assertIn("el('systemLtc').textContent=ltc", launcher.PANEL_HTML_V2)
         self.assertNotIn("body.show-mode .system-ltc{display:none", launcher.PANEL_HTML_V2)
-        self.assertIn(".state-time{font:18px Menlo", launcher.PANEL_HTML_V2)
+        self.assertIn(".state-time{font:18px -apple-system", launcher.PANEL_HTML_V2)
         self.assertIn(".system-ltc::before{content:'LTC  '", launcher.PANEL_HTML_V2)
         self.assertIn("body.show-mode .state-time{", launcher.PANEL_HTML_V2)
         self.assertIn("body.show-mode .system-ltc{", launcher.PANEL_HTML_V2)
@@ -641,7 +662,7 @@ class NetworkConfigurationRouteTests(unittest.TestCase):
             mock.patch.object(launcher, "load_profiles", return_value=profiles),
             mock.patch.object(launcher, "get_lan_ip", return_value="192.168.1.99"),
         ):
-            payload = launcher.app.test_client().get("/state").get_json()
+            payload = self.client.get("/state").get_json()
         self.assertEqual(payload["ltc_destination"], "192.168.1.99")
         self.assertEqual(payload["ltc_port"], 63123)
 

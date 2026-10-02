@@ -5,6 +5,7 @@ from pathlib import Path
 from dataclasses import replace
 from types import SimpleNamespace
 from unittest import mock
+from security_test_helper import prepare_security, admin_client
 
 import app
 from console_title_library import ConsoleLibraryStore
@@ -13,6 +14,7 @@ from device_profiles import DeviceConfiguration, default_device_configuration
 
 class DynamicConsoleLibraryTests(unittest.TestCase):
     def setUp(self):
+        prepare_security(self, app)
         defaults = default_device_configuration()
         ql1 = defaults.by_id("console_b")
         ql3 = replace(
@@ -55,7 +57,7 @@ class DynamicConsoleLibraryTests(unittest.TestCase):
             },
             clear=False,
         ):
-            response = app.app.test_client().get(
+            response = admin_client(app).get(
                 "/console-scene-title?console=ql3&midi_program=41"
             )
 
@@ -68,7 +70,7 @@ class DynamicConsoleLibraryTests(unittest.TestCase):
 
     def test_unconfigured_library_lookup_is_rejected(self):
         with self.configuration_patch():
-            response = app.app.test_client().get(
+            response = admin_client(app).get(
                 "/console-scene-title?console=unknown&midi_program=0"
             )
 
@@ -76,7 +78,7 @@ class DynamicConsoleLibraryTests(unittest.TestCase):
 
     def test_dynamic_library_import_preview_accepts_ql3(self):
         with self.configuration_patch():
-            response = app.app.test_client().post(
+            response = admin_client(app).post(
                 "/console-library/import/ql3",
                 data={
                     "preview": "1",
@@ -98,7 +100,7 @@ class DynamicConsoleLibraryTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             store = ConsoleLibraryStore(Path(temporary) / "Console Files")
             with self.configuration_patch(), mock.patch.object(app, "CONSOLE_LIBRARY_STORE", store):
-                response = app.app.test_client().post(
+                response = admin_client(app).post(
                     "/console-library/import/ql3",
                     data={
                         "file": (

@@ -1,0 +1,9 @@
+/Users/mbprochris/Applications/CL Show Control.app.backup-20260928-204628
+/Users/mbprochris/Applications/CL Show Control.app.backup-mtc
+/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.backup-20260930-064645.app
+/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL-Monitor-backup-20260930-073639
+/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL-Monitor-backup-20260930-073716
+/Users/mbprochris/Applications/CL Show Control.app/Contents/Frameworks/tools/ableton_mtc_bridge/CLAbletonMTCBridge.before-hot-backup-20260929
+/Users/mbprochris/Applications/CL Show Control.app/Contents/Resources/templates/index.html.backup-osc-meter-20260913-024059
+/Users/mbprochris/Applications/CL Show Control.app.backup-mtc/Contents/Resources/templates/index.html.backup-osc-meter-20260913-024059
+/Users/mbprochris/Applications/CL Show Control.app.backup-20260928-204628/Contents/Resources/templates/index.html.backup-osc-meter-20260913-024059

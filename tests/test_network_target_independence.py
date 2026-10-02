@@ -17,6 +17,12 @@ class NetworkIndependenceTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
+        self.security_directory = mock.patch.object(launcher.launcher_security, 'directory', Path(self.tmp.name)/'security')
+        self.security_directory.start(); self.addCleanup(self.security_directory.stop)
+        launcher.launcher_security.set_password('Phase2 regression password')
+        self.client = launcher.app.test_client()
+        self.client.post('/security/admin/unlock', json={'password':'Phase2 regression password'})
+        self.client.post('/security/admin/mode', json={'mode':'development'})
         self.path = Path(self.tmp.name) / 'config' / 'network-config.json'
         self.path.parent.mkdir(mode=0o700)
         self.payload = {
@@ -36,7 +42,7 @@ class NetworkIndependenceTests(unittest.TestCase):
         self.assertEqual(self.path.read_bytes(), original)
         with mock.patch.object(launcher, 'load_profiles', side_effect=lambda: targets.load_profiles(self.path)), mock.patch.object(launcher, 'save_profiles', side_effect=lambda p: targets.save_profiles(p, self.path)), mock.patch.object(launcher, 'selected_cl_status', return_value=({}, {}, {})):
             for mode, host in [('local', ''), ('manual', '192.168.3.64'), ('paradis', ''), ('local', '')]:
-                result = launcher.app.test_client().post('/network-config', json={'cl_server': {'mode': mode, 'host': host}})
+                result = self.client.post('/network-config', json={'cl_server': {'mode': mode, 'host': host}})
                 self.assertEqual(result.status_code, 200)
                 saved = json.loads(self.path.read_text())
                 self.assertEqual(saved['profiles'], self.payload['profiles'])
@@ -47,7 +53,7 @@ class NetworkIndependenceTests(unittest.TestCase):
         with mock.patch.object(launcher, 'load_profiles', side_effect=lambda: targets.load_profiles(self.path)), mock.patch.object(launcher, 'save_profiles', side_effect=lambda p: targets.save_profiles(p, self.path)), mock.patch.object(launcher, 'is_paradis_server_machine', return_value=True), mock.patch.object(launcher, 'tcp_ok', return_value=False), mock.patch.object(launcher, 'get_lan_ip', return_value='192.168.1.54'), mock.patch.object(launcher, 'event'):
             for mode in ['local', 'remote', 'local', 'remote']:
                 payload = dict(self.payload['profiles'][mode])
-                result = launcher.app.test_client().post('/network-config', json=payload)
+                result = self.client.post('/network-config', json=payload)
                 self.assertEqual(result.status_code, 200, result.get_json())
                 profiles = targets.load_profiles(self.path)
                 self.assertFalse(launcher.cl_server_is_remote(profiles))

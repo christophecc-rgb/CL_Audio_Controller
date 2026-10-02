@@ -9,7 +9,10 @@ TOOLS = ROOT / "tools" / "cl_midi_network"
 class MidiNetworkToolsTests(unittest.TestCase):
     def test_simulator_tx_is_published_only_as_explicit_return_source(self):
         source = (ROOT / "tools" / "cl_midi_network" / "CLMIDINetworkDashboard.m").read_text()
-        self.assertIn('@"source": @"local_simulator_tx"', source)
+        self.assertIn('@"local_simulator_tx": self.lastCL5SimulatorTX ?: @{}', source)
+        self.assertIn('@"local_simulator_tx": self.lastQL1SimulatorTX ?: @{}', source)
+        self.assertIn('@"source": @"physical_midi"', source)
+        self.assertIn('@"returned_program_source": @"physical_midi"', source)
         self.assertIn('@"local_simulator_tx": self.lastCL5SimulatorTX', source)
         self.assertIn('@"local_simulator_tx": self.lastQL1SimulatorTX', source)
     def test_show_control_network_endpoint_is_not_console_return(self):
@@ -20,7 +23,8 @@ class MidiNetworkToolsTests(unittest.TestCase):
             "static BOOL CLIsProtectedDeviceTestEndpoint", 1
         )[0]
 
-        self.assertIn('@"Réseau CL Show Control"', predicate)
+        self.assertIn('CLMIDINameMatches(name, @CL_MIDI_SHOW_RTP)', predicate)
+        self.assertIn('CLMIDINameMatches(name, @CL_MIDI_DIRECT_RTP)', predicate)
         self.assertIn("return NO;", predicate)
         self.assertIn("CLRTPReturnEndpointName", predicate)
         self.assertIn('rangeOfString:@"RTP"', predicate)
@@ -102,7 +106,7 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('${1:-$SCRIPT_DIR/build}', source)
         self.assertIn("-framework CoreMIDI", source)
         self.assertIn("-arch arm64 -arch x86_64", source)
-        self.assertEqual(source.count("-mmacosx-version-min=10.15"), 9)
+        self.assertEqual(source.count("-mmacosx-version-min=10.15"), 10)
         self.assertIn("CLMIDINetworkGuardian", source)
         self.assertIn("CLYamahaConsoleSimulator", source)
         self.assertIn("CLMIDIRoundTripTester", source)
@@ -132,8 +136,9 @@ class MidiNetworkToolsTests(unittest.TestCase):
 
     def test_dashboard_exposes_visible_rtp_status_and_real_round_trip(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text()
-        self.assertIn('title:@"RTP HORS LIGNE"', source)
-        self.assertIn('title:@"RTP DISPONIBLE"', source)
+        self.assertIn('title:@"RETOUR RTP HORS LIGNE"', source)
+        self.assertIn('title:@"MIDI DISTANT DISPONIBLE"', source)
+        self.assertIn('@"RTP DISTANT · DISPONIBLE"', source)
         self.assertIn('title:@"RTP VALIDÉ"', source)
         self.assertIn('CLMIDIRoundTripTester', source)
         self.assertIn('@"--endpoint"', source)
@@ -261,7 +266,7 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertNotIn('simulatorModeMenu', source)
         self.assertIn('self.simulatorModeLabel.stringValue = self.localReturnMode ?', mode_changed)
         self.assertIn('[self updateRoundTripPanelForCurrentMode]', mode_changed)
-        self.assertIn('self.testPanel.hidden = !rtpMode', updater)
+        self.assertIn('self.testPanel.hidden = YES', updater)
         self.assertIn('self.testButton.enabled = rtpMode', updater)
         self.assertNotIn('self.testPanel.hidden = NO', presentation)
         self.assertIn('[self updateRoundTripPanelForCurrentMode]', presentation)
@@ -276,13 +281,15 @@ class MidiNetworkToolsTests(unittest.TestCase):
     def test_local_assistant_layout_collapses_the_hidden_rtp_test_space(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
         layout = source.split('- (void)layoutAssistantViewForRTPMode:(BOOL)rtpMode {', 1)[1].split('\n}', 1)[0]
-        self.assertIn('650 + offset', layout)
-        self.assertIn('rtpMode ? 104.0 : 0.0', layout)
+        self.assertIn('NSSize targetContentSize = NSMakeSize(500, 650)', layout)
+        self.assertIn('CGFloat offset = 0.0', layout)
+        self.assertIn('self.testPanel.hidden = YES', layout)
         self.assertIn('self.assistantReturnPanel.frame = NSMakeRect(16, 90, 468, 215)', layout)
-        self.assertIn('self.testPanel.frame = NSMakeRect(16, 343, 468, 96)', layout)
-        self.assertIn('self.assistantTestBanner.frame = NSMakeRect(16, 42, 468, 36)', layout)
-        self.assertIn('CGFloat modePanelHeight = rtpMode ? 100.0 : 58.0', layout)
-        self.assertIn('@"MODE · LOCAL"', layout)
+        self.assertIn('self.testPanel.frame = NSMakeRect(0, 0, 1, 1)', layout)
+        self.assertIn('self.assistantTestBanner.frame = NSMakeRect(80, 47, 340, 26)', layout)
+        self.assertIn('CGFloat modePanelHeight = rtpMode ? 76.0 : 58.0', layout)
+        self.assertIn('@"PILOTÉ PAR CL SHOW CONTROL"', layout)
+        self.assertIn('@"CIBLE DISTANTE"', layout)
 
     def test_console_return_cards_keep_cl5_and_ql1_identity_colors(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
@@ -309,7 +316,7 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('monospacedDigitSystemFontOfSize:28.0', source)
         self.assertIn('titleLabel.stringValue', cards)
         self.assertIn('titleLabel.hidden = !titleLabel.stringValue.length', cards)
-        self.assertIn('hasLibrary && resolvedTitle.length', cards)
+        self.assertIn('hasLibrary && resolvedTitleValid', cards)
         self.assertIn('@"Program Change %ld%@%@"', cards)
         self.assertIn('metaLabel.stringValue = @"Control Change"', cards)
         self.assertIn('metaLabel.stringValue = @"Note"', cards)
@@ -422,7 +429,8 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('[self.simulatorOutputBuffers removeAllObjects]', stop)
         self.assertIn('if (task.running) [task terminate]', stop)
         self.assertIn('action:@selector(stopIntegratedSimulator:)', source)
-        self.assertIn('self.assistantStopTestsButton = [self accentButton:@"Tout arrêter"', source)
+        self.assertIn('[self accentButton:@"Arrêter"', source)
+        self.assertIn('action:@selector(stopIntegratedSimulator:)', source)
 
     def test_rtp_settings_script_finds_the_network_globe_by_accessibility_text(self):
         source = (TOOLS / "open_rtp_settings.applescript").read_text()
@@ -474,7 +482,7 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('@"lastQL1Program"', source)
         self.assertIn('CLMidiAgeDescription', source)
         self.assertIn('@"En attente du retour"', source)
-        self.assertIn('@"✓ Confirmé par la console"', source)
+        self.assertIn('@"✓ Retour conforme"', source)
         self.assertIn('Mismatch · reçu %ld · attendu %ld', source)
         self.assertIn('@"Retour ancien · %@"', source)
         return_cards = source.split('- (void)updateConsoleReturnCards {', 1)[1].split('- (void)refreshAbletonSceneTitle {', 1)[0]
@@ -506,9 +514,11 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertNotIn('ltc_timecode', source)
         self.assertIn('@"Diagnostic détaillé"', source)
         self.assertIn('@"Vue Spectacle"', source)
-        self.assertIn('NSSize targetContentSize = NSMakeSize(500, 650 + offset)', source)
-        self.assertIn('setContentSize:NSMakeSize(500, localHeight + offset)', source)
-        self.assertIn('CGFloat localHeight = MIN(768.0, MAX(690.0, 650.0 + returnsHeight))', source)
+        self.assertIn('NSSize targetContentSize = NSMakeSize(', source)
+        self.assertIn('[self.window setContentSize:targetContentSize]', source)
+        self.assertIn('NSMakeSize(500, contentHeight)', source)
+        self.assertIn('CGFloat returnsHeight =', source)
+        self.assertIn('CGFloat contentHeight =', source)
         self.assertIn('self.technicalPanel.hidden = !detailed', source)
         self.assertIn('RÉSEAUX CONSOLES', source)
         self.assertIn('self.lastCL5Test', source)
@@ -524,11 +534,16 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('ensureGuardianRunning', source)
         self.assertIn('@"CLMIDINetworkGuardian"', source)
         self.assertIn('@[@"--peer-name", peer]', source)
-        self.assertIn('[arguments addObjectsFromArray:@[@"--interval", @"2"]]', source)
+        self.assertIn('@"--interval", @"2"', source)
+        self.assertIn('@"--owner-pid"', source)
         self.assertIn('if (self.guardianTask.running) [self.guardianTask terminate]', source)
         self.assertIn('method=SystemMIDI double-click', source)
-        self.assertIn('rtp-connect-retry-scheduled', source)
-        self.assertIn('retry <= 8', source)
+        self.assertIn('@"rtp-connect-pending"', source)
+        self.assertIn('@"rtp-legacy-start"', source)
+        self.assertIn('@"rtp-legacy-success"', source)
+        self.assertIn('@"rtp-legacy-failed"', source)
+        self.assertIn('NSUInteger retry = [self.systemConnectRetryCounts[peer] unsignedIntegerValue] + 1', source)
+        self.assertIn('self.systemConnectRetryCounts[peer] = @(retry)', source)
         self.assertNotIn('ensureLegacyWakeIfNeeded', source)
         self.assertNotIn('legacy-wake-retry', source)
         self.assertIn('applicationShouldHandleReopen:', source)
@@ -618,10 +633,10 @@ class MidiNetworkToolsTests(unittest.TestCase):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
         predicate = source.split('static BOOL CLIsRTPReturnEndpointName', 1)[1].split('\n}', 1)[0]
         refresh = source.split('- (void)refreshEndpoints', 1)[1].split('- (NSString *)toolPath:', 1)[0]
-        self.assertIn('[name isEqualToString:CLExpectedEndpointName]', predicate)
+        self.assertIn('CLMIDINameMatches(name, @CL_MIDI_SHOW_IAC)', predicate)
         self.assertIn('[name isEqualToString:CLLocalReturnEndpointName]', predicate)
         self.assertGreaterEqual(refresh.count('CLIsRTPReturnEndpointName(name)'), 2)
-        self.assertIn('CLRTPReturnEndpointName = @"Réseau RTP MB Chris"', source)
+        self.assertIn('CLRTPReturnEndpointName = @CL_MIDI_RETURN_RTP', source)
 
     def test_return_mode_selects_saved_dynamic_source_and_guards_rtp_diagnostics(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
@@ -637,7 +652,7 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('CLPreferredConsoleReturnEndpoint(EndpointNames(YES))', simulator_changed)
         self.assertIn('[self selectPassiveReturnSourceNamed:preferred]', simulator_changed)
         self.assertIn('if (self.localReturnMode)', run_test)
-        self.assertIn('[name isEqualToString:CLExpectedEndpointName]', selector)
+        self.assertIn('CLMIDINameMatches(name, @CL_MIDI_SHOW_IAC)', selector)
         self.assertIn('[name isEqualToString:CLLocalReturnEndpointName]', selector)
 
     def test_dashboard_simulator_never_uses_ableton_title_as_return_title(self):
@@ -686,9 +701,9 @@ class MidiNetworkToolsTests(unittest.TestCase):
 
     def test_dashboard_has_independent_expected_and_return_coremidi_inputs(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
-        self.assertIn('CLExpectedEndpointName = @"Gestionnaire IAC Bus 1"', source)
-        self.assertIn('CLLocalReturnEndpointName = @"CL MIDI Return Test"', source)
-        self.assertIn('CLRTPReturnEndpointName = @"Réseau RTP MB Chris"', source)
+        self.assertIn('CLMIDIResolveName(EndpointNames(YES), @CL_MIDI_SHOW_IAC)', source)
+        self.assertIn('CLLocalReturnEndpointName = @CL_MIDI_RETURN_TEST', source)
+        self.assertIn('CLRTPReturnEndpointName = @CL_MIDI_RETURN_RTP', source)
         self.assertIn('MIDIDestinationCreate', source)
         self.assertIn('CLPassiveExpectedRead', source)
         self.assertIn('CLPassiveReturnRead', source)
@@ -706,7 +721,7 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertNotIn('expectedQL1Program = program', returned)
         refresh = source.split('- (void)refreshEndpoints', 1)[1].split('- (NSString *)toolPath:', 1)[0]
         self.assertIn('selectPassiveExpectedSourceNamed:CLExpectedEndpointName', refresh)
-        self.assertIn('selectPassiveReturnSourceNamed:preferred', refresh)
+        self.assertIn('selectPassiveReturnSourceNamed:', refresh)
 
     def test_return_callback_routes_real_program_changes_through_device_profiles(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
@@ -789,7 +804,8 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('if (channel != 1 && channel != 2)', expected)
         self.assertIn('self.expectedCL5Program = program', expected)
         self.assertIn('self.expectedQL1Program = program', expected)
-        self.assertIn('@"expected_devices": self.expectedDeviceStates', writer)
+        self.assertIn('@"expected_devices": self.localReturnMode', writer)
+        self.assertIn('(self.expectedDeviceStates ?: @{})', writer)
 
     def test_generic_expected_is_only_written_by_passive_expected_callback_path(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
@@ -820,7 +836,7 @@ class MidiNetworkToolsTests(unittest.TestCase):
 
     def test_iac_simulator_is_explicitly_refused_to_protect_expected_role(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
-        self.assertIn('Gestionnaire IAC Bus 1 est exclusivement la source expected', source)
+        self.assertIn('CL Show Control IAC (alias legacy acceptés) est exclusivement la source expected', source)
         self.assertIn('[CLSimulatorInputEndpointNames() containsObject:CLExpectedEndpointName]', source)
         manual_send = source.split('- (void)sendSimulatorMemory:', 1)[1].split('- (void)simulatorModeChanged:', 1)[0]
         self.assertIn('self.simulatorEndpointMenu.titleOfSelectedItem', manual_send)
@@ -876,15 +892,16 @@ class MidiNetworkToolsTests(unittest.TestCase):
         mode = source.split('- (void)simulatorModeChanged:', 1)[1].split('- (NSTask *)launchSimulatorDevice:', 1)[0]
         transport = source.split('- (BOOL)simulatorTransport:', 1)[1].split('- (void)startSimulatorDevice:', 1)[0]
         self.assertIn('selectPassiveExpectedSourceNamed:CLExpectedEndpointName', refresh)
-        self.assertIn('[self selectPassiveReturnSourceNamed:preferred]', refresh)
+        self.assertIn('selectPassiveReturnSourceNamed:', refresh)
         self.assertNotIn('if (!self.localReturnMode &&', refresh)
         self.assertNotIn('expectedMonitorSource = 0', mode)
         self.assertNotIn('expectedCL5Program = -1', mode)
         self.assertNotIn('expectedQL1Program = -1', mode)
         self.assertIn('BOOL local = self.localReturnMode', transport)
         self.assertIn('NSString *requiredEndpoint = selectedEndpoint', transport)
-        self.assertIn('local ? @"iac" : @"rtp"', transport)
-        self.assertIn('EXPECTED absent : Gestionnaire IAC Bus 1 introuvable', transport)
+        self.assertIn('if (transport) *transport = @"iac"', transport)
+        self.assertIn('CLRemoteSimulatorInputEndpointName', transport)
+        self.assertIn('EXPECTED absent : CL Show Control IAC introuvable (alias legacy acceptés)', transport)
         self.assertNotIn('self.localReturnDestination', transport)
         self.assertIn('Destination MIDI locale indisponible', transport)
 
@@ -989,13 +1006,16 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('CLSimulatorAutoDeviceIDsV1', source)
         self.assertIn('restorePersistedSimulatorAutoDevices', source)
         self.assertIn('updateSimulatorCompactStatus', source)
-        self.assertIn('@"● RETOURS AUTO %lu/%lu"', source)
+        self.assertIn('@"● SIMULATEURS %lu/%lu"', source)
         self.assertIn('CLPersistSimulatorAutoDeviceID(device[@"id"], YES)', source)
         self.assertIn('CLPersistSimulatorAutoDeviceID(deviceID, NO)', source)
         self.assertIn('if (sender != nil)', source)
         self.assertIn('CLClearPersistedSimulatorAutoDeviceIDs()', source)
-        self.assertIn('endpoint:CLLocalReturnEndpointName', source)
-        self.assertIn('AUTO LOCAL PAR DÉFAUT', source)
+        self.assertIn('simulatorTransport:&transport endpoint:&endpoint delay:&delay', source)
+        self.assertIn('endpoint:endpoint', source)
+        self.assertIn('@"MODE AUTO"', source)
+        self.assertIn('@"AUTO · ARRÊTÉ"', source)
+        self.assertIn('@"AUTO · %lu ACTIF%@"', source)
         self.assertIn('[wanted addObject:deviceID]', source)
 
     def test_remote_simulator_selects_and_validates_a_local_rtp_endpoint(self):
@@ -1005,14 +1025,19 @@ class MidiNetworkToolsTests(unittest.TestCase):
         mode = source.split('- (void)simulatorModeChanged:', 1)[1].split('- (NSTask *)launchSimulatorDevice:', 1)[0]
         transport = source.split('- (BOOL)simulatorTransport:', 1)[1].split('- (void)startSimulatorDevice:', 1)[0]
         self.assertIn('@selector(simulatorEndpointChanged:)', setup)
-        self.assertIn('NSMutableOrderedSet<NSString *> *localRTPNames', refresh)
-        self.assertIn('[destinationSet containsObject:name]', refresh)
-        self.assertIn('simulatorLocalRtpEndpoint', source)
-        self.assertIn('@"QL1 simulator"', source)
-        self.assertIn('self.simulatorEndpointMenu.enabled = localRTPEndpoints.count > 0', refresh)
+        self.assertIn('[destinations containsObject:CLLocalReturnEndpointName]', refresh)
+        self.assertIn('selectItemWithTitle:CLLocalReturnEndpointName', refresh)
+        self.assertIn('self.simulatorEndpointMenu.enabled = NO', refresh)
+        self.assertIn('[destinations containsObject:CLLocalReturnEndpointName]', refresh)
+        self.assertIn('NSString *selectedEndpoint = CLLocalReturnEndpointName', transport)
+        self.assertIn('containsObject:CLRemoteSimulatorInputEndpointName', transport)
+        self.assertIn('[@[@"CL5", @"QL1"] containsObject:device[@"name"]]', source)
+        self.assertIn('@"--label", device[@"name"]', source)
+        self.assertIn('self.simulatorEndpointMenu.enabled = localDestinations.count > 0', refresh)
         self.assertNotIn('[self.simulatorEndpointMenu selectItemWithTitle:CLRTPReturnEndpointName]', mode)
-        self.assertIn('[CLLocalRTPEndpointNames() containsObject:requiredEndpoint]', transport)
-        self.assertIn('Endpoint RTP local introuvable', transport)
+        self.assertIn('[requiredEndpoint isEqualToString:CLLocalReturnEndpointName]', transport)
+        self.assertIn('[EndpointNames(NO) containsObject:requiredEndpoint]', transport)
+        self.assertIn('Destination MIDI locale indisponible', transport)
         self.assertNotIn('mode == 0 ? CLLocalReturnEndpointName : CLRTPReturnEndpointName', transport)
 
     def test_remote_simulator_input_and_output_are_independent(self):
@@ -1279,8 +1304,10 @@ class MidiNetworkToolsTests(unittest.TestCase):
 
     def test_rtp_timeout_explains_missing_remote_return_without_blame_on_iac(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
-        self.assertIn('Source expected Ableton (indépendante du RTP)', source)
-        self.assertIn('indisponible (sans effet sur la liaison RTP)', source)
+        self.assertIn('Expected distant : fourni par CL Show Control / backend', source)
+        self.assertIn('Retour console RTP : %@ · %@', source)
+        self.assertIn('@"RTP NON VALIDÉ"', source)
+        self.assertIn('@"Aucun retour RTP console exploitable."', source)
         self.assertIn('aucun simulateur de retour actif sur le Mac distant', source)
 
     def test_remote_simulator_accepts_bidirectional_rtp_endpoints_with_the_same_name(self):
@@ -1301,7 +1328,9 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('networkSource = findEndpoint(YES, inputEndpointName)', engine)
         self.assertNotIn('caseInsensitiveCompare:endpointSearchName', engine)
         self.assertNotIn('Boucle MIDI refusée', engine)
-        self.assertIn('[sources containsObject:savedInput] ? savedInput : @"Aucune"', refresh)
+        self.assertIn('[sources containsObject:CLRemoteSimulatorInputEndpointName]', refresh)
+        self.assertIn('selectItemWithTitle:CLRemoteSimulatorInputEndpointName', refresh)
+        self.assertIn('self.simulatorInputEndpointMenu.enabled = NO', refresh)
         self.assertNotIn('isEqualToString:endpoint', endpoint_changed)
         self.assertNotIn('isEqualToString:output', input_changed)
         self.assertNotIn('isEqualToString:requiredEndpoint', transport)
@@ -1383,12 +1412,13 @@ class MidiNetworkToolsTests(unittest.TestCase):
             self.assertIn(f'expected[@"{field}"]', method)
         for status in ("confirmed", "mismatch", "stale", "local_fallback", "unavailable"):
             self.assertIn(f'@"{status}"', method)
-        self.assertIn('@"✓ Confirmé par la console"', method)
+        self.assertIn('@"✓ Retour conforme"', method)
         self.assertIn('@"En attente du retour"', method)
         self.assertIn('@"recall_waiting"', method)
         self.assertIn('elapsedSinceExpected < 4.0', method)
         self.assertIn('!mismatch', method)
-        self.assertIn('[visualState isEqualToString:@"recall_waiting"]', method)
+        self.assertIn('visualRecallActive', method)
+        self.assertIn('? @"recall_waiting"', method)
         self.assertIn('@"clVisualRecallTimerKey"', method)
         self.assertIn('4.0 - elapsedSinceExpected', method)
         self.assertNotIn("date.timeIntervalSinceNow", method)
@@ -1450,15 +1480,13 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('[canonicalName containsString:@"QL1"]', source)
         self.assertIn('saveConfiguration', source)
 
-    def test_network_monitor_registers_dynamic_bonjour_startup(self):
+    def test_network_monitor_keeps_bonjour_without_implicit_launch_agent(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text()
-        self.assertIn('com.claudio.midi-network-monitor.plist', source)
+        self.assertNotIn('com.claudio.midi-network-monitor.plist', source)
+        self.assertNotIn('installBackgroundLaunchAgent', source)
         self.assertIn('@"--background-monitor"', source)
         self.assertIn('@"--show-control-monitor"', source)
         self.assertIn('BOOL showControlMonitor', source)
-        self.assertIn('!showControlMonitor', source)
-        self.assertIn('@"RunAtLoad": @YES', source)
-        self.assertIn('@"KeepAlive": @YES', source)
         self.assertIn('refreshTargetMenu', source)
         self.assertIn('preferredRtpPeer', source)
         self.assertIn('ownsPassiveReturnMonitor', source)
@@ -1510,7 +1538,8 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('set connectButton to button 1 of directoryGroup', source)
         self.assertIn('return "already-connected:" & connectedName', source)
         self.assertIn('bundle identifier is "com.apple.audio.AudioMIDISetup"', source)
-        self.assertIn('set visible to false', source)
+        self.assertIn('set frontmost to true', source)
+        self.assertNotIn('disconnectButton', source)
         self.assertNotIn('click button "Se déconnecter"', source)
 
     def test_ql1_visual_identity_keeps_configurable_cyan_variants(self):
@@ -1687,24 +1716,24 @@ class MidiNetworkToolsTests(unittest.TestCase):
 
     def test_verification_bundle_never_rewrites_production_monitor_launch_agent(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
-        self.assertIn('hasSuffix:@".verification"', source)
-        self.assertIn('runningFromAppBundle && !verificationBundle', source)
-        self.assertIn('bundle Verification isolé : LaunchAgent de production inchangé', source)
+        self.assertNotIn('installBackgroundLaunchAgent', source)
+        self.assertNotIn('Library/LaunchAgents', source)
 
     def test_dashboard_clarifies_mode_devices_connection_and_simulator_actions(self):
         source = (TOOLS / "CLMIDINetworkDashboard.m").read_text(encoding="utf-8")
-        self.assertIn('@"Mode appliqué par CL Show Control"', source)
-        self.assertIn('@"CL Show Control indisponible · mode affiché conservé localement"', source)
-        self.assertIn('@"CIBLE ABLETON DISTANTE (RTP)"', source)
-        self.assertIn('self.connectButton.title = local ? @"Non requis" : @"Connecter"', source)
-        self.assertIn('self.connectButton.title = self.localReturnMode ? @"Non requis" : @"Connecter"', source)
+        self.assertIn('@"PILOTÉ PAR CL SHOW CONTROL"', source)
+        self.assertIn('@"CL Show Control indisponible · dernier mode MIDI conservé"', source)
+        self.assertIn('@"CIBLE DISTANTE"', source)
+        self.assertIn('self.connectButton.title =', source)
+        self.assertIn('local ? @"Non requis" : @"Établir RTP"', source)
+        self.assertIn('self.connectButton.title = self.localReturnMode ? @"Non requis" : @"Établir RTP"', source)
         self.assertIn('scroll.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable', source)
         self.assertIn('self.assistantReturnPanel.frame = NSMakeRect(16, 90, 468, 215)', source)
         self.assertIn('self.assistantDevicesScroll.frame = self.assistantReturnPanel.bounds', source)
         self.assertIn('visibleDevices.count == 1 ? 1 : 2', source)
         self.assertIn('visibleDevices.count <= 2 ? 106.0 : 100.0', source)
         self.assertIn('self.assistantDevicesButton.frame = NSMakeRect(246, 527 + offset, 106, 30)', source)
-        self.assertIn('@"⚙  Appareils…"', source)
+        self.assertIn('@"⚙  Configurer appareils…"', source)
         self.assertEqual(source.count('action:@selector(openDevicesEditor:)'), 1)
         self.assertIn('documentHeight - scroll.contentView.bounds.size.height', source)
         self.assertIn('self.consoleLibrariesPanel.hidden = !detailed', source)
@@ -1714,7 +1743,7 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('self.assistantDevicesButton.enabled = YES', source)
         self.assertIn('positioned:NSWindowAbove', source)
         self.assertEqual(source.count('addSubview:self.assistantDevicesButton'), 1)
-        self.assertIn('@"APPAREILS SUIVIS"', source)
+        self.assertIn('@"APPAREILS DU SPECTACLE"', source)
         self.assertIn('@"Mode test actif · %lu appareil%@ simulé%@"', source)
         self.assertIn('@"%@ · %@", verdict, mode', source)
         self.assertIn('self.expectedDeviceStates[deviceID]', source)
@@ -1732,14 +1761,22 @@ class MidiNetworkToolsTests(unittest.TestCase):
             '- (void)createIntegratedSimulatorPanelInView:', 1
         )[0]
 
-        self.assertIn('CGFloat modePanelHeight = 58.0', presentation)
-        self.assertIn('self.technicalPanel.frame = NSMakeRect(16, 47, 468, 132)', presentation)
-        self.assertIn('self.simulatorWindowButton.frame = NSMakeRect(170, actionsY, 160, 32)', presentation)
-        self.assertIn('self.consoleLibrariesPanel.frame = NSMakeRect(16, actionsY + 50.0 + returnsHeight, 468, 116)', presentation)
-        self.assertIn('self.testPanel.frame = NSMakeRect(16, actionsY + 59.0 + returnsHeight + 116.0, 468, 96)', presentation)
-        self.assertIn('CGFloat offset = self.localReturnMode ? 0.0 : 104.0', presentation)
-        self.assertIn('self.connectButton.frame = NSMakeRect(364, 5, 92, 30)', presentation)
-        self.assertIn('self.operatingModeReasonLabel.hidden = detailed', presentation)
+        self.assertIn('CGFloat returnsHeight =', presentation)
+        self.assertIn('self.technicalPanel.frame =', presentation)
+        self.assertIn('NSMakeRect(16, 47, 468, 132)', presentation)
+        self.assertIn('self.simulatorWindowButton.frame =', presentation)
+        self.assertIn('NSMakeRect(256, toolsY, 228, toolsHeight)', presentation)
+        self.assertIn('self.consoleLibrariesPanel.frame =', presentation)
+        self.assertIn('NSMakeRect(16, backendY, 468, 116)', presentation)
+        self.assertIn('self.testPanel.frame =', presentation)
+        self.assertIn('NSMakeRect(0, 0, 1, 1)', presentation)
+        self.assertIn('self.testPanel.hidden = YES', presentation)
+        self.assertIn('CGFloat targetHeight =', presentation)
+        self.assertIn('self.localReturnMode ? 58.0 : 90.0', presentation)
+        self.assertIn('self.connectButton.frame =', presentation)
+        self.assertIn('NSMakeRect(324, 20, 128, 38)', presentation)
+        self.assertIn('NSMakeRect(0, 0, 1, 1)', presentation)
+        self.assertIn('self.operatingModeReasonLabel.hidden = YES', presentation)
         self.assertIn('@"RETOURS PROGRAM CHANGE"', source)
         return_cards = source.split('- (void)rebuildProgramChangeReturnCards {', 1)[1].split(
             '- (void)updateConsoleReturnCards {', 1
@@ -1751,8 +1788,8 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('isEqualToString:@"program_change"', return_cards)
         self.assertNotIn('console_a', return_cards)
         self.assertNotIn('console_b', return_cards)
-        self.assertIn('index / 3', return_cards)
-        self.assertIn('index % 3', return_cards)
+        self.assertIn('index / 2, column = index % 2', return_cards)
+        self.assertIn('index % 2', return_cards)
         self.assertIn('palette[@"accent"]', return_cards)
         self.assertIn('programLabel.stringValue = hasReturn', source)
         self.assertIn('@"Aucun retour"', source)
@@ -1763,15 +1800,16 @@ class MidiNetworkToolsTests(unittest.TestCase):
         self.assertIn('@"● BACKEND %lu/%lu"', source)
         self.assertIn('@"RTP non requis"', source)
         self.assertIn('@"Retour MIDI local via port dédié."', source)
-        self.assertIn('self.remoteTargetTitleLabel.hidden = self.localReturnMode', presentation)
+        self.assertIn('self.remoteTargetTitleLabel.hidden = YES', presentation)
         self.assertIn('self.targetMenu.hidden = self.localReturnMode', presentation)
         self.assertIn('self.connectButton.hidden = self.localReturnMode', presentation)
-        self.assertIn('self.returnModeMenu.frame = self.localReturnMode', presentation)
-        self.assertIn('? NSMakeRect(116, 13, 164, 32)', presentation)
+        self.assertIn('self.returnModeMenu.frame =', presentation)
+        self.assertIn('NSMakeRect(0, 0, 1, 1)', presentation)
+        self.assertIn('self.returnModeMenu.hidden = YES', presentation)
         self.assertIn('colorWithRed:0.58 green:0.34 blue:0.19', source)
-        self.assertIn('self.testPanel.hidden = !rtpMode', source)
-        self.assertIn('self.settingsButton.frame = NSMakeRect(16, actionsY, 146, 32)', presentation)
-        self.assertIn('self.refreshButton.frame = NSMakeRect(338, actionsY, 146, 32)', presentation)
+        self.assertIn('self.testPanel.hidden = YES', source)
+        self.assertIn('NSMakeRect(16, actionsY, 228, 38)', presentation)
+        self.assertIn('NSMakeRect(256, actionsY, 228, 38)', presentation)
         self.assertIn('colorWithRed:0.08 green:0.43 blue:0.39', source)
 
         self.assertIn('const CGFloat rowHeight = 28.0', simulator)

@@ -1,0 +1,11 @@
+{
+  "KeepAlive" => true
+  "Label" => "com.claudio.midi-network-monitor"
+  "ProcessType" => "Background"
+  "ProgramArguments" => [
+    0 => "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.app/Contents/MacOS/CL MIDI Network Assistant"
+    1 => "--background-monitor"
+  ]
+  "RunAtLoad" => true
+  "ThrottleInterval" => 30
+}

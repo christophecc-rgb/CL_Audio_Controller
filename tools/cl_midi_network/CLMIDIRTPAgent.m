@@ -1,3 +1,4 @@
+#import "../shared/CLMIDIEndpointNames.h"
 #import <Foundation/Foundation.h>
 #import <AppKit/AppKit.h>
 #import <CoreMIDI/CoreMIDI.h>
@@ -327,7 +328,7 @@ int main(int argc, const char *argv[]) {
         NSString *directPeerHost = argumentValue(arguments, @"--direct-peer-host", @"");
         uint16_t directPeerPort = (uint16_t)[argumentValue(arguments, @"--direct-peer-port", @"5006") integerValue];
         NSString *directPeerName = argumentValue(arguments, @"--direct-peer-name", @"CL Ableton Distant");
-        NSString *directEndpointName = argumentValue(arguments, @"--direct-endpoint", @"CL Direct RTP");
+        NSString *directEndpointName = argumentValue(arguments, @"--direct-endpoint", @CL_MIDI_DIRECT_RTP);
 
         BOOL directMode =
             directPeerHost.length > 0 ||

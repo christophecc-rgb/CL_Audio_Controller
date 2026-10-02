@@ -1,3 +1,4 @@
+#import "../shared/CLMIDIEndpointNames.h"
 #import "CLConfigurationChecker.h"
 
 static NSString *const CLConfigurationErrorDomain = @"com.claudio.configuration-checker";
@@ -56,7 +57,7 @@ static NSDictionary *CLPersistentProfileValues(NSDictionary *values) {
         @"ableton": @{@"host": remote ? NSProcessInfo.processInfo.hostName ?: @"" : @"127.0.0.1", @"osc_send_port": @11000, @"osc_reply_port": @11001},
         @"rtp": @{@"local_session_name": @"", @"local_endpoint": @"", @"bonjour_name": @"", @"expected_peer": @""},
         @"midi": @{@"cl5_channel": @1, @"ql1_channel": @2},
-        @"simulator": @{@"transport": remote ? @"rtp" : @"iac", @"endpoint": remote ? @"" : @"CL MIDI Return Test", @"delay_ms": @80},
+        @"simulator": @{@"transport": remote ? @"rtp" : @"iac", @"endpoint": remote ? @"" : @CL_MIDI_RETURN_TEST, @"delay_ms": @80},
         @"console_return": @{@"mode": remote ? @"" : @"local_dedicated", @"source": @""},
         @"console_libraries": @{
             @"cl5_path": [NSHomeDirectory() stringByAppendingPathComponent:@"Library/Application Support/CL Audio Controller/Console Files/CL5.titles.json"],

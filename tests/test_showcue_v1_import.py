@@ -6,9 +6,11 @@ import unittest
 import zipfile
 from pathlib import Path
 from unittest.mock import patch
+from security_test_helper import prepare_security, admin_client
 
-from show_cues import initialize_show_cue_sessions, active_session_paths
+from show_cues import initialize_show_cue_sessions, active_session_paths, load_document_data
 from showcue_session_archive import import_session, export_session
+from showcue_builder import normalize_builder_document
 
 FIXTURE = Path(__file__).parent / 'fixtures' / 'legacy_v1.showcue'
 
@@ -24,23 +26,63 @@ class LegacyImportTests(unittest.TestCase):
             self.original = {name: json.loads(archive.read(name)) for name in archive.namelist()}
 
     def assert_preserved(self, registry):
-        self.assertEqual(registry['active_session_id'], self.registry['active_session_id'])
+        self.assertEqual(
+            registry['active_session_id'],
+            self.registry['active_session_id'],
+        )
+
         imported = registry['sessions'][-1]
         self.assertEqual(imported['name'], 'OP 2026')
         directory = self.root / 'Sessions' / imported['id']
+
+        def normalized_expected(name):
+            expected = self.original[name]
+
+            if name == 'show_cues.json':
+                normalized = load_document_data(expected)
+                return {
+                    'version': 1,
+                    'cues': [
+                        {
+                            key: value
+                            for key, value in cue.items()
+                            if not key.startswith('_')
+                        }
+                        for cue in normalized['cues']
+                    ],
+                }
+
+            if name == 'showcue_builder.json':
+                return normalize_builder_document(expected)
+
+            raise AssertionError(f"document inattendu : {name}")
+
         for name in ('show_cues.json', 'showcue_builder.json'):
             actual = json.loads((directory / name).read_text())
-            expected = self.original[name]
-            # _position is a transient sorting cache, not persisted by ShowCue.
-            expected = {**expected, 'cues': [{k: v for k, v in cue.items() if k != '_position'}
-                                           for cue in expected['cues']]}
-            self.assertEqual(actual, expected)
-        self.assertEqual(self.original['showcue_builder.json']['revision'], 341)
-        self.assertEqual({c['mode'] for c in self.original['show_cues.json']['cues']},
-                         {'manual', 'library', 'timed', 'realtime'})
-        with zipfile.ZipFile(io.BytesIO(export_session(self.root, registry, imported['id']))) as archive:
+            self.assertEqual(actual, normalized_expected(name))
+
+        self.assertEqual(
+            self.original['showcue_builder.json']['revision'],
+            341,
+        )
+        self.assertEqual(
+            {
+                cue['mode']
+                for cue in self.original['show_cues.json']['cues']
+            },
+            {'manual', 'library', 'timed', 'realtime'},
+        )
+
+        exported = export_session(
+            self.root,
+            registry,
+            imported['id'],
+        )
+
+        with zipfile.ZipFile(io.BytesIO(exported)) as archive:
             for name in ('show_cues.json', 'showcue_builder.json'):
-                self.assertEqual(json.loads(archive.read(name)), self.original[name])
+                actual = json.loads(archive.read(name))
+                self.assertEqual(actual, normalized_expected(name))
 
     def test_v1_import_and_export_preserve_documents(self):
         self.assertEqual(self.original['manifest.json'], {'format': 'CL ShowCue', 'version': 1, 'name': 'OP 2026'})
@@ -51,8 +93,9 @@ class LegacyImportTests(unittest.TestCase):
 
     def test_multipart_historical_filename(self):
         import app
+        prepare_security(self, app)
         with patch.object(app, 'SHOW_CUES_DATA_DIRECTORY', self.root):
-            client = app.app.test_client()
+            client = admin_client(app)
             response = client.post('/show-info/builder/sessions/import',
                                    data={'file': (io.BytesIO(self.payload), 'Oiseau de Paradis.showcue')})
             self.assertEqual(response.status_code, 201, response.data)

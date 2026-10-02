@@ -380,7 +380,9 @@ function buildForm(cue){
     paintRoleControls();
     paintRoleFields();
     const classif=group('Classification');classif.classList.add('ce-form-grid');
-    inputField(classif,'type',cue.type);const section=inputField(classif,'section',cue.section);
+    inputField(classif,'type',cue.type);
+    inputField(classif,'phase',cue.phase);
+    const section=inputField(classif,'section',cue.section);
     const sections=el('datalist');sections.id='ce-section-options';for(const value of builderSectionValues()){const o=el('option');o.value=value;sections.append(o);}section.setAttribute('list',sections.id);classif.append(sections);
     const destinations=group('Destinations');destinations.classList.add('ce-destinations');
     for(const k of postKeys){const l=el('label'),n=el('input');n.type='checkbox';n.checked=cue[k];n.dataset.editKey=k;fields[k]=n;l.append(n,document.createTextNode(k.toUpperCase()));destinations.append(l);}

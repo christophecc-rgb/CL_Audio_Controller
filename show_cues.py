@@ -341,7 +341,7 @@ def _normalize_cue(raw, index, used_ids):
     if builder is not None:
         if not isinstance(builder, dict):
             raise ValueError(f"cue {cue_id} : metadata Builder invalide")
-        allowed = ("builder_id", "number", "source", "type", "section", "role", "artist_override",
+        allowed = ("builder_id", "number", "source", "type", "phase", "section", "role", "artist_override",
                    "microphone_override", "iem_override", "equipment_override",
                    "origin", "notes", "resolved_artist", "resolved_microphone",
                    "resolved_iem", "resolved_equipment")

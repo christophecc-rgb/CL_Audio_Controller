@@ -5,7 +5,7 @@
     const oldInput = document.getElementById('cl-session-upload');
     if (oldInput) oldInput.closest('details').remove();
     const panel = document.createElement('details');
-    panel.className = 'validation';
+    panel.className = 'validation cl-session-panel';
     panel.open = true;
     panel.innerHTML = '<summary>SHOWS / SESSIONS</summary><label>Show enregistré <select id="cl-saved-sessions"></select></label> <button id="cl-open-session">OUVRIR</button><hr><label>IMPORTER ET OUVRIR UN SHOW <input id="cl-session-upload" type="file" accept=".showcue,.showcue.zip"></label><div id="cl-session-archives"></div><div id="cl-libraries"></div><a href="/show-info/builder/sessions/export">EXPORTER LE SHOW ACTIF</a><div id="cl-import-result" role="status"></div>';
     document.querySelector('header.top').append(panel);

@@ -1,3 +1,4 @@
+#import "../shared/CLMIDIEndpointNames.h"
 #import <Foundation/Foundation.h>
 #import <CoreMIDI/CoreMIDI.h>
 
@@ -22,6 +23,8 @@ static NSString *endpointName(MIDIEndpointRef endpoint) {
 }
 
 static MIDIEndpointRef findEndpoint(BOOL source, NSString *preferredName) {
+    if (CLMIDINameTable()[CLMIDICanonicalName(preferredName)])
+        return CLMIDIFindEndpoint(source, preferredName);
     ItemCount count = source ? MIDIGetNumberOfSources() : MIDIGetNumberOfDestinations();
     for (ItemCount index = 0; index < count; index++) {
         MIDIEndpointRef endpoint = source ? MIDIGetSource(index) : MIDIGetDestination(index);

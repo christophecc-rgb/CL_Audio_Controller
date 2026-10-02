@@ -5,6 +5,7 @@ import unittest
 import zipfile
 from pathlib import Path
 from unittest import mock
+from security_test_helper import prepare_security, admin_client
 
 from show_cues import (SHOW_SECTIONS, active_session_paths, create_show_cue,
                        initialize_show_cue_sessions, load_show_document,
@@ -53,7 +54,7 @@ def legacy_xlsx_payload():
     output = io.BytesIO()
     with zipfile.ZipFile(source) as archive:
         files = {name: archive.read(name) for name in archive.namelist()}
-    files["xl/worksheets/sheet2.xml"] = _sheet_xml([
+    files["xl/worksheets/sheet3.xml"] = _sheet_xml([
         ["RÔLE", "ARTISTE", "MICRO", "IEM", "ÉQUIPEMENT", "ACTIF", "NOTES"],
         ["DIRECTRICE", "VENUS", "M3 / C3", "IEM 3", "TABLE HF", True, ""],
     ]).encode()
@@ -64,18 +65,30 @@ def legacy_xlsx_payload():
 
 
 class ShowCueBuilderTests(unittest.TestCase):
-    def test_equipment_slots_accept_zero_one_and_three_but_reject_four(self):
-        for count in (0, 1, 3):
+    def test_equipment_slots_accept_up_to_backend_limit_and_reject_overflow(self):
+        from showcue_builder import MAX_EQUIPMENT_SLOTS
+
+        for count in (0, 1, MAX_EQUIPMENT_SLOTS):
             with self.subTest(count=count):
                 document = slotted_document()
                 document["distribution"][0]["equipment_slots"] = [
                     {"type": "AUTRE", "value": f"E{index}"} for index in range(count)]
-                self.assertEqual(len(normalize_builder_document(document)
-                                     ["distribution"][0]["equipment_slots"]), count)
+                self.assertEqual(
+                    len(normalize_builder_document(document)
+                        ["distribution"][0]["equipment_slots"]),
+                    count,
+                )
+
         document = slotted_document()
-        document["distribution"][0]["equipment_slots"].append(
-            {"type": "ÉQUIPEMENT", "value": "QUATRIÈME"})
-        with self.assertRaisesRegex(ValueError, "maximum 3 équipements"):
+        document["distribution"][0]["equipment_slots"] = [
+            {"type": "AUTRE", "value": f"E{index}"}
+            for index in range(MAX_EQUIPMENT_SLOTS + 1)
+        ]
+
+        with self.assertRaisesRegex(
+            ValueError,
+            f"maximum {MAX_EQUIPMENT_SLOTS} équipements",
+        ):
             normalize_builder_document(document)
 
     def test_legacy_distribution_fields_become_typed_slots_without_loss(self):
@@ -301,7 +314,8 @@ class ShowCueBuilderRouteTests(unittest.TestCase):
         self.cue_path, _ = active_session_paths(self.data, registry)
         self.patch = mock.patch.object(self.app_module, "SHOW_CUES_DATA_DIRECTORY", self.data)
         self.patch.start()
-        self.client = self.app_module.app.test_client()
+        prepare_security(self, self.app_module)
+        self.client = admin_client(self.app_module)
 
     def tearDown(self):
         self.patch.stop()
@@ -313,7 +327,8 @@ class ShowCueBuilderRouteTests(unittest.TestCase):
         self.assertEqual(page.status_code, 200)
         self.assertIn("ADOPTER LA PRÉVISUALISATION", page.get_data(as_text=True))
         self.assertIn("captureBuilderTc", page.get_data(as_text=True))
-        self.assertIn("setTimeout(()=>save(),750)", page.get_data(as_text=True))
+        self.assertIn("autosaveTimer=setTimeout", page.get_data(as_text=True))
+        self.assertIn("},750);", page.get_data(as_text=True))
         self.assertIn("MODIFICATIONS…", page.get_data(as_text=True))
         self.assertIn("ERREUR DE SAUVEGARDE", page.get_data(as_text=True))
         self.assertNotIn("setInterval", page.get_data(as_text=True))
@@ -325,12 +340,21 @@ class ShowCueBuilderRouteTests(unittest.TestCase):
         self.assertTrue((self.cue_path.parent / "showcue_builder.json").is_file())
 
     def test_xlsx_import_is_preview_only_until_explicit_builder_save(self):
+        builder_path = self.cue_path.parent / "showcue_builder.json"
+
+        baseline = self.client.get("/show-info/builder/document")
+        self.assertEqual(baseline.status_code, 200)
+        before = builder_path.read_bytes() if builder_path.exists() else None
+
         payload = export_xlsx(sample_document())
         response = self.client.post("/show-info/builder/import", data={
             "file": (io.BytesIO(payload), "conduite.xlsx")})
+
         self.assertEqual(response.status_code, 200)
         self.assertFalse(response.get_json()["saved"])
-        self.assertFalse((self.cue_path.parent / "showcue_builder.json").exists())
+
+        after = builder_path.read_bytes() if builder_path.exists() else None
+        self.assertEqual(after, before)
 
     def test_export_routes_round_trip_current_builder(self):
         self.client.put("/show-info/builder/document", json={
@@ -361,7 +385,7 @@ class ShowCueBuilderRouteTests(unittest.TestCase):
                          (1, 0, []))
         imported = self.client.post("/show-info/builder/showcue-import", json={
             "token": payload["token"], "confirm": True})
-        self.assertEqual(imported.status_code, 201)
+        self.assertEqual(imported.status_code, 200)
         cues = load_show_document(self.cue_path)["cues"]
         self.assertEqual(cues[0]["id"], original["id"])
         self.assertEqual(len(cues), 2)
@@ -439,13 +463,17 @@ class ShowCueBuilderRouteTests(unittest.TestCase):
         self.assertTrue(document["distribution"][1]["active"])
 
     def test_server_rejects_four_equipment_slots_and_multiple_active_artists(self):
+        from showcue_builder import MAX_EQUIPMENT_SLOTS
+
         too_many = slotted_document()
-        too_many["distribution"][0]["equipment_slots"].append(
-            {"type": "AUTRE", "value": "QUATRIÈME"})
+        too_many["distribution"][0]["equipment_slots"] = [
+            {"type": "AUTRE", "value": f"E{index}"}
+            for index in range(MAX_EQUIPMENT_SLOTS + 1)
+        ]
         response = self.client.put("/show-info/builder/document", json={
             "session_id": self.session_id, "document": too_many})
         self.assertEqual(response.status_code, 400)
-        self.assertIn("maximum 3 équipements", response.get_json()["message"])
+        self.assertIn(f"maximum {MAX_EQUIPMENT_SLOTS} équipements", response.get_json()["message"])
         multiple = slotted_document()
         multiple["distribution"][1]["active"] = True
         response = self.client.put("/show-info/builder/document", json={
@@ -493,7 +521,8 @@ class ShowCueBuilderRouteTests(unittest.TestCase):
         self.assertIn("IMPORT ALS — À VENIR", page)
         self.assertIn("+ ÉQUIPEMENT", page)
         self.assertIn("equipment_slots", page)
-        self.assertIn("setTimeout(()=>save(),750)", page)
+        self.assertIn("autosaveTimer=setTimeout", page)
+        self.assertIn("},750);", page)
         self.assertNotIn("AbletonOSC", launcher)
 
 

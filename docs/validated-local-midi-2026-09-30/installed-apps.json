@@ -1,0 +1,281 @@
+[
+  {
+    "path": "/Users/mbprochris/Applications/CL Cue Editor.app",
+    "version": "1.0.0",
+    "build": "1",
+    "binaries": [
+      {
+        "path": "/Users/mbprochris/Applications/CL Cue Editor.app/Contents/MacOS/CL ShowCue Builder",
+        "size": 4447552,
+        "sha256": "0b923778146f3de076449af3efaea32f9826e76df456c8328051d1bbda4ea4bf"
+      }
+    ]
+  },
+  {
+    "path": "/Users/mbprochris/Applications/CL Show Control.app",
+    "version": "2.2.0",
+    "build": "6",
+    "binaries": [
+      {
+        "path": "/Users/mbprochris/Applications/CL Show Control.app/Contents/MacOS/CL Audio Controller",
+        "size": 7959376,
+        "sha256": "78413f8507fc3eab3e7baf4c8d9bd4a91c05191bc7760fb2394656ff6d80d503"
+      },
+      {
+        "path": "/Users/mbprochris/Applications/CL Show Control.app/Contents/Frameworks/tools/ableton_mtc_bridge/CLAbletonMTCBridge.before-hot-backup-20260929",
+        "size": 138960,
+        "sha256": "4b888ab4515a30fd120bb80ce1d1433594d09f236be2cbcd071cbf96e079437c"
+      },
+      {
+        "path": "/Users/mbprochris/Applications/CL Show Control.app/Contents/Frameworks/tools/ableton_mtc_bridge/CLAbletonMTCBridge",
+        "size": 72976,
+        "sha256": "0358607b8f335a8d16f08e5c227db1589be922c6dcb62cd3925598aa9d284d50"
+      }
+    ]
+  },
+  {
+    "path": "/Users/mbprochris/Applications/CL ShowCue.app",
+    "version": "1.0.0",
+    "build": "1",
+    "binaries": [
+      {
+        "path": "/Users/mbprochris/Applications/CL ShowCue.app/Contents/MacOS/CL ShowCue",
+        "size": 4447824,
+        "sha256": "310431ec544baa38de998eafc48b7a2b7c36990a51afbd4ef1876ee50dbde4e6"
+      }
+    ]
+  },
+  {
+    "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.backup-20260930-064645.app",
+    "version": "2.2.1",
+    "build": null,
+    "binaries": [
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.backup-20260930-064645.app/Contents/MacOS/CL MIDI Network Assistant",
+        "size": 1448368,
+        "sha256": "70a2934025abbd11a1ffd8cbbddafbfe3a83c85fe7b1a287fbbc5030aa9a85fc"
+      },
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.backup-20260930-064645.app/Contents/Resources/Network Tools/list_rtp_peers.applescript",
+        "size": 1179,
+        "sha256": "d11924d7ebade3f163ce8d36b85c715833ea6c1a45925579929cbd1836b40734"
+      },
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.backup-20260930-064645.app/Contents/Resources/Network Tools/CLAudioConfigurationChecker",
+        "size": 391200,
+        "sha256": "fb04e24802981f31a4e6b3eaca272abf03d8fcfcd9459b2258b9b7990060a29a"
+      },
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.backup-20260930-064645.app/Contents/Resources/Network Tools/reconnect_legacy_rtp.applescript",
+        "size": 2679,
+        "sha256": "cab77067fb678e62aa93b3ee002a157c1fef3041afe721c175d889cc0ce6de21"
+      },
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.backup-20260930-064645.app/Contents/Resources/Network Tools/open_rtp_settings.applescript",
+        "size": 3731,
+        "sha256": "47425cc39ced40cc8a718703a667ae8886b6dd0746c188296117465564d85c34"
+      },
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.backup-20260930-064645.app/Contents/Resources/Network Tools/CLMIDINetworkGuardian",
+        "size": 137792,
+        "sha256": "a18ab550ae321f454a7ec9f192ea1e5e1a884f8e254952b0121ceb2c76fc3873"
+      },
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.backup-20260930-064645.app/Contents/Resources/Network Tools/CLMIDIRTPResponder",
+        "size": 138752,
+        "sha256": "89967f9a51a332a662ed84f1070c8251bd13e28ae9399847972e48f9252a6640"
+      },
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.backup-20260930-064645.app/Contents/Resources/Network Tools/CLMIDIRoundTripTester",
+        "size": 137072,
+        "sha256": "561128fe17fcd363a68c3ddbb1b272a6778b91dbefdf3abafbd473b864da7606"
+      },
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.backup-20260930-064645.app/Contents/Resources/Network Tools/CLMIDIDirectBridge",
+        "size": 137280,
+        "sha256": "70647e02fdfbd417b52c61dc7b5fec39a25a44ab555828697b0d27169bcec83a"
+      },
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.backup-20260930-064645.app/Contents/Resources/Network Tools/connect_rtp_peer.applescript",
+        "size": 6745,
+        "sha256": "3f58dab01c8ea3db0d06fc97f6a1c823901dcf4e0e75266b1570f930fd4c17c5"
+      },
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.backup-20260930-064645.app/Contents/Resources/Network Tools/CLMIDIRTPAgent",
+        "size": 178224,
+        "sha256": "7d943760a13bc414026ae6eecdec7ec7fc89dc057a87a73df2aa99a495f030f7"
+      },
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.backup-20260930-064645.app/Contents/Resources/Network Tools/CLMIDINetworkDashboard",
+        "size": 1448352,
+        "sha256": "5efb69f102d3f56810f731781d64d504fdd6ee62bab01e960ec446770faee2b0"
+      },
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.backup-20260930-064645.app/Contents/Resources/Network Tools/CLYamahaConsoleSimulator",
+        "size": 138752,
+        "sha256": "7f83438ea7c2bddf6d1cb27009712ac216058a452a80d87949ee85806d938770"
+      }
+    ]
+  },
+  {
+    "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.app",
+    "version": "2.2.1",
+    "build": null,
+    "binaries": [
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.app/Contents/MacOS/CL MIDI Network Assistant",
+        "size": 1557536,
+        "sha256": "043cd0d0effa277b6e39a4fedd33c0f16ec9478b20945d3eba58bb2d5024517e"
+      },
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.app/Contents/Resources/Network Tools/list_rtp_peers.applescript",
+        "size": 1179,
+        "sha256": "d11924d7ebade3f163ce8d36b85c715833ea6c1a45925579929cbd1836b40734"
+      },
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.app/Contents/Resources/Network Tools/CLAudioConfigurationChecker",
+        "size": 391200,
+        "sha256": "fb04e24802981f31a4e6b3eaca272abf03d8fcfcd9459b2258b9b7990060a29a"
+      },
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.app/Contents/Resources/Network Tools/reconnect_legacy_rtp.applescript",
+        "size": 2679,
+        "sha256": "cab77067fb678e62aa93b3ee002a157c1fef3041afe721c175d889cc0ce6de21"
+      },
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.app/Contents/Resources/Network Tools/open_rtp_settings.applescript",
+        "size": 3731,
+        "sha256": "47425cc39ced40cc8a718703a667ae8886b6dd0746c188296117465564d85c34"
+      },
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.app/Contents/Resources/Network Tools/CLMIDINetworkGuardian",
+        "size": 137888,
+        "sha256": "fe58f6a51df9bd80984d3dd25ead43b38a6ec8924d9b2c8ce3e2d9acebce8145"
+      },
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.app/Contents/Resources/Network Tools/CLMIDIRTPResponder",
+        "size": 138752,
+        "sha256": "89967f9a51a332a662ed84f1070c8251bd13e28ae9399847972e48f9252a6640"
+      },
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.app/Contents/Resources/Network Tools/CLMIDIRoundTripTester",
+        "size": 137072,
+        "sha256": "561128fe17fcd363a68c3ddbb1b272a6778b91dbefdf3abafbd473b864da7606"
+      },
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.app/Contents/Resources/Network Tools/CLMIDIDirectBridge",
+        "size": 137280,
+        "sha256": "70647e02fdfbd417b52c61dc7b5fec39a25a44ab555828697b0d27169bcec83a"
+      },
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.app/Contents/Resources/Network Tools/connect_rtp_peer.applescript",
+        "size": 6745,
+        "sha256": "3f58dab01c8ea3db0d06fc97f6a1c823901dcf4e0e75266b1570f930fd4c17c5"
+      },
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.app/Contents/Resources/Network Tools/CLMIDIRTPAgent",
+        "size": 178224,
+        "sha256": "7d943760a13bc414026ae6eecdec7ec7fc89dc057a87a73df2aa99a495f030f7"
+      },
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.app/Contents/Resources/Network Tools/CLMIDINetworkDashboard",
+        "size": 1557472,
+        "sha256": "1cee7607fa41a8e02c34c23cf22e5e7a04ede509a2f4331a5ae4b9963d3bbca0"
+      },
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.app/Contents/Resources/Network Tools/CLYamahaConsoleSimulator",
+        "size": 174160,
+        "sha256": "df5827d208f626355a691eb96db514e6e992066df7b2a9184adf4a5f5f1ff4c5"
+      }
+    ]
+  },
+  {
+    "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Performance Monitor.app",
+    "version": "2.2.1",
+    "build": "1",
+    "binaries": [
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Performance Monitor.app/Contents/MacOS/CLMIDIPerformanceMonitor",
+        "size": 197280,
+        "sha256": "396504ea94819c4771257d176469239e76399233bd47e8c09709b887f21ca20c"
+      }
+    ]
+  },
+  {
+    "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI & RTP Diagnostic.app",
+    "version": "2.2.1",
+    "build": "1",
+    "binaries": [
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI & RTP Diagnostic.app/Contents/MacOS/CLAudioConfigurationChecker",
+        "size": 391216,
+        "sha256": "5e48150b34cbfb5989706276997ff6d03e1044716bef3217831b5ffd0fcaafdc"
+      }
+    ]
+  },
+  {
+    "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Analyzer.app",
+    "version": "2.2.1",
+    "build": "1",
+    "binaries": [
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Analyzer.app/Contents/MacOS/CLMIDIAnalyzer",
+        "size": 468272,
+        "sha256": "ab2273e6c6ca18fe7dcbd4c4e762f54a7cc2cda9adfd7b09f520a58371edd675"
+      }
+    ]
+  },
+  {
+    "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI RTP Agent.app",
+    "version": "2.2.0",
+    "build": null,
+    "binaries": [
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI RTP Agent.app/Contents/MacOS/CL MIDI RTP Agent",
+        "size": 178224,
+        "sha256": "8df5787a5e419413a8b7967cbb2f08a65db39319f9be1a1fc70c063f93dc4dcf"
+      },
+      {
+        "path": "/Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI RTP Agent.app/Contents/MacOS/CLMIDIDirectBridge",
+        "size": 137280,
+        "sha256": "5b9d33dff506598a91148e097dd5a3115fac5377fdae93d2b0fa16122f876b0e"
+      }
+    ]
+  },
+  {
+    "path": "/Users/mbprochris/Applications/Prod Ableton/CL Ableton Remote.app",
+    "version": "2.2.0",
+    "build": "1",
+    "binaries": [
+      {
+        "path": "/Users/mbprochris/Applications/Prod Ableton/CL Ableton Remote.app/Contents/MacOS/RemoteAbleton",
+        "size": 172784,
+        "sha256": "10011b338ca8579b7e0b70fc1a5cdabd5b61329f82ae4ae231e699fa902fa8df"
+      }
+    ]
+  },
+  {
+    "path": "/Users/mbprochris/Applications/Prod Ableton/CL Audio Export.app",
+    "version": "1.0.0",
+    "build": "1",
+    "binaries": [
+      {
+        "path": "/Users/mbprochris/Applications/Prod Ableton/CL Audio Export.app/Contents/MacOS/CL Show Audio Builder",
+        "size": 2402688,
+        "sha256": "25a7e63fbd9f44e0986409127a7f6bb86eab0cd860f03c5ca4a4c7134e570ce0"
+      }
+    ]
+  },
+  {
+    "path": "/Users/mbprochris/Applications/Prod Ableton/CL Arrangement Builder.app",
+    "version": "1.2.2",
+    "build": "5",
+    "binaries": [
+      {
+        "path": "/Users/mbprochris/Applications/Prod Ableton/CL Arrangement Builder.app/Contents/MacOS/Arrangement Builder Live",
+        "size": 3565360,
+        "sha256": "2942217471cc3c198236976dd1ba9ef098472fdae1deab76be29c6c0036c4c90"
+      }
+    ]
+  }
+]

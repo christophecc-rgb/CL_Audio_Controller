@@ -5,6 +5,7 @@ import unittest
 from dataclasses import replace
 from pathlib import Path
 from unittest import mock
+from security_test_helper import prepare_security, admin_client
 
 import ableton_targets as targets
 import launcher_control as launcher
@@ -27,6 +28,11 @@ def response(payload):
 class ParadisNetworkTests(unittest.TestCase):
     def setUp(self):
         launcher.cl_discovery_cache.clear()
+        prepare_security(self, launcher, manager_attr="launcher_security")
+        self.admin_client = admin_client(
+            launcher,
+            manager_attr="launcher_security",
+        )
         self.profiles = replace(targets.default_profiles(), cl_server_mode="paradis")
         self.names = mock.patch.object(launcher, "is_paradis_server_machine", return_value=False)
         self.names.start()
@@ -130,7 +136,7 @@ class ParadisNetworkTests(unittest.TestCase):
 
     def test_server_route_only_updates_server_choice(self):
         with mock.patch.object(launcher, "save_profiles") as save:
-            result = launcher.app.test_client().post('/network-config', json={"cl_server": {"mode": "manual", "host": "192.168.3.64"}})
+            result = self.admin_client.post('/network-config', json={"cl_server": {"mode": "manual", "host": "192.168.3.64"}})
         self.assertEqual(result.status_code, 200)
         saved = save.call_args.args[0]
         self.assertEqual(saved.local, self.profiles.local)
@@ -139,7 +145,7 @@ class ParadisNetworkTests(unittest.TestCase):
 
     def test_remote_osc_edit_is_refused(self):
         with mock.patch.object(launcher, "save_profiles") as save:
-            result = launcher.app.test_client().post('/network-config', json={"mode": "local"})
+            result = self.admin_client.post('/network-config', json={"mode": "local"})
         self.assertEqual(result.status_code, 409)
         save.assert_not_called()
 

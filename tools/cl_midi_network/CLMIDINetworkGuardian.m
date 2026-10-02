@@ -1,6 +1,7 @@
 #import <Foundation/Foundation.h>
 #import <CoreMIDI/CoreMIDI.h>
 #import <signal.h>
+#import <unistd.h>
 #import <sys/file.h>
 #import <fcntl.h>
 #import <unistd.h>
@@ -91,6 +92,9 @@ int main(int argc, const char *argv[]) {
         [session addContact:host];
 
         while (keepRunning) {
+            NSUInteger ownerIndex = [NSProcessInfo.processInfo.arguments indexOfObject:@"--owner-pid"];
+            if (ownerIndex != NSNotFound && ownerIndex + 1 < NSProcessInfo.processInfo.arguments.count &&
+                getppid() != [NSProcessInfo.processInfo.arguments[ownerIndex + 1] intValue]) break;
             BOOL connected = NO;
             for (MIDINetworkConnection *connection in session.connections) {
                 if ([connection.host hasSameAddressAs:host] ||

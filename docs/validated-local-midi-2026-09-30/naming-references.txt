@@ -1,0 +1,86 @@
+midi_endpoint_names.py:12:RETURN_TEST = 'CL MIDI Return Test'
+midi_endpoint_names.py:13:DIRECT_RTP = 'CL Direct RTP'
+midi_endpoint_names.py:15:    CLOCK_IAC: ('Gestionnaire IAC CL Ableton Clock IAC', 'IAC Driver CL Ableton Clock IAC', 'Gestionnaire IAC Ableton Clock', 'IAC Driver Ableton Clock'),
+midi_endpoint_names.py:16:    MTC_IAC: ('Gestionnaire IAC CL MTC IAC', 'IAC Driver CL MTC IAC', 'Gestionnaire IAC MTC vers Logic', 'IAC Driver MTC vers Logic'),
+midi_endpoint_names.py:17:    SHOW_IAC: ('Gestionnaire IAC CL Show Control IAC', 'IAC Driver CL Show Control IAC', 'Gestionnaire IAC Bus 1', 'IAC Driver Bus 1'),
+midi_endpoint_names.py:18:    SHOW_RTP: ('Réseau CL Show Control RTP', 'Network CL Show Control RTP', 'Réseau CL Show Control', 'Network CL Show Control'),
+midi_endpoint_names.py:19:    RETURN_RTP: ('Réseau CL Console Return RTP', 'Network CL Console Return RTP', 'Réseau RTP MB Chris', 'Network RTP MB Chris'),
+docs/validated-local-midi-2026-09-30/processes-before.txt:7:13925 13919 mbprochris       Wed Sep 30 07:37:24 2026     /Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.app/Contents/Resources/Network Tools/CLYamahaConsoleSimulator --label CL5 --channel 1 --transport iac --endpoint CL MIDI Return Test --delay-ms 80 --owner-pid 13919 --input-endpoint Gestionnaire IAC Bus 1
+docs/validated-local-midi-2026-09-30/processes-before.txt:8:13926 13919 mbprochris       Wed Sep 30 07:37:24 2026     /Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI Network Manager.app/Contents/Resources/Network Tools/CLYamahaConsoleSimulator --label QL1 --channel 2 --transport iac --endpoint CL MIDI Return Test --delay-ms 80 --owner-pid 13919 --input-endpoint Gestionnaire IAC Bus 1
+docs/validated-local-midi-2026-09-30/processes-before.txt:14:90409 90406 mbprochris       Mon Sep 28 19:30:24 2026     /Users/mbprochris/Applications/Analyse - Réseau - MIDI/CL MIDI RTP Agent.app/Contents/MacOS/CLMIDIDirectBridge --host 192.168.1.138 --port 5006 --peer-name CL Ableton Distant --endpoint CL Direct RTP
+docs/validated-local-midi-2026-09-30/midi-config-readonly.txt:127:          "name" => "CL MIDI Return Test"
+docs/validated-local-midi-2026-09-30/midi-config-readonly.txt:190:      "model" => "Gestionnaire IAC"
+docs/validated-local-midi-2026-09-30/midi-config-readonly.txt:191:      "name" => "Gestionnaire IAC"
+tests/test_midi_endpoint_names.py:26:    assert resolve_endpoint(['Gestionnaire IAC MTC vers Logic', 'Gestionnaire IAC CL MTC IAC'], MTC_IAC) == 'Gestionnaire IAC CL MTC IAC'
+tests/test_midi_endpoint_names.py:27:    for available, requested in [('Réseau CL MTC', MTC_IAC), ('Réseau CL Ableton Clock', CLOCK_IAC)]:
+docs/MIDI_RTP_NAMING.md:11:| CL Ableton Clock IAC | Gestionnaire IAC Ableton Clock | Bus IAC : entrée Clock / transport du bridge MTC |
+docs/MIDI_RTP_NAMING.md:12:| CL MTC IAC | Gestionnaire IAC MTC vers Logic | Bus IAC : sortie MTC du bridge, entrée Sync Meter / Probe |
+docs/MIDI_RTP_NAMING.md:13:| CL Show Control IAC | Gestionnaire IAC Bus 1 | Bus IAC : observation MIDI expected du show |
+docs/MIDI_RTP_NAMING.md:14:| CL Show Control RTP | Réseau CL Show Control | Endpoint RTP du show, distinct du retour consoles |
+docs/MIDI_RTP_NAMING.md:16:| CL MIDI Return Test | Inchangé | Endpoint virtuel dédié au retour simulé |
+docs/MIDI_RTP_NAMING.md:17:| CL Direct RTP | Inchangé | Endpoint virtuel créé par le bridge RTP direct |
+docs/MIDI_RTP_NAMING.md:26:- `Gestionnaire IAC <canonique IAC>` ou `IAC Driver <canonique IAC>` ;
+docs/MIDI_RTP_NAMING.md:35:Ne pas renommer globalement « Gestionnaire IAC » ou « Réseau » pour supprimer les
+docs/MIDI_RTP_NAMING.md:51:- **CL Direct RTP / CL MIDI Return Test** : endpoints virtuels d'applications,
+docs/MIDI_RTP_NAMING.md:54:Les noms `Réseau CL MTC`, `Réseau CL Ableton Clock`, `CL MTC Remote` et
+docs/MIDI_RTP_NAMING.md:72:- RTP Agent / Direct Bridge : `CL Direct RTP` vient de la définition partagée,
+docs/MIDI_RTP_NAMING.md:85:`CL MTC IAC : fallback legacy : Gestionnaire IAC MTC vers Logic`.
+docs/MIDI_RTP_NAMING.md:97:| Gestionnaire IAC Ableton Clock | -238085484 | 284873017 | Bus Ableton Clock / pilote IAC |
+docs/MIDI_RTP_NAMING.md:98:| Gestionnaire IAC MTC vers Logic | -1501262701 | 717385612 | Bus MTC vers Logic / pilote IAC |
+docs/MIDI_RTP_NAMING.md:99:| Gestionnaire IAC Bus 1 | 1822181172 | 49336643 | Bus Bus 1 / pilote IAC |
+docs/MIDI_RTP_NAMING.md:100:| Réseau CL Show Control | 1418576320 | 812879448 | Session locale CL Show Control / pilote réseau |
+docs/MIDI_RTP_NAMING.md:102:`Réseau RTP MB Chris`, `CL Console Return RTP`, `CL MIDI Return Test` et
+docs/MIDI_RTP_NAMING.md:103:`CL Direct RTP` sont absents de cet inventaire ponctuel. L'absence d'un endpoint
+docs/MIDI_RTP_NAMING.md:137:| 1 | Bus IAC Ableton Clock → CL Ableton Clock IAC | Studio MIDI → Gestionnaire IAC → Ports → modifier uniquement ce nom de bus | Live PRIMARY : re-sélectionner si nécessaire la sortie Clock existante ; bridge : nouvelle source ; conserver les cases Sync/Track/Remote telles qu'elles étaient |
+docs/MIDI_RTP_NAMING.md:140:| 4 | Session RTP locale CL Show Control → CL Show Control RTP | Réglages de réseau MIDI → sélectionner CL Show Control → champ Nom local seulement | CoreMIDI peut afficher Réseau CL Show Control RTP ; vérifier Live et entrée RTP du simulateur ; laisser Nom de réseau, port, IP et peer intacts |
+docs/MIDI_RTP_NAMING.md:173:Ne pas saisir « Gestionnaire IAC … » / « Réseau … » comme nom de bus : ce sont
+docs/HOT_BACKUP_EVENT_SYNC_AUDIT.md:24:  vers « Gestionnaire IAC MTC vers Logic ». UDP 20810 reste diagnostic.
+packaging/INSTALLATION_NOUVEAU_MAC.txt:117:aux applications par « Gestionnaire IAC » ou « IAC Driver ». Les outils CL
+packaging/INSTALLATION_NOUVEAU_MAC.txt:125:CL MIDI Return Test et CL Direct RTP restent inchangés et sont créés par leurs
+docs/LOCAL_SIMULATOR_LIFECYCLE.md:15:- Arguments locaux conservés : CL5 canal 1, QL1 canal 2, transport iac, endpoint `CL MIDI Return Test`, input-endpoint `Gestionnaire IAC Bus 1`, délai 80 ms. Seul `--owner-pid` est ajouté pour le nettoyage en cas de disparition du parent.
+docs/LOCAL_SIMULATOR_LIFECYCLE.md:36:- Audit réel en lecture seule : deux anciens processus (93617 CL5 et 93623 QL1) et endpoints Gestionnaire IAC CL MIDI Return Test, MTC vers Logic, Ableton Clock et Bus 1 présents en source et destination. Au premier relevé /status indiquait local_dedicated mais « Aucun port MIDI détecté ». Au dernier relevé le serveur 5050 refusait la connexion. Aucun redémarrage de production ni message MIDI n'a été envoyé.
+tests/test_device_production_states.py:102:            "expected_monitor_source": "Gestionnaire IAC Bus 1",
+tests/test_device_production_states.py:151:                    "expected_monitor_source": "Gestionnaire IAC Bus 1",
+tests/test_device_production_states.py:194:            "expected_monitor_source": "Gestionnaire IAC Bus 1",
+tests/test_midi_network_tools.py:242:        self.assertIn('CL MIDI Return Test', source)
+tests/native/test_local_simulator_supervisor.m:49:    NSArray *args = @[@"/tmp/CLYamahaConsoleSimulator", @"--label", @"CL5", @"--channel", @"1", @"--transport", @"iac", @"--endpoint", @"CL MIDI Return Test", @"--input-endpoint", @"Gestionnaire IAC Bus 1"];
+tests/native/test_midi_endpoint_roles.m:16:    assert([CLLocalReturnSourceName(@[@"Gestionnaire IAC CL MIDI Return Test"]) isEqual:@"Gestionnaire IAC CL MIDI Return Test"]);
+tests/native/test_midi_endpoint_roles.m:17:    assert([CLLocalReturnSourceName(@[@"CL MIDI Return Test"]) isEqual:@"CL MIDI Return Test"]);
+tests/native/test_midi_endpoint_roles.m:18:    assert([CLLocalReturnSourceName(@[@"IAC Driver CL MIDI Return Test"]) isEqual:@"IAC Driver CL MIDI Return Test"]);
+tests/native/test_midi_endpoint_roles.m:19:    assert([CLLocalReturnSourceName(@[@"Gestionnaire IAC CL MIDI Return Test", @"CL MIDI Return Test"]) isEqual:@"CL MIDI Return Test"]);
+tests/native/test_midi_endpoint_roles.m:20:    assert(CLLocalReturnSourceName(@[@"Gestionnaire IAC Bus 1", @"Réseau CL MIDI Return Test"]) == nil);
+tests/native/test_midi_endpoint_names.m:23:    assert([CLMIDIResolveName(@[@"Gestionnaire IAC MTC vers Logic",@"Gestionnaire IAC CL MTC IAC"],@CL_MIDI_MTC_IAC) isEqualToString:@"Gestionnaire IAC CL MTC IAC"]);
+tests/native/test_midi_endpoint_names.m:24:    assert(CLMIDIResolveName(@[@"Réseau CL MTC"],@CL_MIDI_MTC_IAC)==nil);
+tests/native/test_midi_endpoint_names.m:25:    assert(CLMIDIResolveName(@[@"Réseau CL Ableton Clock"],@CL_MIDI_CLOCK_IAC)==nil);
+tests/test_live_set_generation.py:62:            "returned_source": "CL Direct RTP",
+tests/test_live_set_generation.py:106:            "expected_monitor_source": "Gestionnaire IAC Bus 1",
+tests/test_live_set_generation.py:306:            "expected_monitor_source": "Gestionnaire IAC Bus 1",
+tests/test_live_set_generation.py:622:                    "expected_monitor_source": "Gestionnaire IAC Bus 1",
+tests/test_live_set_generation.py:943:            "expected_monitor_source": "Gestionnaire IAC Bus 1",
+tests/test_live_set_generation.py:1015:            "expected_monitor_source": "Gestionnaire IAC Bus 1",
+tests/test_live_set_generation.py:1070:            "expected_monitor_source": "Gestionnaire IAC Bus 1",
+tests/test_live_set_generation.py:1125:            "expected_monitor_source": "Gestionnaire IAC Bus 1",
+tools/cl_midi_network/CLLocalSimulatorSupervisor.h:41:        ![@[@"CL MIDI Return Test", @"Gestionnaire IAC CL MIDI Return Test"] containsObject:CLSimulatorOption(args, @"--endpoint")] ||
+tools/cl_midi_network/CLLocalSimulatorSupervisor.h:42:        ![CLSimulatorOption(args, @"--input-endpoint") isEqualToString:@"Gestionnaire IAC Bus 1"]) return nil;
+tools/cl_midi_network/CLConfigurationValidator.m:103:        [items addObject:CLItem(endpointMatches ? CLCheckLevelOK : CLCheckLevelError, @"Simulateur", [NSString stringWithFormat:@"%@ · %@", label, endpointTitle], simulatorEndpoint, endpoint, rtpScenario ? @"Le processus doit utiliser un endpoint RTP présent sur ce Mac, pas une valeur provenant du Mac serveur." : @"Le simulateur local doit envoyer son retour vers l’endpoint dédié CL MIDI Return Test.", endpointAction)];
+tools/cl_midi_network/CLMIDIDirectBridge.m:1007:                CFSTR("CL Direct RTP Bridge"),
+tools/cl_midi_network/CLMIDINetworkDashboard.m:564:    for (NSString *candidate in @[@"CL MIDI Return Test", @"Gestionnaire IAC CL MIDI Return Test", @"IAC Driver CL MIDI Return Test"]) {
+tools/cl_midi_network/CLMIDINetworkDashboard.m:2690:    // CL MIDI Return Test reste uniquement disponible pour le simulateur/test.
+tools/cl_midi_network/CLMIDINetworkDashboard.m:4435:                : @"CL MIDI Return Test indisponible"];
+tools/cl_midi_network/CLMIDINetworkDashboard.m:4441:        // CL Show Control RTP (ou legacy) -> simulateur -> CL MIDI Return Test.
+tools/cl_midi_network/CLMIDINetworkDashboard.m:4515:                : @"Le port CL MIDI Return Test est indisponible."];
+tools/cl_midi_network/CLMIDINetworkDashboard.m:5524:        // CL MIDI Return Test est volontairement une destination virtuelle
+tools/cl_midi_network/CLMIDINetworkDashboard.m:5640:            self.simulatorStatusLabel.stringValue = @"RETURNED absent : CL MIDI Return Test introuvable";
+tools/cl_midi_network/CLMIDINetworkDashboard.m:5700:    if (self.supervisingLocalLaunch) input = @"Gestionnaire IAC Bus 1";
+tools/cl_midi_network/CLMIDINetworkDashboard.m:5839:                @"RETURNED absent : CL MIDI Return Test introuvable";
+tools/cl_midi_network/CLMIDINetworkDashboard.m:6096:                NSTask *task = [strongSelf launchSimulatorDevice:device transport:@"iac" endpoint:@"CL MIDI Return Test" delay:80];
+tools/cl_midi_network/CLMIDINetworkDashboard.m:6114:        if ([(__bridge NSString *)name isEqualToString:@"Gestionnaire IAC Bus 1"]) input = ep;
+tools/cl_midi_network/CLMIDINetworkDashboard.m:6121:        if ([n isEqualToString:@"CL MIDI Return Test"] || [n isEqualToString:@"Gestionnaire IAC CL MIDI Return Test"]) output = ep;
+tools/shared/CLMIDIEndpointNames.h:10:#define CL_MIDI_RETURN_TEST "CL MIDI Return Test"
+tools/shared/CLMIDIEndpointNames.h:11:#define CL_MIDI_DIRECT_RTP "CL Direct RTP"
+tools/shared/CLMIDIEndpointNames.h:17:        @CL_MIDI_CLOCK_IAC: @[@"Gestionnaire IAC CL Ableton Clock IAC", @"IAC Driver CL Ableton Clock IAC", @"Gestionnaire IAC Ableton Clock", @"IAC Driver Ableton Clock"],
+tools/shared/CLMIDIEndpointNames.h:18:        @CL_MIDI_MTC_IAC: @[@"Gestionnaire IAC CL MTC IAC", @"IAC Driver CL MTC IAC", @"Gestionnaire IAC MTC vers Logic", @"IAC Driver MTC vers Logic"],
+tools/shared/CLMIDIEndpointNames.h:19:        @CL_MIDI_SHOW_IAC: @[@"Gestionnaire IAC CL Show Control IAC", @"IAC Driver CL Show Control IAC", @"Gestionnaire IAC Bus 1", @"IAC Driver Bus 1"],
+tools/shared/CLMIDIEndpointNames.h:20:        @CL_MIDI_SHOW_RTP: @[@"Réseau CL Show Control RTP", @"Network CL Show Control RTP", @"Réseau CL Show Control", @"Network CL Show Control"],
+tools/shared/CLMIDIEndpointNames.h:21:        @CL_MIDI_RETURN_RTP: @[@"Réseau CL Console Return RTP", @"Network CL Console Return RTP", @"Réseau RTP MB Chris", @"Network RTP MB Chris"],
+tools/ableton_mtc_bridge/CL_SYNC_METER.md:63:MTC RX est reconstruit sur `CL MTC IAC` (alias historique : `Gestionnaire IAC MTC vers Logic`). Le décodeur garde

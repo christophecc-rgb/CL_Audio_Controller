@@ -1,3 +1,4 @@
+#import "../shared/CLMIDIEndpointNames.h"
 #import <Foundation/Foundation.h>
 #import <CoreMIDI/CoreMIDI.h>
 #import <arpa/inet.h>
@@ -850,7 +851,7 @@ int main(int argc, const char *argv[]) {
             argumentValue(
                 arguments,
                 @"--endpoint",
-                @"CL Direct RTP"
+                @CL_MIDI_DIRECT_RTP
             );
 
         CLDirectState state = {0};

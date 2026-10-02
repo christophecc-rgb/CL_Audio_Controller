@@ -1,6 +1,12 @@
 #!/bin/bash
 set -euo pipefail
 
+# New roles use the symmetric engine. Historical component selections remain explicit.
+if [[ -n "${CL_SUITE_ROLE:-}" ]]; then
+  ROLE_ENGINE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  exec "${CL_SUITE_PYTHON:-python3}" "$ROLE_ENGINE_DIR/role_install.py" uninstall "$CL_SUITE_ROLE"
+fi
+
 INSTALL_HOME="${CL_SUITE_INSTALL_HOME:-$HOME}"
 USER_APPS="$INSTALL_HOME/Applications"
 PROD_APPS="$USER_APPS/Prod Ableton"
@@ -26,7 +32,6 @@ UNINSTALL_ABLETON_READER=0
 UNINSTALL_BUILDER=0
 UNINSTALL_SHOW_AUDIO_BUILDER=0
 UNINSTALL_AUTOSCENE=0
-UNINSTALL_LIVE10=0
 UNINSTALL_MIDI_CONSOLE=0
 UNINSTALL_MIDI_RECEIVER=0
 UNINSTALL_DIAGNOSTIC_TOOLS=0
@@ -44,7 +49,6 @@ if [[ -z "$CHOICE" ]]; then
   echo "  2 — Télécommande CL Audio"
   echo "  3 — Arrangement Builder"
   echo "  4 — AutoScene Live 11/12"
-  echo "  5 — AutoScene Live 10"
   echo "  6 — CL MIDI Console"
   echo "  7 — Choix personnalisé"
   echo "  8 — Annuler"
@@ -53,13 +57,12 @@ fi
 
 case "$CHOICE" in
   1|all|complete)
-    UNINSTALL_REMOTE=1; UNINSTALL_BUILDER=1; UNINSTALL_SHOW_AUDIO_BUILDER=1; UNINSTALL_AUTOSCENE=1; UNINSTALL_LIVE10=1; UNINSTALL_MIDI_CONSOLE=1; UNINSTALL_MIDI_RECEIVER=1; UNINSTALL_DIAGNOSTIC_TOOLS=1 ;;
+    UNINSTALL_REMOTE=1; UNINSTALL_ABLETON_READER=1; UNINSTALL_BUILDER=1; UNINSTALL_SHOW_AUDIO_BUILDER=1; UNINSTALL_AUTOSCENE=1; UNINSTALL_MIDI_CONSOLE=1; UNINSTALL_MIDI_RECEIVER=1; UNINSTALL_DIAGNOSTIC_TOOLS=1 ;;
   2|remote) UNINSTALL_REMOTE=1 ;;
   3|builder) UNINSTALL_BUILDER=1 ;;
   show-audio-builder) UNINSTALL_SHOW_AUDIO_BUILDER=1 ;;
   showcue) UNINSTALL_CONTROLLER=1 ;;
   4|autoscene) UNINSTALL_AUTOSCENE=1 ;;
-  5|autoscene-live10|live10) UNINSTALL_LIVE10=1 ;;
   6|midi-console) UNINSTALL_MIDI_CONSOLE=1 ;;
   controller|show-control) UNINSTALL_CONTROLLER=1 ;;
   ableton-reader|reader) UNINSTALL_ABLETON_READER=1 ;;
@@ -73,8 +76,6 @@ case "$CHOICE" in
     [[ "$answer" =~ ^([oOyY]|oui|OUI|yes|YES)$ ]] && UNINSTALL_SHOW_AUDIO_BUILDER=1
     read -r -p "Retirer AutoScene Live 11/12 ? (o/n) " answer
     [[ "$answer" =~ ^([oOyY]|oui|OUI|yes|YES)$ ]] && UNINSTALL_AUTOSCENE=1
-    read -r -p "Retirer AutoScene Live 10 ? (o/n) " answer
-    [[ "$answer" =~ ^([oOyY]|oui|OUI|yes|YES)$ ]] && UNINSTALL_LIVE10=1
     read -r -p "Retirer CL MIDI Console ? (o/n) " answer
     [[ "$answer" =~ ^([oOyY]|oui|OUI|yes|YES)$ ]] && UNINSTALL_MIDI_CONSOLE=1
     ;;
@@ -87,12 +88,11 @@ case "$CHOICE" in
     [[ "$normalized" == *,builder,* ]] && UNINSTALL_BUILDER=1
     [[ "$normalized" == *,show-audio-builder,* ]] && UNINSTALL_SHOW_AUDIO_BUILDER=1
     [[ "$normalized" == *,autoscene,* ]] && UNINSTALL_AUTOSCENE=1
-    [[ "$normalized" == *,autoscene-live10,* ]] && UNINSTALL_LIVE10=1
     [[ "$normalized" == *,midi-console,* ]] && UNINSTALL_MIDI_CONSOLE=1
     [[ "$normalized" == *,midi-receiver,* ]] && UNINSTALL_MIDI_RECEIVER=1
     [[ "$normalized" == *,simulator,* ]] && UNINSTALL_MIDI_RECEIVER=1
     [[ "$normalized" == *,diagnostic-tools,* ]] && UNINSTALL_DIAGNOSTIC_TOOLS=1
-    if [[ "$UNINSTALL_REMOTE$UNINSTALL_CONTROLLER$UNINSTALL_ABLETON_READER$UNINSTALL_BUILDER$UNINSTALL_SHOW_AUDIO_BUILDER$UNINSTALL_AUTOSCENE$UNINSTALL_LIVE10$UNINSTALL_MIDI_CONSOLE$UNINSTALL_MIDI_RECEIVER$UNINSTALL_DIAGNOSTIC_TOOLS" == "0000000000" ]]; then
+    if [[ "$UNINSTALL_REMOTE$UNINSTALL_CONTROLLER$UNINSTALL_ABLETON_READER$UNINSTALL_BUILDER$UNINSTALL_SHOW_AUDIO_BUILDER$UNINSTALL_AUTOSCENE$UNINSTALL_MIDI_CONSOLE$UNINSTALL_MIDI_RECEIVER$UNINSTALL_DIAGNOSTIC_TOOLS" == "0000000000" ]]; then
       echo "Désinstallation annulée."
       exit 0
     fi
@@ -107,7 +107,6 @@ is_selected() {
     builder) [[ "$UNINSTALL_BUILDER" == "1" ]] ;;
     show-audio-builder) [[ "$UNINSTALL_SHOW_AUDIO_BUILDER" == "1" ]] ;;
     autoscene) [[ "$UNINSTALL_AUTOSCENE" == "1" ]] ;;
-    autoscene-live10) [[ "$UNINSTALL_LIVE10" == "1" ]] ;;
     midi-console) [[ "$UNINSTALL_MIDI_CONSOLE" == "1" ]] ;;
     midi-receiver) [[ "$UNINSTALL_MIDI_RECEIVER" == "1" ]] ;;
     diagnostic-tools) [[ "$UNINSTALL_DIAGNOSTIC_TOOLS" == "1" ]] ;;
@@ -180,9 +179,22 @@ if [[ "${CL_SUITE_NONINTERACTIVE:-0}" != "1" ]]; then
   [[ "$confirmation" == "DESINSTALLER" ]] || { echo "Désinstallation annulée."; exit 0; }
 fi
 
-if [[ "$UNINSTALL_MIDI_CONSOLE" == "1" && "$INSTALL_HOME" == "$HOME" && "${CL_SUITE_SKIP_POSTINSTALL:-0}" != "1" ]]; then
-  /bin/launchctl bootout "gui/$(id -u)/com.claudio.midi-network-monitor" >/dev/null 2>&1 || true
-  rm -f "$HOME/Library/LaunchAgents/com.claudio.midi-network-monitor.plist"
+retire_launch_agent() {
+  local label="$1"
+  if [[ "$INSTALL_HOME" == "$HOME" && "${CL_SUITE_SKIP_POSTINSTALL:-0}" != "1" ]]; then
+    /bin/launchctl bootout "gui/$(id -u)/$label" >/dev/null 2>&1 || true
+  fi
+  rm -f "$INSTALL_HOME/Library/LaunchAgents/$label.plist"
+}
+
+if [[ "$UNINSTALL_MIDI_CONSOLE" == "1" || "$UNINSTALL_CONTROLLER" == "1" || "$UNINSTALL_REMOTE" == "1" ]]; then
+  retire_launch_agent com.claudio.midi-network-monitor
+fi
+if [[ "$UNINSTALL_ABLETON_READER" == "1" || "$UNINSTALL_REMOTE" == "1" ]]; then
+  retire_launch_agent com.claudio.midi-rtp-agent
+fi
+
+if [[ ( "$UNINSTALL_MIDI_CONSOLE" == "1" || "$UNINSTALL_CONTROLLER" == "1" || "$UNINSTALL_REMOTE" == "1" ) && "$INSTALL_HOME" == "$HOME" && "${CL_SUITE_SKIP_POSTINSTALL:-0}" != "1" ]]; then
   /usr/bin/osascript >/dev/null 2>&1 <<'APPLESCRIPT' || true
 tell application "System Events"
   if exists login item "CL MIDI Network Manager" then

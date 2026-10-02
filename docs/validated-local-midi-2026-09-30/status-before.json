@@ -1,0 +1,4294 @@
+{
+  "ableton_midi_output": {
+    "cl5": {
+      "activated_at": 1790746837.072345,
+      "expected_activated_at": 1790746837.072345,
+      "expected_midi_program": 8,
+      "midi_program": 8,
+      "scene_index": 1,
+      "source": "show_control_go_intent"
+    },
+    "console_a": {
+      "activated_at": 1790746837.072345,
+      "expected_activated_at": 1790746837.072345,
+      "expected_midi_program": 8,
+      "midi_program": 8,
+      "scene_index": 1,
+      "source": "show_control_go_intent"
+    },
+    "console_b": {
+      "activated_at": 1790746837.072345,
+      "expected_activated_at": 1790746837.072345,
+      "expected_midi_program": 9,
+      "midi_program": 9,
+      "scene_index": 1,
+      "source": "show_control_go_intent"
+    },
+    "ql1": {
+      "activated_at": 1790746837.072345,
+      "expected_activated_at": 1790746837.072345,
+      "expected_midi_program": 9,
+      "midi_program": 9,
+      "scene_index": 1,
+      "source": "show_control_go_intent"
+    }
+  },
+  "ableton_mode": "Local",
+  "ableton_target": {
+    "host": "127.0.0.1",
+    "mode": "local",
+    "reply_port": 11001,
+    "send_port": 11000,
+    "target_id": "primary"
+  },
+  "arrangement_marker": "—",
+  "arrangement_markers": [],
+  "arrangement_markers_source": "JSON",
+  "arrangement_time": 1300.4810791015625,
+  "arrangement_time_label": "21:40",
+  "arrangement_time_seconds": 650.2405395507812,
+  "bootstrap_generation": null,
+  "bootstrap_running": false,
+  "bootstrap_step": "Live Set prêt",
+  "build_id": "CL_Audio_Controller-2.0.1-identity-v1",
+  "connected": true,
+  "console_return_mode": "local_dedicated",
+  "console_return_source": "Gestionnaire IAC CL MIDI Return Test",
+  "console_scene_library_status": {
+    "cl5": {
+      "console": "CL5",
+      "entries": [
+        {
+          "console": "CL5",
+          "memory": 1,
+          "midi_program": 0,
+          "title": "base Show 2023"
+        },
+        {
+          "console": "CL5",
+          "memory": 3,
+          "midi_program": 2,
+          "title": "CORUM JADE"
+        },
+        {
+          "console": "CL5",
+          "memory": 4,
+          "midi_program": 3,
+          "title": "CORUM JADE"
+        },
+        {
+          "console": "CL5",
+          "memory": 5,
+          "midi_program": 4,
+          "title": "FOH2026"
+        },
+        {
+          "console": "CL5",
+          "memory": 6,
+          "midi_program": 5,
+          "title": "CORUM MATHILDE"
+        },
+        {
+          "console": "CL5",
+          "memory": 7,
+          "midi_program": 6,
+          "title": "DYNAMO"
+        },
+        {
+          "console": "CL5",
+          "memory": 8,
+          "midi_program": 7,
+          "title": "MUSIC AMBIANCE"
+        },
+        {
+          "console": "CL5",
+          "memory": 9,
+          "midi_program": 8,
+          "title": "MUSIC AMBIANCE"
+        },
+        {
+          "console": "CL5",
+          "memory": 10,
+          "midi_program": 9,
+          "title": "base preshow"
+        },
+        {
+          "console": "CL5",
+          "memory": 11,
+          "midi_program": 10,
+          "title": "TOXIC"
+        },
+        {
+          "console": "CL5",
+          "memory": 12,
+          "midi_program": 11,
+          "title": "QUE RESTE IL"
+        },
+        {
+          "console": "CL5",
+          "memory": 13,
+          "midi_program": 12,
+          "title": "FALLING"
+        },
+        {
+          "console": "CL5",
+          "memory": 14,
+          "midi_program": 13,
+          "title": "FEVER"
+        },
+        {
+          "console": "CL5",
+          "memory": 15,
+          "midi_program": 14,
+          "title": "WHAT ABOUT US"
+        },
+        {
+          "console": "CL5",
+          "memory": 16,
+          "midi_program": 15,
+          "title": "BATTEZ VOUS"
+        },
+        {
+          "console": "CL5",
+          "memory": 17,
+          "midi_program": 16,
+          "title": "FLOWERS"
+        },
+        {
+          "console": "CL5",
+          "memory": 18,
+          "midi_program": 17,
+          "title": "LA FOULE"
+        },
+        {
+          "console": "CL5",
+          "memory": 19,
+          "midi_program": 18,
+          "title": "VIOLON SOLO"
+        },
+        {
+          "console": "CL5",
+          "memory": 20,
+          "midi_program": 19,
+          "title": "LET S DANCE"
+        },
+        {
+          "console": "CL5",
+          "memory": 21,
+          "midi_program": 20,
+          "title": "JARDIN D HIVER"
+        },
+        {
+          "console": "CL5",
+          "memory": 22,
+          "midi_program": 21,
+          "title": "VIENS VOIR"
+        },
+        {
+          "console": "CL5",
+          "memory": 23,
+          "midi_program": 22,
+          "title": "HOLLOWBACK GIRL"
+        },
+        {
+          "console": "CL5",
+          "memory": 24,
+          "midi_program": 23,
+          "title": "NE ME QUITTE PAS"
+        },
+        {
+          "console": "CL5",
+          "memory": 25,
+          "midi_program": 24,
+          "title": "BANG BANG"
+        },
+        {
+          "console": "CL5",
+          "memory": 26,
+          "midi_program": 25,
+          "title": "CRAZY"
+        },
+        {
+          "console": "CL5",
+          "memory": 27,
+          "midi_program": 26,
+          "title": "VALSE A 1000 Tem"
+        },
+        {
+          "console": "CL5",
+          "memory": 28,
+          "midi_program": 27,
+          "title": "entree DIRECTRIC"
+        },
+        {
+          "console": "CL5",
+          "memory": 29,
+          "midi_program": 28,
+          "title": "entracte"
+        },
+        {
+          "console": "CL5",
+          "memory": 30,
+          "midi_program": 29,
+          "title": "THE WINNER"
+        },
+        {
+          "console": "CL5",
+          "memory": 31,
+          "midi_program": 30,
+          "title": "VIDEO"
+        },
+        {
+          "console": "CL5",
+          "memory": 32,
+          "midi_program": 31,
+          "title": "VIDEO"
+        },
+        {
+          "console": "CL5",
+          "memory": 34,
+          "midi_program": 33,
+          "title": "QUE JE T'AIME"
+        },
+        {
+          "console": "CL5",
+          "memory": 35,
+          "midi_program": 34,
+          "title": "QUE JE T'AIME"
+        },
+        {
+          "console": "CL5",
+          "memory": 39,
+          "midi_program": 38,
+          "title": "base Show 2025"
+        },
+        {
+          "console": "CL5",
+          "memory": 40,
+          "midi_program": 39,
+          "title": "base Show 2025"
+        },
+        {
+          "console": "CL5",
+          "memory": 41,
+          "midi_program": 40,
+          "title": "En ROUTE ...."
+        },
+        {
+          "console": "CL5",
+          "memory": 42,
+          "midi_program": 41,
+          "title": "VIS A VIS"
+        },
+        {
+          "console": "CL5",
+          "memory": 43,
+          "midi_program": 42,
+          "title": "ENTREE DIRECTRIC"
+        },
+        {
+          "console": "CL5",
+          "memory": 44,
+          "midi_program": 43,
+          "title": "SUPREME"
+        },
+        {
+          "console": "CL5",
+          "memory": 45,
+          "midi_program": 44,
+          "title": "TALK IRIS DIR"
+        },
+        {
+          "console": "CL5",
+          "memory": 46,
+          "midi_program": 45,
+          "title": "NEVER ENOUGH"
+        },
+        {
+          "console": "CL5",
+          "memory": 47,
+          "midi_program": 46,
+          "title": "TALK MARCEL DIR"
+        },
+        {
+          "console": "CL5",
+          "memory": 48,
+          "midi_program": 47,
+          "title": "AVA"
+        },
+        {
+          "console": "CL5",
+          "memory": 49,
+          "midi_program": 48,
+          "title": "paris mon amour"
+        },
+        {
+          "console": "CL5",
+          "memory": 50,
+          "midi_program": 49,
+          "title": "HYPNOTIQUE"
+        },
+        {
+          "console": "CL5",
+          "memory": 51,
+          "midi_program": 50,
+          "title": "AVA fakir"
+        },
+        {
+          "console": "CL5",
+          "memory": 52,
+          "midi_program": 51,
+          "title": "DISCO GIGI"
+        },
+        {
+          "console": "CL5",
+          "memory": 53,
+          "midi_program": 52,
+          "title": "GLORIA MARCEL"
+        },
+        {
+          "console": "CL5",
+          "memory": 54,
+          "midi_program": 53,
+          "title": "LOVE TO  LOVE"
+        },
+        {
+          "console": "CL5",
+          "memory": 55,
+          "midi_program": 54,
+          "title": "DANCING QUEEN"
+        },
+        {
+          "console": "CL5",
+          "memory": 56,
+          "midi_program": 55,
+          "title": "A CAPPELA"
+        },
+        {
+          "console": "CL5",
+          "memory": 57,
+          "midi_program": 56,
+          "title": "OBJET DESIR"
+        },
+        {
+          "console": "CL5",
+          "memory": 58,
+          "midi_program": 57,
+          "title": "ROCKY"
+        },
+        {
+          "console": "CL5",
+          "memory": 59,
+          "midi_program": 58,
+          "title": "MARSEILLAISE"
+        },
+        {
+          "console": "CL5",
+          "memory": 60,
+          "midi_program": 59,
+          "title": "H2O"
+        },
+        {
+          "console": "CL5",
+          "memory": 61,
+          "midi_program": 60,
+          "title": "BRUITAGES"
+        },
+        {
+          "console": "CL5",
+          "memory": 62,
+          "midi_program": 61,
+          "title": "ROMANE ET CECILE"
+        },
+        {
+          "console": "CL5",
+          "memory": 63,
+          "midi_program": 62,
+          "title": "UN AUTRE MONDE"
+        },
+        {
+          "console": "CL5",
+          "memory": 64,
+          "midi_program": 63,
+          "title": "BETE 2 SEXE"
+        },
+        {
+          "console": "CL5",
+          "memory": 65,
+          "midi_program": 64,
+          "title": "UKULELE IN"
+        },
+        {
+          "console": "CL5",
+          "memory": 66,
+          "midi_program": 65,
+          "title": "IN  MAR/DIREC"
+        },
+        {
+          "console": "CL5",
+          "memory": 67,
+          "midi_program": 66,
+          "title": "METAMORPHOSE"
+        },
+        {
+          "console": "CL5",
+          "memory": 68,
+          "midi_program": 67,
+          "title": "OUT DIRECTRICE"
+        },
+        {
+          "console": "CL5",
+          "memory": 69,
+          "midi_program": 68,
+          "title": "CANCAN"
+        },
+        {
+          "console": "CL5",
+          "memory": 70,
+          "midi_program": 69,
+          "title": "CANCAN TECHNO"
+        },
+        {
+          "console": "CL5",
+          "memory": 71,
+          "midi_program": 70,
+          "title": "CECILE TRAPEZE"
+        },
+        {
+          "console": "CL5",
+          "memory": 72,
+          "midi_program": 71,
+          "title": "DUA LIPA"
+        },
+        {
+          "console": "CL5",
+          "memory": 73,
+          "midi_program": 72,
+          "title": "FREE FROM DESIRE"
+        },
+        {
+          "console": "CL5",
+          "memory": 74,
+          "midi_program": 73,
+          "title": "PROUD MARY"
+        },
+        {
+          "console": "CL5",
+          "memory": 75,
+          "midi_program": 74,
+          "title": "CANT STOP THE FE"
+        },
+        {
+          "console": "CL5",
+          "memory": 76,
+          "midi_program": 75,
+          "title": "A CAPPELLA"
+        },
+        {
+          "console": "CL5",
+          "memory": 77,
+          "midi_program": 76,
+          "title": "in cannes"
+        },
+        {
+          "console": "CL5",
+          "memory": 78,
+          "midi_program": 77,
+          "title": "OUT CANNES"
+        },
+        {
+          "console": "CL5",
+          "memory": 79,
+          "midi_program": 78,
+          "title": "TALK MARCEL DIR"
+        },
+        {
+          "console": "CL5",
+          "memory": 80,
+          "midi_program": 79,
+          "title": "FINAL - PEGASE"
+        },
+        {
+          "console": "CL5",
+          "memory": 81,
+          "midi_program": 80,
+          "title": "1er Cabaret NEW"
+        },
+        {
+          "console": "CL5",
+          "memory": 82,
+          "midi_program": 81,
+          "title": "RIRES"
+        },
+        {
+          "console": "CL5",
+          "memory": 83,
+          "midi_program": 82,
+          "title": "WOUCH"
+        },
+        {
+          "console": "CL5",
+          "memory": 84,
+          "midi_program": 83,
+          "title": "WELCOME"
+        },
+        {
+          "console": "CL5",
+          "memory": 85,
+          "midi_program": 84,
+          "title": "GAGA 1"
+        },
+        {
+          "console": "CL5",
+          "memory": 86,
+          "midi_program": 85,
+          "title": "COMEDIE"
+        },
+        {
+          "console": "CL5",
+          "memory": 87,
+          "midi_program": 86,
+          "title": "GAGA 2"
+        },
+        {
+          "console": "CL5",
+          "memory": 88,
+          "midi_program": 87,
+          "title": "STAR IS BORN"
+        },
+        {
+          "console": "CL5",
+          "memory": 89,
+          "midi_program": 88,
+          "title": "COMEDIE 3"
+        },
+        {
+          "console": "CL5",
+          "memory": 90,
+          "midi_program": 89,
+          "title": "IN ROXY"
+        },
+        {
+          "console": "CL5",
+          "memory": 91,
+          "midi_program": 90,
+          "title": "ZOE CHOEUR"
+        },
+        {
+          "console": "CL5",
+          "memory": 92,
+          "midi_program": 91,
+          "title": "Comedie"
+        },
+        {
+          "console": "CL5",
+          "memory": 93,
+          "midi_program": 92,
+          "title": "quick change"
+        },
+        {
+          "console": "CL5",
+          "memory": 94,
+          "midi_program": 93,
+          "title": "BONNIE TYLER"
+        },
+        {
+          "console": "CL5",
+          "memory": 95,
+          "midi_program": 94,
+          "title": "COMEDIE 4"
+        },
+        {
+          "console": "CL5",
+          "memory": 96,
+          "midi_program": 95,
+          "title": "circassien"
+        },
+        {
+          "console": "CL5",
+          "memory": 97,
+          "midi_program": 96,
+          "title": "ombre chinoises"
+        },
+        {
+          "console": "CL5",
+          "memory": 98,
+          "midi_program": 97,
+          "title": "zazie"
+        },
+        {
+          "console": "CL5",
+          "memory": 99,
+          "midi_program": 98,
+          "title": "comedie"
+        },
+        {
+          "console": "CL5",
+          "memory": 100,
+          "midi_program": 99,
+          "title": "reve bleu"
+        },
+        {
+          "console": "CL5",
+          "memory": 101,
+          "midi_program": 100,
+          "title": "tournette"
+        },
+        {
+          "console": "CL5",
+          "memory": 102,
+          "midi_program": 101,
+          "title": "comedie 5"
+        },
+        {
+          "console": "CL5",
+          "memory": 103,
+          "midi_program": 102,
+          "title": "TULLE"
+        },
+        {
+          "console": "CL5",
+          "memory": 104,
+          "midi_program": 103,
+          "title": "PING PONG"
+        },
+        {
+          "console": "CL5",
+          "memory": 105,
+          "midi_program": 104,
+          "title": "JUST DANCE"
+        },
+        {
+          "console": "CL5",
+          "memory": 106,
+          "midi_program": 105,
+          "title": "ENTREE ROXY #"
+        },
+        {
+          "console": "CL5",
+          "memory": 107,
+          "midi_program": 106,
+          "title": "IN EDDY MICH"
+        },
+        {
+          "console": "CL5",
+          "memory": 108,
+          "midi_program": 107,
+          "title": "CATAPULE"
+        },
+        {
+          "console": "CL5",
+          "memory": 109,
+          "midi_program": 108,
+          "title": "LAC DES CYGNES"
+        },
+        {
+          "console": "CL5",
+          "memory": 110,
+          "midi_program": 109,
+          "title": "SUPER HEROS"
+        },
+        {
+          "console": "CL5",
+          "memory": 111,
+          "midi_program": 110,
+          "title": "IN ZOE LEO"
+        },
+        {
+          "console": "CL5",
+          "memory": 112,
+          "midi_program": 111,
+          "title": "ANNEES FOLLES"
+        },
+        {
+          "console": "CL5",
+          "memory": 113,
+          "midi_program": 112,
+          "title": "shake it up"
+        },
+        {
+          "console": "CL5",
+          "memory": 114,
+          "midi_program": 113,
+          "title": "BTS"
+        },
+        {
+          "console": "CL5",
+          "memory": 115,
+          "midi_program": 114,
+          "title": "PARTY"
+        },
+        {
+          "console": "CL5",
+          "memory": 116,
+          "midi_program": 115,
+          "title": "THIS IS ME"
+        },
+        {
+          "console": "CL5",
+          "memory": 117,
+          "midi_program": 116,
+          "title": "IN  LEO"
+        },
+        {
+          "console": "CL5",
+          "memory": 118,
+          "midi_program": 117,
+          "title": "papaoute"
+        },
+        {
+          "console": "CL5",
+          "memory": 119,
+          "midi_program": 118,
+          "title": "BOITE MAGIQUE"
+        },
+        {
+          "console": "CL5",
+          "memory": 120,
+          "midi_program": 119,
+          "title": "CANCAN"
+        },
+        {
+          "console": "CL5",
+          "memory": 121,
+          "midi_program": 120,
+          "title": "MALE & FILS"
+        },
+        {
+          "console": "CL5",
+          "memory": 122,
+          "midi_program": 121,
+          "title": "BOOWLING"
+        },
+        {
+          "console": "CL5",
+          "memory": 123,
+          "midi_program": 122,
+          "title": "34 FINAL"
+        },
+        {
+          "console": "CL5",
+          "memory": 124,
+          "midi_program": 123,
+          "title": "34 FINAL STEF"
+        },
+        {
+          "console": "CL5",
+          "memory": 125,
+          "midi_program": 124,
+          "title": "34 FINAL LEO"
+        },
+        {
+          "console": "CL5",
+          "memory": 126,
+          "midi_program": 125,
+          "title": "34 CABARET JADE"
+        },
+        {
+          "console": "CL5",
+          "memory": 127,
+          "midi_program": 126,
+          "title": "34 CABARET ALL"
+        },
+        {
+          "console": "CL5",
+          "memory": 128,
+          "midi_program": 127,
+          "title": "REC JADE"
+        }
+      ],
+      "imported_at": "2026-08-29T11:15:06.820988+00:00",
+      "path": "/Users/mbprochris/Applications/CL Audio/CL_Transport/Console_Libraries/CL5/CL5.titles.json",
+      "scene_count": 123,
+      "schema_version": 1,
+      "source": "CL_Transport",
+      "source_format": "CLF",
+      "source_name": "cl5 memoires.CLF",
+      "status": "Valide",
+      "transport_root": "/Users/mbprochris/Applications/CL Audio/CL_Transport",
+      "warnings": []
+    },
+    "ql1": {
+      "console": "QL1",
+      "entries": [
+        {
+          "console": "QL1",
+          "memory": 9,
+          "midi_program": 8,
+          "title": "PRESHOW CHECK"
+        },
+        {
+          "console": "QL1",
+          "memory": 10,
+          "midi_program": 9,
+          "title": "PRESHOW CHECK"
+        },
+        {
+          "console": "QL1",
+          "memory": 11,
+          "midi_program": 10,
+          "title": "TOXIC"
+        },
+        {
+          "console": "QL1",
+          "memory": 12,
+          "midi_program": 11,
+          "title": "QUE RESTE IL"
+        },
+        {
+          "console": "QL1",
+          "memory": 13,
+          "midi_program": 12,
+          "title": "FALLIN`"
+        },
+        {
+          "console": "QL1",
+          "memory": 14,
+          "midi_program": 13,
+          "title": "FEVER"
+        },
+        {
+          "console": "QL1",
+          "memory": 15,
+          "midi_program": 14,
+          "title": "WHAT ABOUT US"
+        },
+        {
+          "console": "QL1",
+          "memory": 16,
+          "midi_program": 15,
+          "title": "BATTEZ VOUS"
+        },
+        {
+          "console": "QL1",
+          "memory": 17,
+          "midi_program": 16,
+          "title": "FLOWER"
+        },
+        {
+          "console": "QL1",
+          "memory": 18,
+          "midi_program": 17,
+          "title": "EMPORTE PAR FOUL"
+        },
+        {
+          "console": "QL1",
+          "memory": 19,
+          "midi_program": 18,
+          "title": "CELLO SOLO"
+        },
+        {
+          "console": "QL1",
+          "memory": 20,
+          "midi_program": 19,
+          "title": "let s dance"
+        },
+        {
+          "console": "QL1",
+          "memory": 21,
+          "midi_program": 20,
+          "title": "JARDIN D HIVER"
+        },
+        {
+          "console": "QL1",
+          "memory": 22,
+          "midi_program": 21,
+          "title": "VIENS VOIR"
+        },
+        {
+          "console": "QL1",
+          "memory": 23,
+          "midi_program": 22,
+          "title": "HOLLOWBACK GIRL"
+        },
+        {
+          "console": "QL1",
+          "memory": 24,
+          "midi_program": 23,
+          "title": "NE ME QUITTE PAS"
+        },
+        {
+          "console": "QL1",
+          "memory": 25,
+          "midi_program": 24,
+          "title": "BANG BANG"
+        },
+        {
+          "console": "QL1",
+          "memory": 26,
+          "midi_program": 25,
+          "title": "CRAZY"
+        },
+        {
+          "console": "QL1",
+          "memory": 27,
+          "midi_program": 26,
+          "title": "VALSE A 1000 TPS"
+        },
+        {
+          "console": "QL1",
+          "memory": 28,
+          "midi_program": 27,
+          "title": "ENTREE DIRECTRIC"
+        },
+        {
+          "console": "QL1",
+          "memory": 29,
+          "midi_program": 28,
+          "title": "ALL SO QUIET"
+        },
+        {
+          "console": "QL1",
+          "memory": 30,
+          "midi_program": 29,
+          "title": "WINNER TAKES IT"
+        },
+        {
+          "console": "QL1",
+          "memory": 31,
+          "midi_program": 30,
+          "title": "MARCIA BAILA"
+        },
+        {
+          "console": "QL1",
+          "memory": 32,
+          "midi_program": 31,
+          "title": "MARCIA BAILA"
+        },
+        {
+          "console": "QL1",
+          "memory": 39,
+          "midi_program": 38,
+          "title": "ENTRACTE CHECK"
+        },
+        {
+          "console": "QL1",
+          "memory": 40,
+          "midi_program": 39,
+          "title": "ENTRACTE CHECK"
+        },
+        {
+          "console": "QL1",
+          "memory": 41,
+          "midi_program": 40,
+          "title": "NAPOLEON Visavis"
+        },
+        {
+          "console": "QL1",
+          "memory": 42,
+          "midi_program": 41,
+          "title": "ENTREE DIRECTRIC"
+        },
+        {
+          "console": "QL1",
+          "memory": 43,
+          "midi_program": 42,
+          "title": "SUPREM"
+        },
+        {
+          "console": "QL1",
+          "memory": 44,
+          "midi_program": 43,
+          "title": "TALK MENEUSE DIR"
+        },
+        {
+          "console": "QL1",
+          "memory": 45,
+          "midi_program": 44,
+          "title": "NEVER ENOUGH"
+        },
+        {
+          "console": "QL1",
+          "memory": 46,
+          "midi_program": 45,
+          "title": "TALK MARCEL DIR"
+        },
+        {
+          "console": "QL1",
+          "memory": 47,
+          "midi_program": 46,
+          "title": "AVA lustre"
+        },
+        {
+          "console": "QL1",
+          "memory": 48,
+          "midi_program": 47,
+          "title": "DISCO not use"
+        },
+        {
+          "console": "QL1",
+          "memory": 49,
+          "midi_program": 48,
+          "title": "PARADISCO"
+        },
+        {
+          "console": "QL1",
+          "memory": 50,
+          "midi_program": 49,
+          "title": "GLORIA MARCEL"
+        },
+        {
+          "console": "QL1",
+          "memory": 51,
+          "midi_program": 50,
+          "title": "LOVE TO LOVE"
+        },
+        {
+          "console": "QL1",
+          "memory": 52,
+          "midi_program": 51,
+          "title": "DANCIN QUEEN"
+        },
+        {
+          "console": "QL1",
+          "memory": 53,
+          "midi_program": 52,
+          "title": "DQ acapella"
+        },
+        {
+          "console": "QL1",
+          "memory": 54,
+          "midi_program": 53,
+          "title": "OBJET DESIR"
+        },
+        {
+          "console": "QL1",
+          "memory": 55,
+          "midi_program": 54,
+          "title": "ROCKY/MARSEILLAI"
+        },
+        {
+          "console": "QL1",
+          "memory": 56,
+          "midi_program": 55,
+          "title": "H2O + BAIGNOIRE"
+        },
+        {
+          "console": "QL1",
+          "memory": 57,
+          "midi_program": 56,
+          "title": "VOYACH VOYACH"
+        },
+        {
+          "console": "QL1",
+          "memory": 58,
+          "midi_program": 57,
+          "title": "BETE DE SEXE"
+        },
+        {
+          "console": "QL1",
+          "memory": 59,
+          "midi_program": 58,
+          "title": "AVA UKU OUT"
+        },
+        {
+          "console": "QL1",
+          "memory": 60,
+          "midi_program": 59,
+          "title": "MAPPING"
+        },
+        {
+          "console": "QL1",
+          "memory": 61,
+          "midi_program": 60,
+          "title": "CANCAN"
+        },
+        {
+          "console": "QL1",
+          "memory": 62,
+          "midi_program": 61,
+          "title": "AVA LINGE"
+        },
+        {
+          "console": "QL1",
+          "memory": 63,
+          "midi_program": 62,
+          "title": "AVA LINGE SORTIE"
+        },
+        {
+          "console": "QL1",
+          "memory": 64,
+          "midi_program": 63,
+          "title": "DUA LIPA"
+        },
+        {
+          "console": "QL1",
+          "memory": 65,
+          "midi_program": 64,
+          "title": "DESIRE"
+        },
+        {
+          "console": "QL1",
+          "memory": 66,
+          "midi_program": 65,
+          "title": "PROUD MARY"
+        },
+        {
+          "console": "QL1",
+          "memory": 67,
+          "midi_program": 66,
+          "title": "CAN^T STOP FEELI"
+        },
+        {
+          "console": "QL1",
+          "memory": 68,
+          "midi_program": 67,
+          "title": "AVA CADABRA"
+        },
+        {
+          "console": "QL1",
+          "memory": 69,
+          "midi_program": 68,
+          "title": "TALK MARCEL DIR"
+        },
+        {
+          "console": "QL1",
+          "memory": 70,
+          "midi_program": 69,
+          "title": "FINAL - PEGASE"
+        },
+        {
+          "console": "QL1",
+          "memory": 71,
+          "midi_program": 70,
+          "title": "PEGAZ MENEUSE"
+        },
+        {
+          "console": "QL1",
+          "memory": 72,
+          "midi_program": 71,
+          "title": "P MENEUSE+MARCEL"
+        },
+        {
+          "console": "QL1",
+          "memory": 73,
+          "midi_program": 72,
+          "title": "PEGAZ DIR"
+        },
+        {
+          "console": "QL1",
+          "memory": 77,
+          "midi_program": 76,
+          "title": "Test MPC"
+        },
+        {
+          "console": "QL1",
+          "memory": 78,
+          "midi_program": 77,
+          "title": "Test MPC"
+        },
+        {
+          "console": "QL1",
+          "memory": 79,
+          "midi_program": 78,
+          "title": "Entree E&M"
+        },
+        {
+          "console": "QL1",
+          "memory": 80,
+          "midi_program": 79,
+          "title": "WELCOME CABARET"
+        },
+        {
+          "console": "QL1",
+          "memory": 81,
+          "midi_program": 80,
+          "title": "LADY GAGA"
+        },
+        {
+          "console": "QL1",
+          "memory": 82,
+          "midi_program": 81,
+          "title": "GAGA TALK"
+        },
+        {
+          "console": "QL1",
+          "memory": 83,
+          "midi_program": 82,
+          "title": "A STAR IS BORN"
+        },
+        {
+          "console": "QL1",
+          "memory": 84,
+          "midi_program": 83,
+          "title": "TALK R E&M"
+        },
+        {
+          "console": "QL1",
+          "memory": 85,
+          "midi_program": 84,
+          "title": "BIM BAM \\ COEUR"
+        },
+        {
+          "console": "QL1",
+          "memory": 86,
+          "midi_program": 85,
+          "title": "TALK TOUS"
+        },
+        {
+          "console": "QL1",
+          "memory": 87,
+          "midi_program": 86,
+          "title": "E&M"
+        },
+        {
+          "console": "QL1",
+          "memory": 88,
+          "midi_program": 87,
+          "title": "BONNIE TYLER"
+        },
+        {
+          "console": "QL1",
+          "memory": 89,
+          "midi_program": 88,
+          "title": "TALK RLP"
+        },
+        {
+          "console": "QL1",
+          "memory": 90,
+          "midi_program": 89,
+          "title": "L^ENVOLE"
+        },
+        {
+          "console": "QL1",
+          "memory": 91,
+          "midi_program": 90,
+          "title": "OMBRE CHINOISE"
+        },
+        {
+          "console": "QL1",
+          "memory": 92,
+          "midi_program": 91,
+          "title": "J`ENVOI VALSER"
+        },
+        {
+          "console": "QL1",
+          "memory": 93,
+          "midi_program": 92,
+          "title": "TALK E&M ROXY"
+        },
+        {
+          "console": "QL1",
+          "memory": 94,
+          "midi_program": 93,
+          "title": "ALADIN"
+        },
+        {
+          "console": "QL1",
+          "memory": 95,
+          "midi_program": 94,
+          "title": "MONDE TOURNETTE"
+        },
+        {
+          "console": "QL1",
+          "memory": 96,
+          "midi_program": 95,
+          "title": "TALK ROXY LEO"
+        },
+        {
+          "console": "QL1",
+          "memory": 97,
+          "midi_program": 96,
+          "title": "E&M Pouces lumin"
+        },
+        {
+          "console": "QL1",
+          "memory": 98,
+          "midi_program": 97,
+          "title": "JUST DANSE ROXY"
+        },
+        {
+          "console": "QL1",
+          "memory": 99,
+          "midi_program": 98,
+          "title": "ANNIVERSAIRE"
+        },
+        {
+          "console": "QL1",
+          "memory": 100,
+          "midi_program": 99,
+          "title": "LAC DES CYGNES"
+        },
+        {
+          "console": "QL1",
+          "memory": 101,
+          "midi_program": 100,
+          "title": "SUPER HEROS"
+        },
+        {
+          "console": "QL1",
+          "memory": 102,
+          "midi_program": 101,
+          "title": "SUPER HEROS TALK"
+        },
+        {
+          "console": "QL1",
+          "memory": 103,
+          "midi_program": 102,
+          "title": "ANNE FOLLES PARA"
+        },
+        {
+          "console": "QL1",
+          "memory": 104,
+          "midi_program": 103,
+          "title": "ANNE FOLLE LEO"
+        },
+        {
+          "console": "QL1",
+          "memory": 105,
+          "midi_program": 104,
+          "title": "ANNE FOLLES ROXY"
+        },
+        {
+          "console": "QL1",
+          "memory": 106,
+          "midi_program": 105,
+          "title": "ANNE FOLLES TOUS"
+        },
+        {
+          "console": "QL1",
+          "memory": 107,
+          "midi_program": 106,
+          "title": "IN papaout"
+        },
+        {
+          "console": "QL1",
+          "memory": 108,
+          "midi_program": 107,
+          "title": "hymne \\ papaout"
+        },
+        {
+          "console": "QL1",
+          "memory": 109,
+          "midi_program": 108,
+          "title": "E&M"
+        },
+        {
+          "console": "QL1",
+          "memory": 111,
+          "midi_program": 110,
+          "title": "FINAL PARADIS"
+        },
+        {
+          "console": "QL1",
+          "memory": 112,
+          "midi_program": 111,
+          "title": "FINAL PARADIS"
+        },
+        {
+          "console": "QL1",
+          "memory": 113,
+          "midi_program": 112,
+          "title": "FINAL LEO"
+        },
+        {
+          "console": "QL1",
+          "memory": 114,
+          "midi_program": 113,
+          "title": "FINAL PONT"
+        },
+        {
+          "console": "QL1",
+          "memory": 115,
+          "midi_program": 114,
+          "title": "FINAL TOUS"
+        },
+        {
+          "console": "QL1",
+          "memory": 117,
+          "midi_program": 116,
+          "title": "DUA LIPA OPC"
+        },
+        {
+          "console": "QL1",
+          "memory": 118,
+          "midi_program": 117,
+          "title": "DUA LIPA OPC"
+        },
+        {
+          "console": "QL1",
+          "memory": 119,
+          "midi_program": 118,
+          "title": "DESIRE OPC"
+        },
+        {
+          "console": "QL1",
+          "memory": 120,
+          "midi_program": 119,
+          "title": "PROUD MARY OPC"
+        },
+        {
+          "console": "QL1",
+          "memory": 121,
+          "midi_program": 120,
+          "title": "CAN`T STOP OPC"
+        },
+        {
+          "console": "QL1",
+          "memory": 122,
+          "midi_program": 121,
+          "title": "HOLLOWBACK OPC"
+        },
+        {
+          "console": "QL1",
+          "memory": 123,
+          "midi_program": 122,
+          "title": "SUPREM lea corum"
+        },
+        {
+          "console": "QL1",
+          "memory": 124,
+          "midi_program": 123,
+          "title": "TOXIC"
+        },
+        {
+          "console": "QL1",
+          "memory": 125,
+          "midi_program": 124,
+          "title": "I NEED A HERO"
+        },
+        {
+          "console": "QL1",
+          "memory": 126,
+          "midi_program": 125,
+          "title": "I NEED A HERO"
+        }
+      ],
+      "imported_at": "2026-08-29T11:15:21.493242+00:00",
+      "path": "/Users/mbprochris/Applications/CL Audio/CL_Transport/Console_Libraries/QL1/QL1.titles.json",
+      "scene_count": 107,
+      "schema_version": 1,
+      "source": "CL_Transport",
+      "source_format": "CLF",
+      "source_name": "QL1 mem.CLF",
+      "status": "Valide",
+      "transport_root": "/Users/mbprochris/Applications/CL Audio/CL_Transport",
+      "warnings": []
+    }
+  },
+  "console_scene_map": {
+    "cl5": {
+      "8": [
+        {
+          "midi_program": 8,
+          "program": 9,
+          "program_source": "ableton_clip_name",
+          "scene_index": 1,
+          "title": "Reset CL5/QL1"
+        },
+        {
+          "midi_program": 8,
+          "program": 9,
+          "program_source": "ableton_clip_name",
+          "scene_index": 27,
+          "title": "ENTRACTE"
+        }
+      ],
+      "9": [
+        {
+          "midi_program": 9,
+          "program": 10,
+          "program_source": "ableton_clip_name",
+          "scene_index": 2,
+          "title": "Musique DINER+PREPA SHOW"
+        }
+      ],
+      "10": [
+        {
+          "midi_program": 10,
+          "program": 11,
+          "program_source": "ableton_clip_name",
+          "scene_index": 3,
+          "title": "TOXIC ; BPM ; KEY ; 4:25"
+        }
+      ],
+      "11": [
+        {
+          "midi_program": 11,
+          "program": 12,
+          "program_source": "ableton_clip_name",
+          "scene_index": 4,
+          "title": "Que reste t'il de nos amours ; BPM ; KEY ; 2:57"
+        }
+      ],
+      "12": [
+        {
+          "midi_program": 12,
+          "program": 13,
+          "program_source": "ableton_clip_name",
+          "scene_index": 5,
+          "title": "Falling ; BPM ; KEY ; 3:49"
+        }
+      ],
+      "13": [
+        {
+          "midi_program": 13,
+          "program": 14,
+          "program_source": "ableton_clip_name",
+          "scene_index": 6,
+          "title": "fever ; BPM ; KEY ; 3:35"
+        }
+      ],
+      "14": [
+        {
+          "midi_program": 14,
+          "program": 15,
+          "program_source": "ableton_clip_name",
+          "scene_index": 7,
+          "title": "what about us ; BPM ; KEY ; 4:27"
+        }
+      ],
+      "15": [
+        {
+          "midi_program": 15,
+          "program": 16,
+          "program_source": "ableton_clip_name",
+          "scene_index": 8,
+          "title": "Battez Vous  ; BPM ; KEY ; 4:16"
+        }
+      ],
+      "16": [
+        {
+          "midi_program": 16,
+          "program": 17,
+          "program_source": "ableton_clip_name",
+          "scene_index": 9,
+          "title": "FLOWERS ; BPM ; KEY ; 3:15"
+        },
+        {
+          "midi_program": 16,
+          "program": 17,
+          "program_source": "ableton_clip_name",
+          "scene_index": 76,
+          "title": "Diamons ; BPM ; KEY ; 3:48"
+        }
+      ],
+      "17": [
+        {
+          "midi_program": 17,
+          "program": 18,
+          "program_source": "ableton_clip_name",
+          "scene_index": 10,
+          "title": "la foule + violons ; BPM ; KEY ; 3:34"
+        }
+      ],
+      "18": [
+        {
+          "midi_program": 18,
+          "program": 19,
+          "program_source": "ableton_clip_name",
+          "scene_index": 11,
+          "title": "VIOLONS Bob Marley ; BPM ; KEY ; 1:43"
+        }
+      ],
+      "19": [
+        {
+          "midi_program": 19,
+          "program": 20,
+          "program_source": "ableton_clip_name",
+          "scene_index": 16,
+          "title": "let's Dance; BPM ; KEY ; 3:10"
+        }
+      ],
+      "20": [
+        {
+          "midi_program": 20,
+          "program": 21,
+          "program_source": "ableton_clip_name",
+          "scene_index": 17,
+          "title": "Jardin d'hiver ; BPM ; KEY ; 2:57"
+        }
+      ],
+      "21": [
+        {
+          "midi_program": 21,
+          "program": 22,
+          "program_source": "ableton_clip_name",
+          "scene_index": 19,
+          "title": "VIENS VOIR  ; BPM ; KEY ; 2:20"
+        }
+      ],
+      "22": [
+        {
+          "midi_program": 22,
+          "program": 23,
+          "program_source": "ableton_clip_name",
+          "scene_index": 21,
+          "title": "HOLLOWBACK GIRL ; BPM ; KEY ; 2:53"
+        }
+      ],
+      "23": [
+        {
+          "midi_program": 23,
+          "program": 24,
+          "program_source": "ableton_clip_name",
+          "scene_index": 22,
+          "title": "Ne me quitte pas; BPM ; KEY ; 4:07"
+        }
+      ],
+      "24": [
+        {
+          "midi_program": 24,
+          "program": 25,
+          "program_source": "ableton_clip_name",
+          "scene_index": 23,
+          "title": "BANG BANG ; BPM ; KEY ; 2:41"
+        }
+      ],
+      "25": [
+        {
+          "midi_program": 25,
+          "program": 26,
+          "program_source": "ableton_clip_name",
+          "scene_index": 24,
+          "title": "CRAZY ; BPM ; KEY ; 2:46"
+        }
+      ],
+      "26": [
+        {
+          "midi_program": 26,
+          "program": 27,
+          "program_source": "ableton_clip_name",
+          "scene_index": 25,
+          "title": "LA VALSE A 1000 TEMPS ; BPM ; KEY ; 4:02"
+        }
+      ],
+      "27": [
+        {
+          "midi_program": 27,
+          "program": 28,
+          "program_source": "ableton_clip_name",
+          "scene_index": 26,
+          "title": "entree directrice"
+        }
+      ],
+      "39": [
+        {
+          "midi_program": 39,
+          "program": 40,
+          "program_source": "ableton_clip_name",
+          "scene_index": 28,
+          "title": "prepa SHOW"
+        }
+      ],
+      "40": [
+        {
+          "midi_program": 40,
+          "program": 41,
+          "program_source": "ableton_clip_name",
+          "scene_index": 30,
+          "title": "1 - EN ROUTE POUR LE PARADIS_NAPOLEON ; BPM ; KEY ; 1:14"
+        }
+      ],
+      "41": [
+        {
+          "midi_program": 41,
+          "program": 42,
+          "program_source": "ableton_clip_name",
+          "scene_index": 31,
+          "title": "2 - TABLEAU VIS A VIS ; BPM ; KEY ; 6:15"
+        }
+      ],
+      "43": [
+        {
+          "midi_program": 43,
+          "program": 44,
+          "program_source": "ableton_clip_name",
+          "scene_index": 32,
+          "title": "3 -  SUPREME ; BPM ; KEY ; 3:40"
+        }
+      ],
+      "45": [
+        {
+          "midi_program": 45,
+          "program": 46,
+          "program_source": "ableton_clip_name",
+          "scene_index": 33,
+          "title": "4 -  NEVER The Greateast ; BPM ; KEY ; 3:30"
+        }
+      ],
+      "47": [
+        {
+          "midi_program": 47,
+          "program": 48,
+          "program_source": "ableton_clip_name",
+          "scene_index": 34,
+          "title": "Jingle AVA Le lustre"
+        },
+        {
+          "midi_program": 47,
+          "program": 48,
+          "program_source": "ableton_clip_name",
+          "scene_index": 39,
+          "title": "AVA \"j ai encore peté les plombs\""
+        },
+        {
+          "midi_program": 47,
+          "program": 48,
+          "program_source": "ableton_clip_name",
+          "scene_index": 55,
+          "title": "AVA UKULELE OUT ; BPM ; KEY ; 0:28"
+        },
+        {
+          "midi_program": 47,
+          "program": 48,
+          "program_source": "ableton_clip_name",
+          "scene_index": 56,
+          "title": "AVA UKULELE OUT 2 ; BPM ; KEY ; 0:28"
+        },
+        {
+          "midi_program": 47,
+          "program": 48,
+          "program_source": "ableton_clip_name",
+          "scene_index": 60,
+          "title": "IN AVA corde a linge ; BPM ; KEY ; 0:28"
+        }
+      ],
+      "48": [
+        {
+          "midi_program": 48,
+          "program": 49,
+          "program_source": "ableton_clip_name",
+          "scene_index": 36,
+          "title": "6 - PARIS MON AMOUR ; BPM ; KEY ; 2:03"
+        }
+      ],
+      "49": [
+        {
+          "midi_program": 49,
+          "program": 50,
+          "program_source": "ableton_clip_name",
+          "scene_index": 37,
+          "title": "7 - TABLEAU HYPNOTIQUE ; BPM ; KEY ; 6:29"
+        }
+      ],
+      "50": [
+        {
+          "midi_program": 50,
+          "program": 51,
+          "program_source": "ableton_clip_name",
+          "scene_index": 38,
+          "title": "AVA \"FAKIR\"; BPM;KEY;5:17"
+        }
+      ],
+      "51": [
+        {
+          "midi_program": 51,
+          "program": 52,
+          "program_source": "ableton_clip_name",
+          "scene_index": 40,
+          "title": "GIGI; BPM ; KEY ; 1:51"
+        }
+      ],
+      "56": [
+        {
+          "midi_program": 56,
+          "program": 57,
+          "program_source": "ableton_clip_name",
+          "scene_index": 44,
+          "title": "10 - L'OBJET DU DESIR ; BPM ; KEY ; 3:11"
+        }
+      ],
+      "57": [
+        {
+          "midi_program": 57,
+          "program": 58,
+          "program_source": "ableton_clip_name",
+          "scene_index": 45,
+          "title": "11 - DEFILE DES NATIONS ; BPM ; KEY ; 1:19"
+        }
+      ],
+      "58": [
+        {
+          "midi_program": 58,
+          "program": 59,
+          "program_source": "ableton_clip_name",
+          "scene_index": 46,
+          "title": "12 - LA MARSEILLAISE ; BPM ; KEY ; 0:55"
+        }
+      ],
+      "59": [
+        {
+          "midi_program": 59,
+          "program": 60,
+          "program_source": "ableton_clip_name",
+          "scene_index": 47,
+          "title": "13 - H2O - VIDEO - ; BPM ; KEY ; 3:20"
+        }
+      ],
+      "60": [
+        {
+          "midi_program": 60,
+          "program": 61,
+          "program_source": "ableton_clip_name",
+          "scene_index": 48,
+          "title": "14 - ORAGE"
+        }
+      ],
+      "61": [
+        {
+          "midi_program": 61,
+          "program": 62,
+          "program_source": "ableton_clip_name",
+          "scene_index": 49,
+          "title": "15 - Baignoire ; BPM ; KEY ; 4:45"
+        },
+        {
+          "midi_program": 61,
+          "program": 62,
+          "program_source": "ableton_clip_name",
+          "scene_index": 82,
+          "title": "15 - ARNO ; BPM ; KEY ; 4:45"
+        },
+        {
+          "midi_program": 61,
+          "program": 62,
+          "program_source": "ableton_clip_name",
+          "scene_index": 83,
+          "title": "15 - Cecile MUSE"
+        },
+        {
+          "midi_program": 61,
+          "program": 62,
+          "program_source": "ableton_clip_name",
+          "scene_index": 84,
+          "title": "15 - Cecile boxeuse"
+        },
+        {
+          "midi_program": 61,
+          "program": 62,
+          "program_source": "ableton_clip_name",
+          "scene_index": 85,
+          "title": "15 - Zebulon"
+        }
+      ],
+      "62": [
+        {
+          "midi_program": 62,
+          "program": 63,
+          "program_source": "ableton_clip_name",
+          "scene_index": 50,
+          "title": "16 - in voyage"
+        },
+        {
+          "midi_program": 62,
+          "program": 63,
+          "program_source": "ableton_clip_name",
+          "scene_index": 52,
+          "title": "16 - I WILL ALWAYS/UAM"
+        }
+      ],
+      "63": [
+        {
+          "midi_program": 63,
+          "program": 64,
+          "program_source": "ableton_clip_name",
+          "scene_index": 53,
+          "title": "17 - BETE DE SEXE ; BPM ; KEY ; 8:07"
+        }
+      ],
+      "64": [
+        {
+          "midi_program": 64,
+          "program": 65,
+          "program_source": "ableton_clip_name",
+          "scene_index": 54,
+          "title": "AVA UKULELE IN; BPM ; KEY ; 0:28"
+        }
+      ],
+      "66": [
+        {
+          "midi_program": 66,
+          "program": 67,
+          "program_source": "ableton_clip_name",
+          "scene_index": 57,
+          "title": "19 - MAPPING ; BPM ; KEY ; 2:10"
+        }
+      ],
+      "68": [
+        {
+          "midi_program": 68,
+          "program": 69,
+          "program_source": "ableton_clip_name",
+          "scene_index": 58,
+          "title": "20 - CANCANS traditionnel ; BPM ; KEY ; 5:25"
+        }
+      ],
+      "69": [
+        {
+          "midi_program": 69,
+          "program": 70,
+          "program_source": "ableton_clip_name",
+          "scene_index": 59,
+          "title": "21 - CANCAN TECHNO ; BPM ; KEY ; 1:02"
+        }
+      ],
+      "71": [
+        {
+          "midi_program": 71,
+          "program": 72,
+          "program_source": "ableton_clip_name",
+          "scene_index": 63,
+          "title": "DUA LIPA = CHOEURS ; BPM ; KEY ;  2:05"
+        }
+      ],
+      "76": [
+        {
+          "midi_program": 76,
+          "program": 77,
+          "program_source": "ableton_clip_name",
+          "scene_index": 67,
+          "title": "AVA cannes IN"
+        }
+      ],
+      "79": [
+        {
+          "midi_program": 79,
+          "program": 80,
+          "program_source": "ableton_clip_name",
+          "scene_index": 69,
+          "title": "25 - PEGASE/OISEAU ; BPM ; KEY ; 11:47"
+        },
+        {
+          "midi_program": 79,
+          "program": 80,
+          "program_source": "ableton_clip_name",
+          "scene_index": 73,
+          "title": "25 - OP PEGASE intro; BPM ; KEY ; 2:21"
+        }
+      ]
+    },
+    "console_a": {
+      "8": [
+        {
+          "midi_program": 8,
+          "program": 9,
+          "program_source": "ableton_clip_name",
+          "scene_index": 1,
+          "title": "Reset CL5/QL1"
+        },
+        {
+          "midi_program": 8,
+          "program": 9,
+          "program_source": "ableton_clip_name",
+          "scene_index": 27,
+          "title": "ENTRACTE"
+        }
+      ],
+      "9": [
+        {
+          "midi_program": 9,
+          "program": 10,
+          "program_source": "ableton_clip_name",
+          "scene_index": 2,
+          "title": "Musique DINER+PREPA SHOW"
+        }
+      ],
+      "10": [
+        {
+          "midi_program": 10,
+          "program": 11,
+          "program_source": "ableton_clip_name",
+          "scene_index": 3,
+          "title": "TOXIC ; BPM ; KEY ; 4:25"
+        }
+      ],
+      "11": [
+        {
+          "midi_program": 11,
+          "program": 12,
+          "program_source": "ableton_clip_name",
+          "scene_index": 4,
+          "title": "Que reste t'il de nos amours ; BPM ; KEY ; 2:57"
+        }
+      ],
+      "12": [
+        {
+          "midi_program": 12,
+          "program": 13,
+          "program_source": "ableton_clip_name",
+          "scene_index": 5,
+          "title": "Falling ; BPM ; KEY ; 3:49"
+        }
+      ],
+      "13": [
+        {
+          "midi_program": 13,
+          "program": 14,
+          "program_source": "ableton_clip_name",
+          "scene_index": 6,
+          "title": "fever ; BPM ; KEY ; 3:35"
+        }
+      ],
+      "14": [
+        {
+          "midi_program": 14,
+          "program": 15,
+          "program_source": "ableton_clip_name",
+          "scene_index": 7,
+          "title": "what about us ; BPM ; KEY ; 4:27"
+        }
+      ],
+      "15": [
+        {
+          "midi_program": 15,
+          "program": 16,
+          "program_source": "ableton_clip_name",
+          "scene_index": 8,
+          "title": "Battez Vous  ; BPM ; KEY ; 4:16"
+        }
+      ],
+      "16": [
+        {
+          "midi_program": 16,
+          "program": 17,
+          "program_source": "ableton_clip_name",
+          "scene_index": 9,
+          "title": "FLOWERS ; BPM ; KEY ; 3:15"
+        },
+        {
+          "midi_program": 16,
+          "program": 17,
+          "program_source": "ableton_clip_name",
+          "scene_index": 76,
+          "title": "Diamons ; BPM ; KEY ; 3:48"
+        }
+      ],
+      "17": [
+        {
+          "midi_program": 17,
+          "program": 18,
+          "program_source": "ableton_clip_name",
+          "scene_index": 10,
+          "title": "la foule + violons ; BPM ; KEY ; 3:34"
+        }
+      ],
+      "18": [
+        {
+          "midi_program": 18,
+          "program": 19,
+          "program_source": "ableton_clip_name",
+          "scene_index": 11,
+          "title": "VIOLONS Bob Marley ; BPM ; KEY ; 1:43"
+        }
+      ],
+      "19": [
+        {
+          "midi_program": 19,
+          "program": 20,
+          "program_source": "ableton_clip_name",
+          "scene_index": 16,
+          "title": "let's Dance; BPM ; KEY ; 3:10"
+        }
+      ],
+      "20": [
+        {
+          "midi_program": 20,
+          "program": 21,
+          "program_source": "ableton_clip_name",
+          "scene_index": 17,
+          "title": "Jardin d'hiver ; BPM ; KEY ; 2:57"
+        }
+      ],
+      "21": [
+        {
+          "midi_program": 21,
+          "program": 22,
+          "program_source": "ableton_clip_name",
+          "scene_index": 19,
+          "title": "VIENS VOIR  ; BPM ; KEY ; 2:20"
+        }
+      ],
+      "22": [
+        {
+          "midi_program": 22,
+          "program": 23,
+          "program_source": "ableton_clip_name",
+          "scene_index": 21,
+          "title": "HOLLOWBACK GIRL ; BPM ; KEY ; 2:53"
+        }
+      ],
+      "23": [
+        {
+          "midi_program": 23,
+          "program": 24,
+          "program_source": "ableton_clip_name",
+          "scene_index": 22,
+          "title": "Ne me quitte pas; BPM ; KEY ; 4:07"
+        }
+      ],
+      "24": [
+        {
+          "midi_program": 24,
+          "program": 25,
+          "program_source": "ableton_clip_name",
+          "scene_index": 23,
+          "title": "BANG BANG ; BPM ; KEY ; 2:41"
+        }
+      ],
+      "25": [
+        {
+          "midi_program": 25,
+          "program": 26,
+          "program_source": "ableton_clip_name",
+          "scene_index": 24,
+          "title": "CRAZY ; BPM ; KEY ; 2:46"
+        }
+      ],
+      "26": [
+        {
+          "midi_program": 26,
+          "program": 27,
+          "program_source": "ableton_clip_name",
+          "scene_index": 25,
+          "title": "LA VALSE A 1000 TEMPS ; BPM ; KEY ; 4:02"
+        }
+      ],
+      "27": [
+        {
+          "midi_program": 27,
+          "program": 28,
+          "program_source": "ableton_clip_name",
+          "scene_index": 26,
+          "title": "entree directrice"
+        }
+      ],
+      "39": [
+        {
+          "midi_program": 39,
+          "program": 40,
+          "program_source": "ableton_clip_name",
+          "scene_index": 28,
+          "title": "prepa SHOW"
+        }
+      ],
+      "40": [
+        {
+          "midi_program": 40,
+          "program": 41,
+          "program_source": "ableton_clip_name",
+          "scene_index": 30,
+          "title": "1 - EN ROUTE POUR LE PARADIS_NAPOLEON ; BPM ; KEY ; 1:14"
+        }
+      ],
+      "41": [
+        {
+          "midi_program": 41,
+          "program": 42,
+          "program_source": "ableton_clip_name",
+          "scene_index": 31,
+          "title": "2 - TABLEAU VIS A VIS ; BPM ; KEY ; 6:15"
+        }
+      ],
+      "43": [
+        {
+          "midi_program": 43,
+          "program": 44,
+          "program_source": "ableton_clip_name",
+          "scene_index": 32,
+          "title": "3 -  SUPREME ; BPM ; KEY ; 3:40"
+        }
+      ],
+      "45": [
+        {
+          "midi_program": 45,
+          "program": 46,
+          "program_source": "ableton_clip_name",
+          "scene_index": 33,
+          "title": "4 -  NEVER The Greateast ; BPM ; KEY ; 3:30"
+        }
+      ],
+      "47": [
+        {
+          "midi_program": 47,
+          "program": 48,
+          "program_source": "ableton_clip_name",
+          "scene_index": 34,
+          "title": "Jingle AVA Le lustre"
+        },
+        {
+          "midi_program": 47,
+          "program": 48,
+          "program_source": "ableton_clip_name",
+          "scene_index": 39,
+          "title": "AVA \"j ai encore peté les plombs\""
+        },
+        {
+          "midi_program": 47,
+          "program": 48,
+          "program_source": "ableton_clip_name",
+          "scene_index": 55,
+          "title": "AVA UKULELE OUT ; BPM ; KEY ; 0:28"
+        },
+        {
+          "midi_program": 47,
+          "program": 48,
+          "program_source": "ableton_clip_name",
+          "scene_index": 56,
+          "title": "AVA UKULELE OUT 2 ; BPM ; KEY ; 0:28"
+        },
+        {
+          "midi_program": 47,
+          "program": 48,
+          "program_source": "ableton_clip_name",
+          "scene_index": 60,
+          "title": "IN AVA corde a linge ; BPM ; KEY ; 0:28"
+        }
+      ],
+      "48": [
+        {
+          "midi_program": 48,
+          "program": 49,
+          "program_source": "ableton_clip_name",
+          "scene_index": 36,
+          "title": "6 - PARIS MON AMOUR ; BPM ; KEY ; 2:03"
+        }
+      ],
+      "49": [
+        {
+          "midi_program": 49,
+          "program": 50,
+          "program_source": "ableton_clip_name",
+          "scene_index": 37,
+          "title": "7 - TABLEAU HYPNOTIQUE ; BPM ; KEY ; 6:29"
+        }
+      ],
+      "50": [
+        {
+          "midi_program": 50,
+          "program": 51,
+          "program_source": "ableton_clip_name",
+          "scene_index": 38,
+          "title": "AVA \"FAKIR\"; BPM;KEY;5:17"
+        }
+      ],
+      "51": [
+        {
+          "midi_program": 51,
+          "program": 52,
+          "program_source": "ableton_clip_name",
+          "scene_index": 40,
+          "title": "GIGI; BPM ; KEY ; 1:51"
+        }
+      ],
+      "56": [
+        {
+          "midi_program": 56,
+          "program": 57,
+          "program_source": "ableton_clip_name",
+          "scene_index": 44,
+          "title": "10 - L'OBJET DU DESIR ; BPM ; KEY ; 3:11"
+        }
+      ],
+      "57": [
+        {
+          "midi_program": 57,
+          "program": 58,
+          "program_source": "ableton_clip_name",
+          "scene_index": 45,
+          "title": "11 - DEFILE DES NATIONS ; BPM ; KEY ; 1:19"
+        }
+      ],
+      "58": [
+        {
+          "midi_program": 58,
+          "program": 59,
+          "program_source": "ableton_clip_name",
+          "scene_index": 46,
+          "title": "12 - LA MARSEILLAISE ; BPM ; KEY ; 0:55"
+        }
+      ],
+      "59": [
+        {
+          "midi_program": 59,
+          "program": 60,
+          "program_source": "ableton_clip_name",
+          "scene_index": 47,
+          "title": "13 - H2O - VIDEO - ; BPM ; KEY ; 3:20"
+        }
+      ],
+      "60": [
+        {
+          "midi_program": 60,
+          "program": 61,
+          "program_source": "ableton_clip_name",
+          "scene_index": 48,
+          "title": "14 - ORAGE"
+        }
+      ],
+      "61": [
+        {
+          "midi_program": 61,
+          "program": 62,
+          "program_source": "ableton_clip_name",
+          "scene_index": 49,
+          "title": "15 - Baignoire ; BPM ; KEY ; 4:45"
+        },
+        {
+          "midi_program": 61,
+          "program": 62,
+          "program_source": "ableton_clip_name",
+          "scene_index": 82,
+          "title": "15 - ARNO ; BPM ; KEY ; 4:45"
+        },
+        {
+          "midi_program": 61,
+          "program": 62,
+          "program_source": "ableton_clip_name",
+          "scene_index": 83,
+          "title": "15 - Cecile MUSE"
+        },
+        {
+          "midi_program": 61,
+          "program": 62,
+          "program_source": "ableton_clip_name",
+          "scene_index": 84,
+          "title": "15 - Cecile boxeuse"
+        },
+        {
+          "midi_program": 61,
+          "program": 62,
+          "program_source": "ableton_clip_name",
+          "scene_index": 85,
+          "title": "15 - Zebulon"
+        }
+      ],
+      "62": [
+        {
+          "midi_program": 62,
+          "program": 63,
+          "program_source": "ableton_clip_name",
+          "scene_index": 50,
+          "title": "16 - in voyage"
+        },
+        {
+          "midi_program": 62,
+          "program": 63,
+          "program_source": "ableton_clip_name",
+          "scene_index": 52,
+          "title": "16 - I WILL ALWAYS/UAM"
+        }
+      ],
+      "63": [
+        {
+          "midi_program": 63,
+          "program": 64,
+          "program_source": "ableton_clip_name",
+          "scene_index": 53,
+          "title": "17 - BETE DE SEXE ; BPM ; KEY ; 8:07"
+        }
+      ],
+      "64": [
+        {
+          "midi_program": 64,
+          "program": 65,
+          "program_source": "ableton_clip_name",
+          "scene_index": 54,
+          "title": "AVA UKULELE IN; BPM ; KEY ; 0:28"
+        }
+      ],
+      "66": [
+        {
+          "midi_program": 66,
+          "program": 67,
+          "program_source": "ableton_clip_name",
+          "scene_index": 57,
+          "title": "19 - MAPPING ; BPM ; KEY ; 2:10"
+        }
+      ],
+      "68": [
+        {
+          "midi_program": 68,
+          "program": 69,
+          "program_source": "ableton_clip_name",
+          "scene_index": 58,
+          "title": "20 - CANCANS traditionnel ; BPM ; KEY ; 5:25"
+        }
+      ],
+      "69": [
+        {
+          "midi_program": 69,
+          "program": 70,
+          "program_source": "ableton_clip_name",
+          "scene_index": 59,
+          "title": "21 - CANCAN TECHNO ; BPM ; KEY ; 1:02"
+        }
+      ],
+      "71": [
+        {
+          "midi_program": 71,
+          "program": 72,
+          "program_source": "ableton_clip_name",
+          "scene_index": 63,
+          "title": "DUA LIPA = CHOEURS ; BPM ; KEY ;  2:05"
+        }
+      ],
+      "76": [
+        {
+          "midi_program": 76,
+          "program": 77,
+          "program_source": "ableton_clip_name",
+          "scene_index": 67,
+          "title": "AVA cannes IN"
+        }
+      ],
+      "79": [
+        {
+          "midi_program": 79,
+          "program": 80,
+          "program_source": "ableton_clip_name",
+          "scene_index": 69,
+          "title": "25 - PEGASE/OISEAU ; BPM ; KEY ; 11:47"
+        },
+        {
+          "midi_program": 79,
+          "program": 80,
+          "program_source": "ableton_clip_name",
+          "scene_index": 73,
+          "title": "25 - OP PEGASE intro; BPM ; KEY ; 2:21"
+        }
+      ]
+    },
+    "console_b": {
+      "9": [
+        {
+          "midi_program": 9,
+          "program": 10,
+          "program_source": "ableton_clip_name",
+          "scene_index": 1,
+          "title": "Reset CL5/QL1"
+        },
+        {
+          "midi_program": 9,
+          "program": 10,
+          "program_source": "ableton_clip_name",
+          "scene_index": 2,
+          "title": "Musique DINER+PREPA SHOW"
+        }
+      ],
+      "10": [
+        {
+          "midi_program": 10,
+          "program": 11,
+          "program_source": "ableton_clip_name",
+          "scene_index": 3,
+          "title": "TOXIC ; BPM ; KEY ; 4:25"
+        }
+      ],
+      "11": [
+        {
+          "midi_program": 11,
+          "program": 12,
+          "program_source": "ableton_clip_name",
+          "scene_index": 4,
+          "title": "Que reste t'il de nos amours ; BPM ; KEY ; 2:57"
+        }
+      ],
+      "12": [
+        {
+          "midi_program": 12,
+          "program": 13,
+          "program_source": "ableton_clip_name",
+          "scene_index": 5,
+          "title": "Falling ; BPM ; KEY ; 3:49"
+        }
+      ],
+      "13": [
+        {
+          "midi_program": 13,
+          "program": 14,
+          "program_source": "ableton_clip_name",
+          "scene_index": 6,
+          "title": "fever ; BPM ; KEY ; 3:35"
+        }
+      ],
+      "14": [
+        {
+          "midi_program": 14,
+          "program": 15,
+          "program_source": "ableton_clip_name",
+          "scene_index": 7,
+          "title": "what about us ; BPM ; KEY ; 4:27"
+        }
+      ],
+      "15": [
+        {
+          "midi_program": 15,
+          "program": 16,
+          "program_source": "ableton_clip_name",
+          "scene_index": 8,
+          "title": "Battez Vous  ; BPM ; KEY ; 4:16"
+        }
+      ],
+      "16": [
+        {
+          "midi_program": 16,
+          "program": 17,
+          "program_source": "ableton_clip_name",
+          "scene_index": 9,
+          "title": "FLOWERS ; BPM ; KEY ; 3:15"
+        },
+        {
+          "midi_program": 16,
+          "program": 17,
+          "program_source": "ableton_clip_name",
+          "scene_index": 76,
+          "title": "Diamons ; BPM ; KEY ; 3:48"
+        }
+      ],
+      "17": [
+        {
+          "midi_program": 17,
+          "program": 18,
+          "program_source": "ableton_clip_name",
+          "scene_index": 10,
+          "title": "la foule + violons ; BPM ; KEY ; 3:34"
+        }
+      ],
+      "18": [
+        {
+          "midi_program": 18,
+          "program": 19,
+          "program_source": "ableton_clip_name",
+          "scene_index": 11,
+          "title": "VIOLONS Bob Marley ; BPM ; KEY ; 1:43"
+        }
+      ],
+      "19": [
+        {
+          "midi_program": 19,
+          "program": 20,
+          "program_source": "ableton_clip_name",
+          "scene_index": 16,
+          "title": "let's Dance; BPM ; KEY ; 3:10"
+        }
+      ],
+      "20": [
+        {
+          "midi_program": 20,
+          "program": 21,
+          "program_source": "ableton_clip_name",
+          "scene_index": 17,
+          "title": "Jardin d'hiver ; BPM ; KEY ; 2:57"
+        }
+      ],
+      "21": [
+        {
+          "midi_program": 21,
+          "program": 22,
+          "program_source": "ableton_clip_name",
+          "scene_index": 19,
+          "title": "VIENS VOIR  ; BPM ; KEY ; 2:20"
+        }
+      ],
+      "22": [
+        {
+          "midi_program": 22,
+          "program": 23,
+          "program_source": "ableton_clip_name",
+          "scene_index": 21,
+          "title": "HOLLOWBACK GIRL ; BPM ; KEY ; 2:53"
+        }
+      ],
+      "23": [
+        {
+          "midi_program": 23,
+          "program": 24,
+          "program_source": "ableton_clip_name",
+          "scene_index": 22,
+          "title": "Ne me quitte pas; BPM ; KEY ; 4:07"
+        }
+      ],
+      "24": [
+        {
+          "midi_program": 24,
+          "program": 25,
+          "program_source": "ableton_clip_name",
+          "scene_index": 23,
+          "title": "BANG BANG ; BPM ; KEY ; 2:41"
+        }
+      ],
+      "25": [
+        {
+          "midi_program": 25,
+          "program": 26,
+          "program_source": "ableton_clip_name",
+          "scene_index": 24,
+          "title": "CRAZY ; BPM ; KEY ; 2:46"
+        }
+      ],
+      "27": [
+        {
+          "midi_program": 27,
+          "program": 28,
+          "program_source": "ableton_clip_name",
+          "scene_index": 26,
+          "title": "entree directrice"
+        }
+      ],
+      "28": [
+        {
+          "midi_program": 28,
+          "program": 29,
+          "program_source": "ableton_clip_name",
+          "scene_index": 20,
+          "title": "It's all so quiet (Bjork) ; BPM ; KEY ; 3:38"
+        }
+      ],
+      "29": [
+        {
+          "midi_program": 29,
+          "program": 30,
+          "program_source": "ableton_clip_name",
+          "scene_index": 18,
+          "title": "The winner WARPED ; BPM ; KEY ; 2:58"
+        }
+      ],
+      "39": [
+        {
+          "midi_program": 39,
+          "program": 40,
+          "program_source": "ableton_clip_name",
+          "scene_index": 27,
+          "title": "ENTRACTE"
+        },
+        {
+          "midi_program": 39,
+          "program": 40,
+          "program_source": "ableton_clip_name",
+          "scene_index": 28,
+          "title": "prepa SHOW"
+        }
+      ],
+      "40": [
+        {
+          "midi_program": 40,
+          "program": 41,
+          "program_source": "ableton_clip_name",
+          "scene_index": 30,
+          "title": "1 - EN ROUTE POUR LE PARADIS_NAPOLEON ; BPM ; KEY ; 1:14"
+        }
+      ],
+      "42": [
+        {
+          "midi_program": 42,
+          "program": 43,
+          "program_source": "ableton_clip_name",
+          "scene_index": 32,
+          "title": "3 -  SUPREME ; BPM ; KEY ; 3:40"
+        }
+      ],
+      "44": [
+        {
+          "midi_program": 44,
+          "program": 45,
+          "program_source": "ableton_clip_name",
+          "scene_index": 33,
+          "title": "4 -  NEVER The Greateast ; BPM ; KEY ; 3:30"
+        }
+      ],
+      "46": [
+        {
+          "midi_program": 46,
+          "program": 47,
+          "program_source": "ableton_clip_name",
+          "scene_index": 34,
+          "title": "Jingle AVA Le lustre"
+        }
+      ],
+      "48": [
+        {
+          "midi_program": 48,
+          "program": 49,
+          "program_source": "ableton_clip_name",
+          "scene_index": 40,
+          "title": "GIGI; BPM ; KEY ; 1:51"
+        }
+      ],
+      "49": [
+        {
+          "midi_program": 49,
+          "program": 50,
+          "program_source": "ableton_clip_name",
+          "scene_index": 41,
+          "title": "NEVER..(Gloria Gaynor) ; BPM ; KEY ; 1:39"
+        }
+      ],
+      "50": [
+        {
+          "midi_program": 50,
+          "program": 51,
+          "program_source": "ableton_clip_name",
+          "scene_index": 42,
+          "title": "LOVE; BPM ; KEY ; 1:39"
+        }
+      ],
+      "53": [
+        {
+          "midi_program": 53,
+          "program": 54,
+          "program_source": "ableton_clip_name",
+          "scene_index": 44,
+          "title": "10 - L'OBJET DU DESIR ; BPM ; KEY ; 3:11"
+        }
+      ],
+      "54": [
+        {
+          "midi_program": 54,
+          "program": 55,
+          "program_source": "ableton_clip_name",
+          "scene_index": 45,
+          "title": "11 - DEFILE DES NATIONS ; BPM ; KEY ; 1:19"
+        }
+      ],
+      "55": [
+        {
+          "midi_program": 55,
+          "program": 56,
+          "program_source": "ableton_clip_name",
+          "scene_index": 47,
+          "title": "13 - H2O - VIDEO - ; BPM ; KEY ; 3:20"
+        }
+      ],
+      "56": [
+        {
+          "midi_program": 56,
+          "program": 57,
+          "program_source": "ableton_clip_name",
+          "scene_index": 50,
+          "title": "16 - in voyage"
+        },
+        {
+          "midi_program": 56,
+          "program": 57,
+          "program_source": "ableton_clip_name",
+          "scene_index": 52,
+          "title": "16 - I WILL ALWAYS/UAM"
+        }
+      ],
+      "57": [
+        {
+          "midi_program": 57,
+          "program": 58,
+          "program_source": "ableton_clip_name",
+          "scene_index": 53,
+          "title": "17 - BETE DE SEXE ; BPM ; KEY ; 8:07"
+        }
+      ],
+      "58": [
+        {
+          "midi_program": 58,
+          "program": 59,
+          "program_source": "ableton_clip_name",
+          "scene_index": 55,
+          "title": "AVA UKULELE OUT ; BPM ; KEY ; 0:28"
+        },
+        {
+          "midi_program": 58,
+          "program": 59,
+          "program_source": "ableton_clip_name",
+          "scene_index": 56,
+          "title": "AVA UKULELE OUT 2 ; BPM ; KEY ; 0:28"
+        }
+      ],
+      "59": [
+        {
+          "midi_program": 59,
+          "program": 60,
+          "program_source": "ableton_clip_name",
+          "scene_index": 57,
+          "title": "19 - MAPPING ; BPM ; KEY ; 2:10"
+        }
+      ],
+      "60": [
+        {
+          "midi_program": 60,
+          "program": 61,
+          "program_source": "ableton_clip_name",
+          "scene_index": 58,
+          "title": "20 - CANCANS traditionnel ; BPM ; KEY ; 5:25"
+        }
+      ],
+      "61": [
+        {
+          "midi_program": 61,
+          "program": 62,
+          "program_source": "ableton_clip_name",
+          "scene_index": 60,
+          "title": "IN AVA corde a linge ; BPM ; KEY ; 0:28"
+        }
+      ],
+      "62": [
+        {
+          "midi_program": 62,
+          "program": 63,
+          "program_source": "ableton_clip_name",
+          "scene_index": 61,
+          "title": "OUT AVA corde a linge; BPM ; KEY ; 0:28"
+        },
+        {
+          "midi_program": 62,
+          "program": 63,
+          "program_source": "ableton_clip_name",
+          "scene_index": 62,
+          "title": "ET MERDE AVA corde a linge; BPM ; KEY ; 0:28"
+        }
+      ],
+      "63": [
+        {
+          "midi_program": 63,
+          "program": 64,
+          "program_source": "ableton_clip_name",
+          "scene_index": 63,
+          "title": "DUA LIPA = CHOEURS ; BPM ; KEY ;  2:05"
+        }
+      ],
+      "64": [
+        {
+          "midi_program": 64,
+          "program": 65,
+          "program_source": "ableton_clip_name",
+          "scene_index": 64,
+          "title": "FREE FROM DESIRE ; BPM ; KEY ; 1:35"
+        }
+      ],
+      "65": [
+        {
+          "midi_program": 65,
+          "program": 66,
+          "program_source": "ableton_clip_name",
+          "scene_index": 65,
+          "title": "PROUD MARY ;  BPM ; KEY ; 1:34"
+        }
+      ],
+      "66": [
+        {
+          "midi_program": 66,
+          "program": 67,
+          "program_source": "ableton_clip_name",
+          "scene_index": 66,
+          "title": "CANT STOP1 ;  BPM ; KEY ; 2:40"
+        }
+      ],
+      "67": [
+        {
+          "midi_program": 67,
+          "program": 68,
+          "program_source": "ableton_clip_name",
+          "scene_index": 67,
+          "title": "AVA cannes IN"
+        }
+      ],
+      "68": [
+        {
+          "midi_program": 68,
+          "program": 69,
+          "program_source": "ableton_clip_name",
+          "scene_index": 68,
+          "title": "Sortie Cannes"
+        }
+      ],
+      "79": [
+        {
+          "midi_program": 79,
+          "program": 80,
+          "program_source": "ableton_clip_name",
+          "scene_index": 73,
+          "title": "25 - OP PEGASE intro; BPM ; KEY ; 2:21"
+        }
+      ]
+    },
+    "ql1": {
+      "9": [
+        {
+          "midi_program": 9,
+          "program": 10,
+          "program_source": "ableton_clip_name",
+          "scene_index": 1,
+          "title": "Reset CL5/QL1"
+        },
+        {
+          "midi_program": 9,
+          "program": 10,
+          "program_source": "ableton_clip_name",
+          "scene_index": 2,
+          "title": "Musique DINER+PREPA SHOW"
+        }
+      ],
+      "10": [
+        {
+          "midi_program": 10,
+          "program": 11,
+          "program_source": "ableton_clip_name",
+          "scene_index": 3,
+          "title": "TOXIC ; BPM ; KEY ; 4:25"
+        }
+      ],
+      "11": [
+        {
+          "midi_program": 11,
+          "program": 12,
+          "program_source": "ableton_clip_name",
+          "scene_index": 4,
+          "title": "Que reste t'il de nos amours ; BPM ; KEY ; 2:57"
+        }
+      ],
+      "12": [
+        {
+          "midi_program": 12,
+          "program": 13,
+          "program_source": "ableton_clip_name",
+          "scene_index": 5,
+          "title": "Falling ; BPM ; KEY ; 3:49"
+        }
+      ],
+      "13": [
+        {
+          "midi_program": 13,
+          "program": 14,
+          "program_source": "ableton_clip_name",
+          "scene_index": 6,
+          "title": "fever ; BPM ; KEY ; 3:35"
+        }
+      ],
+      "14": [
+        {
+          "midi_program": 14,
+          "program": 15,
+          "program_source": "ableton_clip_name",
+          "scene_index": 7,
+          "title": "what about us ; BPM ; KEY ; 4:27"
+        }
+      ],
+      "15": [
+        {
+          "midi_program": 15,
+          "program": 16,
+          "program_source": "ableton_clip_name",
+          "scene_index": 8,
+          "title": "Battez Vous  ; BPM ; KEY ; 4:16"
+        }
+      ],
+      "16": [
+        {
+          "midi_program": 16,
+          "program": 17,
+          "program_source": "ableton_clip_name",
+          "scene_index": 9,
+          "title": "FLOWERS ; BPM ; KEY ; 3:15"
+        },
+        {
+          "midi_program": 16,
+          "program": 17,
+          "program_source": "ableton_clip_name",
+          "scene_index": 76,
+          "title": "Diamons ; BPM ; KEY ; 3:48"
+        }
+      ],
+      "17": [
+        {
+          "midi_program": 17,
+          "program": 18,
+          "program_source": "ableton_clip_name",
+          "scene_index": 10,
+          "title": "la foule + violons ; BPM ; KEY ; 3:34"
+        }
+      ],
+      "18": [
+        {
+          "midi_program": 18,
+          "program": 19,
+          "program_source": "ableton_clip_name",
+          "scene_index": 11,
+          "title": "VIOLONS Bob Marley ; BPM ; KEY ; 1:43"
+        }
+      ],
+      "19": [
+        {
+          "midi_program": 19,
+          "program": 20,
+          "program_source": "ableton_clip_name",
+          "scene_index": 16,
+          "title": "let's Dance; BPM ; KEY ; 3:10"
+        }
+      ],
+      "20": [
+        {
+          "midi_program": 20,
+          "program": 21,
+          "program_source": "ableton_clip_name",
+          "scene_index": 17,
+          "title": "Jardin d'hiver ; BPM ; KEY ; 2:57"
+        }
+      ],
+      "21": [
+        {
+          "midi_program": 21,
+          "program": 22,
+          "program_source": "ableton_clip_name",
+          "scene_index": 19,
+          "title": "VIENS VOIR  ; BPM ; KEY ; 2:20"
+        }
+      ],
+      "22": [
+        {
+          "midi_program": 22,
+          "program": 23,
+          "program_source": "ableton_clip_name",
+          "scene_index": 21,
+          "title": "HOLLOWBACK GIRL ; BPM ; KEY ; 2:53"
+        }
+      ],
+      "23": [
+        {
+          "midi_program": 23,
+          "program": 24,
+          "program_source": "ableton_clip_name",
+          "scene_index": 22,
+          "title": "Ne me quitte pas; BPM ; KEY ; 4:07"
+        }
+      ],
+      "24": [
+        {
+          "midi_program": 24,
+          "program": 25,
+          "program_source": "ableton_clip_name",
+          "scene_index": 23,
+          "title": "BANG BANG ; BPM ; KEY ; 2:41"
+        }
+      ],
+      "25": [
+        {
+          "midi_program": 25,
+          "program": 26,
+          "program_source": "ableton_clip_name",
+          "scene_index": 24,
+          "title": "CRAZY ; BPM ; KEY ; 2:46"
+        }
+      ],
+      "27": [
+        {
+          "midi_program": 27,
+          "program": 28,
+          "program_source": "ableton_clip_name",
+          "scene_index": 26,
+          "title": "entree directrice"
+        }
+      ],
+      "28": [
+        {
+          "midi_program": 28,
+          "program": 29,
+          "program_source": "ableton_clip_name",
+          "scene_index": 20,
+          "title": "It's all so quiet (Bjork) ; BPM ; KEY ; 3:38"
+        }
+      ],
+      "29": [
+        {
+          "midi_program": 29,
+          "program": 30,
+          "program_source": "ableton_clip_name",
+          "scene_index": 18,
+          "title": "The winner WARPED ; BPM ; KEY ; 2:58"
+        }
+      ],
+      "39": [
+        {
+          "midi_program": 39,
+          "program": 40,
+          "program_source": "ableton_clip_name",
+          "scene_index": 27,
+          "title": "ENTRACTE"
+        },
+        {
+          "midi_program": 39,
+          "program": 40,
+          "program_source": "ableton_clip_name",
+          "scene_index": 28,
+          "title": "prepa SHOW"
+        }
+      ],
+      "40": [
+        {
+          "midi_program": 40,
+          "program": 41,
+          "program_source": "ableton_clip_name",
+          "scene_index": 30,
+          "title": "1 - EN ROUTE POUR LE PARADIS_NAPOLEON ; BPM ; KEY ; 1:14"
+        }
+      ],
+      "42": [
+        {
+          "midi_program": 42,
+          "program": 43,
+          "program_source": "ableton_clip_name",
+          "scene_index": 32,
+          "title": "3 -  SUPREME ; BPM ; KEY ; 3:40"
+        }
+      ],
+      "44": [
+        {
+          "midi_program": 44,
+          "program": 45,
+          "program_source": "ableton_clip_name",
+          "scene_index": 33,
+          "title": "4 -  NEVER The Greateast ; BPM ; KEY ; 3:30"
+        }
+      ],
+      "46": [
+        {
+          "midi_program": 46,
+          "program": 47,
+          "program_source": "ableton_clip_name",
+          "scene_index": 34,
+          "title": "Jingle AVA Le lustre"
+        }
+      ],
+      "48": [
+        {
+          "midi_program": 48,
+          "program": 49,
+          "program_source": "ableton_clip_name",
+          "scene_index": 40,
+          "title": "GIGI; BPM ; KEY ; 1:51"
+        }
+      ],
+      "49": [
+        {
+          "midi_program": 49,
+          "program": 50,
+          "program_source": "ableton_clip_name",
+          "scene_index": 41,
+          "title": "NEVER..(Gloria Gaynor) ; BPM ; KEY ; 1:39"
+        }
+      ],
+      "50": [
+        {
+          "midi_program": 50,
+          "program": 51,
+          "program_source": "ableton_clip_name",
+          "scene_index": 42,
+          "title": "LOVE; BPM ; KEY ; 1:39"
+        }
+      ],
+      "53": [
+        {
+          "midi_program": 53,
+          "program": 54,
+          "program_source": "ableton_clip_name",
+          "scene_index": 44,
+          "title": "10 - L'OBJET DU DESIR ; BPM ; KEY ; 3:11"
+        }
+      ],
+      "54": [
+        {
+          "midi_program": 54,
+          "program": 55,
+          "program_source": "ableton_clip_name",
+          "scene_index": 45,
+          "title": "11 - DEFILE DES NATIONS ; BPM ; KEY ; 1:19"
+        }
+      ],
+      "55": [
+        {
+          "midi_program": 55,
+          "program": 56,
+          "program_source": "ableton_clip_name",
+          "scene_index": 47,
+          "title": "13 - H2O - VIDEO - ; BPM ; KEY ; 3:20"
+        }
+      ],
+      "56": [
+        {
+          "midi_program": 56,
+          "program": 57,
+          "program_source": "ableton_clip_name",
+          "scene_index": 50,
+          "title": "16 - in voyage"
+        },
+        {
+          "midi_program": 56,
+          "program": 57,
+          "program_source": "ableton_clip_name",
+          "scene_index": 52,
+          "title": "16 - I WILL ALWAYS/UAM"
+        }
+      ],
+      "57": [
+        {
+          "midi_program": 57,
+          "program": 58,
+          "program_source": "ableton_clip_name",
+          "scene_index": 53,
+          "title": "17 - BETE DE SEXE ; BPM ; KEY ; 8:07"
+        }
+      ],
+      "58": [
+        {
+          "midi_program": 58,
+          "program": 59,
+          "program_source": "ableton_clip_name",
+          "scene_index": 55,
+          "title": "AVA UKULELE OUT ; BPM ; KEY ; 0:28"
+        },
+        {
+          "midi_program": 58,
+          "program": 59,
+          "program_source": "ableton_clip_name",
+          "scene_index": 56,
+          "title": "AVA UKULELE OUT 2 ; BPM ; KEY ; 0:28"
+        }
+      ],
+      "59": [
+        {
+          "midi_program": 59,
+          "program": 60,
+          "program_source": "ableton_clip_name",
+          "scene_index": 57,
+          "title": "19 - MAPPING ; BPM ; KEY ; 2:10"
+        }
+      ],
+      "60": [
+        {
+          "midi_program": 60,
+          "program": 61,
+          "program_source": "ableton_clip_name",
+          "scene_index": 58,
+          "title": "20 - CANCANS traditionnel ; BPM ; KEY ; 5:25"
+        }
+      ],
+      "61": [
+        {
+          "midi_program": 61,
+          "program": 62,
+          "program_source": "ableton_clip_name",
+          "scene_index": 60,
+          "title": "IN AVA corde a linge ; BPM ; KEY ; 0:28"
+        }
+      ],
+      "62": [
+        {
+          "midi_program": 62,
+          "program": 63,
+          "program_source": "ableton_clip_name",
+          "scene_index": 61,
+          "title": "OUT AVA corde a linge; BPM ; KEY ; 0:28"
+        },
+        {
+          "midi_program": 62,
+          "program": 63,
+          "program_source": "ableton_clip_name",
+          "scene_index": 62,
+          "title": "ET MERDE AVA corde a linge; BPM ; KEY ; 0:28"
+        }
+      ],
+      "63": [
+        {
+          "midi_program": 63,
+          "program": 64,
+          "program_source": "ableton_clip_name",
+          "scene_index": 63,
+          "title": "DUA LIPA = CHOEURS ; BPM ; KEY ;  2:05"
+        }
+      ],
+      "64": [
+        {
+          "midi_program": 64,
+          "program": 65,
+          "program_source": "ableton_clip_name",
+          "scene_index": 64,
+          "title": "FREE FROM DESIRE ; BPM ; KEY ; 1:35"
+        }
+      ],
+      "65": [
+        {
+          "midi_program": 65,
+          "program": 66,
+          "program_source": "ableton_clip_name",
+          "scene_index": 65,
+          "title": "PROUD MARY ;  BPM ; KEY ; 1:34"
+        }
+      ],
+      "66": [
+        {
+          "midi_program": 66,
+          "program": 67,
+          "program_source": "ableton_clip_name",
+          "scene_index": 66,
+          "title": "CANT STOP1 ;  BPM ; KEY ; 2:40"
+        }
+      ],
+      "67": [
+        {
+          "midi_program": 67,
+          "program": 68,
+          "program_source": "ableton_clip_name",
+          "scene_index": 67,
+          "title": "AVA cannes IN"
+        }
+      ],
+      "68": [
+        {
+          "midi_program": 68,
+          "program": 69,
+          "program_source": "ableton_clip_name",
+          "scene_index": 68,
+          "title": "Sortie Cannes"
+        }
+      ],
+      "79": [
+        {
+          "midi_program": 79,
+          "program": 80,
+          "program_source": "ableton_clip_name",
+          "scene_index": 73,
+          "title": "25 - OP PEGASE intro; BPM ; KEY ; 2:21"
+        }
+      ]
+    }
+  },
+  "console_scene_map_diagnostic": {
+    "attempt": 1,
+    "cl5_program_count": 45,
+    "clip_name_samples": {
+      "PGM CHANGE CL5": [
+        "PGM CHANGE 9",
+        "PGM CHANGE 10",
+        "PGM CHANGE 11",
+        "PGM CHANGE 12",
+        "PGM CHANGE 13",
+        "PGM CHANGE 14",
+        "PGM CHANGE 15",
+        "PGM CHANGE 16",
+        "PGM CHANGE 17",
+        "PGM CHANGE 18",
+        "PGM CHANGE 19",
+        "PGM CHANGE 20"
+      ],
+      "PGM CHANGE QL1": [
+        "PGM CHANGE 10",
+        "PGM CHANGE 10",
+        "PGM CHANGE 11",
+        "PGM CHANGE 12",
+        "PGM CHANGE 13",
+        "PGM CHANGE 14",
+        "PGM CHANGE 15",
+        "PGM CHANGE 16",
+        "PGM CHANGE 17",
+        "PGM CHANGE 18",
+        "PGM CHANGE 19",
+        "PGM CHANGE 20"
+      ]
+    },
+    "missing_tracks": [
+      "Main"
+    ],
+    "ql1_program_count": 45,
+    "status": "ready",
+    "track_names": [
+      "1 LTC  VIDEO / LIGHT",
+      "Sync Mtc Stop",
+      "RESAMPLE",
+      "4 CLICS INFOS",
+      "5 TONAS MIDI",
+      "6 SHOW TONA",
+      "TONA BASSE (A)",
+      "TONA HAUTE (B)",
+      "DETUNED (B)",
+      "10-Grand Piano",
+      "11 PLAYBACKS",
+      "12 amalia",
+      "13 PB JADE Naomi",
+      "14 PB JADE Chantelle",
+      "15 PB MIKA",
+      "16 PB JOHANNA",
+      "17 Venus",
+      "18 PRESHOW",
+      "19 Jade N (pbo)",
+      "20 Mathilde (pbo)",
+      "21 AMALIA (pbo)",
+      "22 VIOLONS / spare",
+      "23 SAISON 8",
+      "24 JMD",
+      "JOHANNA/MIKA/DIR",
+      "26 JCD",
+      "JOHANNA/CYRYL/DIR",
+      "28 JC/C/V",
+      "JUSTINE/CYR-DIR",
+      "30 JMD",
+      "JOHANNA/MIKA/DIR",
+      "32 JC/D/V",
+      "JADE.C -TOONY- DIRECTRICES",
+      "34 JC/D/V",
+      "JADE.C -DAVID- DIRECTRICE",
+      "36 JC/D/V",
+      "JADE.C -KEY- RYAN/VENUS",
+      "38 JC/B/V",
+      "JADE.C-BENY-RYAN/VENUS",
+      "40 JC/F/M",
+      "JADE FLO VENUS/R",
+      "42 TABLEAUX",
+      "43 Bruitages Eau",
+      "YAMAHA Mixer",
+      "PGM CHANGE CL5",
+      "46 RT CL5",
+      "CC TO PGM QL1",
+      "PGM CHANGE QL1",
+      "TOP infos"
+    ]
+  },
+  "console_title_mode": "imported_library",
+  "console_title_offset_range": {
+    "max": 5,
+    "min": -5
+  },
+  "console_title_offsets": {
+    "cl5": 0,
+    "ql1": 0
+  },
+  "console_title_source": "Bibliothèque de titres importée",
+  "current_scene": null,
+  "current_set_id": "/Users/mbprochris/Music/Ableton/S8. v12 def/S8 version MIKA_JOHANNA_VENUS FILAGE copie.als",
+  "current_set_name": "S8 version MIKA_JOHANNA_VENUS FILAGE copie",
+  "device_profile": {
+    "error": null,
+    "profile_id": "default",
+    "profile_name": "Configuration personnalisée",
+    "restart_required_after_save": true,
+    "schema_version": 1,
+    "source": "file"
+  },
+  "device_states": {
+    "console_a": {
+      "ableton_mode": "Local",
+      "ableton_title": "",
+      "ableton_track_aliases": [
+        "PGM CHANGE CL5"
+      ],
+      "age_seconds": 638.9501329660416,
+      "configurable": true,
+      "confirmation_latency_ms": 73,
+      "confirmed": true,
+      "device_type": "console",
+      "display_name": "CL5",
+      "display_source": "ableton_scene",
+      "enabled": true,
+      "expected": 9,
+      "expected_activated_at": 1790746837.202301,
+      "expected_generation": 2,
+      "expected_midi_program": 8,
+      "expected_program": 9,
+      "expected_program_source": "ableton_iac_output",
+      "expected_received_at": 1790746837.202301,
+      "expected_scene_index": null,
+      "expected_scene_memory": 9,
+      "expected_scene_memory_source": "program_number_identity",
+      "expected_source": "Gestionnaire IAC Bus 1",
+      "expected_title": "MUSIC AMBIANCE",
+      "expected_title_lookup_memory": 9,
+      "expected_title_source": "imported_library",
+      "expected_title_source_detail": "CLF · cl5 memoires.CLF",
+      "fresh": false,
+      "id": "console_a",
+      "last_return_age_seconds": 639.0169279575348,
+      "legacy_key": "cl5",
+      "library": "cl5",
+      "local_simulator_tx": {},
+      "matched": true,
+      "midi_channel": 1,
+      "midi_program": 8,
+      "mismatch": false,
+      "monitor_title": "MUSIC AMBIANCE",
+      "palette": {
+        "accent": "#9B6BD6",
+        "base": "#C09AF2"
+      },
+      "production_supported": true,
+      "program": 9,
+      "protocol": "midi",
+      "received": 1,
+      "received_at": 1790746837.275622,
+      "request_identity": "local:cl5:1790746837.202301",
+      "return_program": 9,
+      "return_recent": false,
+      "returned": 9,
+      "returned_at": 1790746837.275622,
+      "returned_midi_program": 8,
+      "returned_program": 9,
+      "returned_program_source": "physical_midi",
+      "returned_received_at": 1790746837.275622,
+      "returned_scene_memory": 9,
+      "returned_scene_memory_source": "program_number_identity",
+      "returned_source": "Réseau Rtp MB Chris",
+      "returned_title": "MUSIC AMBIANCE",
+      "returned_title_lookup_memory": 9,
+      "returned_title_source": "imported_library",
+      "returned_title_source_detail": "CLF · cl5 memoires.CLF",
+      "rx": {
+        "enabled": true
+      },
+      "scene": 9,
+      "scene_memory": 9,
+      "signal_type": "program_change",
+      "source": "physical_midi",
+      "stale": false,
+      "status": "confirmed",
+      "supported": true,
+      "title": "",
+      "title_offset": 0,
+      "title_source": "imported_library",
+      "tx": {
+        "enabled": true
+      },
+      "validation_status": "confirmed",
+      "visibility": {
+        "network_manager": true,
+        "remote": true,
+        "show_control": true
+      },
+      "visual_state": "confirmed"
+    },
+    "console_b": {
+      "ableton_mode": "Local",
+      "ableton_title": "",
+      "ableton_track_aliases": [
+        "PGM CHANGE QL1"
+      ],
+      "age_seconds": 638.9501219987869,
+      "configurable": true,
+      "confirmation_latency_ms": 76,
+      "confirmed": true,
+      "device_type": "console",
+      "display_name": "QL1",
+      "display_source": "ableton_scene",
+      "enabled": true,
+      "expected": 10,
+      "expected_activated_at": 1790746837.20009,
+      "expected_generation": 2,
+      "expected_midi_program": 9,
+      "expected_program": 10,
+      "expected_program_source": "ableton_iac_output",
+      "expected_received_at": 1790746837.20009,
+      "expected_scene_index": null,
+      "expected_scene_memory": 10,
+      "expected_scene_memory_source": "program_number_identity",
+      "expected_source": "Gestionnaire IAC Bus 1",
+      "expected_title": "PRESHOW CHECK",
+      "expected_title_lookup_memory": 10,
+      "expected_title_source": "imported_library",
+      "expected_title_source_detail": "CLF · QL1 mem.CLF",
+      "fresh": false,
+      "id": "console_b",
+      "last_return_age_seconds": 639.0169038772583,
+      "legacy_key": "ql1",
+      "library": "ql1",
+      "local_simulator_tx": {},
+      "matched": true,
+      "midi_channel": 2,
+      "midi_program": 9,
+      "mismatch": false,
+      "monitor_title": "PRESHOW CHECK",
+      "palette": {
+        "accent": "#3E9EAC",
+        "base": "#63C7D4"
+      },
+      "production_supported": true,
+      "program": 10,
+      "protocol": "midi",
+      "received": 1,
+      "received_at": 1790746837.275646,
+      "request_identity": "local:ql1:1790746837.20009",
+      "return_program": 10,
+      "return_recent": false,
+      "returned": 10,
+      "returned_at": 1790746837.275646,
+      "returned_midi_program": 9,
+      "returned_program": 10,
+      "returned_program_source": "physical_midi",
+      "returned_received_at": 1790746837.275646,
+      "returned_scene_memory": 10,
+      "returned_scene_memory_source": "program_number_identity",
+      "returned_source": "Réseau Rtp MB Chris",
+      "returned_title": "PRESHOW CHECK",
+      "returned_title_lookup_memory": 10,
+      "returned_title_source": "imported_library",
+      "returned_title_source_detail": "CLF · QL1 mem.CLF",
+      "rx": {
+        "enabled": true
+      },
+      "scene": 10,
+      "scene_memory": 10,
+      "signal_type": "program_change",
+      "source": "physical_midi",
+      "stale": false,
+      "status": "confirmed",
+      "supported": true,
+      "title": "",
+      "title_offset": 0,
+      "title_source": "imported_library",
+      "tx": {
+        "enabled": true
+      },
+      "validation_status": "confirmed",
+      "visibility": {
+        "network_manager": true,
+        "remote": true,
+        "show_control": true
+      },
+      "visual_state": "confirmed"
+    }
+  },
+  "devices": [
+    {
+      "ableton_mode": "Local",
+      "ableton_title": "",
+      "ableton_track_aliases": [
+        "PGM CHANGE CL5"
+      ],
+      "age_seconds": 638.9501329660416,
+      "configurable": true,
+      "confirmation_latency_ms": 73,
+      "confirmed": true,
+      "device_type": "console",
+      "display_name": "CL5",
+      "display_source": "ableton_scene",
+      "enabled": true,
+      "expected": 9,
+      "expected_activated_at": 1790746837.202301,
+      "expected_generation": 2,
+      "expected_midi_program": 8,
+      "expected_program": 9,
+      "expected_program_source": "ableton_iac_output",
+      "expected_received_at": 1790746837.202301,
+      "expected_scene_index": null,
+      "expected_scene_memory": 9,
+      "expected_scene_memory_source": "program_number_identity",
+      "expected_source": "Gestionnaire IAC Bus 1",
+      "expected_title": "MUSIC AMBIANCE",
+      "expected_title_lookup_memory": 9,
+      "expected_title_source": "imported_library",
+      "expected_title_source_detail": "CLF · cl5 memoires.CLF",
+      "fresh": false,
+      "id": "console_a",
+      "last_return_age_seconds": 639.0169279575348,
+      "legacy_key": "cl5",
+      "library": "cl5",
+      "local_simulator_tx": {},
+      "matched": true,
+      "midi_channel": 1,
+      "midi_program": 8,
+      "mismatch": false,
+      "monitor_title": "MUSIC AMBIANCE",
+      "palette": {
+        "accent": "#9B6BD6",
+        "base": "#C09AF2"
+      },
+      "production_supported": true,
+      "program": 9,
+      "protocol": "midi",
+      "received": 1,
+      "received_at": 1790746837.275622,
+      "request_identity": "local:cl5:1790746837.202301",
+      "return_program": 9,
+      "return_recent": false,
+      "returned": 9,
+      "returned_at": 1790746837.275622,
+      "returned_midi_program": 8,
+      "returned_program": 9,
+      "returned_program_source": "physical_midi",
+      "returned_received_at": 1790746837.275622,
+      "returned_scene_memory": 9,
+      "returned_scene_memory_source": "program_number_identity",
+      "returned_source": "Réseau Rtp MB Chris",
+      "returned_title": "MUSIC AMBIANCE",
+      "returned_title_lookup_memory": 9,
+      "returned_title_source": "imported_library",
+      "returned_title_source_detail": "CLF · cl5 memoires.CLF",
+      "rx": {
+        "enabled": true
+      },
+      "scene": 9,
+      "scene_memory": 9,
+      "signal_type": "program_change",
+      "source": "physical_midi",
+      "stale": false,
+      "status": "confirmed",
+      "supported": true,
+      "title": "",
+      "title_offset": 0,
+      "title_source": "imported_library",
+      "tx": {
+        "enabled": true
+      },
+      "validation_status": "confirmed",
+      "visibility": {
+        "network_manager": true,
+        "remote": true,
+        "show_control": true
+      },
+      "visual_state": "confirmed"
+    },
+    {
+      "ableton_mode": "Local",
+      "ableton_title": "",
+      "ableton_track_aliases": [
+        "PGM CHANGE QL1"
+      ],
+      "age_seconds": 638.9501219987869,
+      "configurable": true,
+      "confirmation_latency_ms": 76,
+      "confirmed": true,
+      "device_type": "console",
+      "display_name": "QL1",
+      "display_source": "ableton_scene",
+      "enabled": true,
+      "expected": 10,
+      "expected_activated_at": 1790746837.20009,
+      "expected_generation": 2,
+      "expected_midi_program": 9,
+      "expected_program": 10,
+      "expected_program_source": "ableton_iac_output",
+      "expected_received_at": 1790746837.20009,
+      "expected_scene_index": null,
+      "expected_scene_memory": 10,
+      "expected_scene_memory_source": "program_number_identity",
+      "expected_source": "Gestionnaire IAC Bus 1",
+      "expected_title": "PRESHOW CHECK",
+      "expected_title_lookup_memory": 10,
+      "expected_title_source": "imported_library",
+      "expected_title_source_detail": "CLF · QL1 mem.CLF",
+      "fresh": false,
+      "id": "console_b",
+      "last_return_age_seconds": 639.0169038772583,
+      "legacy_key": "ql1",
+      "library": "ql1",
+      "local_simulator_tx": {},
+      "matched": true,
+      "midi_channel": 2,
+      "midi_program": 9,
+      "mismatch": false,
+      "monitor_title": "PRESHOW CHECK",
+      "palette": {
+        "accent": "#3E9EAC",
+        "base": "#63C7D4"
+      },
+      "production_supported": true,
+      "program": 10,
+      "protocol": "midi",
+      "received": 1,
+      "received_at": 1790746837.275646,
+      "request_identity": "local:ql1:1790746837.20009",
+      "return_program": 10,
+      "return_recent": false,
+      "returned": 10,
+      "returned_at": 1790746837.275646,
+      "returned_midi_program": 9,
+      "returned_program": 10,
+      "returned_program_source": "physical_midi",
+      "returned_received_at": 1790746837.275646,
+      "returned_scene_memory": 10,
+      "returned_scene_memory_source": "program_number_identity",
+      "returned_source": "Réseau Rtp MB Chris",
+      "returned_title": "PRESHOW CHECK",
+      "returned_title_lookup_memory": 10,
+      "returned_title_source": "imported_library",
+      "returned_title_source_detail": "CLF · QL1 mem.CLF",
+      "rx": {
+        "enabled": true
+      },
+      "scene": 10,
+      "scene_memory": 10,
+      "signal_type": "program_change",
+      "source": "physical_midi",
+      "stale": false,
+      "status": "confirmed",
+      "supported": true,
+      "title": "",
+      "title_offset": 0,
+      "title_source": "imported_library",
+      "tx": {
+        "enabled": true
+      },
+      "validation_status": "confirmed",
+      "visibility": {
+        "network_manager": true,
+        "remote": true,
+        "show_control": true
+      },
+      "visual_state": "confirmed"
+    }
+  ],
+  "expected_activated_at": 1790746840.259551,
+  "expected_generation": 2,
+  "expected_scene_index": null,
+  "expected_scene_signature": [
+    2,
+    "stopped",
+    -1
+  ],
+  "expected_title": "",
+  "generation_debug": false,
+  "has_show_started": true,
+  "identity_protocol_version": 1,
+  "is_paused": false,
+  "is_playing": true,
+  "last_arrangement_time": 1298.4210205078125,
+  "last_fired_scene": 1,
+  "last_fired_scene_name": "Reset CL5/QL1",
+  "last_successful_bootstrap": {
+    "completed_at": 1790746805.534848,
+    "current_set_id": "/Users/mbprochris/Music/Ableton/S8. v12 def/S8 version MIKA_JOHANNA_VENUS FILAGE copie.als",
+    "generation": 2,
+    "scene_count": 94,
+    "selected_scene": 0
+  },
+  "launch_id": "f144f7fe-fb62-49cb-8ed1-3dcf2a3d02f2",
+  "ltc": "00:00:00:02",
+  "ltc_connected": false,
+  "ltc_last_received_at": 1790746837.292927,
+  "ltc_last_rejected_source": "127.0.0.1",
+  "ltc_last_rejection_reason": "invalid-prefix",
+  "ltc_last_source": "127.0.0.1",
+  "ltc_listener_active": true,
+  "ltc_rejected_count": 2,
+  "ltc_timecode": "00:00:00:02",
+  "message": "Connecté à AbletonOSC",
+  "midi_console": {
+    "age_seconds": 0.06700301170349121,
+    "cl5": {
+      "ableton_mode": "Local",
+      "ableton_title": "",
+      "age_seconds": 638.9501329660416,
+      "confirmation_latency_ms": 73,
+      "confirmed": true,
+      "display_source": "ableton_scene",
+      "expected_activated_at": 1790746837.202301,
+      "expected_generation": 2,
+      "expected_midi_program": 8,
+      "expected_program": 9,
+      "expected_program_source": "ableton_iac_output",
+      "expected_scene_index": null,
+      "expected_scene_memory": 9,
+      "expected_scene_memory_source": "program_number_identity",
+      "expected_source": "Gestionnaire IAC Bus 1",
+      "expected_title": "MUSIC AMBIANCE",
+      "expected_title_lookup_memory": 9,
+      "expected_title_source": "imported_library",
+      "expected_title_source_detail": "CLF · cl5 memoires.CLF",
+      "fresh": 0,
+      "last_return_age_seconds": 639.0169279575348,
+      "local_simulator_tx": {},
+      "matched": true,
+      "midi_program": 8,
+      "mismatch": false,
+      "monitor_title": "MUSIC AMBIANCE",
+      "program": 9,
+      "received": 1,
+      "received_at": 1790746837.275622,
+      "request_identity": "local:cl5:1790746837.202301",
+      "return_program": 9,
+      "return_recent": false,
+      "returned_at": 1790746837.275622,
+      "returned_midi_program": 8,
+      "returned_program": 9,
+      "returned_program_source": "physical_midi",
+      "returned_scene_memory": 9,
+      "returned_scene_memory_source": "program_number_identity",
+      "returned_source": "Réseau Rtp MB Chris",
+      "returned_title": "MUSIC AMBIANCE",
+      "returned_title_lookup_memory": 9,
+      "returned_title_source": "imported_library",
+      "returned_title_source_detail": "CLF · cl5 memoires.CLF",
+      "scene": 9,
+      "title": "",
+      "title_offset": 0,
+      "title_source": "imported_library",
+      "validation_status": "confirmed",
+      "visual_state": "confirmed"
+    },
+    "expected_devices": {
+      "console_a": {
+        "expected_activated_at": 1790746837.202301,
+        "expected_midi_program": 8,
+        "expected_program_source": "ableton_iac_output",
+        "expected_received_at": 1790746837.202301,
+        "expected_scene_memory": 9,
+        "midi_program": 8,
+        "received_at": 1790746837.202301,
+        "scene_memory": 9,
+        "source": "ableton_iac_output"
+      },
+      "console_b": {
+        "expected_activated_at": 1790746837.20009,
+        "expected_midi_program": 9,
+        "expected_program_source": "ableton_iac_output",
+        "expected_received_at": 1790746837.20009,
+        "expected_scene_memory": 10,
+        "midi_program": 9,
+        "received_at": 1790746837.20009,
+        "scene_memory": 10,
+        "source": "ableton_iac_output"
+      }
+    },
+    "expected_monitor_source": "Gestionnaire IAC Bus 1",
+    "expected_monitor_status": 0,
+    "monitor_source": "CL MIDI Return Test",
+    "monitor_status": 0,
+    "online": true,
+    "ql1": {
+      "ableton_mode": "Local",
+      "ableton_title": "",
+      "age_seconds": 638.9501219987869,
+      "confirmation_latency_ms": 76,
+      "confirmed": true,
+      "display_source": "ableton_scene",
+      "expected_activated_at": 1790746837.20009,
+      "expected_generation": 2,
+      "expected_midi_program": 9,
+      "expected_program": 10,
+      "expected_program_source": "ableton_iac_output",
+      "expected_scene_index": null,
+      "expected_scene_memory": 10,
+      "expected_scene_memory_source": "program_number_identity",
+      "expected_source": "Gestionnaire IAC Bus 1",
+      "expected_title": "PRESHOW CHECK",
+      "expected_title_lookup_memory": 10,
+      "expected_title_source": "imported_library",
+      "expected_title_source_detail": "CLF · QL1 mem.CLF",
+      "fresh": 0,
+      "last_return_age_seconds": 639.0169038772583,
+      "local_simulator_tx": {},
+      "matched": true,
+      "midi_program": 9,
+      "mismatch": false,
+      "monitor_title": "PRESHOW CHECK",
+      "program": 10,
+      "received": 1,
+      "received_at": 1790746837.275646,
+      "request_identity": "local:ql1:1790746837.20009",
+      "return_program": 10,
+      "return_recent": false,
+      "returned_at": 1790746837.275646,
+      "returned_midi_program": 9,
+      "returned_program": 10,
+      "returned_program_source": "physical_midi",
+      "returned_scene_memory": 10,
+      "returned_scene_memory_source": "program_number_identity",
+      "returned_source": "Réseau Rtp MB Chris",
+      "returned_title": "PRESHOW CHECK",
+      "returned_title_lookup_memory": 10,
+      "returned_title_source": "imported_library",
+      "returned_title_source_detail": "CLF · QL1 mem.CLF",
+      "scene": 10,
+      "title": "",
+      "title_offset": 0,
+      "title_source": "imported_library",
+      "validation_status": "confirmed",
+      "visual_state": "confirmed"
+    },
+    "return_mode": "local_dedicated",
+    "return_monitor_source": "CL MIDI Return Test",
+    "return_monitor_status": 0,
+    "return_source": "Gestionnaire IAC CL MIDI Return Test",
+    "returned_devices": {
+      "console_a": {
+        "midi_program": 8,
+        "received_at": 1790746837.275622,
+        "returned_midi_program": 8,
+        "returned_program_source": "physical_midi",
+        "returned_received_at": 1790746837.275622,
+        "returned_scene_memory": 9,
+        "scene_memory": 9,
+        "source": "physical_midi"
+      },
+      "console_b": {
+        "midi_program": 9,
+        "received_at": 1790746837.275646,
+        "returned_midi_program": 9,
+        "returned_program_source": "physical_midi",
+        "returned_received_at": 1790746837.275646,
+        "returned_scene_memory": 10,
+        "scene_memory": 10,
+        "source": "physical_midi"
+      }
+    },
+    "rtp": {
+      "available": true,
+      "endpoint": "Gestionnaire IAC CL MIDI Return Test",
+      "last_test": "Aucun aller-retour validé",
+      "latency_ms": null,
+      "loop_detected": false,
+      "peer": "CL Ableton Clock",
+      "status": "idle",
+      "validated": false,
+      "validated_at": null
+    },
+    "schema_version": 3,
+    "service": "cl-midi-console-monitor",
+    "source": "CL MIDI Network Assistant",
+    "stale": false,
+    "test": {
+      "channel": 1,
+      "console": "CL5",
+      "latency_ms": null,
+      "midi_program": 41,
+      "program": 42,
+      "scene": 42,
+      "status": "idle",
+      "updated_at": 1790747476.2255468
+    },
+    "updated_at": 1790747476.2255468
+  },
+  "midi_devices": {
+    "cl5": {
+      "ableton_mode": "Local",
+      "ableton_title": "",
+      "age_seconds": 638.9501329660416,
+      "channel": 1,
+      "confirmation_latency_ms": 73,
+      "confirmed": true,
+      "display_source": "ableton_scene",
+      "expected_activated_at": 1790746837.202301,
+      "expected_generation": 2,
+      "expected_midi_program": 8,
+      "expected_program": 9,
+      "expected_program_source": "ableton_iac_output",
+      "expected_scene_index": null,
+      "expected_scene_memory": 9,
+      "expected_scene_memory_source": "program_number_identity",
+      "expected_source": "Gestionnaire IAC Bus 1",
+      "expected_title": "MUSIC AMBIANCE",
+      "expected_title_lookup_memory": 9,
+      "expected_title_source": "imported_library",
+      "expected_title_source_detail": "CLF · cl5 memoires.CLF",
+      "fresh": 0,
+      "last_return_age_seconds": 639.0169279575348,
+      "local_simulator_tx": {},
+      "matched": true,
+      "midi_program": 8,
+      "mismatch": false,
+      "monitor_title": "MUSIC AMBIANCE",
+      "name": "CL5",
+      "program": 9,
+      "received": 1,
+      "received_at": 1790746837.275622,
+      "request_identity": "local:cl5:1790746837.202301",
+      "return_program": 9,
+      "return_recent": false,
+      "returned_at": 1790746837.275622,
+      "returned_midi_program": 8,
+      "returned_program": 9,
+      "returned_program_source": "physical_midi",
+      "returned_scene_memory": 9,
+      "returned_scene_memory_source": "program_number_identity",
+      "returned_source": "Réseau Rtp MB Chris",
+      "returned_title": "MUSIC AMBIANCE",
+      "returned_title_lookup_memory": 9,
+      "returned_title_source": "imported_library",
+      "returned_title_source_detail": "CLF · cl5 memoires.CLF",
+      "scene": 9,
+      "title": "",
+      "title_offset": 0,
+      "title_source": "imported_library",
+      "validation_status": "confirmed",
+      "visual_state": "confirmed"
+    },
+    "ql1": {
+      "ableton_mode": "Local",
+      "ableton_title": "",
+      "age_seconds": 638.9501219987869,
+      "channel": 2,
+      "confirmation_latency_ms": 76,
+      "confirmed": true,
+      "display_source": "ableton_scene",
+      "expected_activated_at": 1790746837.20009,
+      "expected_generation": 2,
+      "expected_midi_program": 9,
+      "expected_program": 10,
+      "expected_program_source": "ableton_iac_output",
+      "expected_scene_index": null,
+      "expected_scene_memory": 10,
+      "expected_scene_memory_source": "program_number_identity",
+      "expected_source": "Gestionnaire IAC Bus 1",
+      "expected_title": "PRESHOW CHECK",
+      "expected_title_lookup_memory": 10,
+      "expected_title_source": "imported_library",
+      "expected_title_source_detail": "CLF · QL1 mem.CLF",
+      "fresh": 0,
+      "last_return_age_seconds": 639.0169038772583,
+      "local_simulator_tx": {},
+      "matched": true,
+      "midi_program": 9,
+      "mismatch": false,
+      "monitor_title": "PRESHOW CHECK",
+      "name": "QL1",
+      "program": 10,
+      "received": 1,
+      "received_at": 1790746837.275646,
+      "request_identity": "local:ql1:1790746837.20009",
+      "return_program": 10,
+      "return_recent": false,
+      "returned_at": 1790746837.275646,
+      "returned_midi_program": 9,
+      "returned_program": 10,
+      "returned_program_source": "physical_midi",
+      "returned_scene_memory": 10,
+      "returned_scene_memory_source": "program_number_identity",
+      "returned_source": "Réseau Rtp MB Chris",
+      "returned_title": "PRESHOW CHECK",
+      "returned_title_lookup_memory": 10,
+      "returned_title_source": "imported_library",
+      "returned_title_source_detail": "CLF · QL1 mem.CLF",
+      "scene": 10,
+      "title": "",
+      "title_offset": 0,
+      "title_source": "imported_library",
+      "validation_status": "confirmed",
+      "visual_state": "confirmed"
+    }
+  },
+  "midi_expected_source": "Gestionnaire IAC Bus 1",
+  "midi_returned_source": "Réseau Rtp MB Chris",
+  "next_scene": 2,
+  "osc_transport": {
+    "connected": false,
+    "host": "127.0.0.1",
+    "last_error": null,
+    "last_latency_ms": 4.818916320800781,
+    "last_response_at": 1790747476.199853,
+    "resolved_host": "127.0.0.1",
+    "timeout_count": 7590,
+    "traffic": {
+      "peak_msg_s": 116,
+      "rx_bytes_total": 1053704,
+      "rx_kbit_s": 10.976,
+      "rx_messages_total": 19418,
+      "rx_msg_s": 5,
+      "tx_bytes_total": 633328,
+      "tx_kbit_s": 1.248,
+      "tx_messages_total": 19438,
+      "tx_msg_s": 5
+    }
+  },
+  "pending_request": null,
+  "play_mode": "stopped",
+  "playback_deadline": null,
+  "playing_scene": -1,
+  "playing_scene_name": "—",
+  "remaining_seconds": null,
+  "scene_duration_is_clip": true,
+  "scene_duration_seconds": 1.5,
+  "scenes": {
+    "0": "test",
+    "1": "Reset CL5/QL1",
+    "2": "Musique DINER+PREPA SHOW",
+    "3": " TOXIC ; BPM ; KEY ; 4:25",
+    "4": "Que reste t'il de nos amours ; BPM ; KEY ; 2:57",
+    "5": "Falling ; BPM ; KEY ; 3:49",
+    "6": "fever ; BPM ; KEY ; 3:35",
+    "7": "what about us ; BPM ; KEY ; 4:27",
+    "8": "Battez Vous  ; BPM ; KEY ; 4:16",
+    "9": "FLOWERS ; BPM ; KEY ; 3:15",
+    "10": "la foule + violons ; BPM ; KEY ; 3:34",
+    "11": "VIOLONS Bob Marley ; BPM ; KEY ; 1:43",
+    "12": "VIOLONS Léo Ferré ; BPM ; KEY ; 2:41",
+    "13": "VIOLONS Pensia me ; BPM ; KEY ; 2:07",
+    "14": "VIOLONS QUEEN ; BPM ; KEY ; 2:8",
+    "15": "VIOLONS Smooth Criminal ; BPM ; KEY ; 2:05",
+    "16": "let's Dance; BPM ; KEY ; 3:10",
+    "17": "Jardin d'hiver ; BPM ; KEY ; 2:57",
+    "18": "The winner WARPED ; BPM ; KEY ; 2:58",
+    "19": "VIENS VOIR  ; BPM ; KEY ; 2:20",
+    "20": "It's all so quiet (Bjork) ; BPM ; KEY ; 3:38",
+    "21": "HOLLOWBACK GIRL ; BPM ; KEY ; 2:53",
+    "22": "Ne me quitte pas; BPM ; KEY ; 4:07",
+    "23": "BANG BANG ; BPM ; KEY ; 2:41",
+    "24": "CRAZY ; BPM ; KEY ; 2:46",
+    "25": "LA VALSE A 1000 TEMPS ; BPM ; KEY ; 4:02",
+    "26": "entree directrice",
+    "27": "ENTRACTE",
+    "28": "prepa SHOW",
+    "29": "ANNONCE",
+    "30": "1 - EN ROUTE POUR LE PARADIS_NAPOLEON ; BPM ; KEY ; 1:14",
+    "31": "2 - TABLEAU VIS A VIS ; BPM ; KEY ; 6:15",
+    "32": "3 -  SUPREME ; BPM ; KEY ; 3:40",
+    "33": "4 -  NEVER The Greateast ; BPM ; KEY ; 3:30",
+    "34": "Jingle AVA Le lustre",
+    "35": "5-Machoire",
+    "36": "6 - PARIS MON AMOUR ; BPM ; KEY ; 2:03",
+    "37": "7 - TABLEAU HYPNOTIQUE ; BPM ; KEY ; 6:29",
+    "38": " AVA \"FAKIR\"; BPM;KEY;5:17",
+    "39": " AVA \"j ai encore peté les plombs\"",
+    "40": "GIGI; BPM ; KEY ; 1:51",
+    "41": "NEVER..(Gloria Gaynor) ; BPM ; KEY ; 1:39",
+    "42": "LOVE; BPM ; KEY ; 1:39",
+    "43": "DANCING QUEEN; BPM ; KEY ; 2:14",
+    "44": "10 - L'OBJET DU DESIR ; BPM ; KEY ; 3:11",
+    "45": "11 - DEFILE DES NATIONS ; BPM ; KEY ; 1:19",
+    "46": "12 - LA MARSEILLAISE ; BPM ; KEY ; 0:55",
+    "47": "13 - H2O - VIDEO - ; BPM ; KEY ; 3:20",
+    "48": "14 - ORAGE",
+    "49": "15 - Baignoire ; BPM ; KEY ; 4:45",
+    "50": "16 - in voyage",
+    "51": "16 - Top Voyage",
+    "52": "16 - I WILL ALWAYS/UAM",
+    "53": "17 - BETE DE SEXE ; BPM ; KEY ; 8:07",
+    "54": "AVA UKULELE IN; BPM ; KEY ; 0:28",
+    "55": "AVA UKULELE OUT ; BPM ; KEY ; 0:28",
+    "56": "AVA UKULELE OUT 2 ; BPM ; KEY ; 0:28",
+    "57": "19 - MAPPING ; BPM ; KEY ; 2:10",
+    "58": "20 - CANCANS traditionnel ; BPM ; KEY ; 5:25",
+    "59": "21 - CANCAN TECHNO ; BPM ; KEY ; 1:02",
+    "60": "IN AVA corde a linge ; BPM ; KEY ; 0:28",
+    "61": "OUT AVA corde a linge; BPM ; KEY ; 0:28",
+    "62": "ET MERDE AVA corde a linge; BPM ; KEY ; 0:28",
+    "63": "DUA LIPA = CHOEURS ; BPM ; KEY ;  2:05",
+    "64": "FREE FROM DESIRE ; BPM ; KEY ; 1:35",
+    "65": "PROUD MARY ;  BPM ; KEY ; 1:34",
+    "66": "CANT STOP1 ;  BPM ; KEY ; 2:40",
+    "67": "AVA cannes IN",
+    "68": "Sortie Cannes",
+    "69": "25 - PEGASE/OISEAU ; BPM ; KEY ; 11:47",
+    "70": "FIN END",
+    "71": "SPARES",
+    "72": "5-AVA trapeze",
+    "73": "25 - OP PEGASE intro; BPM ; KEY ; 2:21",
+    "74": "25 - OP CHANTE ; BPM ; KEY ; 11:49",
+    "75": "25 - FINAL REPRISE ; BPM ; KEY ; 4:04",
+    "76": "Diamons ; BPM ; KEY ; 3:48",
+    "77": "Frozen 20h48 ; BPM ; KEY ; 3:42",
+    "78": "TEST VIDEO",
+    "79": "V mise public",
+    "80": "V chute d'eau ",
+    "81": "V premier cabaret",
+    "82": "15 - ARNO ; BPM ; KEY ; 4:45",
+    "83": "15 - Cecile MUSE",
+    "84": "15 - Cecile boxeuse",
+    "85": "15 - Zebulon",
+    "86": "ATTRACTIONS",
+    "87": "RAYMOND 1",
+    "88": "RAYMOND 2",
+    "89": "RAYMOND 3",
+    "90": "BERTH ET FRED 1",
+    "91": "BERTH ET FRED 2",
+    "92": "BERTH ET FRED 3",
+    "93": ""
+  },
+  "selected_scene": 2,
+  "selected_scene_duration_index": 2,
+  "selected_scene_duration_is_clip": true,
+  "selected_scene_duration_seconds": 2304.0,
+  "selected_scene_name": "Musique DINER+PREPA SHOW",
+  "server_instance_id": "2d54ec49-9f23-4586-b064-0ea32befc6f6",
+  "server_process_id": 7019,
+  "service": "CL_Audio_Controller",
+  "set_generation": 2,
+  "set_ready": true,
+  "smpte": "00:00:00:02",
+  "started_at": 1790744216.993396,
+  "state_object_id": 4434790592,
+  "sync_source": "Ableton",
+  "timecode": "00:00:00:02",
+  "uptime_ms": 3259553
+}

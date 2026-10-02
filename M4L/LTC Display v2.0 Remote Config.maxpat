@@ -8221,6 +8221,99 @@
       }
      }
     }
+   },
+   {
+    "box": {
+     "id": "obj-cl-ltc-config-udp",
+     "maxclass": "newobj",
+     "numinlets": 0,
+     "numoutlets": 1,
+     "outlettype": [
+      "FullPacket"
+     ],
+     "patching_rect": [
+      930.0,
+      1040.0,
+      120.0,
+      22.0
+     ],
+     "text": "udpreceive 63124"
+    }
+   },
+   {
+    "box": {
+     "id": "obj-cl-ltc-config-oscparse",
+     "maxclass": "newobj",
+     "numinlets": 1,
+     "numoutlets": 1,
+     "patching_rect": [
+      930.0,
+      1070.0,
+      70.0,
+      22.0
+     ],
+     "text": "oscparse"
+    }
+   },
+   {
+    "box": {
+     "id": "obj-cl-ltc-config-trim",
+     "maxclass": "newobj",
+     "numinlets": 1,
+     "numoutlets": 1,
+     "patching_rect": [
+      930.0,
+      1100.0,
+      55.0,
+      22.0
+     ],
+     "text": "list trim"
+    }
+   },
+   {
+    "box": {
+     "id": "obj-cl-ltc-config-route-cl",
+     "maxclass": "newobj",
+     "numinlets": 1,
+     "numoutlets": 2,
+     "patching_rect": [
+      930.0,
+      1130.0,
+      60.0,
+      22.0
+     ],
+     "text": "route cl"
+    }
+   },
+   {
+    "box": {
+     "id": "obj-cl-ltc-config-route-ltc",
+     "maxclass": "newobj",
+     "numinlets": 1,
+     "numoutlets": 2,
+     "patching_rect": [
+      930.0,
+      1160.0,
+      62.0,
+      22.0
+     ],
+     "text": "route ltc"
+    }
+   },
+   {
+    "box": {
+     "id": "obj-cl-ltc-config-route-values",
+     "maxclass": "newobj",
+     "numinlets": 1,
+     "numoutlets": 3,
+     "patching_rect": [
+      930.0,
+      1190.0,
+      105.0,
+      22.0
+     ],
+     "text": "route host port"
+    }
    }
   ],
   "lines": [
@@ -9933,6 +10026,114 @@
      "destination": [
       "obj-51",
       3
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "obj-cl-ltc-config-udp",
+      0
+     ],
+     "destination": [
+      "obj-cl-ltc-config-oscparse",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "obj-cl-ltc-config-oscparse",
+      0
+     ],
+     "destination": [
+      "obj-cl-ltc-config-trim",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "obj-cl-ltc-config-trim",
+      0
+     ],
+     "destination": [
+      "obj-cl-ltc-config-route-cl",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "obj-cl-ltc-config-route-cl",
+      0
+     ],
+     "destination": [
+      "obj-cl-ltc-config-route-ltc",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "obj-cl-ltc-config-route-ltc",
+      0
+     ],
+     "destination": [
+      "obj-cl-ltc-config-route-values",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "obj-cl-ltc-config-route-values",
+      0
+     ],
+     "destination": [
+      "obj-ltc-host-message",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "obj-cl-ltc-config-route-values",
+      0
+     ],
+     "destination": [
+      "obj-ltc-host-set",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "obj-cl-ltc-config-route-values",
+      1
+     ],
+     "destination": [
+      "obj-ltc-port-message",
+      0
+     ]
+    }
+   },
+   {
+    "patchline": {
+     "source": [
+      "obj-cl-ltc-config-route-values",
+      1
+     ],
+     "destination": [
+      "obj-ltc-port-set",
+      0
      ]
     }
    }

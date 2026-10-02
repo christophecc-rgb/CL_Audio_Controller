@@ -409,10 +409,12 @@ def test_export_start_is_verified_and_never_adjusted_by_ax(tmp_path):
         script.index('choose("Base.RenderedTrack"')
     ]
 
+    assert "start_verified_by_live_loop" in block
+
     assert (
         'assertBBT(\n'
         '    "Base.RenderStartBox.RenderStart",'
-        in block
+        not in block
     )
 
     assert (

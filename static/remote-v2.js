@@ -162,7 +162,8 @@
     const disconnected = status.classList.contains('disconnected') || /déconnect|erreur|impossible|hors ligne/i.test(text);
     document.body.classList.toggle('v2-connected', !disconnected);
     document.body.classList.toggle('v2-error', disconnected && !/connexion/i.test(text));
-    if (healthLabel) healthLabel.textContent = disconnected ? 'Hors ligne' : 'Ableton connecté';
+    if (healthLabel) healthLabel.textContent = disconnected ? 'Hors ligne'
+      : status.dataset.abletonHost ? 'Connecté à ' + status.dataset.abletonHost : 'Ableton connecté';
     if (healthDetail) healthDetail.textContent = text.replace(/^●\s*/, '');
     if (footerMessage) footerMessage.textContent = text.replace(/^●\s*/, '');
 

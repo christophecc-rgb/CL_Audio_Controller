@@ -1908,6 +1908,7 @@ body{
 
 </style>
 
+<script src="/static/remote-auth.js"></script>
 </head>
 <body><main class="shell"><header class="topbar showcue-header-v6">
 
@@ -7414,99 +7415,6 @@ $('capture-tc').onclick = captureTcOnSelectedConduiteCue;
 
 
 
-<!-- CL_SHOWCUE_SHOW_CONTROL_LINK_V2 -->
-<style>
-  .cl-show-control-return {
-    position: fixed;
-    top: max(10px, env(safe-area-inset-top));
-    left: max(10px, env(safe-area-inset-left));
-    z-index: 10000;
-
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 5px;
-
-    min-height: 35px;
-    padding: 6px 11px;
-
-    border: 1px solid rgba(184, 86, 92, .72);
-    border-radius: 10px;
-
-    background:
-      linear-gradient(
-        180deg,
-        rgba(112, 48, 53, .94),
-        rgba(70, 31, 35, .96)
-      );
-
-    color: rgba(255, 236, 237, .97);
-
-    box-shadow:
-      inset 0 1px 0 rgba(255,255,255,.07),
-      0 4px 16px rgba(0,0,0,.26);
-
-    -webkit-backdrop-filter: blur(12px);
-    backdrop-filter: blur(12px);
-
-    font-family:
-      -apple-system,
-      BlinkMacSystemFont,
-      "SF Pro Display",
-      "Segoe UI",
-      sans-serif;
-
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: .075em;
-    text-decoration: none;
-    white-space: nowrap;
-
-    -webkit-tap-highlight-color: transparent;
-  }
-
-  .cl-show-control-return:active {
-    transform: scale(.96);
-
-    background:
-      linear-gradient(
-        180deg,
-        rgba(130, 56, 62, .98),
-        rgba(79, 34, 39, .98)
-      );
-  }
-
-  .cl-show-control-return__back {
-    font-size: 17px;
-    line-height: .8;
-    font-weight: 500;
-    letter-spacing: 0;
-    transform: translateY(-1px);
-  }
-
-  @media (max-width: 430px) {
-    .cl-show-control-return {
-      top: max(7px, env(safe-area-inset-top));
-      left: max(7px, env(safe-area-inset-left));
-      min-height: 32px;
-      padding: 5px 9px;
-      border-radius: 9px;
-      font-size: 9px;
-    }
-  }
-</style>
-
-<a
-  class="cl-show-control-return"
-  href="/"
-  aria-label="Retour à CL Show Control"
->
-  <span class="cl-show-control-return__back">‹</span>
-  <span>SHOW CONTROL</span>
-</a>
-
-
-
 <!-- CL_SHOWCUE_MOBILE_HEADER_V4 -->
 <style>
 
@@ -7516,51 +7424,12 @@ $('capture-tc').onclick = captureTcOnSelectedConduiteCue;
 
 @media (max-width:600px){
 
-  /*
-   * Ligne Poste / retour Show Control.
-   * Le bouton est réellement inséré dans .v6-context-row par
-   * le petit JS ci-dessous : il ne flotte plus sur la page.
-   */
+  /* Ligne Poste. */
   .v6-context-row{
     display:grid !important;
-    grid-template-columns:auto minmax(0,1fr) !important;
+    grid-template-columns:minmax(0,1fr) !important;
     align-items:end !important;
     gap:8px 10px !important;
-  }
-
-  .v6-context-row .cl-show-control-return{
-    position:static !important;
-
-    grid-column:1 !important;
-    grid-row:1 !important;
-
-    align-self:end !important;
-
-    min-height:34px !important;
-    margin:0 !important;
-    padding:6px 10px !important;
-
-    border:1px solid rgba(180,76,82,.72) !important;
-    border-radius:9px !important;
-
-    background:
-      linear-gradient(
-        180deg,
-        rgba(111,45,50,.94),
-        rgba(70,29,33,.97)
-      ) !important;
-
-    color:#f7e8e6 !important;
-
-    box-shadow:
-      inset 0 1px rgba(255,255,255,.07),
-      0 3px 10px rgba(0,0,0,.18) !important;
-
-    font-size:9px !important;
-    font-weight:850 !important;
-    letter-spacing:.09em !important;
-
-    white-space:nowrap !important;
   }
 
   /*
@@ -7568,7 +7437,7 @@ $('capture-tc').onclick = captureTcOnSelectedConduiteCue;
    * Beaucoup moins large qu'avant.
    */
   .v6-context-field:has(#post){
-    grid-column:2 !important;
+    grid-column:1 !important;
     grid-row:1 !important;
 
     justify-self:start !important;
@@ -7756,7 +7625,7 @@ $('capture-tc').onclick = captureTcOnSelectedConduiteCue;
 
 /*
  * Très petits iPhone :
- * le poste reste confortable mais ne pousse jamais le retour.
+ * le poste reste confortable.
  */
 @media (max-width:390px){
 
@@ -7775,73 +7644,16 @@ $('capture-tc').onclick = captureTcOnSelectedConduiteCue;
 
 </style>
 
-<script>
-(() => {
-  'use strict';
-
-  function installShowCueHeaderV4(){
-
-    const contextRow =
-      document.querySelector('.v6-context-row');
-
-    const returnButton =
-      document.querySelector('.cl-show-control-return');
-
-    /*
-     * Déplacement physique dans le header.
-     * Plus de position:fixed ni d'overlay.
-     */
-    if (
-      contextRow &&
-      returnButton &&
-      returnButton.parentElement !== contextRow
-    ){
-      contextRow.insertBefore(
-        returnButton,
-        contextRow.firstChild
-      );
-    }
-  }
-
-  if(document.readyState === 'loading'){
-    document.addEventListener(
-      'DOMContentLoaded',
-      installShowCueHeaderV4,
-      {once:true}
-    );
-  }else{
-    installShowCueHeaderV4();
-  }
-})();
-</script>
-
-
-<!-- CL_SHOWCUE_NAV_RETURN_V6 -->
+<!-- CL_SHOWCUE_MOBILE_TABS_V6 -->
 <style>
 @media (max-width:600px){
 
-  /*
-   * L'ancien gros bouton retour reste dans le DOM,
-   * mais il n'est plus affiché.
-   */
-  .cl-show-control-return{
-    display:none !important;
-  }
-
-  /*
-   * Barre de navigation mobile :
-   * petit bouton retour + 4 vues ShowCue.
-   */
+  /* Barre de navigation mobile : quatre vues ShowCue. */
   .v6-tabs{
     display:grid !important;
-
-    grid-template-columns:
-      44px
-      repeat(4, minmax(0,1fr)) !important;
-
+    grid-template-columns:repeat(4,minmax(0,1fr)) !important;
     align-items:stretch !important;
     gap:2px !important;
-
     width:100% !important;
   }
 
@@ -7858,61 +7670,11 @@ $('capture-tc').onclick = captureTcOnSelectedConduiteCue;
     white-space:nowrap !important;
   }
 
-  /*
-   * Retour Show Control intégré à la barre.
-   */
-  .v6-tabs .cl-showcontrol-nav-return{
-    display:flex !important;
-    align-items:center !important;
-    justify-content:center !important;
-
-    min-width:0 !important;
-    width:44px !important;
-
-    border:1px solid rgba(180,76,82,.66) !important;
-    border-radius:9px !important;
-
-    background:
-      linear-gradient(
-        180deg,
-        rgba(104,42,48,.92),
-        rgba(65,27,31,.97)
-      ) !important;
-
-    color:#f4e5e3 !important;
-
-    font-size:22px !important;
-    font-weight:500 !important;
-    line-height:1 !important;
-
-    text-decoration:none !important;
-
-    box-shadow:
-      inset 0 1px 0 rgba(255,255,255,.05),
-      0 2px 8px rgba(0,0,0,.22) !important;
-
-    -webkit-tap-highlight-color:transparent;
-  }
-
-  .v6-tabs .cl-showcontrol-nav-return:active{
-    transform:scale(.94);
-  }
 }
 
 
 /* Très petits écrans */
 @media (max-width:390px){
-
-  .v6-tabs{
-    grid-template-columns:
-      40px
-      repeat(4,minmax(0,1fr)) !important;
-  }
-
-  .v6-tabs .cl-showcontrol-nav-return{
-    width:40px !important;
-    font-size:20px !important;
-  }
 
   .v6-tabs .tab{
     font-size:.58rem !important;
@@ -7920,65 +7682,6 @@ $('capture-tc').onclick = captureTcOnSelectedConduiteCue;
   }
 }
 </style>
-
-<script>
-(() => {
-  'use strict';
-
-  function installShowControlNavReturn(){
-
-    const tabs =
-      document.querySelector('.v6-tabs');
-
-    if(!tabs) return;
-
-    if(
-      tabs.querySelector(
-        '.cl-showcontrol-nav-return'
-      )
-    ){
-      return;
-    }
-
-    const link =
-      document.createElement('a');
-
-    link.className =
-      'cl-showcontrol-nav-return';
-
-    link.href = '/';
-
-    link.textContent = '‹';
-
-    link.title = 'Show Control';
-
-    link.setAttribute(
-      'aria-label',
-      'Retour à CL Show Control'
-    );
-
-    tabs.insertBefore(
-      link,
-      tabs.firstElementChild
-    );
-  }
-
-  if(document.readyState === 'loading'){
-    document.addEventListener(
-      'DOMContentLoaded',
-      installShowControlNavReturn,
-      {once:true}
-    );
-  }else{
-    installShowControlNavReturn();
-  }
-})();
-</script>
-
-
-
-
-
 
 <!-- CL_SHOWCUE_FINAL_VISUAL_V11 -->
 <style>

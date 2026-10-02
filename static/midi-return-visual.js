@@ -1,7 +1,7 @@
 (function (root) {
   'use strict';
 
-  const FINAL_STATES = new Set(['confirmed', 'mismatch', 'timeout', 'idle']);
+  const FINAL_STATES = new Set(['confirmed', 'mismatch', 'timeout', 'idle', 'waiting', 'loaded']);
 
   const runtimeDiagnostics = {
     counters: {GO_EVENT_COUNT: 0, PROGRAM_RECALL_COUNT: 0, PROGRAM_RAF1_COUNT: 0, PROGRAM_RAF2_COUNT: 0},
@@ -250,7 +250,7 @@
         }
 
         /*
-         * Une mémoire déjà réellement confirmée reste MÉMORISÉE tant que
+         * Une mémoire déjà réellement confirmée reste SYNCHRONISÉE tant que
          * l'EXPECTED courant ne change pas.
          *
          * Le backend peut ensuite qualifier le même retour de stale/timeout
@@ -308,10 +308,24 @@
     ];
   }
 
+  // Same raw-PC comparison as Show Control: titles, offsets and memory labels
+  // are display metadata, never evidence of a mismatch.
+  function programComparison(device) {
+    const number = value => value == null || value === '' || typeof value === 'boolean'
+      ? null : (Number.isFinite(Number(value)) ? Number(value) : null);
+    const expected = number(device.expected_midi_program);
+    const returned = number(device.returned_midi_program);
+    return expected === null || returned === null ? null : expected === returned;
+  }
+
   function deviceViewModel(device) {
     const palette = device.palette || FALLBACK_PALETTES[device.id] || {base:'#AEB5C0', accent:'#66707D'};
     const productionSupported = device.production_supported === true;
     const status = productionSupported ? (device.validation_status || device.status || 'unavailable') : 'unavailable';
+    const comparison = productionSupported && status !== 'unavailable' ? programComparison(device) : null;
+    const visualState = comparison === false ? 'mismatch'
+      : comparison === true ? (status === 'confirmed' ? 'confirmed' : 'loaded')
+      : (device.visual_state === 'mismatch' ? 'waiting' : (device.visual_state || 'idle'));
     const showReturned = status === 'confirmed' || status === 'mismatch' || device.expected_scene_memory == null;
     const memory = (showReturned ? device.returned_scene_memory : device.expected_scene_memory) ?? '—';
     const hasLibrary = Boolean(device.library);
@@ -325,7 +339,8 @@
       accent: palette.accent,
       productionSupported,
       status,
-      visualState: productionSupported ? (device.visual_state || 'idle') : 'idle',
+      visualState: productionSupported ? visualState : 'idle',
+      programMatch: comparison,
       memory,
       title,
       expectedKey: [device.id || '', device.expected_midi_program ?? '', device.expected_activated_at ?? ''].join(':'),
@@ -534,6 +549,7 @@
       card.classList.toggle('device-unavailable', !view.productionSupported);
       card.querySelector('.midi-return-state').textContent = view.label || (
         visual === 'confirmed' ? '✓ Boucle confirmée' :
+        visual === 'loaded' && view.programMatch === true ? '✓ Boucle synchronisée' :
         visual === 'mismatch' ? '⚠ Retour différent' :
         visual === 'waiting' ? 'Retour en attente…' :
         visual === 'timeout' ? '⚠ Retour absent' : ''
@@ -547,5 +563,5 @@
     return visible.map(deviceViewModel);
   }
 
-  root.CLMidiReturnVisual = {createController, restartCssAnimation, runtimeTrace, runtimeDiagnostics, devicesFromState, visibleDevices, deviceViewModel, renderDeviceCards};
+  root.CLMidiReturnVisual = {createController, restartCssAnimation, runtimeTrace, runtimeDiagnostics, devicesFromState, visibleDevices, programComparison, deviceViewModel, renderDeviceCards};
 })(typeof window !== 'undefined' ? window : globalThis);

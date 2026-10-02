@@ -72,7 +72,7 @@ class MidiConsolePackagingTests(unittest.TestCase):
         self.assertIn("UNINSTALL_MIDI_CONSOLE", source)
         self.assertIn("Presets/MIDI Effects/Max MIDI Effect/CL MIDI Console Monitor", source)
         self.assertIn("Application Support/CL MIDI Console/Network Tools", source)
-        self.assertIn("Applications/CL MIDI Network Manager.app", source)
+        self.assertIn("$MIDI_NETWORK_APPS/CL MIDI Network Manager.app", source)
         self.assertIn('midi-console)', source)
         self.assertIn('delete login item "CL MIDI Network Assistant"', source)
         self.assertNotIn("pkill", source)
@@ -98,7 +98,7 @@ class MidiConsolePackagingTests(unittest.TestCase):
         self.assertIn("BANC DE TEST MIDI · 16 CANAUX", dashboard)
         self.assertIn('@"Ableton local", @"Ableton distant"', dashboard)
         self.assertIn('@"--transport", transport', dashboard)
-        self.assertIn("Gestionnaire IAC Bus 1 est exclusivement la source expected", dashboard)
+        self.assertIn("CL Show Control IAC (alias legacy acceptés) est exclusivement la source expected", dashboard)
         self.assertIn('localCoreMIDI', engine)
 
         export_source = (ROOT / "scripts" / "export_transport_kit.command").read_text()

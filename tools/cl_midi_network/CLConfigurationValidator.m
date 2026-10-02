@@ -1,3 +1,4 @@
+#import "../shared/CLMIDIEndpointNames.h"
 #import "CLConfigurationChecker.h"
 #import <netdb.h>
 
@@ -40,11 +41,43 @@ static NSString *CLArgument(NSString *command, NSString *name) {
     NSMutableSet *sourceNames = [NSMutableSet set], *destinationNames = [NSMutableSet set];
     for (NSDictionary *endpoint in endpoints) { NSString *name = endpoint[@"name"] ?: @""; if ([endpoint[@"direction"] isEqualToString:@"source"]) [sourceNames addObject:name]; else [destinationNames addObject:name]; }
     if (rtpScenario) {
-        BOOL endpointOK = expectedEndpoint.length && [sourceNames containsObject:expectedEndpoint] && [destinationNames containsObject:expectedEndpoint];
-        NSString *endpointActual = endpointOK ? expectedEndpoint : [NSString stringWithFormat:@"Attendu « %@ » · sources trouvées [%@] · destinations trouvées [%@] · direction manquante %@", expectedEndpoint, [[sourceNames allObjects] componentsJoinedByString:@", "], [[destinationNames allObjects] componentsJoinedByString:@", "], ![sourceNames containsObject:expectedEndpoint] ? @"source" : @"destination"];
+        NSString *resolvedSource = CLMIDIResolveName(sourceNames.allObjects, expectedEndpoint);
+        NSString *resolvedDestination = CLMIDIResolveName(destinationNames.allObjects, expectedEndpoint);
+        BOOL endpointOK = expectedEndpoint.length && resolvedSource.length && resolvedDestination.length;
+        NSString *endpointActual = endpointOK ? [NSString stringWithFormat:@"RX %@ / TX %@", resolvedSource, resolvedDestination] : [NSString stringWithFormat:@"Attendu « %@ » · sources trouvées [%@] · destinations trouvées [%@] · direction manquante %@", expectedEndpoint, [[sourceNames allObjects] componentsJoinedByString:@", "], [[destinationNames allObjects] componentsJoinedByString:@", "], !resolvedSource.length ? @"source" : @"destination"];
         [items addObject:CLItem(!expectedEndpoint.length ? CLCheckLevelInfo : (endpointOK ? CLCheckLevelOK : CLCheckLevelError), @"CoreMIDI", @"Endpoint RTP local", expectedEndpoint, !expectedEndpoint.length ? @"Non défini dans le profil" : endpointActual, @"Le nom de session RTP et le nom d’endpoint CoreMIDI peuvent différer. Les routages actifs Source/Destination sur Aucun sont normaux et sûrs.", @"Vérifier le nom réellement publié et la direction manquante, sans sélectionner Bus 1 dans les routages actifs RTP.")];
     }
-    for (NSString *name in @[@"Gestionnaire IAC Bus 1", @"CL MIDI Return Test"]) if ([sourceNames containsObject:name] || [destinationNames containsObject:name]) [items addObject:CLItem(CLCheckLevelOK, @"CoreMIDI", name, name, name, @"Endpoint local détecté.", @"")];
+    NSArray<NSString *> *localRoles = server
+        ? @[@CL_MIDI_CLOCK_IAC, @CL_MIDI_MTC_IAC, @CL_MIDI_SHOW_IAC, @CL_MIDI_RETURN_TEST]
+        : @[];
+
+    for (NSString *name in localRoles) {
+        NSString *actual =
+            CLMIDIResolveName(sourceNames.allObjects, name)
+            ?: CLMIDIResolveName(destinationNames.allObjects, name);
+
+        BOOL generatedEndpoint =
+            [name isEqualToString:@CL_MIDI_RETURN_TEST];
+
+        NSString *action = @"";
+        if (!actual.length) {
+            action = generatedEndpoint
+                ? @"Ne pas créer de bus IAC homonyme. Lancer les outils CL qui publient cet endpoint."
+                : @"Créer ce bus dans Configuration audio et MIDI > Pilote IAC. Ne pas renommer un endpoint existant.";
+        }
+
+        [items addObject:CLItem(
+            actual ? CLCheckLevelOK : CLCheckLevelWarning,
+            @"CoreMIDI",
+            name,
+            name,
+            actual ?: @"Endpoint absent (alias legacy acceptés)",
+            generatedEndpoint
+                ? @"Endpoint généré par les outils CL ; ce n’est pas un bus IAC à créer manuellement."
+                : @"Bus IAC canonique ; les anciens noms restent acceptés comme alias.",
+            action
+        )];
+    }
 
     if (rtpScenario) {
         NSString *sessionExpected = expectedRTP[@"local_session_name"] ?: @"", *sessionActual = actualRTP[@"local_session_name"] ?: @"";
@@ -88,8 +121,10 @@ static NSString *CLArgument(NSString *command, NSString *name) {
         }
         if (!expectedChannel.length) expectedChannel = channel;
         NSString *simulatorEndpoint = simulatorProfile[@"endpoint"] ?: @"";
-        BOOL endpointPresent = [sourceNames containsObject:endpoint] || [destinationNames containsObject:endpoint];
-        BOOL endpointMatches = simulatorEndpoint.length && [endpoint isEqualToString:simulatorEndpoint] && (rtpScenario ? ([sourceNames containsObject:endpoint] && [destinationNames containsObject:endpoint]) : endpointPresent);
+        BOOL sourcePresent = CLMIDIResolveName(sourceNames.allObjects, endpoint).length > 0;
+        BOOL destinationPresent = CLMIDIResolveName(destinationNames.allObjects, endpoint).length > 0;
+        BOOL endpointPresent = sourcePresent || destinationPresent;
+        BOOL endpointMatches = simulatorEndpoint.length && CLMIDINameMatches(endpoint, simulatorEndpoint) && (rtpScenario ? (sourcePresent && destinationPresent) : endpointPresent);
         NSString *endpointTitle = rtpScenario ? @"endpoint RTP local" : @"endpoint local de retour";
         NSString *endpointAction = simulatorEndpoint.length ? [NSString stringWithFormat:@"Sélectionner l’endpoint %@ « %@ ».", rtpScenario ? @"RTP local" : @"local de retour", simulatorEndpoint] : @"Définir l’endpoint requis dans le profil avant de lancer le simulateur.";
         [items addObject:CLItem(endpointMatches ? CLCheckLevelOK : CLCheckLevelError, @"Simulateur", [NSString stringWithFormat:@"%@ · %@", label, endpointTitle], simulatorEndpoint, endpoint, rtpScenario ? @"Le processus doit utiliser un endpoint RTP présent sur ce Mac, pas une valeur provenant du Mac serveur." : @"Le simulateur local doit envoyer son retour vers l’endpoint dédié CL MIDI Return Test.", endpointAction)];

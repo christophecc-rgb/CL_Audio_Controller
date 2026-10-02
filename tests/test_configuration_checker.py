@@ -38,7 +38,7 @@ class ConfigurationCheckerTests(unittest.TestCase):
         profile = (TOOLS / "CLConfigurationProfile.m").read_text()
         validator = (TOOLS / "CLConfigurationValidator.m").read_text()
         self.assertIn('remote ? @"rtp" : @"iac"', profile)
-        self.assertIn('remote ? @"" : @"CL MIDI Return Test"', profile)
+        self.assertIn('remote ? @"" : @CL_MIDI_RETURN_TEST', profile)
         self.assertIn('remote ? @"" : @"local_dedicated"', profile)
         self.assertIn('BOOL rtpScenario = !server ||', validator)
         self.assertIn('if (rtpScenario)', validator)
@@ -49,7 +49,7 @@ class ConfigurationCheckerTests(unittest.TestCase):
         profile = (TOOLS / "CLConfigurationProfile.m").read_text()
         validator = (TOOLS / "CLConfigurationValidator.m").read_text()
         self.assertIn('remote ? @"rtp" : @"iac"', profile)
-        self.assertIn('rtpScenario ? ([sourceNames containsObject:endpoint] && [destinationNames containsObject:endpoint])', validator)
+        self.assertIn('rtpScenario ? (sourcePresent && destinationPresent)', validator)
         for title in ("Session RTP locale", "Nom Bonjour local", "Peer RTP attendu"):
             self.assertIn(title, validator)
 
@@ -113,8 +113,8 @@ class ConfigurationCheckerTests(unittest.TestCase):
 
     def test_same_named_rtp_source_and_destination_form_a_valid_pair(self):
         source = (TOOLS / "CLConfigurationValidator.m").read_text()
-        self.assertIn("[sourceNames containsObject:expectedEndpoint]", source)
-        self.assertIn("[destinationNames containsObject:expectedEndpoint]", source)
+        self.assertIn("CLMIDIResolveName(sourceNames.allObjects, expectedEndpoint)", source)
+        self.assertIn("CLMIDIResolveName(destinationNames.allObjects, expectedEndpoint)", source)
         self.assertNotIn("sourceNames intersectsSet:destinationNames", source)
 
     def test_processes_are_counted_by_executable_not_bundle_path(self):

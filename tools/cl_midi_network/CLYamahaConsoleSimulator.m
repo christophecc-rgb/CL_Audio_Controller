@@ -1,7 +1,9 @@
+#import "../shared/CLMIDIEndpointNames.h"
 #import <Foundation/Foundation.h>
 #import <CoreMIDI/CoreMIDI.h>
 #import <dispatch/dispatch.h>
 #import <signal.h>
+#import "CLSimulatorProcessLease.h"
 
 static MIDIPortRef outputPort = 0;
 static MIDIEndpointRef networkDestination = 0;
@@ -128,17 +130,7 @@ static NSString *endpointName(MIDIEndpointRef endpoint) {
 }
 
 static MIDIEndpointRef findEndpoint(BOOL source, NSString *preferredName) {
-    ItemCount count = source ? MIDIGetNumberOfSources() : MIDIGetNumberOfDestinations();
-    for (ItemCount index = 0; index < count; index++) {
-        MIDIEndpointRef endpoint = source ? MIDIGetSource(index) : MIDIGetDestination(index);
-        NSString *name = endpointName(endpoint);
-        fprintf(stdout, "MIDI_%s index=%lu name=%s\n", source ? "SOURCE" : "DESTINATION",
-                (unsigned long)index, name.UTF8String);
-        if ([name caseInsensitiveCompare:preferredName] == NSOrderedSame) {
-            return endpoint;
-        }
-    }
-    return 0;
+    return CLMIDIFindEndpoint(source, preferredName);
 }
 
 static void sendProgramChange(UInt8 status, UInt8 program) {
@@ -211,7 +203,7 @@ int main(int argc, const char *argv[]) {
             return 0;
         }
         consoleLabel = argumentValue(arguments, @"--label", responderMode ? @"RTP RESPONDER" : @"QL1");
-        NSString *endpointSearchName = argumentValue(arguments, @"--endpoint", @"Réseau Rtp MB Chris");
+        NSString *endpointSearchName = argumentValue(arguments, @"--endpoint", @CL_MIDI_RETURN_RTP);
         BOOL inputWasConfigured = hasArgument(arguments, @"--input-endpoint") || responderMode;
         NSString *inputEndpointName = argumentValue(arguments, @"--input-endpoint",
                                                      responderMode ? endpointSearchName : @"");
@@ -226,6 +218,12 @@ int main(int argc, const char *argv[]) {
             fputs("Manual Program Change requires --send-program 1...128 and --channel 1...16\n", stderr);
             return 2;
         }
+        int localLease = -1;
+        if (localCoreMIDI && !manualSend && [@[@"CL5", @"QL1"] containsObject:consoleLabel]) {
+            localLease = CLSimulatorProcessLease(consoleLabel);
+            if (localLease < 0) { fprintf(stderr, "Local simulator %s already owned\n", consoleLabel.UTF8String); return 75; }
+        }
+        pid_t ownerPID = [argumentValue(arguments, @"--owner-pid", @"0") intValue];
         echoEnabled = inputWasConfigured && ![arguments containsObject:@"--no-echo"];
         signal(SIGINT, stopHandler);
         signal(SIGTERM, stopHandler);
@@ -278,12 +276,17 @@ int main(int argc, const char *argv[]) {
         fflush(stdout);
 
         while (keepRunning) {
+            if (ownerPID > 0 && getppid() != ownerPID) break;
+            if (localCoreMIDI && inputWasConfigured &&
+                (findEndpoint(YES, inputEndpointName) != networkSource ||
+                 findEndpoint(NO, endpointSearchName) != networkDestination)) break;
             [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.25]];
         }
         if (inputPort && networkSource) MIDIPortDisconnectSource(inputPort, networkSource);
         if (inputPort) MIDIPortDispose(inputPort);
         MIDIPortDispose(outputPort);
         MIDIClientDispose(client);
+        if (localLease >= 0) close(localLease);
     }
     return 0;
 }

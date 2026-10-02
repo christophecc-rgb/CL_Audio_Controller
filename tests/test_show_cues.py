@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
+from security_test_helper import prepare_security, admin_client
 
 from show_cues import (
     activate_show_cue_session, active_session_paths, create_show_cue,
@@ -342,7 +343,8 @@ class ShowCueRouteTests(unittest.TestCase):
         self.data_path_patch.start()
         with self.app_module.SHOW_CALLS_LOCK:
             self.app_module.SHOW_CALLS.clear()
-        self.client = self.app_module.app.test_client()
+        prepare_security(self, self.app_module)
+        self.client = admin_client(self.app_module)
 
     def tearDown(self):
         self.data_path_patch.stop()
@@ -351,6 +353,25 @@ class ShowCueRouteTests(unittest.TestCase):
     def set_ltc(self, value, connected):
         with self.app_module.lock:
             self.app_module.state.update({"ltc_timecode": value, "ltc_connected": connected, "is_playing": connected})
+
+    def test_showq_headers_keep_internal_navigation_without_show_control_return(self):
+        for route in ("/show-info", "/show-info/builder"):
+            with self.subTest(route=route):
+                # Render the registered pages independently of device authorization.
+                with self.app_module.app.test_request_context(
+                        route, environ_base={"REMOTE_ADDR": "127.0.0.1"}):
+                    endpoint = self.app_module.app.url_map.bind("localhost").match(route)[0]
+                    source = self.app_module.app.view_functions[endpoint]()
+                for removed in ("SHOW CONTROL", "Retour à CL Show Control",
+                                "cl-show-control-return", "cl-showcontrol-nav-return",
+                                "installShowControlNavReturn", "installShowCueHeaderV4"):
+                    self.assertNotIn(removed, source)
+                if route == "/show-info":
+                    for view in ("live", "conduite", "distribution", "captures"):
+                        self.assertIn(f'data-view="{view}"', source)
+                        self.assertIn(f'id="view-{view}"', source)
+                    self.assertIn("location.href='/show-info/builder'", source)
+                    self.assertIn("grid-template-columns:repeat(4,minmax(0,1fr))", source)
 
     def test_existing_page_status_and_invalid_post_routes(self):
         self.set_ltc("00:00:06:00", True)
@@ -376,7 +397,7 @@ class ShowCueRouteTests(unittest.TestCase):
         self.assertIn("$('quick-cancel').onclick=()=>{quickEditor.close()", source)
         self.assertIn("showCueVisualLtc", source)
         self.assertIn("performance.now", source)
-        self.assertNotIn("requestAnimationFrame", source)
+        self.assertIn("requestAnimationFrame(()=>followConduiteActive())", source)
         self.assertNotIn("Date.now", source)
         self.assertIn(".ableton-value", source)
         self.assertIn("--ltc:#62df91", source)
@@ -450,8 +471,10 @@ class ShowCueRouteTests(unittest.TestCase):
         self.assertIn("posts:Object.keys(destinationLabels)", source)
         self.assertIn("library-line", source)
         self.assertIn('grid-template-areas:"text edit" "meta meta"', source)
-        self.assertIn("(data.timed||[]).filter(cue=>cue.status==='official')", source)
-        self.assertIn("(data.manual||[]).filter(cue=>cue.status==='official')", source)
+        self.assertIn("const timed=(data.timed||[]).filter(", source)
+        self.assertIn("cue=>cue.status==='official'", source)
+        self.assertIn("const allManual=(data.manual||[]).filter(", source)
+        self.assertIn("cue=>cue.status==='official'", source)
         response = self.client.get("/show-info/status?post=FOH")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["current"]["id"], "cue_base")

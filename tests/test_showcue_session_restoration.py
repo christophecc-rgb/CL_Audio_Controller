@@ -8,6 +8,7 @@ import unittest
 import zipfile
 from pathlib import Path
 from unittest.mock import patch
+from security_test_helper import prepare_security, admin_client
 
 import app
 from show_cues import initialize_show_cue_sessions, load_session_registry
@@ -33,7 +34,8 @@ class SessionRestorationTests(unittest.TestCase):
         self.storage = patch.object(app, 'SHOW_CUES_DATA_DIRECTORY', self.root)
         self.storage.start()
         self.addCleanup(self.storage.stop)
-        self.client = app.app.test_client()
+        prepare_security(self, app)
+        self.client = admin_client(app)
 
     def upload(self, name):
         data = (FIXTURES / name).read_bytes()
@@ -64,7 +66,7 @@ class SessionRestorationTests(unittest.TestCase):
             'import json,sys; from show_cues import initialize_show_cue_sessions; print(json.dumps(initialize_show_cue_sessions(sys.argv[1])))', str(self.root)])
         self.assertEqual(json.loads(result), json.loads(before))
         self.assertEqual((self.root / 'sessions.json').read_bytes(), before)
-        self.client = app.app.test_client()
+        self.client = admin_client(app)
         self.activate_and_check(mpc, 54, 56, 30)
         self.activate_and_check(op, 142, 134, 341)
         self.activate_and_check(mpc, 54, 56, 30)

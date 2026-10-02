@@ -12,7 +12,6 @@ CE KIT CONTIENT
    - XFADER OSC BRIDGE v8
    - LTC Display v2.0 Remote Config
    - Paradis Latin AutoScene
-   - Paradis Latin AutoScene - Live 10
 
 3. AbletonOSC CL — Live 11 et Live 12
    Version validée avec les routes utilisées par CL Audio Controller.
@@ -75,7 +74,6 @@ COMPATIBILITÉ
 - Ableton Live 12 : configuration principale, AbletonOSC CL fourni et validé
 - Ableton Live 11 : utilise le même ensemble de composants que Live 12
 - Ableton Live 10 : ne pas installer l'AbletonOSC fourni sans validation ;
-  l'installateur ne propose que « Paradis Latin AutoScene - Live 10 ».
 - Max for Live est nécessaire pour les périphériques LTC et crossfader.
 
 
@@ -109,3 +107,44 @@ CL ARRANGEMENT BUILDER LIVE
 
 CL Arrangement Builder reste une application indépendante. L'installateur
 graphique permet de l'installer seule ou avec le reste de la suite.
+
+NOMENCLATURE MIDI — NOUVELLES INSTALLATIONS / TRANSITION
+Créer les bus IAC avec les noms suivants dans Configuration audio et MIDI :
+  CL Ableton Clock IAC
+  CL MTC IAC
+  CL Show Control IAC
+Conserver le nom du périphérique parent IAC ; macOS peut préfixer les noms exposés
+aux applications par « Gestionnaire IAC » ou « IAC Driver ». Les outils CL
+acceptent ces formes ainsi que les anciens noms, avec priorité au canonique.
+
+Noms locaux des sessions RTP correspondantes :
+  CL Show Control RTP
+  CL Console Return RTP
+Ne pas confondre ces noms locaux avec le nom réseau Bonjour ou le peer distant.
+Ne pas modifier les IP, ports ou connexions RTP existants pour renommer un port.
+CL MIDI Return Test et CL Direct RTP restent inchangés et sont créés par leurs
+outils respectifs ; ne pas créer de bus IAC homonymes.
+
+L'installateur ne renomme pas une configuration MIDI existante. Installer tous
+les outils compatibles avant de migrer, hors exploitation, un endpoint à la fois.
+Procédure détaillée et rollback : Documentation/MIDI_RTP_NAMING.md.
+
+VÉRIFICATION POST-INSTALLATION MIDI / MTC
+
+Dans CL MIDI Network Manager, utiliser « Vérifier MIDI / MTC ».
+
+Ce contrôle est en lecture seule :
+- il accepte les noms canoniques et les anciens alias ;
+- il ne renomme ni ne supprime aucun endpoint ;
+- il ne modifie aucune IP, connexion ou session RTP ;
+- il signale les bus IAC manquants ;
+- il vérifie la présence du bridge MTC ;
+- il rappelle MTC 25 fps, UDP 20809/20810, CL5 canal 1 et QL1 canal 2.
+
+Les trois bus IAC d'une installation neuve sont :
+  CL Ableton Clock IAC
+  CL MTC IAC
+  CL Show Control IAC
+
+CL MIDI Return Test est publié par les outils CL et ne doit pas être créé
+manuellement comme bus IAC.

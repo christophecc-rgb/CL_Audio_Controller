@@ -85,8 +85,6 @@ for required in \
   "XFADER OSC BRIDGE v8.amxd" \
   "LTC Display v2.0 Remote Config.amxd" \
   "Paradis Latin AutoScene.amxd" \
-  "Paradis Latin AutoScene - Live 10.amxd" \
-  "Paradis Latin AutoScene - Live 10.maxpat" \
   "ParadisLatin_AutoScene.js" \
   "paradis_latin_logo.jpg"; do
   require_file "$PROJECT_DIR/M4L/Install/$required"
@@ -180,7 +178,6 @@ mkdir -p \
   "$COMPONENTS_ROOT/Ableton Live 11-12/Max for Live/Paradis Latin AutoScene" \
   "$COMPONENTS_ROOT/Ableton Live 11-12/Max for Live/CL MIDI Console Monitor" \
   "$COMPONENTS_ROOT/Ableton Live 11-12/Max for Live/CL Absolute MTC" \
-  "$COMPONENTS_ROOT/Ableton Live 10/Max for Live/Paradis Latin AutoScene - Live 10" \
   "$COMPONENTS_ROOT/Outils_reseau_MIDI" \
   "$INSTALLER_RESOURCES/Documentation" \
   "$UNINSTALLER_APP/Contents/MacOS" \
@@ -188,6 +185,23 @@ mkdir -p \
 
 echo
 echo "Assemblage des applications et composants…"
+# Native sync applications are separate role components, not background agents.
+MTC_ROLE_APP="$COMPONENTS_ROOT/Applications/CL MTC Bridge.app"
+mkdir -p "$MTC_ROLE_APP/Contents/MacOS"
+cp "$PROJECT_DIR/tools/ableton_mtc_bridge/CLAbletonMTCBridge" "$MTC_ROLE_APP/Contents/MacOS/CLAbletonMTCBridge"
+cat > "$MTC_ROLE_APP/Contents/Info.plist" <<'MTC_ROLE_PLIST'
+<?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict>
+<key>CFBundleExecutable</key><string>CLAbletonMTCBridge</string>
+<key>CFBundleIdentifier</key><string>com.claudio.mtc-bridge</string>
+<key>CFBundleName</key><string>CL MTC Bridge</string>
+<key>CFBundlePackageType</key><string>APPL</string>
+<key>LSMinimumSystemVersion</key><string>11.0</string>
+</dict></plist>
+MTC_ROLE_PLIST
+codesign --force --sign - "$MTC_ROLE_APP"
+"$PROJECT_DIR/tools/ableton_mtc_bridge/build_sync_meter.command"
+ditto "$PROJECT_DIR/tools/ableton_mtc_bridge/build-sync-meter/CL Sync Meter.app" "$COMPONENTS_ROOT/Applications/CL Sync Meter.app"
+
 ditto "$CONTROLLER_ROOT/01 — Applications principales/CL Show Control.app" "$COMPONENTS_ROOT/Applications/CL Show Control.app"
 ditto "$CONTROLLER_ROOT/02 — Production/CL Ableton Remote.app" "$COMPONENTS_ROOT/Applications/CL Ableton Remote.app"
 ditto "$SHOW_AUDIO_APP" "$COMPONENTS_ROOT/Applications/CL Audio Export.app"
@@ -224,9 +238,6 @@ done
 ditto   "$PROJECT_DIR/tools/ableton_mtc_bridge/max_for_live/CL_Absolute_MTC.amxd"   "$COMPONENTS_ROOT/Ableton Live 11-12/Max for Live/CL Absolute MTC/CL Absolute MTC.amxd"
 
 ditto   "$PROJECT_DIR/tools/ableton_mtc_bridge/max_for_live/CL_Absolute_MTC.maxpat"   "$COMPONENTS_ROOT/Ableton Live 11-12/Max for Live/CL Absolute MTC/CL Absolute MTC.maxpat"
-for file in "Paradis Latin AutoScene - Live 10.amxd" "Paradis Latin AutoScene - Live 10.maxpat" ParadisLatin_AutoScene.js paradis_latin_logo.jpg; do
-  ditto "$PROJECT_DIR/M4L/Install/$file" "$COMPONENTS_ROOT/Ableton Live 10/Max for Live/Paradis Latin AutoScene - Live 10/$file"
-done
 ditto "$CONTROLLER_ROOT/03 — MIDI & Réseau/CL MIDI Network Tools" "$COMPONENTS_ROOT/Outils_reseau_MIDI"
 
 # Les caches trouvés dans d'anciens livrables Builder ne sont jamais requis à
@@ -250,11 +261,16 @@ done < <(find "$COMPONENTS_ROOT/Applications" -type d -name '*.app' -print0)
 cp "$PROJECT_DIR/packaging/BUILD_UNIVERSAL2.md" "$INSTALLER_RESOURCES/Documentation/BUILD_UNIVERSAL2.md"
 cp "$PROJECT_DIR/README.md" "$INSTALLER_RESOURCES/Documentation/README_CL_Audio_Controller.md"
 cp "$PROJECT_DIR/packaging/INSTALLATION_NOUVEAU_MAC.txt" "$INSTALLER_RESOURCES/Documentation/INSTALLATION_NOUVEAU_MAC.txt"
-cp "$PROJECT_DIR/packaging/INSTALLATION_AUTOSCENE_LIVE_10.txt" "$INSTALLER_RESOURCES/Documentation/INSTALLATION_AUTOSCENE_LIVE_10.txt"
+cp "$PROJECT_DIR/docs/MIDI_RTP_NAMING.md" "$INSTALLER_RESOURCES/Documentation/MIDI_RTP_NAMING.md"
 cp "$PROJECT_DIR/packaging/Installer_Toute_La_Suite_CL.command" "$INSTALLER_RESOURCES/Installer_Toute_La_Suite_CL.command"
 cp "$PROJECT_DIR/assets/app_icons/CL_Install.icns" "$INSTALLER_RESOURCES/CL_AUDIO.icns"
 
 cp "$PROJECT_DIR/packaging/Desinstaller_La_Suite_CL.command" "$UNINSTALLER_APP/Contents/Resources/Desinstaller_La_Suite_CL.command"
+for role_resources in "$INSTALLER_RESOURCES" "$UNINSTALLER_APP/Contents/Resources"; do
+  cp "$PROJECT_DIR/packaging/role_install.py" "$role_resources/role_install.py"
+  cp "$PROJECT_DIR/config/installation_roles.json" "$role_resources/installation_roles.json"
+done
+
 cp "$PROJECT_DIR/assets/app_icons/CL_Uninstall.icns" "$UNINSTALLER_APP/Contents/Resources/CL_AUDIO.icns"
 
 echo "Compilation de l’interface native de l’installateur…"
@@ -357,7 +373,6 @@ INSTALLATION AUTOMATIQUE
 Double-cliquer sur « Installer la Suite CL.app » puis choisir :
 - Ableton Live 12 pour sélectionner librement CL Audio Controller,
   CL Audio Export, Arrangement Builder, AutoScene et CL MIDI Console Monitor ;
-- Ableton Live 10 pour installer uniquement la variante AutoScene compatible.
 
 Les installations existantes et leurs anciennes sauvegardes sont déplacées dans
 une session datée de la Corbeille avant remplacement. Elles restent récupérables.
@@ -439,7 +454,6 @@ for expected in \
   "XFADER OSC BRIDGE v8.amxd" \
   "LTC Display v2.0 Remote Config.amxd" \
   "Paradis Latin AutoScene.amxd" \
-  "Paradis Latin AutoScene - Live 10.amxd" \
   "CL MIDI Console Monitor.amxd" \
   "CL MIDI Network Manager.app/" \
   "CL MIDI RTP Agent.app/" \

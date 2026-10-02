@@ -14,7 +14,6 @@ Chaque périphérique est conservé avec :
 Deux variantes sont présentes :
 
 - `Paradis Latin AutoScene.maxpat` et `.amxd` pour les versions actuelles ;
-- `Paradis Latin AutoScene - Live 10.maxpat` et `.amxd` pour Live 10.
 
 Les deux variantes utilisent `ParadisLatin_AutoScene.js` et
 `paradis_latin_logo.jpg`. Le chemin du script dans les sources et les AMXD est
@@ -37,7 +36,7 @@ la seule source est totalement autonome. L'AMXD validé reste inchangé.
 
 Depuis la double écoute native de `CL MIDI Network Assistant`, ce device est
 optionnel et conservé comme outil legacy/diagnostic. L’attendu canonique est le
-Program Change réellement observé sur `Gestionnaire IAC Bus 1`; l’OSC du device
+Program Change réellement observé sur `CL Show Control IAC` (alias historique : `Gestionnaire IAC Bus 1`); l’OSC du device
 sur UDP 11001 reste un fallback et ne peut pas écraser une intention IAC.
 
 Le moniteur se place en dernier effet MIDI sur la piste de commande CL5 ou

@@ -1681,6 +1681,7 @@
     }
 </style>
   <link rel="stylesheet" href="/static/cl-skins.css?v=20260827-142046">
+<script src="/static/remote-auth.js"></script>
 </head>
 <body>
   
@@ -2019,6 +2020,7 @@
 
     function applyStatus(state) {
       if (!acceptStateGeneration(state)) return;
+      statusEl.dataset.abletonHost = String(state?.ableton_target?.host || '').trim();
       lastKnownAbState = state;
       const connected = Boolean(state && state.connected);
       setStatus((connected ? '● ' : '○ ') + ((state && state.message) || (connected ? 'Connecté' : 'Interface non connectée')), connected);

@@ -1,9 +1,13 @@
+from midi_endpoint_names import SHOW_IAC, SHOW_RTP, RETURN_TEST
 import socket, subprocess, webbrowser, threading, os, time, sys, importlib.util, json, uuid, secrets, functools
+import atexit
+import signal
 import urllib.request
 import urllib.error
 import ipaddress
 from dataclasses import replace
 from bonjour_remote import resolve_ipv4_addresses
+from ableton_discovery import DiscoveryCache
 
 try:
     import webview
@@ -12,6 +16,8 @@ except ModuleNotFoundError:
 from pathlib import Path
 from flask import Flask, jsonify, render_template_string, request, send_file
 from build_identity import BUILD_ID, IDENTITY_PROTOCOL_VERSION, SERVICE_NAME
+from runtime_identity import runtime_identity
+from security_http import attach_security
 from ableton_targets import (
     AbletonTargetError,
     load_profiles,
@@ -29,6 +35,8 @@ from server_ownership import (
     remove_record,
     write_record,
 )
+
+ableton_discovery_cache = DiscoveryCache()
 
 ROOT = Path(__file__).resolve().parent
 APP = ROOT / "app.py"
@@ -81,6 +89,11 @@ PARADIS_LOGO = bundled_resource("assets", "paradis latin.jpg")
 WEB_PORT = 5050
 MIDI_CONSOLE_STATE_PATH = Path("/private/tmp/CL_MIDI_Console_State.json")
 MIDI_CONSOLE_MONITOR_PROCESS = None
+MTC_BRIDGE_PROCESS = None
+owned_children_lock = threading.RLock()
+launcher_cleanup_lock = threading.RLock()
+launcher_stopping = threading.Event()
+launcher_cleanup_result = None
 OSC_PORT = 11000
 RETURN_PORT = 11001
 LTC_PORT = 63123
@@ -249,38 +262,235 @@ def find_midi_network_assistant():
 def ensure_midi_console_monitor():
     """Démarre l'écoute CoreMIDI sans afficher la fenêtre de diagnostic."""
     global MIDI_CONSOLE_MONITOR_PROCESS
-    if MIDI_CONSOLE_MONITOR_PROCESS and MIDI_CONSOLE_MONITOR_PROCESS.poll() is None:
+    with owned_children_lock:
+        if launcher_stopping.is_set():
+            return False
+        if MIDI_CONSOLE_MONITOR_PROCESS and MIDI_CONSOLE_MONITOR_PROCESS.poll() is None:
+            return True
+        assistant = find_midi_network_assistant()
+        if assistant is None:
+            return False
+        executable = assistant / "Contents" / "MacOS" / "CL MIDI Network Assistant"
+        if not executable.exists():
+            return False
+        MIDI_CONSOLE_MONITOR_PROCESS = subprocess.Popen(
+            [str(executable), "--show-control-monitor"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
         return True
-    assistant = find_midi_network_assistant()
-    if assistant is None:
-        return False
-    executable = assistant / "Contents" / "MacOS" / "CL MIDI Network Assistant"
-    if not executable.exists():
-        return False
-    MIDI_CONSOLE_MONITOR_PROCESS = subprocess.Popen(
-        [str(executable), "--show-control-monitor"],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    return True
+
+
+def stop_owned_child(process, timeout=4.0):
+    """Signal only a Popen handle owned by this launcher; never search by name."""
+    if process is None or process.poll() is not None:
+        return
+    try:
+        process.terminate()
+        process.wait(timeout=timeout)
+    except ProcessLookupError:
+        process.wait(timeout=1.0)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=1.0)
 
 
 def stop_midi_console_monitor():
-    """Arrête uniquement le moniteur démarré par cette instance du launcher."""
     global MIDI_CONSOLE_MONITOR_PROCESS
-    process = MIDI_CONSOLE_MONITOR_PROCESS
-    MIDI_CONSOLE_MONITOR_PROCESS = None
+    with owned_children_lock:
+        process = MIDI_CONSOLE_MONITOR_PROCESS
+        stop_owned_child(process)
+        MIDI_CONSOLE_MONITOR_PROCESS = None
+
+
+def cleanup_launcher():
+    """One idempotent shutdown for window, Cmd+Q, HTTP, signals and normal exit."""
+    global launcher_cleanup_result
+    with launcher_cleanup_lock, server_lifecycle_lock, owned_children_lock:
+        if launcher_cleanup_result is not None:
+            return launcher_cleanup_result
+        launcher_stopping.set()
+        results = {}
+        for name, stop in (
+            ("backend", stop_owned_server),
+            ("midi_monitor", stop_midi_console_monitor),
+            ("simulators", stop_console_simulators),
+            ("mtc_bridge", _cl_mtc_bridge_stop_process),
+        ):
+            try:
+                results[name] = stop()
+            except Exception as exc:
+                results[name] = {"ok": False, "error": str(exc)}
+        launcher_cleanup_result = results
+        launcher_diagnostic_log({"source": "LauncherLifecycle", "event": "cleanup", "results": results})
+        return results
+
+
+def exit_launcher():
+    cleanup_launcher()
+    os._exit(0)
+
+
+def launcher_termination_signal(signum, frame):
+    # Unwind through the webview finally/atexit cleanup on the main thread.
+    raise SystemExit(128 + signum)
+
+
+# ===== SHOW CONTROL CONSOLE SIMULATORS BEGIN =====
+
+CONSOLE_SIMULATOR_LOCK = threading.RLock()
+CONSOLE_SIMULATOR_PROCESSES = {}
+
+CONSOLE_SIMULATOR_DEVICES = {
+    "cl5": {"label": "CL5", "channel": 1},
+    "ql1": {"label": "QL1", "channel": 2},
+}
+
+CONSOLE_SIMULATOR_RETURN_ENDPOINT = RETURN_TEST
+CONSOLE_SIMULATOR_LOCAL_INPUT_ENDPOINT = SHOW_IAC
+CONSOLE_SIMULATOR_REMOTE_INPUT_ENDPOINT = SHOW_RTP
+CONSOLE_SIMULATOR_DELAY_MS = 80
+
+
+def find_yamaha_console_simulator():
+    """Résout le moteur existant sans recréer de logique MIDI."""
+    candidates = []
+
+    assistant = find_midi_network_assistant()
+    if assistant is not None:
+        candidates.append(
+            assistant
+            / "Contents"
+            / "Resources"
+            / "Network Tools"
+            / "CLYamahaConsoleSimulator"
+        )
+
+    root = Path(__file__).resolve().parent
+    candidates.extend([
+        root / "tools" / "cl_midi_network" / "CLYamahaConsoleSimulator",
+        root / "tools" / "cl_midi_network" / "build" / "CLYamahaConsoleSimulator",
+        root / "dist-local" / "CLYamahaConsoleSimulator",
+    ])
+
+    return next(
+        (
+            candidate
+            for candidate in candidates
+            if candidate.exists() and os.access(candidate, os.X_OK)
+        ),
+        None,
+    )
+
+
+def console_simulator_status():
+    executable = find_yamaha_console_simulator()
+    result = {}
+
+    with CONSOLE_SIMULATOR_LOCK:
+        for device_id, config in CONSOLE_SIMULATOR_DEVICES.items():
+            process = CONSOLE_SIMULATOR_PROCESSES.get(device_id)
+            running = bool(process and process.poll() is None)
+
+            if process is not None and not running:
+                CONSOLE_SIMULATOR_PROCESSES.pop(device_id, None)
+
+            result[device_id] = {
+                "running": running,
+                "pid": process.pid if running else None,
+                "label": config["label"],
+                "channel": config["channel"],
+                "available": executable is not None,
+            }
+
+    return result
+
+
+def start_console_simulator(device_id):
+    config = CONSOLE_SIMULATOR_DEVICES.get(device_id)
+    if config is None:
+        return False, f"Simulateur inconnu : {device_id}"
+
+    executable = find_yamaha_console_simulator()
+    if executable is None:
+        return False, "CLYamahaConsoleSimulator introuvable"
+
+    with CONSOLE_SIMULATOR_LOCK:
+        if launcher_stopping.is_set():
+            return False, "Launcher en cours d’arrêt"
+        existing = CONSOLE_SIMULATOR_PROCESSES.get(device_id)
+        if existing and existing.poll() is None:
+            return True, f"{config['label']} déjà actif"
+
+        active_mode = getattr(load_profiles(), "active_mode", "local")
+        input_endpoint = (
+            CONSOLE_SIMULATOR_REMOTE_INPUT_ENDPOINT
+            if active_mode == "remote"
+            else CONSOLE_SIMULATOR_LOCAL_INPUT_ENDPOINT
+        )
+
+        command = [
+            str(executable),
+            "--label", config["label"],
+            "--channel", str(config["channel"]),
+            "--transport", "iac",
+            "--endpoint", CONSOLE_SIMULATOR_RETURN_ENDPOINT,
+            "--delay-ms", str(CONSOLE_SIMULATOR_DELAY_MS),
+            "--input-endpoint", input_endpoint,
+        ]
+
+        try:
+            process = subprocess.Popen(
+                command,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+                close_fds=True,
+            )
+        except Exception as exc:
+            return False, f"Démarrage {config['label']} impossible : {exc}"
+
+        CONSOLE_SIMULATOR_PROCESSES[device_id] = process
+
+    event(
+        f"Simulateur {config['label']} démarré "
+        f"· canal {config['channel']} · PID {process.pid}"
+    )
+    return True, f"Simulateur {config['label']} démarré"
+
+
+def stop_console_simulator(device_id):
+    config = CONSOLE_SIMULATOR_DEVICES.get(device_id)
+    if config is None:
+        return False, f"Simulateur inconnu : {device_id}"
+
+    with CONSOLE_SIMULATOR_LOCK:
+        process = CONSOLE_SIMULATOR_PROCESSES.get(device_id)
+
     if process is None or process.poll() is not None:
-        return
-    process.terminate()
-    try:
-        process.wait(timeout=2)
-    except subprocess.TimeoutExpired:
-        launcher_diagnostic_log({
-            "source": "MidiConsoleMonitor",
-            "event": "monitor-stop-timeout",
-            "monitorProcessId": process.pid,
-        })
+        return True, f"Simulateur {config['label']} déjà arrêté"
+
+    stop_owned_child(process)
+    with CONSOLE_SIMULATOR_LOCK:
+        if CONSOLE_SIMULATOR_PROCESSES.get(device_id) is process:
+            CONSOLE_SIMULATOR_PROCESSES.pop(device_id, None)
+
+    event(f"Simulateur {config['label']} arrêté")
+    return True, f"Simulateur {config['label']} arrêté"
+
+
+def stop_console_simulators():
+    results = {}
+    for device_id in tuple(CONSOLE_SIMULATOR_DEVICES):
+        try:
+            results[device_id] = stop_console_simulator(device_id)
+        except Exception as exc:
+            results[device_id] = (False, str(exc))
+    return results
+
+
+# ===== SHOW CONTROL CONSOLE SIMULATORS END =====
 
 
 def ownership_headers(record):
@@ -548,6 +758,10 @@ def run_embedded_server():
     if callable(start_expected_bonjour):
         start_expected_bonjour()
 
+    remote_tls = module.start_remote_tls(module.app)
+    if remote_tls is not None:
+        atexit.register(remote_tls.shutdown)
+
     module.app.run(host="0.0.0.0", port=WEB_PORT, debug=False, use_reloader=False, threaded=True)
 
 
@@ -568,6 +782,8 @@ def start_web_server(timeout=6.0):
     """Lance et valide exactement le processus enfant créé par ce launcher."""
     global owned_server
     with server_ownership_lock:
+        if launcher_stopping.is_set():
+            return False, "Launcher en cours d’arrêt"
         if owned_server is not None:
             payload, validation = current_identity_status()
             if validation["valid"]:
@@ -740,6 +956,7 @@ def find_remote_app():
 events = ["Launcher prêt"]
 
 app = Flask(__name__)
+launcher_security = attach_security(app, launcher=True)
 
 HTML = r'''
 <!doctype html>
@@ -859,6 +1076,51 @@ button:active{transform:scale(.985)}
 
 
 
+
+
+
+.tools-actions{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  margin-left:10px;
+}
+
+.rtp-card .console-head{
+  justify-content:flex-start;
+}
+
+.rtp-card .tools-actions button{
+  width:180px;
+  height:34px;
+  min-height:34px;
+  padding:0 12px;
+  border:1px solid #52789c;
+  border-radius:7px;
+  background:#293d52;
+  color:#e1edf7;
+  font-size:11px;
+  font-weight:700;
+  white-space:nowrap;
+  box-shadow:none;
+}
+
+.rtp-card .tools-actions button:hover{
+  background:#354d67;
+  filter:none;
+}
+
+.rtp-card .tools-actions .midi-assistant-button{
+  width:180px;
+  height:34px;
+  min-height:34px;
+  margin:0;
+  padding:0 12px;
+  background:#293d52;
+  border-color:#52789c;
+  color:#e1edf7;
+  font-size:11px;
+}
 
 </style>
 <style>
@@ -1371,10 +1633,10 @@ button{font:inherit}
 @keyframes pulse{50%{opacity:.35;transform:scale(.75)}}
 .state-title{font-size:16px;font-weight:820;letter-spacing:.01em}
 .state-detail{font-size:11px;color:var(--muted);margin-top:2px}
-.state-time{font:18px Menlo,monospace;font-weight:780;line-height:1;color:#f1f4f8;letter-spacing:.015em;font-variant-numeric:tabular-nums}
+.state-time{font:18px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;font-weight:600;line-height:1;color:#f1f4f8;letter-spacing:.015em;font-variant-numeric:tabular-nums}
 .system-side{display:grid;grid-template-rows:1fr 1fr;align-items:center;justify-items:end;align-self:stretch;min-width:142px}
-.system-ltc{min-width:0;padding:0;color:#70dc94;text-align:right;font:18px Menlo,monospace;font-weight:780;line-height:1;letter-spacing:.015em;font-variant-numeric:tabular-nums}
-.system-ltc::before{content:'LTC  ';font:7px -apple-system,BlinkMacSystemFont,"SF Pro Display",sans-serif;font-weight:760;letter-spacing:.11em;color:#68717d}
+.system-ltc{min-width:0;padding:0;color:#70dc94;text-align:right;font:18px -apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;font-weight:600;line-height:1;letter-spacing:.015em;font-variant-numeric:tabular-nums}
+.system-ltc::before{content:'LTC  ';font-family:inherit;font-size:10px;font-weight:inherit;letter-spacing:inherit;color:inherit}
 .system-ltc.offline{color:#707985}
 .command-row{display:flex;flex-direction:column;gap:8px}
 .primary{height:41px;width:100%;border:1px solid rgba(88,162,255,.72);border-radius:10px;background:linear-gradient(180deg,#408ce7,#2868b8);color:white;font-size:13px;font-weight:790;cursor:pointer;box-shadow:0 8px 18px rgba(32,101,190,.22)}
@@ -1683,7 +1945,7 @@ body.show-mode .state-time{
 }
 
 body.show-mode .system-ltc{
-  font-size:17px;
+  font-size:21px;
 }
 
 .show-current,
@@ -1984,13 +2246,21 @@ body.show-mode .console-title{
   .primary{height:42px}.action{height:38px}
 }
 /* Show Control console diagnostics: existing palette and component language. */
-.console-health{padding:10px 12px;margin:7px 0;border:1px solid #b76a6a;border-left:5px solid #ed8787;border-radius:10px;background:#382025;color:#ffd5d5}
-.console-health strong{display:block;font-size:13px;letter-spacing:.025em;line-height:1.4}.console-health p{margin:3px 0 0;font-size:11px;line-height:1.35;color:inherit}
-.console-health.ok{background:#173429;border-color:#51876c;border-left-color:#77dca0;color:#b6f5ce}.console-health.warning{background:#382d1a;border-color:#987338;border-left-color:#efb54f;color:#ffe0a0}
+.console-health{padding:7px 9px;margin:5px 0 7px;border:1px solid #b76a6a;border-left:3px solid #ed8787;border-radius:9px;background:#382025;color:#ffd5d5}
+.console-health strong{display:block;font-size:11px;letter-spacing:.025em;line-height:1.25}.console-health p{margin:2px 0 0;font-size:10px;line-height:1.25;color:inherit}
+.console-health.ok{background:#173429;border-color:#51876c;border-left-color:#77dca0;color:#b6f5ce}
+.console-health.warning{background:#382d1a;border-color:#987338;border-left-color:#efb54f;color:#ffe0a0}
+.console-health.neutral{background:#171b21;border-color:#353c47;border-left-color:#566170;color:#aeb6c2}
+.console-simulator-control{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:7px;padding-top:6px;border-top:1px solid #2d333d}
+.console-simulator-status{font-size:9px;color:#7f8895}
+.console-simulator-status.running{color:#70d89a}
+.console-simulator-button{height:23px;padding:0 9px;border:1px solid #414a57;border-radius:6px;background:#232a33;color:#d9dee6;font-size:9px;font-weight:700;cursor:pointer}
+.console-simulator-button:hover:not(:disabled){filter:brightness(1.16)}
+.console-simulator-button:disabled{opacity:.42;cursor:default}
 .console-card .midi-assistant-button{width:100%;height:auto;min-height:40px;margin:0 0 8px;padding:8px;border-radius:9px;font-size:12px;font-weight:800;letter-spacing:.035em;white-space:normal}
 .console-card .midi-assistant-button.corrective{background:#e9bd70;color:#271d11;border-color:#f6d39a;box-shadow:inset 0 1px 0 #fff6}.console-card button:focus-visible{outline:2px solid #f6d39a;outline-offset:3px}
 .console-components{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 8px}.console-component{padding:6px 9px;border:1px solid #364151;border-radius:8px;background:#151c26;min-width:0;font-size:11px;line-height:1.35;overflow-wrap:anywhere}.console-component strong{display:block;color:#d9e2ed;font-size:9px;text-transform:uppercase;letter-spacing:.05em;margin-bottom:2px}.console-component small{display:block;color:#a9b5c4;margin-top:2px;font-size:9px}
-.console-card .console-grid{max-height:none;overflow:visible}.console-diagnostic .console-program{font-size:10px;color:#aeb9c8;margin-top:5px;letter-spacing:.04em}.console-diagnostic .console-title{white-space:normal;overflow-wrap:anywhere;font-size:12px;line-height:1.35}.console-received{font-size:11px;line-height:1.35;margin-top:5px;color:#e3eaf3;overflow-wrap:anywhere}.console-age,.console-delay{font-size:10px;color:#b9c5d3;margin-top:3px}.console-diagnostic .console-state{font-size:12px;font-weight:750;margin-top:5px}.console-return.console-diagnostic{padding:8px;animation:none!important;filter:none!important;opacity:1}.console-diagnostic.unavailable{border-style:dashed}.console-diagnostic.remembered .console-state{color:#efc482}.console-diagnostic.mismatch .console-state{color:#ffa6a0}.console-diagnostic .console-meta{color:#a7b3c2}
+.console-card .console-grid{max-height:none;overflow:visible}.console-diagnostic .console-program{font-size:10px;color:#aeb9c8;margin-top:5px;letter-spacing:.04em}.console-diagnostic .console-title{white-space:normal;overflow-wrap:anywhere;font-size:12px;line-height:1.35}.console-received{font-size:11px;line-height:1.35;margin-top:5px;color:#e3eaf3;overflow-wrap:anywhere}.console-age,.console-delay{font-size:10px;color:#b9c5d3;margin-top:3px}.console-diagnostic .console-state{font-size:12px;font-weight:750;margin-top:5px}.console-return.console-diagnostic{padding:8px;animation:none!important;filter:none!important;opacity:1}.console-diagnostic.unavailable{border-style:dashed}.console-diagnostic.remembered .console-state{color:#98a3b0}.console-diagnostic.mismatch .console-state{color:#ffa6a0}.console-diagnostic .console-meta{color:#a7b3c2}
 @media(max-width:560px){.console-components{grid-template-columns:1fr}.console-health strong{font-size:13px}}
 .console-return.console-diagnostic{display:flex;flex-direction:column;align-items:stretch}.console-diagnostic .console-program{align-self:flex-start}.console-diagnostic .console-meta{font-size:10px}
 
@@ -2011,7 +2281,7 @@ body.show-mode .console-title{
 .topbar{grid-template-columns:156px 1fr}.brand{height:48px}.product{font-size:18px}.product-copy{flex:1}
 .product-row{justify-content:flex-end}.card{padding:14px;border-radius:12px;background:#1a1e25;box-shadow:none}
 .system{min-height:72px}.system.ready,.system.warning,.system.error{background:#1a1e25}
-.state-title{font-size:22px}.state-detail{font-size:13px;color:#b9c2cd}.system-side{gap:8px}.system-ltc{font-size:22px;color:#d8e6f8}.system-ltc::before{font-size:11px;color:#a7b3c2}
+.state-title{font-size:22px}.state-detail{font-size:13px;color:#b9c2cd}.system-side{gap:8px}.system-ltc{font-size:18px;color:#70dc94}.system-ltc::before{font-size:10px;color:inherit}
 .command-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}.action,.primary{font-size:14px;height:40px}.action{padding:0 14px}.action.start{background:#25476e;border-color:#5484b7}.action.restart{background:#282f39;border-color:#526071}.mini,.show-toggle{font-size:12px;min-height:32px}
 .action-status{font-size:12px;min-height:0}.action-status:empty{display:none}
 .desktop-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.12fr);gap:16px;align-items:start}
@@ -2091,15 +2361,167 @@ body.show-mode .console-title{
 button:focus-visible,summary:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #83baff;outline-offset:3px}
 body.show-mode .app{max-width:1440px;overflow-y:auto}body.show-mode .desktop-grid{display:block}body.show-mode .operation-column,body.show-mode .services-column>.column-label,body.show-mode .access-card,body.show-mode .rtp-card{display:none!important}body.show-mode .console-state{display:block!important}body.show-mode .console-grid{max-height:none;overflow:visible}
 @media(max-width:900px){.app{padding:12px}.desktop-grid{grid-template-columns:1fr}.product{font-size:14px}.product-copy{white-space:normal}.command-row{grid-template-columns:1fr}.topbar{grid-template-columns:120px 1fr}.product-row{flex-wrap:wrap}.system{grid-template-columns:12px minmax(0,1fr) auto}.state-title{font-size:18px}.state-detail{font-size:12px}}
-@media(max-width:560px){.console-grid,.remote-mtc-grid{grid-template-columns:1fr!important}.system-side{min-width:110px}.system-ltc{font-size:16px}.diagnostic-row{grid-template-columns:120px minmax(0,1fr)}.network-grid{grid-template-columns:1fr}}
+@media(max-width:560px){.console-grid,.remote-mtc-grid{grid-template-columns:1fr!important}.system-side{min-width:110px}.system-ltc{font-size:18px}.diagnostic-row{grid-template-columns:120px minmax(0,1fr)}.network-grid{grid-template-columns:1fr}}
 
+/* Compact operator view: presentation only; expanded diagnostics remain available. */
+.operation-column,.services-column{gap:8px}.card{padding:9px 10px}.access-head{margin-bottom:7px}
+.network-grid{gap:5px}.network-grid label{font-size:10px}.network-grid input,.network-grid select{height:30px;font-size:12px;margin-top:3px}
+.server-card>.action,.network-buttons{margin-top:6px}.server-card>.action,.network-buttons .action{height:30px;font-size:12px}
+.network-buttons .action{border:1px solid #52789c!important;background:#293d52!important;color:#e1edf7!important;box-shadow:none!important}
+.network-grid .ports-readonly{min-height:0;height:25px;padding:0 8px;font-size:10px}
+.ltc-destination{min-height:0;height:25px;box-sizing:border-box;padding:3px 8px;margin-top:6px;font-size:10px}.ltc-destination strong{font-size:11px}
+#clServerDiagnostic{font-size:11px!important;line-height:17px;margin-top:6px!important}
+.server-mtc-row{margin-top:7px}
+#cl-mtc-native-slot #cl-mtc-bridge-control{display:flex;align-items:center;justify-content:space-between;gap:8px;box-sizing:border-box}
+#cl-mtc-native-slot #cl-mtc-bridge-control>div:first-child{margin-bottom:0!important;font-size:11px}
+#cl-mtc-native-slot #cl-mtc-bridge-control>div:nth-child(2){flex-direction:row!important}
+#cl-mtc-native-slot #cl-mtc-bridge-control>div:nth-child(2) button{width:auto!important;min-height:24px;color:#e4eaf3}
+.console-health,.console-health.ok,.console-health.warning,.console-health.neutral{display:flex;align-items:center;gap:5px;height:28px;box-sizing:border-box;padding:3px 7px;margin:0 0 6px}
+.console-health strong{font-size:10px;white-space:nowrap;letter-spacing:0}.console-health strong:before{content:'● ';font-size:8px}.console-health p{margin:0;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.console-health p:before{content:'· '}.console-grid{gap:7px;grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr))}
+.console-return.console-diagnostic{padding:8px;gap:3px;border-color:color-mix(in srgb,var(--console-accent) 25%,#414650);background:#141920;box-shadow:none}
+.console-card-header{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:1px;flex-wrap:wrap}.console-name{font-size:12px;color:var(--console-color)}
+.console-simulator-control{margin:0;padding:0;border:0;gap:6px;flex-shrink:0}.console-simulator-status{font-size:9px}.console-simulator-button{height:24px;font-size:10px;font-weight:600;border-color:#566477;background:#2c3746;color:#e8eef6;text-transform:none}
+.console-diagnostic .console-program,.console-diagnostic .console-received{font-size:11px;line-height:16px;margin:0;letter-spacing:0;color:#e3eaf3;font-weight:500;overflow-wrap:anywhere}
+.console-diagnostic .console-title{font-size:11px;line-height:16px;margin:0 0 0 48px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.console-diagnostic .console-state{font-size:10px;line-height:15px;margin:0;font-weight:500;color:#aab3bf}
+.console-return-values{font-size:10px;line-height:15px;overflow-wrap:anywhere}.console-diagnostic .console-detail{margin:0}.console-detail summary{height:17px;font-size:9px;line-height:17px}
+.console-diagnostic.ok .console-state{color:#85dca9}.console-return.console-diagnostic.mismatch{border-color:#c59a48;background:#252219}.console-diagnostic.mismatch .console-state{color:#f0c66e}
+.console-return.console-diagnostic.unavailable{border-color:#bd6969}.console-diagnostic.unavailable .console-state{color:#f09a9a}
+.console-return.console-diagnostic.matching{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:6px;row-gap:3px}
+.console-diagnostic.matching .console-card-header{grid-column:1/-1;grid-row:1}
+.console-diagnostic.matching .console-program{grid-column:1/-1;grid-row:2}
+.console-diagnostic.matching .console-received{grid-column:1;grid-row:3;padding:0}
+.console-diagnostic.matching .console-state{grid-column:2;grid-row:3;position:static;text-align:right}
+.console-diagnostic.matching .console-title{grid-column:1/-1;grid-row:4;min-width:0}
+.console-diagnostic.matching .console-detail{grid-column:1/-1;grid-row:5;min-width:0}
+.rtp-card{margin-bottom:0}.rtp-card .console-head{flex-wrap:wrap;gap:6px;margin-bottom:4px}.rtp-card .console-head strong{font-size:12px;letter-spacing:0}
+.rtp-card .midi-assistant-button{width:auto;height:30px;max-width:100%;font-size:10px;flex-shrink:0}
+.rtp-card .console-components{display:flex;flex-wrap:wrap;gap:0 16px;margin:0}.rtp-card .console-component{padding:0;border:0;background:none;font-size:11px;line-height:17px}.rtp-card .console-component strong{display:inline;font-size:10px;text-transform:none;letter-spacing:0}.rtp-card .console-component strong:after{content:' · '}
+.advanced-console .rtp-badge{display:inline-block;margin:6px 0;font-size:11px}
+@media(max-width:380px){.console-card-header{flex-wrap:wrap}.console-diagnostic.matching .console-state{position:static}.console-diagnostic.matching .console-received{padding-right:0}.rtp-card .console-head{flex-wrap:wrap}.ltc-destination{height:auto}}
+
+
+/* Final alignment and three button sizes; all action handlers are unchanged. */
+.command-row{grid-template-columns:minmax(0,1fr) minmax(260px,1.12fr);gap:12px}
+.command-row .secondary-actions{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.command-row .action,.command-row .primary{height:42px;min-height:42px;font-size:13px;padding:0 12px;white-space:nowrap}
+.command-row .stop{background:#382328;border:1px solid #a65e66;color:#f3c2c7;box-shadow:none}
+.command-row .stop:hover{background:#492a31;border-color:#cb8089}
+.server-card>.action{font-size:11px;font-weight:600;background:#252c36;border-color:#465262;box-shadow:none}
+.server-access-card{padding:9px 10px}.server-access-grid{gap:8px}
+.server-access-label{font-size:9px;font-weight:600;letter-spacing:.04em;color:#a7b2c1;margin-bottom:4px}
+.server-access-row{gap:4px 6px}.server-access-url{min-height:28px;padding:4px 7px;font-size:12px}
+.server-access-row .remote-address-full{font-size:12px!important;min-height:28px}
+.server-access-row button,.console-simulator-button,.offset-button{height:24px;min-height:24px;box-sizing:border-box}
+.server-access-row button{font-size:10px;padding:0 9px}
+#cl-mtc-native-slot #cl-mtc-bridge-control{gap:6px;flex-wrap:wrap}
+#cl-mtc-native-slot #cl-mtc-bridge-control>div:nth-child(2){margin-left:auto;flex-shrink:0}
+#cl-mtc-native-slot #cl-mtc-bridge-control>div:nth-child(2) button{height:24px;min-height:24px;box-sizing:border-box;font-size:10px!important}
+.console-health,.console-health.ok,.console-health.warning,.console-health.neutral{height:26px}
+.mini,.show-toggle,.bottom .local{height:30px;min-height:30px;font-size:11px}
+.bottom{justify-content:flex-start;gap:0;padding:0}.footer{font-size:9px}
+@media(max-width:900px){.command-row{grid-template-columns:1fr}.command-row .primary{width:100%}}
+@media(max-width:380px){
+  .command-row .action{padding:0 5px;font-size:11px}
+  .console-return.console-diagnostic.matching{grid-template-columns:minmax(0,1fr)}
+  .console-diagnostic.matching .console-state{grid-column:1;grid-row:4;text-align:left}
+  .console-diagnostic.matching .console-title{grid-row:5}.console-diagnostic.matching .console-detail{grid-row:6}
+}
+.ableton-discovery{display:grid;gap:3px;margin-top:5px;min-width:0}
+.ableton-discovery label,.ableton-discovery [role=status]{font-size:10px;color:#aeb9c8;line-height:14px}
+.ableton-discovery select{width:100%;min-width:0;height:30px;border:1px solid #465262;border-radius:6px;background:#151b22;color:#e3eaf3;font-size:11px;padding:0 6px}
+.ableton-discovery select:disabled{color:#8995a3}
+#abletonDiscoveryDetails{font-size:10px;overflow-wrap:anywhere}
+
+/* Footer administration : discret, hors zone d'exploitation principale. */
+.admin-footer-links{
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:6px;
+  padding:5px 8px 1px;
+  text-align:center;
+  font-size:11px;
+  line-height:1.35;
+  color:#78818e;
+}
+.admin-footer-links a{
+  color:#a5afbc;
+  text-decoration:none;
+}
+.admin-footer-links a:hover{
+  color:#a8b6c7;
+  text-decoration:underline;
+}
+
+/* Outils : titre et deux actions secondaires sur la même ligne. */
+.rtp-card .tools-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:nowrap;
+  gap:10px;
+}
+.tools-head>strong{flex-shrink:0}
+.tools-actions{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,210px));
+  justify-content:end;
+  align-items:center;
+  gap:10px;
+  flex:1;
+  min-width:0;
+}
+.tools-actions .rtp-open,
+.tools-actions .midi-assistant-button{
+  width:100% !important;
+  max-width:none !important;
+  min-width:0 !important;
+  height:36px !important;
+  min-height:36px !important;
+  margin:0 !important;
+  padding:0 12px !important;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:1px solid #46505d !important;
+  border-radius:7px !important;
+  background:#2a3038 !important;
+  color:#dce2ea !important;
+  box-shadow:none !important;
+  font-size:11px !important;
+  font-weight:650 !important;
+  letter-spacing:0 !important;
+  white-space:normal;
+  text-align:center;
+}
+.tools-actions .rtp-open:hover,
+.tools-actions .midi-assistant-button:hover{
+  background:#343b45 !important;
+  border-color:#5d6978 !important;
+  filter:none !important;
+}
+
+@media(max-width:560px){
+  .rtp-card .tools-head{gap:6px}
+  .tools-actions{gap:6px}
+  .tools-actions .rtp-open{padding:0 6px !important}
+}
 </style>
 </head>
 <body>
 <main class="app">
   <div class="topbar">
     <div class="brand"><img src="/paradis-logo" alt="Paradis Latin Cabaret"></div>
-    <div class="product-row"><div class="product-copy"><div class="product">CL AUDIO SHOW CONTROL</div></div><button type="button" class="mini" onclick="window.open('/help','_blank')">Aide</button><button id="showMode" class="show-toggle" onclick="toggleShowMode()">Mode spectacle</button></div>
+    <div class="product-row">
+      <div class="product-copy">
+        <div class="product">CL AUDIO SHOW CONTROL</div>
+      </div>
+      <button type="button" class="mini" onclick="window.open('/help','_blank')">Aide</button>
+      <button id="showMode" class="show-toggle" onclick="toggleShowMode()">Mode spectacle</button>
+    </div>
   </div>
 
   <section id="systemCard" class="card system warning">
@@ -2118,6 +2540,7 @@ body.show-mode .app{max-width:1440px;overflow-y:auto}body.show-mode .desktop-gri
     <div class="secondary-actions">
       <button class="action start" onclick="runAction('/start','Démarrage du serveur')">▶&nbsp;&nbsp;Démarrer</button>
       <button class="action restart" onclick="runAction('/restart','Relance du serveur')">↻&nbsp;&nbsp;Relancer</button>
+      <button class="action stop" onclick="confirmStop()">■ Arrêter…</button>
     </div>
     <button class="primary" onclick="runAction('/remote-window','Ouverture de la télécommande')">OUVRIR LA TÉLÉCOMMANDE</button>
   </div>
@@ -2134,7 +2557,7 @@ body.show-mode .app{max-width:1440px;overflow-y:auto}body.show-mode .desktop-gri
   </section>
 
 <div class="desktop-grid">
-<div class="operation-column"><div class="column-label">EXPLOITATION</div>
+<div class="operation-column"><div class="column-label">RÉSEAU / CONNEXIONS</div>
     <section class="card server-card">
       <div class="access-head">Serveur CL Audio</div>
       <div class="network-grid">
@@ -2152,15 +2575,21 @@ body.show-mode .app{max-width:1440px;overflow-y:auto}body.show-mode .desktop-gri
         <label>Adresse Ableton enregistrée<input id="abletonHost" value="127.0.0.1"></label>
         <div class="ports-readonly"><span>Ports AbletonOSC fixes</span><strong><span id="abletonSendPort">11000</span> → <span id="abletonReplyPort">11001</span></strong></div>
       </div>
+      <div class="ableton-discovery">
+        <label for="abletonReaders">Lecteurs Ableton détectés</label>
+        <select id="abletonReaders" onchange="selectAbletonReader(this.value)" aria-describedby="abletonDiscoveryStatus"><option value="">Recherche Bonjour…</option></select>
+        <div id="abletonDiscoveryStatus" role="status">Annonce Bonjour · connexion non validée</div>
+      </div>
       <div class="network-buttons">
         <button class="action save-network" title="Appliquer et sauvegarder cette configuration" onclick="saveNetworkConfig()">Appliquer</button>
         <button class="action" onclick="testAbletonConnection()">Tester la connexion</button>
       </div>
         <div class="ltc-destination" role="button" tabindex="0" onclick="copyLtcDestination()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();copyLtcDestination();}"><span id="ltcDestinationLabel">Destination LTC Display v2 · cliquer pour copier</span><strong id="ltcDestination">127.0.0.1:63123</strong></div>
     </section>
-</div>
-<div class="services-column"><div class="column-label">RÉSEAU &amp; RETOURS</div>
 
+
+</div>
+<div class="services-column"><div class="column-label">RETOURS / CONTRÔLE</div>
 <section class="card access-card server-access-card">
   <div class="access-head">ACCÈS AU SERVEUR</div>
 
@@ -2216,17 +2645,25 @@ body.show-mode .app{max-width:1440px;overflow-y:auto}body.show-mode .desktop-gri
 
     <div class="console-grid" id="showDevices"></div>
   </section>
-<section class="card rtp-card"><div class="console-head"><strong>RTP / MIDI RÉSEAU</strong><span id="rtpBadge" class="rtp-badge">RTP · attente</span></div>    <div class="console-components">
+<section class="card rtp-card">
+  <div class="console-head tools-head">
+    <strong>OUTILS</strong>
+    <div class="tools-actions">
+      <button type="button" class="rtp-open" onclick="openShowQ()">Ouvrir ShowQ</button>
+      <button id="consoleManager" class="rtp-open midi-assistant-button" onclick="runAction('/midi-network-assistant','Ouverture de CL MIDI Network Manager')">Ouvrir CL MIDI Network Manager</button>
+    </div>
+  </div>
+  <div class="console-components">
       <div class="console-component"><strong>Moniteur retour</strong><span id="consoleMonitor">Non renseigné</span></div>
       <div class="console-component"><strong>Endpoint retour</strong><span id="consoleEndpoint">Non renseigné</span></div>
     </div>
-    <button id="consoleManager" class="rtp-open midi-assistant-button corrective" onclick="runAction('/midi-network-assistant','Ouverture de CL MIDI Network Manager')">OUVRIR CL MIDI NETWORK MANAGER</button></section>
+</section>
 </div>
 </div>
 
   <details>
     <summary>Informations détaillées · Diagnostic avancé / Logs</summary>
-<div class="advanced-console"><p id="consoleMonitorMeta" class="state-detail"></p><div class="console-components">      <div class="console-component"><strong>Simulateurs</strong><span id="consoleSimulators">CL5 : non renseigné · QL1 : non renseigné</span><small>État des processus et PID non publiés.</small></div>
+<div class="advanced-console"><p id="abletonDiscoveryDetails" class="state-detail"></p><div id="clServerDiagnosticDetails"></div><span id="rtpBadge" class="rtp-badge">RTP · attente</span><p id="consoleMonitorMeta" class="state-detail"></p><div class="console-components">      <div class="console-component"><strong>Simulateurs</strong><span id="consoleSimulators">CL5 : non renseigné · QL1 : non renseigné</span><small>État des processus et PID non publiés.</small></div>
       <div class="console-component"><strong>Dernier retour</strong><span id="consoleLastReturns">Non renseigné</span><small>Récent : 30 s maximum et postérieur à l’attente courante.</small></div>
 </div>    <div class="console-config" id="consoleOffsets"><span class="console-config-title">CONFIGURATION CONSOLES</span></div>
 </div>
@@ -2243,7 +2680,11 @@ body.show-mode .app{max-width:1440px;overflow-y:auto}body.show-mode .desktop-gri
     </div>
   </details>
 
-  <div class="bottom"><button class="local" onclick="runAction('/local-page','Ouverture de la page locale')">↗ Page locale</button><button class="stop" onclick="confirmStop()">■ Arrêter…</button></div>
+  <div class="admin-footer-links">
+    <a href="/security/panel" target="_blank">MAINTENANCE LOCALE — mot de passe / mode</a>
+    <span aria-hidden="true">·</span>
+    <a href="http://127.0.0.1:5050/security/panel" target="_blank">TÉLÉCOMMANDES — QR / armement / appareils</a>
+  </div>
   <button id="showModeExit" class="show-exit" onclick="toggleShowMode()">Quitter le mode spectacle</button>
   <div class="footer">CL AUDIO · SHOW CONTROL</div>
 </main>
@@ -2297,7 +2738,7 @@ function syncShowDeviceDom(devices,offsets){
     let card=Array.from(grid.children).find(item=>item.dataset.deviceId===key);
     if(!card){
       card=document.createElement('div');card.dataset.deviceId=key;
-      card.innerHTML='<div class="console-name"></div><div class="console-program"><span></span></div><div class="console-title"></div><div class="console-received"></div><div class="console-state"></div><details class="console-detail"><summary>Détails du retour</summary><div class="console-age"></div><div class="console-delay"></div><div class="console-meta"></div></details>';
+      card.innerHTML='<div class="console-card-header"><div class="console-name"></div></div><div class="console-program"><span></span></div><div class="console-received"></div><div class="console-state"></div><div class="console-title"></div><details class="console-detail"><summary>Détails du retour</summary><div class="console-return-values"></div><div class="console-age"></div><div class="console-delay"></div><div class="console-meta"></div></details>';
       grid.appendChild(card);
     }
     card.id=legacy==='cl5'?'cl5Return':legacy==='ql1'?'ql1Return':'deviceReturn-'+key;
@@ -2343,15 +2784,20 @@ function consoleHealth(state,devices,now=Date.now()/1000){
     const stale=age!==null&&(age>CONSOLE_RETURN_FRESH_SECONDS||beforeIntent||value.validation_status==='stale');
     const supported=value.production_supported!==false;
     const recent=age!==null&&age<=CONSOLE_RETURN_FRESH_SECONDS&&!stale;
-    const status=!endpoint||!supported?'unavailable':stale?'stale':expected===null||returned===null||activated===null||!recent?'waiting':expected!==returned?'mismatch':'synced';
-    return {id:device.id,legacy,value,expected,returned,age,status,
+    const simulatorRunning=Boolean(
+      legacy&&consoleSimulatorState?.[legacy]?.running
+    );
+    const returnPathAvailable=endpoint||simulatorRunning;
+    const status=!returnPathAvailable||!supported?'unavailable':stale?'stale':expected===null||returned===null||activated===null||!recent?'waiting':expected!==returned?'mismatch':'synced';
+    return {id:device.id,legacy,value,expected,returned,age,status,returnPathAvailable,simulatorRunning,
       latency:status==='synced'?consoleNumber(value.confirmation_latency_ms):null};
   });
   const targets=cards.filter(c=>c.value.production_supported!==false);
-  const healthy=endpoint&&targets.length>0&&targets.every(c=>c.status==='synced');
+  const healthy=targets.length>0&&targets.every(c=>c.status==='synced');
   const mismatch=targets.some(c=>c.status==='mismatch');
   const recent=targets.some(c=>c.age!==null&&c.age<=CONSOLE_RETURN_FRESH_SECONDS);
-  const level=!endpoint?'error':healthy?'ok':'warning';
+  const unavailable=targets.length===0||targets.every(c=>c.status==='unavailable');
+  const level=unavailable?'error':healthy?'ok':mismatch?'warning':'neutral';
   // Presentation only: the level and per-device statuses above remain unchanged.
   const oldMatching=targets.length>0&&targets.every(c=>c.age!==null&&c.expected!==null&&c.returned===c.expected)&&targets.some(c=>c.status==='stale'&&c.age>CONSOLE_RETURN_FRESH_SECONDS);
   const noReturn=targets.length===0||targets.every(c=>c.age===null||c.returned===null);
@@ -2360,44 +2806,234 @@ function consoleHealth(state,devices,now=Date.now()/1000){
   const oldDetail=ages.every(age=>age===ages[0])
     ? 'Dernier retour '+targets.map(c=>c.value.display_name||c.legacy?.toUpperCase()||c.id).join('/')+' conforme · '+ages[0]+' · seuil 30 s'
     : 'Derniers retours conformes · '+namedAges+' · seuil 30 s';
-  const title=level==='error'?'RETOUR CONSOLES INDISPONIBLE':healthy?'RETOUR CONSOLES OK':mismatch?'BACKEND ACTIF · RETOUR DIFFÉRENT':oldMatching?'BACKEND ACTIF · RETOUR ANCIEN':noReturn?'BACKEND ACTIF · AUCUN RETOUR':recent?'BACKEND ACTIF · RETOUR À VÉRIFIER':'BACKEND ACTIF · RETOUR ANCIEN';
-  const detail=level==='error'?(!online?'Publication du moniteur absente ou ancienne':code!==0?'Moniteur retour arrêté ou en erreur':'Endpoint retour introuvable'):
-    healthy?'Backend actif · Retours récents et conformes aux attentes':mismatch?'Moniteur actif · Un retour ne correspond pas au PC attendu':oldMatching?oldDetail:
-    noReturn?'Moniteur actif · '+source+' disponible · En attente de retour':recent?'Moniteur actif · Attente de confirmation pour toutes les consoles':'Derniers retours à vérifier · '+namedAges+' · seuil 30 s';
+  const title=level==='error'
+    ?'RETOUR CONSOLES INDISPONIBLE'
+    :healthy
+      ?'RETOURS CONSOLES OK'
+      :mismatch
+        ?'RETOUR DIFFÉRENT'
+        :'MONITEUR RETOURS ACTIF';
+
+  const detail=level==='error'
+    ?(!online
+      ?'Publication du moniteur absente ou ancienne'
+      :code!==0
+        ?'Moniteur retour arrêté ou en erreur'
+        :'Endpoint retour introuvable')
+    :healthy
+      ?'Retours récents et conformes'
+      :mismatch
+        ?'Un retour ne correspond pas au Program Change attendu'
+        :oldMatching
+          ?oldDetail.replace(' · seuil 30 s','')
+          :noReturn
+            ?'En attente du premier retour console'
+            :recent
+              ?'Attente de confirmation des consoles'
+              :'Derniers retours reçus · '+namedAges;
   return {level,title,detail,monitor,online,source,endpoint,publishedAge,code,cards,mode:midi.return_mode||'Non renseigné'};
 }
+
+let consoleSimulatorState={
+  cl5:{running:false,available:false,pid:null},
+  ql1:{running:false,available:false,pid:null}
+};
+let consoleSimulatorRefreshAt=0;
+let consoleSimulatorFetchBusy=false;
+
+function updateConsoleSimulatorSummary(){
+  const target=el('consoleSimulators');
+  if(!target)return;
+  const label=id=>{
+    const s=consoleSimulatorState[id]||{};
+    if(!s.available)return 'indisponible';
+    return s.running?'actif'+(s.pid?' · PID '+s.pid:''):'arrêté';
+  };
+  target.textContent='CL5 : '+label('cl5')+' · QL1 : '+label('ql1');
+}
+
+function updateConsoleSimulatorControls(){
+  ['cl5','ql1'].forEach(id=>{
+    const card=id==='cl5'?el('cl5Return'):el('ql1Return');
+    if(!card)return;
+
+    const state=consoleSimulatorState[id]||{};
+    const line=card.querySelector('.console-simulator-control');
+    if(!line)return;
+
+    const status=line.querySelector('.console-simulator-status');
+    const button=line.querySelector('button');
+
+    status.textContent=state.running?'● Simulateur actif':'○ Simulateur arrêté';
+    status.classList.toggle('running',Boolean(state.running));
+
+    button.textContent=state.running?'Arrêter':'Démarrer';
+    button.disabled=!state.available;
+    button.dataset.running=state.running?'1':'0';
+    button.title=!state.available
+      ?'CLYamahaConsoleSimulator introuvable'
+      :(state.running?'Arrêter le simulateur de cette console':'Démarrer le simulateur de cette console');
+  });
+
+  updateConsoleSimulatorSummary();
+}
+
+async function refreshConsoleSimulatorState(force=false){
+  const now=Date.now();
+  if(consoleSimulatorFetchBusy)return;
+  if(!force&&now-consoleSimulatorRefreshAt<1500)return;
+
+  consoleSimulatorRefreshAt=now;
+  consoleSimulatorFetchBusy=true;
+
+  try{
+    const response=await fetch('/api/console-simulators/status',{cache:'no-store'});
+    if(!response.ok)throw new Error('status simulateurs indisponible');
+
+    const data=await response.json();
+    if(data&&data.simulators){
+      consoleSimulatorState={
+        ...consoleSimulatorState,
+        ...data.simulators
+      };
+      updateConsoleSimulatorControls();
+    }
+  }catch(_){
+    // Le contrôle des simulateurs ne doit jamais casser le monitoring consoles.
+  }finally{
+    consoleSimulatorFetchBusy=false;
+  }
+}
+
+async function toggleConsoleSimulator(deviceID){
+  const state=consoleSimulatorState[deviceID]||{};
+  const action=state.running?'stop':'start';
+
+  const card=deviceID==='cl5'?el('cl5Return'):el('ql1Return');
+  const button=card&&card.querySelector('.console-simulator-control button');
+  if(button)button.disabled=true;
+
+  try{
+    const response=await fetch(
+      '/api/console-simulators/'+encodeURIComponent(deviceID)+'/'+action,
+      {method:'POST',cache:'no-store'}
+    );
+
+    const data=await response.json().catch(()=>({}));
+
+    if(data&&data.simulators){
+      consoleSimulatorState={
+        ...consoleSimulatorState,
+        ...data.simulators
+      };
+    }
+
+    if(!response.ok){
+      throw new Error(data.message||'Action simulateur impossible');
+    }
+
+    updateConsoleSimulatorControls();
+  }catch(error){
+    console.error('CONSOLE SIMULATOR ERROR',error);
+    await refreshConsoleSimulatorState(true);
+  }finally{
+    if(button)button.disabled=false;
+  }
+}
+
+function renderConsoleSimulatorControl(card,item){
+  if(!card||!item)return;
+
+  const deviceID=
+    item.legacy==='cl5'||item.legacy==='ql1'
+      ? item.legacy
+      : card.id==='cl5Return'
+        ? 'cl5'
+        : card.id==='ql1Return'
+          ? 'ql1'
+          : null;
+
+  if(!deviceID)return;
+
+  let line=card.querySelector('.console-simulator-control');
+
+  if(!line){
+    line=document.createElement('div');
+    line.className='console-simulator-control';
+
+    const status=document.createElement('span');
+    status.className='console-simulator-status';
+
+    const button=document.createElement('button');
+    button.type='button';
+    button.className='console-simulator-button';
+    button.addEventListener('click',event=>{
+      event.preventDefault();
+      event.stopPropagation();
+      void toggleConsoleSimulator(deviceID);
+    });
+
+    line.append(status,button);
+    card.querySelector('.console-card-header').appendChild(line);
+  }
+
+  updateConsoleSimulatorControls();
+}
+
+
 function renderConsoleHealth(state,devices){
   const health=consoleHealth(state,devices);
-  const banner=el('consoleHealth');banner.className='console-health '+health.level;
-  el('consoleHealthTitle').textContent=health.title;el('consoleHealthDetail').textContent=health.detail;
-  el('consoleManager').classList.toggle('corrective',health.level!=='ok');
-  el('consoleMonitor').textContent=(health.monitor?'Actif':health.online?'En erreur / indisponible':'Arrêté ou non joignable')+' · dernière publication '+consoleAgeLabel(health.publishedAge);
+  const banner=el('consoleHealth');
+  const different=health.endpoint&&health.cards.some(c=>c.value.production_supported!==false&&c.expected!==null&&c.returned!==null&&c.expected!==c.returned);
+  banner.className='console-health '+(different?'warning':health.level);
+  const names=health.cards.filter(c=>c.value.production_supported!==false).map(c=>c.value.display_name||c.legacy||c.id).join('/');
+  el('consoleHealthTitle').textContent=health.level==='error'?'Retours indisponibles':different?'Retour différent':'Moniteur retours actif';
+  const matching=health.cards.length>0&&health.cards.every(c=>c.expected!==null&&c.returned===c.expected&&c.age!==null);
+  el('consoleHealthDetail').textContent=different?'Program Change reçu différent de l’attendu':matching&&health.endpoint?names+' conformes · dernier retour '+consoleAgeLabel(Math.min(...health.cards.map(c=>c.age))).replace(/^il y a /,''):health.detail;
+  banner.title=health.title+' · '+health.detail;
+  el('consoleManager').classList.toggle('corrective',health.level==='error'||health.level==='warning');
+  el('consoleMonitor').textContent=(health.monitor?'Actif':health.online?'En erreur / indisponible':'Arrêté ou non joignable')+' · '+consoleAgeLabel(health.publishedAge).replace(/^il y a /,'');
   el('consoleEndpoint').textContent=(health.source||'Nom non renseigné')+' · '+(health.endpoint?'Disponible':'Indisponible');
-  el('consoleSimulators').textContent='CL5 : non renseigné · QL1 : non renseigné';
+  void refreshConsoleSimulatorState();
+  updateConsoleSimulatorSummary();
   el('consoleMonitorMeta').textContent='PID et durée de fonctionnement non exposés · mode '+health.mode;
   el('consoleLastReturns').textContent=health.cards.filter(c=>c.legacy==='cl5'||c.legacy==='ql1').map(c=>(c.legacy==='cl5'?'CL5':'QL1')+' : '+consoleAgeLabel(c.age)).join(' · ')||'Aucun retour renseigné';
   return health;
 }
-function renderConsoleDiagnostic(card,item,offsets){
+function renderConsoleDiagnostic(card,item,offsets,state){
   const v=item.value;
-  const labels={synced:'✓ Synchronisée',waiting:item.age===null||item.returned===null?'En attente de retour':'… En attente',stale:'⚠ Retour ancien'+(item.expected!==null&&item.returned!==null?(item.returned===item.expected?' · conforme':' · différent'):''),mismatch:'⚠ Retour différent',unavailable:'Indisponible'};
-  card.className='console-return console-diagnostic '+({synced:'ok',waiting:'waiting',stale:'remembered',mismatch:'mismatch',unavailable:'unavailable'}[item.status]);
-  card.querySelector('.console-program span').textContent='Attendu (Ableton)';
-  const describe=(pc,memory,title)=>'PC '+(pc??'—')+' · Scène '+(memory??'—')+(title?' · « '+String(title)+' »':'');
-  card.querySelector('.console-title').textContent=describe(item.expected,v.expected_scene_memory,v.expected_title);
-  card.querySelector('.console-title').hidden=false;
-  card.querySelector('.console-received').textContent='Reçu (Retour) · '+describe(item.returned,v.returned_scene_memory,v.returned_title);
+  const waitingForLiveSet=
+    item.expected===null &&
+    state &&
+    state.server_valid===true &&
+    state.live_set_ready===false;
+  const matching=item.expected!==null&&item.returned!==null&&item.expected===item.returned;
+  // Display unequal known PCs in yellow even when their existing validation status is stale.
+  const different=item.status!=='unavailable'&&item.expected!==null&&item.returned!==null&&!matching;
+  const labels={synced:'✓ Conforme',waiting:item.age===null||item.returned===null?'En attente de retour':'En attente de confirmation',stale:matching?'✓ Conforme':'Retour ancien',mismatch:'⚠ Retour différent',unavailable:'Indisponible'};
+  const compactMatch=matching&&(item.status==='synced'||item.status==='stale');
+  card.className='console-return console-diagnostic '+(different?'mismatch':{synced:'ok',waiting:'waiting',stale:'remembered',mismatch:'mismatch',unavailable:'unavailable'}[item.status])+(compactMatch?' matching':'');
+  const describe=(pc,memory,title)=>'PC '+(pc??'—')+' · Sc '+(memory??'—')+(title?'   « '+String(title)+' »':'');
+  card.querySelector('.console-program span').textContent=waitingForLiveSet
+    ?'Attendu   En attente du Live Set…'
+    :'Attendu   '+describe(item.expected,v.expected_scene_memory,matching?'':v.expected_title);
+  card.querySelector('.console-received').textContent='Reçu       '+describe(item.returned,v.returned_scene_memory,matching?'':v.returned_title);
+  const title=card.querySelector('.console-title');
+  title.textContent=matching?'« '+(v.returned_title||v.expected_title||'—')+' »':'';
+  title.title=title.textContent;title.hidden=!matching;
+  card.querySelector('.console-return-values').textContent='Attendu · '+describe(item.expected,v.expected_scene_memory,v.expected_title)+' / Reçu · '+describe(item.returned,v.returned_scene_memory,v.returned_title);
   card.querySelector('.console-age').textContent='Dernier retour · '+consoleAgeLabel(item.age);
   card.querySelector('.console-delay').textContent='Délai · '+(item.latency===null?'Non renseigné':Math.round(item.latency)+' ms');
-  card.querySelector('.console-state').textContent=labels[item.status];
+  card.querySelector('.console-state').textContent=(different?'⚠ Retour différent':labels[item.status])+(compactMatch?' · '+consoleAgeLabel(item.age).replace(/^il y a /,''):'');
   const channel=consoleNumber(v.midi_channel)??(item.legacy==='cl5'?1:item.legacy==='ql1'?2:null);
   card.querySelector('.console-meta').textContent='Canal MIDI '+(channel??'—')+(item.legacy?' · Offset titre '+Number(v.title_offset??offsets[item.legacy]??0).toLocaleString('fr-FR',{signDisplay:'exceptZero'}):'');
+  renderConsoleSimulatorControl(card,item);
 }
 // CONSOLE_HEALTH_END
 function consolePanelUnavailable(){
   const devices=latestState?showDevicesForState(latestState):[];
   const health=renderConsoleHealth({},devices);
-  health.cards.forEach(item=>{const card=Array.from(el('showDevices').children).find(n=>n.dataset.deviceId===String(item.id));if(card)renderConsoleDiagnostic(card,item,{});});
+  health.cards.forEach(item=>{const card=Array.from(el('showDevices').children).find(n=>n.dataset.deviceId===String(item.id));if(card)renderConsoleDiagnostic(card,item,{},{});});
 }
 
 async function saveCLServer(){
@@ -2410,10 +3046,12 @@ function renderCLServer(s){
   if(!clServerDirty&&!clServerInitialized){el('clServerMode').value=c.mode||'local';el('clServerHost').value=c.mode==='manual'?(c.hostname||''):'';el('clServerHost').disabled=c.mode!=='manual';clServerInitialized=true;}
   const target=s.server_valid?s.ableton_server_target:null;
   const ableton=target?target.host+':'+target.send_port:null;
-  const diagnostic=el('clServerDiagnostic');diagnostic.replaceChildren();
+  const diagnostic=el('clServerDiagnosticDetails');diagnostic.replaceChildren();
+  el('clServerDiagnostic').textContent=[(c.mode==='local'?'Serveur local':c.server||'Serveur distant')+' · '+(c.hostname||'—')+' · '+(c.address||'—'),c.validation==='Serveur possédé et validé'?'Validé · possédé':(c.validation||'Validation inconnue'),'Ableton · '+(ableton||'Non disponible')].join('\n');
   ['Serveur recherché : '+(c.server||'—'),'Nom : '+(c.hostname||'—'),'Adresse retenue : '+(c.address||'—'),'Découverte : '+(c.discovery||'—'),'Validation : '+(c.validation||'—'),'Réseau : '+(c.network||'—'),...(ableton?['Cible Ableton du backend actif : '+ableton]:[])].forEach(text=>{const row=document.createElement('div');row.className='diagnostic-row';const split=text.indexOf(' : ');const label=document.createElement('span'),value=document.createElement('strong');label.textContent=text.slice(0,split);value.textContent=text.slice(split+3);row.append(label,value);diagnostic.appendChild(row);});
   el('networkCard').querySelectorAll('input,select,button').forEach(node=>node.disabled=!!c.remote);
   if(!c.remote)el('abletonHost').disabled=el('abletonMode').value==='local';
+  el('abletonReaders').disabled=!!c.remote||el('abletonMode').value==='local';
 }
 function render(s){
   latestState=s;const card=el('systemCard'),title=el('stateTitle'),detail=el('stateDetail');
@@ -2445,7 +3083,7 @@ el('localAddress').textContent=String(s.local_url||'').replace(/^https?:\/\//,''
   const health=renderConsoleHealth(s,devices);
   health.cards.forEach(item=>{
     const card=Array.from(el('showDevices').children).find(node=>node.dataset.deviceId===String(item.id));
-    if(card)renderConsoleDiagnostic(card,item,offsets);
+    if(card)renderConsoleDiagnostic(card,item,offsets,s);
   });
   const ltc=s.ltc_connected?s.ltc_timecode:'--:--:--:--';
   el('systemLtc').textContent=ltc;el('systemLtc').className='system-ltc'+(s.ltc_connected?'':' offline');
@@ -2456,6 +3094,49 @@ async function refresh(){try{render(await(await fetch('/state')).json());}catch(
 async function changeTitleOffset(consoleName,delta,reset=false){const current=Number(latestState?.console_title_offsets?.[consoleName]||0),offset=reset?0:current+delta;try{const response=await fetch('/console-title-offset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({console:consoleName,offset})});const result=await response.json();if(!response.ok)throw new Error(result.error||result.message||'Réglage refusé');el('actionStatus').textContent='✓ '+result.message;await refresh();}catch(error){el('actionStatus').textContent='! '+error;}}
 async function runAction(path,label){setBusy(label);el('actionStatus').textContent=label+'…';try{const response=await fetch(path);const r=await response.json();el('actionStatus').textContent=response.ok?('✓ '+(r.message||'Action terminée')):('! Refus : '+(r.error||response.status));}catch(e){el('actionStatus').textContent='! '+e;}setTimeout(refresh,450);}
 async function runPostAction(path,label){setBusy(label);el('actionStatus').textContent=label+'…';try{const response=await fetch(path,{method:'POST'});const r=await response.json();el('actionStatus').textContent=response.ok?('✓ '+(r.message||'Action terminée')):('! Refus : '+(r.error||response.status));}catch(e){el('actionStatus').textContent='! '+e;}setTimeout(refresh,450);}
+// ABLETON_DISCOVERY_BEGIN: informational discovery; only Appliquer persists a target.
+let abletonReaders=[];
+function renderAbletonReaders(data){
+  abletonReaders=Array.isArray(data.readers)?data.readers:[];
+  const select=el('abletonReaders');
+  select.replaceChildren();
+  const placeholder=document.createElement('option');placeholder.value='';
+  placeholder.textContent=abletonReaders.length?'Choisir un lecteur…':'Aucun lecteur Ableton annoncé';
+  select.appendChild(placeholder);
+  abletonReaders.forEach(reader=>{
+    const option=document.createElement('option');
+    option.value=reader.host+':'+reader.port;
+    const configured=el('abletonHost').value.toLowerCase()===reader.host.toLowerCase();
+    option.textContent=reader.host+' · '+(reader.addresses.join(', ')||'IPv4 non résolue')+' · UDP '+reader.port+' · '+(reader.state==='resolved'?'Résolu':'Découvert')+(reader.port!==11000?' · port non pris en charge':'')+(configured?' · adresse affichée':'');
+    option.disabled=reader.state!=='resolved'||reader.port!==11000;
+    select.appendChild(option);
+  });
+  select.disabled=el('abletonMode').value==='local'||Boolean(latestState?.cl_server?.remote);
+  el('abletonDiscoveryStatus').textContent=data.error?'Découverte indisponible · saisie manuelle conservée':el('abletonMode').value==='local'?'Mode Local conservé · choisir Distant pour sélectionner un lecteur':'Bonjour ≠ connexion validée · sélectionner, Appliquer, puis Tester';
+  el('abletonDiscoveryDetails').textContent='Découverte Ableton · '+data.service+' · '+abletonReaders.length+' lecteur(s) · '+(data.refreshed_at?new Date(data.refreshed_at*1000).toLocaleTimeString('fr-FR'):'—')+' · interfaces ignorées : '+((data.ignored_interfaces||[]).join(', ')||'aucune')+(data.error?' · '+data.error:'')+' · '+abletonReaders.map(r=>r.host+' / '+r.addresses.join(', ')+' / UDP '+r.port+' / '+r.interfaces.join(', ')).join(' ; ');
+}
+function selectAbletonReader(key){
+  const reader=abletonReaders.find(r=>r.host+':'+r.port===key);
+  if(!reader||reader.state!=='resolved'||reader.port!==11000||el('abletonMode').value!=='remote'||latestState?.cl_server?.remote)return;
+  el('abletonHost').value=reader.host;
+  markNetworkDraftDirty();
+  el('abletonDiscoveryStatus').textContent=reader.host+' sélectionné · cliquez Appliquer, puis Tester la connexion';
+}
+async function refreshAbletonReaders(){
+  const controller=new AbortController();
+  const timeout=setTimeout(()=>controller.abort(),45000);
+  try{
+    const response=await fetch('/api/ableton-discovery',{cache:'no-store',signal:controller.signal});
+    if(!response.ok)throw new Error('Découverte indisponible');
+    renderAbletonReaders(await response.json());
+  }catch(error){
+    renderAbletonReaders({readers:[],service:'_cl-ableton._udp',error:String(error)});
+  }finally{
+    clearTimeout(timeout);
+    setTimeout(refreshAbletonReaders,35000);
+  }
+}
+// ABLETON_DISCOVERY_END
 function copyNetworkDraft(value,mode){
   if(!value)return mode==='local'?{name:'',host:'127.0.0.1',send_port:11000,reply_port:11001}:{name:'',host:'',send_port:11000,reply_port:11001};
   return {name:value.name||'',host:mode==='local'?'127.0.0.1':(value.host||''),send_port:Number(value.send_port),reply_port:Number(value.reply_port)};
@@ -2492,6 +3173,7 @@ function updateNetworkFields(){
   networkVisibleMode=el('abletonMode').value;
   restoreNetworkDraft(networkVisibleMode);
   networkFormDirty=true;
+  el('abletonReaders').disabled=networkVisibleMode==='local'||Boolean(latestState?.cl_server?.remote);
 }
 function markNetworkDraftDirty(){captureVisibleNetworkDraft();networkFormDirty=true;}
 async function saveNetworkConfig(){
@@ -2541,7 +3223,7 @@ async function toggleShowMode(){
 ['abletonHost'].forEach(id=>el(id).addEventListener('input',markNetworkDraftDirty));
 let telemetryBusy=false;
 async function refreshTelemetry(){if(telemetryBusy)return;telemetryBusy=true;try{const t=await(await fetch('/telemetry')).json();const ltc=t.ltc_connected?t.ltc_timecode:'--:--:--:--';el('systemLtc').textContent=ltc;el('systemLtc').className='system-ltc'+(t.ltc_connected?'':' offline');el('networkLtc').textContent=ltc;el('networkLtc').className='network-timecode'+(t.ltc_connected?'':' offline');updateShowCurrent(t);}catch(e){}finally{telemetryBusy=false;}}
-refresh();refreshTelemetry();setInterval(refresh,1500);setInterval(refreshTelemetry,100);
+refresh();refreshTelemetry();refreshAbletonReaders();setInterval(refresh,1500);setInterval(refreshTelemetry,100);
 </script>
 </body>
 </html>
@@ -2617,6 +3299,8 @@ def state():
         osc_send_ready = server_valid and transport_connected
     system_ready = server_valid and live_set_ready and osc_return_ready
     response_payload = dict(
+        runtime_identity=runtime_identity(__file__, backend_path=APP),
+        backend_runtime_identity=remote_state.get("runtime_identity"),
         cl_server=cl_server,
         web=web_ready,
         osc=osc_send_ready,
@@ -2713,7 +3397,7 @@ def console_title_offset():
     remote_request = urllib.request.Request(
         f"{selected_cl_url()}action",
         data=body,
-        headers={"Content-Type": "application/json"},
+        headers={"Content-Type": "application/json", **({"Cookie": "cl_admin_backend=" + request.cookies["cl_admin_backend"]} if not cl_server_is_remote() and request.cookies.get("cl_admin_backend") else {})},
         method="POST",
     )
     try:
@@ -2767,6 +3451,13 @@ def validate_remote_target_host(candidate) -> None:
             f"Mode distant refusé : {host} est l’adresse de ce Mac. "
             "Choisissez le Mac Ableton distant ou repassez en mode Local."
         )
+
+
+@app.route("/api/ableton-discovery", methods=["GET"])
+def ableton_discovery_status():
+    response = jsonify(ableton_discovery_cache.snapshot())
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @app.route("/network-config", methods=["GET", "POST"])
@@ -3010,16 +3701,41 @@ def open_midi_network_assistant():
     event("CL MIDI Network Manager ouvert depuis Show Control")
     return jsonify(message="CL MIDI Network Manager ouvert")
 
+@app.route("/api/console-simulators/status", methods=["GET"])
+def console_simulators_status():
+    return jsonify(
+        ok=True,
+        simulators=console_simulator_status(),
+    )
+
+
+@app.route("/api/console-simulators/<device_id>/start", methods=["POST"])
+def console_simulator_start(device_id):
+    ok, message = start_console_simulator(device_id.lower())
+    payload = {
+        "ok": ok,
+        "message": message,
+        "simulators": console_simulator_status(),
+    }
+    return jsonify(payload), (200 if ok else 409)
+
+
+@app.route("/api/console-simulators/<device_id>/stop", methods=["POST"])
+def console_simulator_stop(device_id):
+    ok, message = stop_console_simulator(device_id.lower())
+    payload = {
+        "ok": ok,
+        "message": message,
+        "simulators": console_simulator_status(),
+    }
+    return jsonify(payload), (200 if ok else 409)
+
+
 @app.route("/quit")
 def quit_launcher():
     event("Launcher fermé")
 
-    def close_owned_processes():
-        stop_owned_server()
-        stop_midi_console_monitor()
-        os._exit(0)
-
-    threading.Timer(0.5, close_owned_processes).start()
+    threading.Timer(0.5, exit_launcher).start()
     return jsonify(message="Launcher fermé")
 
 
@@ -3070,10 +3786,10 @@ def _cl_mtc_bridge_executable():
 def _cl_mtc_bridge_pids():
     import subprocess
 
-    exe = str(_cl_mtc_bridge_executable())
-
+    # Le bridge peut provenir du dépôt de développement ou du bundle
+    # CL Show Control. Son chemin absolu n'est donc pas une identité fiable.
     r = subprocess.run(
-        ["pgrep", "-f", exe],
+        ["pgrep", "-x", "CLAbletonMTCBridge"],
         capture_output=True,
         text=True,
         check=False,
@@ -3095,95 +3811,45 @@ def _cl_mtc_bridge_status_data():
         "running": bool(pids),
         "pids": pids,
         "exists": exe.exists(),
+        "owned": bool(MTC_BRIDGE_PROCESS and MTC_BRIDGE_PROCESS.poll() is None),
         "executable": str(exe),
     }
 
 
 def _cl_mtc_bridge_start_process():
-    import subprocess
-
-    exe = _cl_mtc_bridge_executable()
-
-    if not exe.exists():
-        return {
-            "ok": False,
-            "running": False,
-            "error": "Bridge introuvable : " + str(exe),
-        }
-
-    pids = _cl_mtc_bridge_pids()
-
-    if pids:
-        return {
-            "ok": True,
-            "running": True,
-            "pids": pids,
-            "message": "Bridge déjà actif",
-        }
-
-    log_path = "/tmp/CL_Ableton_MTC_Bridge.log"
-
-    log = open(log_path, "ab", buffering=0)
-
-    proc = subprocess.Popen(
-        [str(exe)],
-        cwd=str(exe.parent),
-        stdin=subprocess.DEVNULL,
-        stdout=log,
-        stderr=subprocess.STDOUT,
-        start_new_session=True,
-        close_fds=True,
-    )
-
-    return {
-        "ok": True,
-        "running": True,
-        "pid": proc.pid,
-        "message": "Bridge démarré",
-        "log": log_path,
-    }
+    global MTC_BRIDGE_PROCESS
+    with owned_children_lock:
+        if launcher_stopping.is_set():
+            return {"ok": False, "running": False, "message": "Launcher en cours d’arrêt"}
+        exe = _cl_mtc_bridge_executable()
+        if not exe.exists():
+            return {"ok": False, "running": False, "error": "Bridge introuvable : " + str(exe)}
+        if MTC_BRIDGE_PROCESS is not None and MTC_BRIDGE_PROCESS.poll() is None:
+            return {"ok": True, "running": True, "pid": MTC_BRIDGE_PROCESS.pid, "owned": True}
+        pids = _cl_mtc_bridge_pids()
+        if pids:
+            return {"ok": True, "running": True, "pids": pids, "owned": False,
+                    "message": "Bridge déjà actif, non possédé par ce launcher"}
+        log_path = "/tmp/CL_Ableton_MTC_Bridge.log"
+        with open(log_path, "ab", buffering=0) as log:
+            MTC_BRIDGE_PROCESS = subprocess.Popen(
+                [str(exe)], cwd=str(exe.parent), stdin=subprocess.DEVNULL,
+                stdout=log, stderr=subprocess.STDOUT, close_fds=True,
+            )
+        return {"ok": True, "running": True, "pid": MTC_BRIDGE_PROCESS.pid,
+                "owned": True, "message": "Bridge démarré", "log": log_path}
 
 
 def _cl_mtc_bridge_stop_process():
-    import os
-    import signal
-    import time
-
-    pids = _cl_mtc_bridge_pids()
-
-    if not pids:
-        return {
-            "ok": True,
-            "running": False,
-            "message": "Bridge déjà arrêté",
-        }
-
-    for pid in pids:
-        try:
-            os.kill(pid, signal.SIGTERM)
-        except ProcessLookupError:
-            pass
-
-    deadline = time.time() + 2.0
-
-    while time.time() < deadline:
-        if not _cl_mtc_bridge_pids():
-            break
-
-        time.sleep(0.05)
-
-    remaining = _cl_mtc_bridge_pids()
-
-    return {
-        "ok": not bool(remaining),
-        "running": bool(remaining),
-        "pids": remaining,
-        "message": (
-            "Bridge arrêté"
-            if not remaining
-            else "Bridge toujours actif"
-        ),
-    }
+    global MTC_BRIDGE_PROCESS
+    with owned_children_lock:
+        process = MTC_BRIDGE_PROCESS
+        if process is None:
+            return {"ok": True, "running": bool(_cl_mtc_bridge_pids()), "owned": False,
+                    "message": "Aucun bridge possédé ; processus externes conservés"}
+        stop_owned_child(process)
+        MTC_BRIDGE_PROCESS = None
+        return {"ok": True, "running": False, "owned": True, "message": "Bridge possédé arrêté"}
 
 
 @app.route("/api/cl-mtc-bridge/status", methods=["GET"])
@@ -3211,6 +3877,25 @@ def cl_mtc_bridge_restart():
     return _cl_mtc_bridge_start_process()
 
 
+@app.route("/api/hot-backup", methods=["GET", "POST"])
+def hot_backup_proxy():
+    # Reuse the selected CL backend. No bridge lifecycle or PRIMARY control here.
+    body = None
+    if request.method == "POST":
+        body = json.dumps(request.get_json(silent=True) or {}).encode("utf-8")
+    req = urllib.request.Request(
+        f"{selected_cl_url()}api/hot-backup", data=body,
+        headers={"Content-Type": "application/json", **({"Cookie": "cl_admin_backend=" + request.cookies["cl_admin_backend"]} if not cl_server_is_remote() and request.cookies.get("cl_admin_backend") else {})}, method=request.method,
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=1.0) as response:
+            return jsonify(json.loads(response.read())), response.status
+    except urllib.error.HTTPError as exc:
+        return jsonify(json.loads(exc.read())), exc.code
+    except (OSError, ValueError) as exc:
+        return jsonify(state="OFFLINE", error=str(exc)), 503
+
+
 @app.after_request
 def cl_mtc_bridge_inject_control(response):
     try:
@@ -3229,7 +3914,7 @@ def cl_mtc_bridge_inject_control(response):
 
         widget = '''
 <div id="cl-mtc-bridge-control"
-     style="position:fixed;right:16px;bottom:16px;z-index:99999;padding:9px 10px;border-radius:10px;background:rgba(18,18,18,.92);color:white;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.20);min-width:175px;flex:0 0 auto;">
+     style="position:fixed;right:16px;bottom:16px;z-index:99999;padding:9px 10px;border-radius:10px;background:rgba(18,18,18,.92);color:white;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.20);min-width:175px;flex:0 0 auto;flex-wrap:wrap;">
 
   <div style="display:flex;align-items:center;gap:7px;margin-bottom:8px;">
     <span id="cl-mtc-dot"
@@ -3254,6 +3939,19 @@ def cl_mtc_bridge_inject_control(response):
       Relancer
     </button>
   </div>
+  <details style="flex-basis:100%;margin-top:6px;max-width:320px;">
+    <summary id="cl-sync-summary" style="cursor:pointer">Sync : MTC continu</summary>
+    <select id="cl-sync-mode" aria-label="Mode de synchronisation">
+      <option value="mtc">MTC continu</option><option value="hot_backup">Hot Backup</option>
+    </select>
+    <input id="cl-backup-host" placeholder="IPv4 BACKUP" aria-label="Adresse BACKUP" style="width:135px">
+    <label style="display:block"><input id="cl-backup-ext" type="checkbox"> EXT désactivé sur BACKUP</label>
+    <label style="display:block"><input id="cl-backup-set" type="checkbox"> Mêmes sets et cartes de tempo</label>
+    <button id="cl-backup-apply" type="button">Appliquer à l'arrêt</button>
+    <div id="cl-backup-status" role="status"></div>
+    <small>Commandes Show Control uniquement. EXT se règle manuellement.
+    Après redémarrage : MTC continu, Hot Backup à réarmer.</small>
+  </details>
 </div>
 
 <script>
@@ -3263,6 +3961,42 @@ def cl_mtc_bridge_inject_control(response):
     const stop = document.getElementById("cl-mtc-stop");
     const restart = document.getElementById("cl-mtc-restart");
 
+
+    const backupStatus = document.getElementById("cl-backup-status");
+    let backupFormInitialized = false;
+    async function refreshBackup() {
+        try {
+            const r = await fetch('/api/hot-backup');
+            const s = await r.json();
+            if (!backupFormInitialized && s.mode) {
+                document.getElementById('cl-sync-mode').value = s.mode;
+                document.getElementById('cl-backup-host').value = s.host || '';
+                backupFormInitialized = true;
+            }
+            document.getElementById('cl-sync-summary').textContent =
+                s.mode === 'hot_backup' ? 'Sync : Hot Backup' : 'Sync : MTC continu';
+            backupStatus.textContent = s.mode === 'mtc' ? 'Copie BACKUP désactivée' :
+                'BACKUP : ' + (s.state || 'OFFLINE') + ' — ' + (s.detail || s.error || '');
+        } catch (_) { backupStatus.textContent = 'BACKUP : état indisponible'; }
+    }
+    document.getElementById('cl-backup-apply').onclick = async function () {
+        this.disabled = true;
+        try {
+            const r = await fetch('/api/hot-backup', {method:'POST',
+                headers:{'Content-Type':'application/json'}, body:JSON.stringify({
+                    mode:document.getElementById('cl-sync-mode').value,
+                    host:document.getElementById('cl-backup-host').value.trim(),
+                    ext_off:document.getElementById('cl-backup-ext').checked,
+                    same_set:document.getElementById('cl-backup-set').checked
+                })});
+            const s = await r.json();
+            if (!r.ok) backupStatus.textContent = s.error || 'Réglage refusé';
+            else await refreshBackup();
+        } catch (_) { backupStatus.textContent = 'BACKUP : serveur indisponible'; }
+        finally { this.disabled = false; }
+    };
+    refreshBackup();
+    setInterval(refreshBackup, 3000);
 
     function placeMTCBridgeBesideRemoteAccess() {
         const widget =
@@ -3306,7 +4040,7 @@ def cl_mtc_bridge_inject_control(response):
             }
         } catch (e) {
             state.textContent = "Erreur";
-            dot.style.background = "#f6993f";
+            dot.style.background = "#e3342f";
         }
     }
 
@@ -3393,7 +4127,7 @@ def _cl_mtc_bridge_autostart():
         )
 
 
-_cl_mtc_bridge_autostart()
+# Autostart belongs to the main launcher lifecycle, never to module import.
 
 # ===== CL MTC BRIDGE CONTROL END =====
 
@@ -3531,6 +4265,10 @@ Documentation locale de la suite CL Audio.
 
 
 if __name__ == "__main__":
+    if "--reset-admin-password" in sys.argv:
+        from security_recovery import reset_admin_password
+        reset_admin_password()
+        raise SystemExit(0)
     if "--check-showcue-runtime" in sys.argv:
         from showcue_runtime_check import run
         run()
@@ -3538,6 +4276,10 @@ if __name__ == "__main__":
     if "--serve" in sys.argv:
         run_embedded_server()
         raise SystemExit(0)
+
+    atexit.register(cleanup_launcher)
+    signal.signal(signal.SIGTERM, launcher_termination_signal)
+    signal.signal(signal.SIGINT, launcher_termination_signal)
 
     print("=== LAUNCHER_CONTROL VERSION WEBVIEW ACTIVE ===", flush=True)
     print("Fichier exécuté :", __file__, flush=True)
@@ -3549,7 +4291,17 @@ if __name__ == "__main__":
 
     server_thread = threading.Thread(target=run_control_server, daemon=True)
     server_thread.start()
-    ensure_midi_console_monitor()
+    role_record = Path.home() / "Library/Application Support/CL Audio Controller/role-installation.json"
+    role_components = None
+    if role_record.exists():
+        try:
+            role_components = set(json.loads(role_record.read_text())["manifest"]["components"])
+        except (OSError, ValueError, KeyError):
+            role_components = set()  # Damaged manifest never starts extra services.
+    if role_components is None or "network_manager" in role_components:
+        ensure_midi_console_monitor()
+    if role_components is None or "mtc_bridge" in role_components:
+        _cl_mtc_bridge_autostart()
     server_start_thread = threading.Thread(
         target=auto_start_web_server,
         name="cl-audio-server-autostart",
@@ -3587,17 +4339,16 @@ if __name__ == "__main__":
             return
         panel_close_cleanup_started.set()
         event("Fenêtre principale fermée — arrêt complet")
-        try:
-            stop_owned_server()
-        finally:
-            stop_midi_console_monitor()
-            os._exit(0)
+        exit_launcher()
 
     # Déclencher le nettoyage AVANT que Cocoa ne détruise la fenêtre.
     # `closed` reste un filet de sécurité pour les backends qui ne publient
     # pas correctement l'événement `closing`.
     panel_window.events.closing += quit_when_main_panel_closes
     panel_window.events.closed += quit_when_main_panel_closes
-    webview.start(gui="cocoa", debug=False)
+    try:
+        webview.start(gui="cocoa", debug=False)
+    finally:
+        cleanup_launcher()
     # Filet de sécurité pour les backends où start() retourne sans événement.
     quit_when_main_panel_closes()

@@ -1,0 +1,145 @@
+{
+  "defaultRTP" : {
+    "networkName" : "",
+    "localName" : "",
+    "enabled" : false,
+    "port" : 0
+  },
+  "endpoints" : [
+    {
+      "entity" : "CL Show Control",
+      "uid" : 812879448,
+      "display" : "Réseau CL Show Control",
+      "device" : "Réseau",
+      "driver" : "com.apple.AppleMIDINetworkDriver",
+      "direction" : "destination",
+      "name" : "CL Show Control"
+    },
+    {
+      "entity" : "CL Ableton Clock",
+      "uid" : -92470108,
+      "display" : "Réseau CL Ableton Clock",
+      "device" : "Réseau",
+      "driver" : "com.apple.AppleMIDINetworkDriver",
+      "direction" : "destination",
+      "name" : "CL Ableton Clock"
+    },
+    {
+      "entity" : "CL MTC",
+      "uid" : -1649952904,
+      "display" : "Réseau CL MTC",
+      "device" : "Réseau",
+      "driver" : "com.apple.AppleMIDINetworkDriver",
+      "direction" : "destination",
+      "name" : "CL MTC"
+    },
+    {
+      "entity" : "CL MIDI Return Test",
+      "uid" : -1481201180,
+      "display" : "Gestionnaire IAC CL MIDI Return Test",
+      "device" : "Gestionnaire IAC",
+      "driver" : "com.apple.AppleMIDIIACDriver",
+      "direction" : "destination",
+      "name" : "CL MIDI Return Test"
+    },
+    {
+      "entity" : "MTC vers Logic",
+      "uid" : -1350477559,
+      "display" : "Gestionnaire IAC MTC vers Logic",
+      "device" : "Gestionnaire IAC",
+      "driver" : "com.apple.AppleMIDIIACDriver",
+      "direction" : "destination",
+      "name" : "MTC vers Logic"
+    },
+    {
+      "entity" : "Ableton Clock",
+      "uid" : -1735572229,
+      "display" : "Gestionnaire IAC Ableton Clock",
+      "device" : "Gestionnaire IAC",
+      "driver" : "com.apple.AppleMIDIIACDriver",
+      "direction" : "destination",
+      "name" : "Ableton Clock"
+    },
+    {
+      "entity" : "Bus 1",
+      "uid" : -1612638664,
+      "display" : "Gestionnaire IAC Bus 1",
+      "device" : "Gestionnaire IAC",
+      "driver" : "com.apple.AppleMIDIIACDriver",
+      "direction" : "destination",
+      "name" : "Bus 1"
+    },
+    {
+      "entity" : "",
+      "uid" : -480119136,
+      "display" : "CL MIDI Return Test",
+      "device" : "",
+      "driver" : "",
+      "direction" : "destination",
+      "name" : "CL MIDI Return Test"
+    },
+    {
+      "entity" : "CL Show Control",
+      "uid" : 1418576320,
+      "display" : "Réseau CL Show Control",
+      "device" : "Réseau",
+      "driver" : "com.apple.AppleMIDINetworkDriver",
+      "direction" : "source",
+      "name" : "CL Show Control"
+    },
+    {
+      "entity" : "CL Ableton Clock",
+      "uid" : 1465022093,
+      "display" : "Réseau CL Ableton Clock",
+      "device" : "Réseau",
+      "driver" : "com.apple.AppleMIDINetworkDriver",
+      "direction" : "source",
+      "name" : "CL Ableton Clock"
+    },
+    {
+      "entity" : "CL MTC",
+      "uid" : -421896984,
+      "display" : "Réseau CL MTC",
+      "device" : "Réseau",
+      "driver" : "com.apple.AppleMIDINetworkDriver",
+      "direction" : "source",
+      "name" : "CL MTC"
+    },
+    {
+      "entity" : "CL MIDI Return Test",
+      "uid" : 563240882,
+      "display" : "Gestionnaire IAC CL MIDI Return Test",
+      "device" : "Gestionnaire IAC",
+      "driver" : "com.apple.AppleMIDIIACDriver",
+      "direction" : "source",
+      "name" : "CL MIDI Return Test"
+    },
+    {
+      "entity" : "MTC vers Logic",
+      "uid" : 1754550848,
+      "display" : "Gestionnaire IAC MTC vers Logic",
+      "device" : "Gestionnaire IAC",
+      "driver" : "com.apple.AppleMIDIIACDriver",
+      "direction" : "source",
+      "name" : "MTC vers Logic"
+    },
+    {
+      "entity" : "Ableton Clock",
+      "uid" : 987028535,
+      "display" : "Gestionnaire IAC Ableton Clock",
+      "device" : "Gestionnaire IAC",
+      "driver" : "com.apple.AppleMIDIIACDriver",
+      "direction" : "source",
+      "name" : "Ableton Clock"
+    },
+    {
+      "entity" : "Bus 1",
+      "uid" : 2006808751,
+      "display" : "Gestionnaire IAC Bus 1",
+      "device" : "Gestionnaire IAC",
+      "driver" : "com.apple.AppleMIDIIACDriver",
+      "direction" : "source",
+      "name" : "Bus 1"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+--- a/app.py
++++ b/app.py
+@@ -187,9 +187,24 @@
+ _midi_expected_bonjour_lock = threading.Lock()
+ 
+ 
++def _exit_on_midi_expected_sigterm(signum, frame):
++    # Unwind normally so atexit reaps only the publisher owned by this backend.
++    # Do not acquire its lock from a signal handler.
++    raise SystemExit(128 + signum)
++
++
++def install_midi_expected_sigterm_cleanup():
++    # Both standalone and embedded (--serve) startup call the publisher.
++    # Preserve an explicit handler installed by an embedding host.
++    if (threading.current_thread() is threading.main_thread()
++            and signal.getsignal(signal.SIGTERM) == signal.SIG_DFL):
++        signal.signal(signal.SIGTERM, _exit_on_midi_expected_sigterm)
++
++
+ def start_midi_expected_bonjour_publisher():
+     global _midi_expected_bonjour_process
+ 
++    install_midi_expected_sigterm_cleanup()
+     with _midi_expected_bonjour_lock:
+         proc = _midi_expected_bonjour_process
+         if proc is not None and proc.poll() is None:
+@@ -242,6 +257,7 @@
+     except Exception:
+         try:
+             proc.kill()
++            proc.wait(timeout=1.0)
+         except Exception:
+             pass
+ 

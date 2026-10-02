@@ -105,6 +105,10 @@ case "$answer" in
         ;;
 esac
 
+# Retire the legacy permanent monitor before replacing its diagnostic app.
+/bin/launchctl bootout "gui/$(id -u)/com.claudio.midi-network-monitor" >/dev/null 2>&1 || true
+rm -f "$HOME/Library/LaunchAgents/com.claudio.midi-network-monitor.plist"
+
 mkdir -p \
     "$USER_APPS" \
     "$PROD_APPS" \

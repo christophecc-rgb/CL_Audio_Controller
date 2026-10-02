@@ -51,6 +51,11 @@ import socket
 
 from pythonosc import udp_client
 from osc_transport import OSCTransport
+from hot_backup_sync import HotBackup
+from scene_backup_udp import SceneBackupUDP
+from runtime_identity import runtime_identity
+from security_http import attach_security, start_remote_tls
+from midi_endpoint_names import SHOW_IAC, RETURN_RTP, DIRECT_RTP, endpoint_matches
 from ltc_receiver import LTCReceiver, LTC_BIND_HOST, LTC_PORT
 from show_cues import (
     SHOW_POSTS, SHOW_SECTIONS, activate_show_cue_session, active_session_paths, create_show_cue,
@@ -185,9 +190,24 @@ _midi_expected_bonjour_process = None
 _midi_expected_bonjour_lock = threading.Lock()
 
 
+def _exit_on_midi_expected_sigterm(signum, frame):
+    # Unwind normally so atexit reaps only the publisher owned by this backend.
+    # Do not acquire its lock from a signal handler.
+    raise SystemExit(128 + signum)
+
+
+def install_midi_expected_sigterm_cleanup():
+    # Both standalone and embedded (--serve) startup call the publisher.
+    # Preserve an explicit handler installed by an embedding host.
+    if (threading.current_thread() is threading.main_thread()
+            and signal.getsignal(signal.SIGTERM) == signal.SIG_DFL):
+        signal.signal(signal.SIGTERM, _exit_on_midi_expected_sigterm)
+
+
 def start_midi_expected_bonjour_publisher():
     global _midi_expected_bonjour_process
 
+    install_midi_expected_sigterm_cleanup()
     with _midi_expected_bonjour_lock:
         proc = _midi_expected_bonjour_process
         if proc is not None and proc.poll() is None:
@@ -240,6 +260,7 @@ def stop_midi_expected_bonjour_publisher():
     except Exception:
         try:
             proc.kill()
+            proc.wait(timeout=1.0)
         except Exception:
             pass
 
@@ -276,9 +297,9 @@ def ableton_midi_roles(target_mode: str) -> Dict[str, str]:
     """Rôles MIDI dérivés exclusivement de Connexion Ableton OSC."""
     if str(target_mode) == "remote":
         return {"mode": "Ableton distant", "expected_source": "Ableton MIDI Output",
-                "returned_source": "CL Direct RTP"}
-    return {"mode": "Local", "expected_source": "Gestionnaire IAC Bus 1",
-            "returned_source": "Réseau Rtp MB Chris"}
+                "returned_source": DIRECT_RTP}
+    return {"mode": "Local", "expected_source": SHOW_IAC,
+            "returned_source": RETURN_RTP}
 
 
 def load_console_title_mode(path: Path = CONSOLE_TITLE_PREFERENCES_PATH) -> str:
@@ -355,6 +376,7 @@ GENERATION_DEBUG = os.environ.get("CL_AUDIO_GENERATION_DEBUG", "0").strip().lowe
 
 
 app = Flask(__name__)
+remote_security = attach_security(app)
 ableton_target = load_target()
 
 # La cible enregistrée est autoritaire. OSCTransport résout son nom éventuel ;
@@ -364,6 +386,18 @@ ableton_transport = OSCTransport(
     send_port=ableton_target.send_port,
     reply_port=ableton_target.reply_port,
 )
+# Optional copy only: PRIMARY retains its transport and confirmation path.
+hot_backup = HotBackup()
+ableton_transport.foreign_reply_handler = hot_backup.receive
+hot_backup_generation = None
+
+# Lightweight scene-event backup broadcaster.
+# Disabled by default until explicitly configured.
+scene_backup_udp = SceneBackupUDP()
+atexit.register(scene_backup_udp.close)
+app.extensions["cl_scene_backup"] = scene_backup_udp
+app.extensions["cl_osc_status"] = ableton_transport.diagnostics
+
 # Donne momentanément la priorité au test de connexion demandé par
 # l'opérateur, sans modifier le transport ni annuler le bootstrap courant.
 transport_test_requested = threading.Event()
@@ -1122,8 +1156,12 @@ def record_ableton_midi_output(
     return True
 
 
-def record_go_midi_expectations(scene_index: int, activated_at: float) -> None:
-    """Fige l'intention MIDI de la scène juste avant son lancement."""
+def record_go_midi_expectations(
+    scene_index: int,
+    activated_at: float,
+    source: str = "show_control_go_intent",
+) -> None:
+    """Fige l'intention MIDI attendue pour une scène, sans émettre de commande MIDI."""
     with lock:
         scene_map = state.get("console_scene_map") or {}
         outgoing = dict(state.get("ableton_midi_output") or {})
@@ -1151,7 +1189,7 @@ def record_go_midi_expectations(scene_index: int, activated_at: float) -> None:
                         "activated_at": float(activated_at),
                         "expected_activated_at": float(activated_at),
                         "scene_index": int(scene_index),
-                        "source": "show_control_go_intent",
+                        "source": str(source or "show_control_go_intent"),
                     }
 
             outgoing[device.id] = intent
@@ -1437,6 +1475,7 @@ def state_snapshot_locked() -> Dict[str, Any]:
     snapshot["identity_protocol_version"] = IDENTITY_PROTOCOL_VERSION
     snapshot["launch_id"] = LAUNCH_ID
     snapshot["server_instance_id"] = SERVER_INSTANCE_ID
+    snapshot["runtime_identity"] = runtime_identity(__file__)
     snapshot["build_id"] = BUILD_ID
     snapshot["started_at"] = SERVER_STARTED_AT
     snapshot["uptime_ms"] = int((time.monotonic() - SERVER_STARTED_MONOTONIC) * 1000)
@@ -1532,8 +1571,7 @@ def state_snapshot_locked() -> Dict[str, Any]:
             native_iac_program = console_state.get("expected_midi_program")
             native_iac_source = str(console_state.get("expected_program_source") or "")
             native_iac_monitor_ready = (
-                str(midi_console.get("expected_monitor_source") or "")
-                == "Gestionnaire IAC Bus 1"
+                endpoint_matches(str(midi_console.get("expected_monitor_source") or ""), SHOW_IAC)
                 and int(midi_console.get("expected_monitor_status", -1)) == 0
             )
             remote_midi_mode = ableton_target.mode == "remote"
@@ -1948,6 +1986,15 @@ def receive_playing_slot_event(args, source_host=None) -> None:
             sync_source="Ableton événement", arrangement_marker="—",
         )
 
+        # Une scène lancée directement dans Live devient aussi la nouvelle
+        # intention MIDI attendue. Ceci met uniquement à jour l'état interne :
+        # aucune commande Live ni aucun Program Change n'est émis ici.
+        record_go_midi_expectations(
+            slot,
+            now,
+            source="ableton_playing_scene_event",
+        )
+
         # Une scène lancée directement dans Ableton doit recaler le
         # pointeur LOCAL de la télécommande sur la scène suivante,
         # sans déplacer la sélection Live.
@@ -2208,6 +2255,180 @@ def send(address: str, *args):
     ableton_transport.send(address, *args)
 
 
+def copy_to_backup(address: str, *args):
+    # No network, DNS, query, sleep or PRIMARY mutation in this boundary.
+    try:
+        if hot_backup_generation == state.get("set_generation"):
+            hot_backup.offer(address, *args)
+    except Exception:
+        pass
+
+
+def send_user_transport(address: str, *args):
+    # Preserve PRIMARY first and its historical result, independently of BACKUP.
+    result = send(address, *args)
+    copy_to_backup(address, *args)
+    return result
+
+
+
+@app.route("/api/scene-backup", methods=["GET", "POST"])
+def scene_backup_settings():
+    """
+    Configuration du broadcaster UDP léger CL Show Backup.
+
+    Cette API est indépendante du Hot Backup OSC historique.
+    Aucun envoi n'est effectué tant que enabled=False.
+    """
+    if request.method == "GET":
+        return jsonify(scene_backup_udp.snapshot())
+
+    data = request.get_json(silent=True) or {}
+
+    try:
+        current = scene_backup_udp.snapshot()
+
+        enabled = (
+            bool(data["enabled"])
+            if "enabled" in data
+            else bool(current["enabled"])
+        )
+
+        show_id = str(
+            data.get("show", current["show"])
+        ).strip()
+
+        if not show_id:
+            raise ValueError("Show ID vide")
+
+        port = int(
+            data.get("port", current["port"])
+        )
+
+        if not 1 <= port <= 65535:
+            raise ValueError("Port UDP invalide")
+
+        raw_destinations = data.get(
+            "destinations",
+            current["destinations"],
+        )
+
+        if not isinstance(raw_destinations, list):
+            raise ValueError("destinations doit être une liste")
+
+        destinations = []
+
+        for index, item in enumerate(raw_destinations):
+            if not isinstance(item, dict):
+                raise ValueError(
+                    f"Destination {index + 1} invalide"
+                )
+
+            host = str(
+                item.get("host", item.get("ip", ""))
+            ).strip()
+
+            name = str(
+                item.get("name", host)
+            ).strip() or host
+
+            active = bool(
+                item.get("enabled", True)
+            )
+
+            if not host:
+                raise ValueError(
+                    f"Adresse destination {index + 1} vide"
+                )
+
+            try:
+                normalized_host = str(
+                    ipaddress.IPv4Address(host)
+                )
+            except ipaddress.AddressValueError:
+                raise ValueError(
+                    f"Adresse IPv4 invalide : {host}"
+                )
+
+            destinations.append({
+                "name": name,
+                "host": normalized_host,
+                "enabled": active,
+            })
+
+        if enabled and data.get("authentication", current["authentication"]) == "legacy_v1" and data.get("authentication") != "legacy_v1":
+            raise ValueError("Migration explicite requise : choisir hmac_v1 ou confirmer legacy_v1 non authentifié")
+
+        scene_backup_udp.configure(
+            enabled=enabled,
+            show_id=show_id,
+            port=port,
+            destinations=destinations,
+            source_ip=data.get("source_ip"),
+            source_interface=data.get("source_interface"),
+            authentication=data.get("authentication"),
+            shared_secret=data.get("shared_secret"),
+            session=data.get("session"),
+        )
+
+        result = scene_backup_udp.snapshot()
+        result["ok"] = True
+        return jsonify(result)
+
+    except (TypeError, ValueError) as exc:
+        result = scene_backup_udp.snapshot()
+        result.update(
+            ok=False,
+            error=str(exc),
+        )
+        return jsonify(result), 400
+
+
+@app.route("/api/hot-backup", methods=["GET", "POST"])
+def hot_backup_settings():
+    global hot_backup_generation
+    if request.method == "GET":
+        result = hot_backup.snapshot()
+        if result["mode"] == "hot_backup" and hot_backup_generation != state.get("set_generation"):
+            result.update(state="NOT READY", detail="Set PRIMARY changé : réarmer à l'arrêt")
+        return jsonify(result)
+    data = request.get_json(silent=True) or {}
+    try:
+        mode = data.get("mode", "mtc")
+        if mode == "mtc":
+            hot_backup.configure("mtc")
+            hot_backup_generation = None
+        elif mode == "hot_backup":
+            if data.get("ext_off") is not True or data.get("same_set") is not True:
+                raise ValueError("Confirmer EXT OFF et les mêmes sets / cartes de tempo")
+            with lock:
+                generation = state.get("set_generation")
+                name = str(state.get("current_set_name") or "")
+                if not state.get("set_ready") or state.get("is_playing"):
+                    raise ValueError("Armer Hot Backup à l'arrêt, avec PRIMARY prêt")
+            host = str(ipaddress.IPv4Address(data.get("host", "")))
+            # Reject aliases of this machine, and the actual PRIMARY address.
+            local_ips = set(socket.gethostbyname_ex(socket.gethostname())[2])
+            if host == ableton_transport.resolved_host or host in local_ips:
+                raise ValueError("BACKUP doit être une autre machine que PRIMARY / ce serveur")
+            if ableton_transport.reply_port != 11001:
+                raise ValueError("V1 nécessite le récepteur OSC 11001 (retour AbletonOSC standard)")
+            # Reuse PRIMARY telemetry. Even setup must not seize its query lock.
+            cached_tempo = ableton_transport.last_song_tempo
+            if not cached_tempo or time.monotonic() - cached_tempo[1] > 5:
+                raise ValueError("Tempo PRIMARY récent indisponible : ouvrir la vue Arrangement puis réessayer")
+            tempo = float(cached_tempo[0])
+            if not generation_is_current(generation):
+                raise ValueError("Set PRIMARY changé pendant la préparation")
+            hot_backup.configure(mode, host, name, tempo)
+            hot_backup_generation = generation
+        else:
+            raise ValueError("Mode invalide")
+    except (ValueError, OSError, TypeError) as exc:
+        return jsonify(ok=False, error=str(exc)), 400
+    return jsonify(ok=True, **hot_backup.snapshot())
+
+
 def _arrangement_live_value(address: str, generation: int):
     response = query(address, timeout=0.12, expected_generation=generation,
                      apply_response=False)
@@ -2248,12 +2469,14 @@ def execute_arrangement_marker_go(target: float, name: str, cue_index: int,
             return False, "État de lecture Ableton indisponible avant GO"
         if ableton_transport.send("/live/song/set/back_to_arranger", 0) is False:
             return False, "Ableton inaccessible avant GO"
+        copy_to_backup("/live/song/set/back_to_arranger", 0)
 
         # Live mémorise la position de Pause. La reprise doit précéder le saut,
         # sinon continue_playing peut restaurer A après une confirmation de B.
         if not playing_before:
             if ableton_transport.send("/live/song/continue_playing") is False:
                 return False, "Reprise Arrangement non envoyée"
+            copy_to_backup("/live/song/continue_playing")
             resume_deadline = time.monotonic() + 0.85
             while time.monotonic() < resume_deadline:
                 if _arrangement_live_playing(generation) is True:
@@ -2266,6 +2489,7 @@ def execute_arrangement_marker_go(target: float, name: str, cue_index: int,
             return False, "Live Set modifié pendant GO"
         if ableton_transport.send("/live/song/set/current_song_time", target) is False:
             return False, "Saut Arrangement non envoyé"
+        copy_to_backup("/live/song/set/current_song_time", target)
 
         position = _confirmed_arrangement_time(target, generation,
                                                time.monotonic() + 0.85,
@@ -2940,7 +3164,7 @@ def refresh_arrangement_time():
 def set_arrangement_time(seconds: float, label: str = ""):
     seconds = max(0.0, float(seconds))
     # Adresse standard AbletonOSC pour déplacer la tête de lecture Arrangement.
-    send("/live/song/set/current_song_time", seconds)
+    send_user_transport("/live/song/set/current_song_time", seconds)
     with lock:
         state["arrangement_time"] = seconds
         state["arrangement_time_label"] = format_time_label(seconds)
@@ -3981,8 +4205,17 @@ def send_crossfader_m4l(value: float):
         payload = value
 
     try:
-        m4l_client.send_message(address, payload)
-        print(f"XFADE M4L OSC envoyé : {address} {payload} -> {M4L_IP}:{M4L_PORT}", flush=True)
+        target_host = str(ableton_transport.host or M4L_IP)
+        ableton_transport.send_to(
+            target_host,
+            M4L_PORT,
+            address,
+            payload,
+        )
+        print(
+            f"XFADE M4L OSC envoyé : {address} {payload} -> {target_host}:{M4L_PORT}",
+            flush=True,
+        )
         return True, f"M4L OSC {address}"
     except Exception as e:
         print("XFADE M4L OSC erreur :", e, flush=True)
@@ -7482,6 +7715,16 @@ def execute_go_transaction(request_id: str, expected_generation: int, scene_numb
             # Le lancement utilise l'index de la transaction, jamais selected_scene.
             send("/live/scene/fire_as_selected", scene_index)
 
+            # Human-facing scene number for CL Show Backup:
+            # Ableton index 0 -> scene 1.
+            try:
+                scene_backup_udp.scene_launched(scene_index + 1)
+            except Exception:
+                # Backup transport must never disturb the PRIMARY GO path.
+                pass
+
+            copy_to_backup("/live/scene/fire", scene_index)
+
             next_scene = scene_index + 1 if (scene_index + 1) in scenes_snapshot else scene_index
             # La prochaine scène reste locale : ne pas déplacer la sélection Live.
 
@@ -7711,7 +7954,7 @@ def action():
 
         if arrangement_is_playing:
             with transport_command_lock:
-                send("/live/song/stop_playing")
+                send_user_transport("/live/song/stop_playing")
             with lock:
                 state["is_playing"] = False
                 state["is_paused"] = True
@@ -7756,14 +7999,14 @@ def action():
                             arrangement_context_index = marker_index
                         break
             with transport_command_lock:
-                send("/live/song/set/back_to_arranger", 0)
+                send_user_transport("/live/song/set/back_to_arranger", 0)
                 if arrangement_context_name and arrangement_context_name != "—":
                     send_midi_monitor_scene_context(
                         action_generation,
                         arrangement_context_index,
                         arrangement_context_name,
                     )
-                send("/live/song/continue_playing")
+                send_user_transport("/live/song/continue_playing")
             with lock:
                 state["is_playing"] = True
                 state["is_paused"] = False
@@ -7794,7 +8037,7 @@ def action():
 
             with transport_command_lock:
 
-                send("/live/song/stop_playing")
+                send_user_transport("/live/song/stop_playing")
 
 
             with lock:
@@ -7808,7 +8051,7 @@ def action():
                 state["sync_source"] = "Télécommande"
         else:
             with transport_command_lock:
-                send("/live/song/continue_playing")
+                send_user_transport("/live/song/continue_playing")
             with lock:
                 remaining_seconds = state.get("remaining_seconds")
                 if remaining_seconds is not None:
@@ -7820,7 +8063,7 @@ def action():
                 state["sync_source"] = "Télécommande"
 
     elif action_name == "stop":
-        send("/live/song/stop_playing")
+        send_user_transport("/live/song/stop_playing")
         with lock:
             state["is_playing"] = False
             state["is_paused"] = False
@@ -7829,7 +8072,7 @@ def action():
             state["sync_source"] = "Télécommande"
 
     elif action_name == "back_to_arrangement":
-        send("/live/song/set/back_to_arranger", 0)
+        send_user_transport("/live/song/set/back_to_arranger", 0)
 
     elif action_name == "arrangement_start":
         set_arrangement_time(0, "Début")
@@ -7845,7 +8088,7 @@ def action():
             return jsonify({"ok": False, "message": "Position Arrangement invalide"}), 400
 
         if not play_after_jump:
-            send("/live/song/stop_playing")
+            send_user_transport("/live/song/stop_playing")
 
         try:
             marker_context_index = int(data.get("cue_index", data.get("marker_index", -1)))
@@ -7861,7 +8104,7 @@ def action():
                                 "message": message}), 409
         else:
             with transport_command_lock:
-                send("/live/song/set/back_to_arranger", 0)
+                send_user_transport("/live/song/set/back_to_arranger", 0)
                 set_arrangement_time(seconds, marker_name)
 
         if marker_name and not play_after_jump:
@@ -7889,7 +8132,7 @@ def action():
 
     elif action_name in ("arrangement_prev", "arrangement_next"):
         show_arrangement_view()
-        send("/live/song/stop_playing")
+        send_user_transport("/live/song/stop_playing")
 
         with lock:
             markers = list(state.get("arrangement_markers", []))
@@ -8380,4 +8623,7 @@ if __name__ == "__main__":
 
     # threaded=True permet à Flask de répondre même si une autre requête est en cours.
     threading.Thread(target=open_browser_delayed, daemon=True).start()
+    remote_tls = start_remote_tls(app)
+    if remote_tls is not None:
+        atexit.register(remote_tls.shutdown)
     app.run(host="0.0.0.0", port=5050, debug=False, threaded=True)

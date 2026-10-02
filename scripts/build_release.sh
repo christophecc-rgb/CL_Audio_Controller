@@ -170,6 +170,13 @@ cd "$PROJECT_ROOT"
 echo "========== BUILD $VERSION =========="
 "$CL_PYTHON" -c "import pypdf, PyInstaller"
 "$CL_PYTHON" "$PROJECT_ROOT/scripts/generate_app_icon_variants.py"
+export CL_MTC_BRIDGE_BINARY="$BUILD_ROOT/CLAbletonMTCBridge"
+clang -fobjc-arc -fblocks -arch arm64 -arch x86_64 -mmacosx-version-min=11.0 \
+  "$PROJECT_ROOT/tools/ableton_mtc_bridge/CLAbletonMTCBridge.m" \
+  -framework Foundation -framework CoreMIDI -o "$CL_MTC_BRIDGE_BINARY"
+verify_universal "$CL_MTC_BRIDGE_BINARY"
+sign_universal_binary "$CL_MTC_BRIDGE_BINARY"
+/usr/bin/codesign --verify --strict "$CL_MTC_BRIDGE_BINARY"
 "$CL_PYTHON" -m PyInstaller \
   --noconfirm \
   --workpath "$BUILD_ROOT/build" \
@@ -426,6 +433,7 @@ cp "$PACKAGING_SOURCE/Installer_CL_Audio_Controller.command" "$KIT_ROOT/Installe
 cp "$PACKAGING_SOURCE/Verifier_SHA256.command" "$KIT_ROOT/"
 cp "$PACKAGING_SOURCE/INSTALLATION_NOUVEAU_MAC.txt" "$KIT_ROOT/LISEZ_MOI_INSTALLATION.txt"
 cp "$PROJECT_ROOT/README.md" "$KIT_ROOT/Documentation/README.md"
+cp "$PROJECT_ROOT/docs/MIDI_RTP_NAMING.md" "$KIT_ROOT/Documentation/MIDI_RTP_NAMING.md"
 cp "$PROJECT_ROOT/BUILD_ENVIRONMENT.md" "$KIT_ROOT/Documentation/BUILD_ENVIRONMENT.md"
 cp "$PROJECT_ROOT/THIRD_PARTY_LICENSES.md" "$KIT_ROOT/Documentation/THIRD_PARTY_LICENSES.md"
 cp "$PROJECT_ROOT/LICENSE" "$KIT_ROOT/Documentation/LICENSE"
@@ -575,8 +583,6 @@ EOF
     "04 — Ableton & Max for Live/Max for Live à installer/XFADER OSC BRIDGE v8.amxd" \
     "04 — Ableton & Max for Live/Max for Live à installer/LTC Display v2.0 Remote Config.amxd" \
     "04 — Ableton & Max for Live/Max for Live à installer/Paradis Latin AutoScene.amxd" \
-    "04 — Ableton & Max for Live/Max for Live à installer/Paradis Latin AutoScene - Live 10.amxd" \
-    "04 — Ableton & Max for Live/Max for Live à installer/Paradis Latin AutoScene - Live 10.maxpat" \
     "04 — Ableton & Max for Live/Max for Live à installer/CL MIDI Console Monitor/CL MIDI Console Monitor.amxd" \
     "04 — Ableton & Max for Live/Max for Live à installer/CL Absolute MTC/CL Absolute MTC.amxd" \
     "03 — MIDI & Réseau/CL MIDI Network Tools/CLMIDIRoundTripTester" \

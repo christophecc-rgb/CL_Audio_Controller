@@ -74,7 +74,7 @@ def _valid_timecode(value):
     if not TC_PATTERN.fullmatch(value):
         return False
     hours, minutes, seconds, frames = map(int, value.split(":"))
-    return hours <= 99 and minutes <= 59 and seconds <= 59 and frames <= 99
+    return hours <= 99 and minutes <= 59 and seconds <= 59 and frames <= 24
 
 
 def _normalize_equipment_slots(raw, assignment_index):
@@ -161,7 +161,7 @@ def normalize_builder_document(document):
         cue = {
             "id": cue_id, "number": _text(raw.get("number")) or str(index),
             "timecode": _text(raw.get("timecode")), "source": _text(raw.get("source")),
-            "type": _text(raw.get("type")), "section": _text(raw.get("section")),
+            "type": _text(raw.get("type")), "phase": _text(raw.get("phase")), "section": _text(raw.get("section")),
             "role": _text(raw.get("role")), "artist": _text(raw.get("artist")),
             "text": _text(raw.get("text")), "microphone": _text(raw.get("microphone")),
             "iem": _text(raw.get("iem")), "equipment": _text(raw.get("equipment")),
@@ -612,7 +612,7 @@ def builder_import_values(document):
         resolved = resolve_builder_cue(cue, document["distribution"])
         metadata = {
             "builder_id": cue["id"], "number": cue["number"], "source": cue["source"],
-            "type": cue["type"], "section": cue["section"],
+            "type": cue["type"], "phase": cue["phase"], "section": cue["section"],
             "role": cue["role"], "artist_override": cue["artist"],
             "microphone_override": cue["microphone"], "iem_override": cue["iem"],
             "equipment_override": cue["equipment"], "origin": cue["origin"],
@@ -1167,10 +1167,29 @@ def import_xlsx(payload):
         sheets = {sheet.get("name").upper(): _read_xlsx_sheet(
             archive, rels[sheet.get("{%s}id" % ns["r"])], shared)
             for sheet in workbook.findall("m:sheets/m:sheet", ns)}
-    if "CONDUITE" not in sheets:
+    conduite_key = (
+        "CONDUITE"
+        if "CONDUITE" in sheets
+        else "CONDUITE — RÉF"
+        if "CONDUITE — RÉF" in sheets
+        else None
+    )
+    if conduite_key is None:
         raise ValueError("feuille CONDUITE manquante")
+    distribution_key = (
+        "DISTRIBUTION"
+        if "DISTRIBUTION" in sheets
+        else "CASTING — RÉF"
+        if "CASTING — RÉF" in sheets
+        else None
+    )
+
     unknown = []
-    return _rows_to_document(sheets["CONDUITE"], sheets.get("DISTRIBUTION", []), unknown), unknown
+    return _rows_to_document(
+        sheets[conduite_key],
+        sheets[distribution_key] if distribution_key else [],
+        unknown,
+    ), unknown
 
 
 # CL_SHOWCUE_EQUIPMENT_CATALOG_V1
@@ -1268,7 +1287,7 @@ def recover_builder_document(document, show_document):
             cue_id = "builder_recovered_" + source["id"]
         used.add(cue_id)
         cue = {key: metadata.get(key, "") for key in
-               ("source", "type", "role", "origin", "notes", "role_assignments")}
+               ("source", "type", "phase", "role", "origin", "notes", "role_assignments")}
         cue.update({"id": cue_id, "number": metadata.get("number") or str(source.get("order", index)),
                     "text": source.get("text", ""), "timecode": source.get("timecode", ""),
                     "section": metadata.get("section") or source.get("section", "")})

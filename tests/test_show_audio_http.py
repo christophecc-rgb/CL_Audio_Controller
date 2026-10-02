@@ -1,4 +1,5 @@
 from unittest.mock import patch
+from security_test_helper import isolated_admin_client
 
 from show_audio_http import (
     ShowAudioHTTPStatusSource,
@@ -185,11 +186,12 @@ def offline_loop_backend(offline_loop_app, monkeypatch):
     monkeypatch.setattr(app, "ableton_transport", SimpleNamespace(
         query=query, send=send, diagnostics=lambda: {"last_error": "set refusé"},
     ))
-    state.post = lambda action="prepare", loop=True: app.app.test_client().post(
-        "/show-audio/offline/live-loop", json={
-            "action": action, "loop_start": 25872.0, "loop_length": 128.0, "loop": loop,
-        })
-    return state
+    with isolated_admin_client(app) as client:
+        state.post = lambda action="prepare", loop=True: client.post(
+            "/show-audio/offline/live-loop", json={
+                "action": action, "loop_start": 25872.0, "loop_length": 128.0, "loop": loop,
+            })
+        yield state
 
 
 def assert_offline_rollback(state):

@@ -278,9 +278,90 @@ td[data-key="type"].kind-top::after{
 </style>
 
 <link rel="stylesheet" href="/static/showcue-editor.css?v=phase1">
+
+<style id="showcue-conduite-compact">
+.summary{
+display:flex;
+flex-wrap:wrap;
+gap:4px;
+margin:4px 0;
+}
+.metric{
+min-width:78px;
+padding:3px 6px;
+border-radius:5px;
+}
+.metric strong{
+display:inline;
+margin-left:4px;
+font-size:.82rem;
+}
+.metric .muted{
+font-size:.55rem;
+}
+.filters{
+margin:4px 0 6px;
+gap:5px;
+}
+.filters label{
+font-size:.59rem;
+gap:3px;
+}
+.filters select{
+padding:2px 5px;
+font-size:.65rem;
+}
+table{
+font-size:.68rem;
+}
+th{
+font-size:.56rem;
+}
+th,td{
+padding:3px 4px;
+line-height:1.08;
+vertical-align:middle;
+}
+td select,
+td input{
+padding:2px 4px;
+min-height:21px;
+font-size:.64rem;
+}
+.tc button{
+padding:1px 3px;
+margin-left:2px;
+font-size:.5rem;
+}
+.resolved{
+margin-top:1px;
+font-size:.56rem;
+line-height:1.05;
+}
+.row-actions{
+width:28px;
+}
+.row-actions button{
+min-width:20px;
+min-height:20px;
+padding:1px 3px;
+}
+.phase-select{
+width:115px;
+max-width:115px;
+}
+.text-cell{
+min-width:210px;
+}
+.check input{
+width:13px;
+height:13px;
+}
+</style>
+
 </head><body><main class="shell"><header class="top"><div class="bar"><div class="title"><h1>CL Cue Editor</h1><span class="muted">PRÉPARATION ISOLÉE · SESSION <span id="session">—</span></span></div><div class="header-right"><a href="/show-info">← CL SHOWCUE</a><img class="builder-logo" src="/assets/paradis%20latin.jpg" alt="Paradis Latin Cabaret"></div></div><div class="tools"><div class="tool-group"><span class="tool-label">ÉDITION</span><button class="action-blue" id="add-cue">+ CUE</button><button class="action-violet" id="add-distribution">+ AFFECTATION</button><button class="primary" id="save">ENREGISTRER</button></div><div class="tool-group"><span class="tool-label">ÉCHANGE</span><label class="file"><button>IMPORT XLSX / CSV</button><input id="import" type="file" accept=".xlsx,.csv"></label><label class="file pdf-import"><button>IMPORT PDF</button><input id="import-pdf" type="file" accept=".pdf,application/pdf"></label><button disabled title="Import ALS non implémenté">IMPORT ALS — À VENIR</button><a class="action-amber" href="/show-info/builder/export.xlsx">EXPORT XLSX</a><a class="action-amber" href="/show-info/builder/export.csv">EXPORT CSV</a></div><div class="tool-group"><span class="tool-label">VALIDATION</span><button id="adopt" class="hidden action-violet">ADOPTER LA PRÉVISUALISATION</button><button class="action-blue" id="validate">VALIDER</button></div></div><div id="message" class="validation muted">Aucune donnée de l’éditeur ne modifie la conduite officielle.</div></header>
-<div class="summary" id="summary"></div><div class="filters"><label>SECTION <select id="filter-section"><option value="">TOUT</option></select></label><label>TYPE <select id="filter-type"><option value="">TOUT</option></select></label><label>RÔLE <select id="filter-role"><option value="">TOUT</option></select></label><label>ARTISTE <select id="filter-artist"><option value="">TOUT</option></select></label></div>
-<section><div class="table-wrap"><table><thead><tr><th>#</th><th>TC</th><th>TABLEAU / MORCEAU</th><th>CUE / ACTION</th><th>CATÉGORIE</th><th>SECTION</th><th>RÔLE / AFFECTATION DU JOUR</th><th class="advanced-column">ARTISTE<br>FORCÉ</th><th class="advanced-column">MICRO<br>FORCÉ</th><th class="advanced-column">IEM<br>FORCÉ</th><th class="advanced-column">ÉQUIPEMENT<br>FORCÉ</th><th>FOH</th><th>RET</th><th>PLT</th><th>LUM</th><th class="advanced-column">ORIGINE</th><th class="advanced-column">NOTES</th><th></th></tr></thead><tbody id="cues"></tbody></table></div></section>
+<div class="summary" id="summary"></div><div class="filters"><label>PHASE <select id="filter-phase"><option value="">TOUT</option></select></label><label>SECTION <select id="filter-section"><option value="">TOUT</option></select></label><label>TYPE <select id="filter-type"><option value="">TOUT</option></select></label><label>RÔLE <select id="filter-role"><option value="">TOUT</option></select></label><label>ARTISTE <select id="filter-artist"><option value="">TOUT</option></select></label></div>
+<section><div class="table-wrap"><table><thead><tr><th>#</th><th>TC</th><th>PHASE</th><th>TABLEAU / MORCEAU</th><th>CUE / ACTION</th><th>CATÉGORIE</th><th>SECTION</th><th>RÔLE / AFFECTATION DU JOUR</th><th class="advanced-column">ARTISTE<br>FORCÉ</th><th class="advanced-column">MICRO<br>FORCÉ</th><th class="advanced-column">IEM<br>FORCÉ</th><th class="advanced-column">ÉQUIPEMENT<br>FORCÉ</th><th>FOH</th><th>RET</th><th>PLT</th><th>LUM</th><th class="advanced-column">ORIGINE</th><th class="advanced-column">NOTES</th><th></th></tr></thead><tbody id="cues"></tbody></table></div></section>
 <section class="section distribution casting-equipment-section">
 <h2>CASTING &amp; ÉQUIPEMENTS</h2>
 
@@ -295,7 +376,21 @@ La table située dessous reste la zone d’édition réelle.
 
 <div class="table-wrap"><table><colgroup><col class="role"><col class="artist"><col class="active"><col class="equipment"><col class="notes"><col class="actions"></colgroup><thead><tr><th>RÔLE</th><th>ARTISTE</th><th>ACTIF</th><th>ÉQUIPEMENTS</th><th>NOTES</th><th></th></tr></thead><tbody id="distribution"></tbody></table></div></section>
 </main><script>
-const $=id=>document.getElementById(id),cueKeys=['number','timecode','source','text','type','section','role','artist','microphone','iem','equipment'],postKeys=['foh','ret','plt','lum'];let documentData={version:1,cues:[],distribution:[]},sessionId=null,preview=null;function newBuilderId(){const values=new Uint32Array(3);crypto.getRandomValues(values);return'builder_'+[...values].map(value=>value.toString(16)).join('')}
+const $=id=>document.getElementById(id),
+cueKeys=['number','timecode','phase','source','text','type','section','role','artist','microphone','iem','equipment'],
+postKeys=['foh','ret','plt','lum'],
+BUILDER_PHASES=[
+'PARTIE PARLÉE',
+'SHOW',
+'SHOW W',
+'PRESHOW',
+'NO PUBLIC',
+'INTERMÈDE',
+'PRÉPARATION',
+'POSTSHOW',
+'TECHNIQUE',
+'RÉPÉTITION'
+];let documentData={version:1,cues:[],distribution:[]},sessionId=null,preview=null;function newBuilderId(){const values=new Uint32Array(3);crypto.getRandomValues(values);return'builder_'+[...values].map(value=>value.toString(16)).join('')}
 async function api(url,options={}){
     const response=await fetch(
         url,
@@ -337,9 +432,32 @@ async function api(url,options={}){
     return data;
 }
 function editable(value,key){const td=document.createElement('td');td.contentEditable='true';td.textContent=value||'';td.dataset.key=key;return td}function removeButton(callback){const td=document.createElement('td'),button=document.createElement('button');td.className='row-actions';button.textContent='×';button.title='Supprimer';button.onclick=callback;td.append(button);return td}
-function readTables(){documentData.cues=[...$('cues').rows].map(row=>{const cue={id:row.dataset.id};cueKeys.forEach(key=>cue[key]=row.querySelector(`[data-key="${key}"]`).textContent.trim());postKeys.forEach(key=>cue[key]=row.querySelector(`[data-key="${key}"]`).checked);cue.origin=row.querySelector('[data-key="origin"]').textContent.trim();cue.notes=row.querySelector('[data-key="notes"]').textContent.trim();return cue});documentData.distribution=[...$('distribution').rows].map(row=>({role:row.querySelector('[data-key="role"]').textContent.trim(),artist:row.querySelector('[data-key="artist"]').textContent.trim(),microphone:row.querySelector('[data-key="microphone"]').textContent.trim(),iem:row.querySelector('[data-key="iem"]').textContent.trim(),equipment:row.querySelector('[data-key="equipment"]').textContent.trim(),active:row.querySelector('[data-key="active"]').checked,notes:row.querySelector('[data-key="notes"]').textContent.trim()}));return documentData}
+function readTables(){documentData.cues=[...$('cues').rows].map(row=>{const cue={id:row.dataset.id};cueKeys.forEach(key=>{
+const node=row.querySelector(`[data-key="${key}"]`);
+cue[key]=String(node && node.value!==undefined ? node.value : node?.textContent||'').trim();
+});postKeys.forEach(key=>cue[key]=row.querySelector(`[data-key="${key}"]`).checked);cue.origin=row.querySelector('[data-key="origin"]').textContent.trim();cue.notes=row.querySelector('[data-key="notes"]').textContent.trim();return cue});documentData.distribution=[...$('distribution').rows].map(row=>({role:row.querySelector('[data-key="role"]').textContent.trim(),artist:row.querySelector('[data-key="artist"]').textContent.trim(),microphone:row.querySelector('[data-key="microphone"]').textContent.trim(),iem:row.querySelector('[data-key="iem"]').textContent.trim(),equipment:row.querySelector('[data-key="equipment"]').textContent.trim(),active:row.querySelector('[data-key="active"]').checked,notes:row.querySelector('[data-key="notes"]').textContent.trim()}));return documentData}
 async function captureBuilderTc(target){try{const result=await api('/show-info/capture',{method:'POST',body:'{}'});if(!result.timecode){$('message').className='validation warning';$('message').textContent='Aucun LTC capturable : lecture arrêtée, signal absent ou invalide.';return}target.textContent=result.timecode;$('message').className='validation ok';$('message').textContent='LTC capturé : '+result.timecode}catch(error){$('message').textContent=error.message}}
-function cueRow(cue,index){const row=document.createElement('tr');row.dataset.id=cue.id||newBuilderId();cueKeys.forEach(key=>{if(key==='timecode'){const td=document.createElement('td'),value=document.createElement('span'),button=document.createElement('button');td.className='tc';value.contentEditable='true';value.dataset.key=key;value.textContent=cue[key]||'';button.textContent='CAPTURER';button.onclick=()=>captureBuilderTc(value);td.append(value,button);row.append(td);return}if(key==='role'){const td=document.createElement('td'),value=document.createElement('span'),resolved=document.createElement('div'),r=cue.resolved||{};value.contentEditable='true';value.dataset.key=key;value.textContent=cue[key]||'';resolved.className='resolved resolved-assignment';
+function cueRow(cue,index){const row=document.createElement('tr');row.dataset.id=cue.id||newBuilderId();cueKeys.forEach(key=>{if(key==='timecode'){const td=document.createElement('td'),value=document.createElement('span'),button=document.createElement('button');td.className='tc';value.contentEditable='true';value.dataset.key=key;value.textContent=cue[key]||'';button.textContent='CAPTURER';button.onclick=()=>captureBuilderTc(value);td.append(value,button);row.append(td);return}
+if(key==='phase'){
+const td=document.createElement('td');
+const select=document.createElement('select');
+select.dataset.key='phase';
+select.className='phase-select';
+
+select.add(new Option('—',''));
+BUILDER_PHASES.forEach(item=>select.add(new Option(item,item)));
+
+const current=String(cue.phase||'').trim();
+if(current && !BUILDER_PHASES.includes(current)){
+select.add(new Option(current,current));
+}
+select.value=current;
+
+td.append(select);
+row.append(td);
+return
+}
+if(key==='role'){const td=document.createElement('td'),value=document.createElement('span'),resolved=document.createElement('div'),r=cue.resolved||{};value.contentEditable='true';value.dataset.key=key;value.textContent=cue[key]||'';resolved.className='resolved resolved-assignment';
 const assignmentParts=[];
 if(r.artist)assignmentParts.push('ARTISTE : '+r.artist);
 if(r.microphone)assignmentParts.push('MICRO : '+r.microphone);
@@ -348,80 +466,45 @@ if(r.equipment)assignmentParts.push('ÉQUIPEMENT : '+r.equipment);
 resolved.textContent=assignmentParts.join(' · ')||({missing:'AUCUN ACTIF',multiple:'PLUSIEURS ACTIFS'}[r.distribution_status]||'');row.dataset.artist=r.artist||cue.artist||'';td.append(value,resolved);row.append(td);return}const td=editable(cue[key]??(key==='number'?index+1:''),key);if(['artist','microphone','iem','equipment'].includes(key))td.className='override';if(key==='text')td.className='text-cell';row.append(td)});postKeys.forEach(key=>{const td=document.createElement('td'),input=document.createElement('input');td.className='check';input.type='checkbox';input.checked=cue[key]!==false;input.dataset.key=key;td.append(input);row.append(td)});const origin=editable(cue.origin||'BUILDER','origin');origin.className='origin-'+(cue.origin||'BUILDER').toLowerCase();row.append(origin,editable(cue.notes,'notes'),removeButton(()=>{row.remove();refreshFilters()}));return row}
 function distributionRow(item={},roleStart=false){const row=document.createElement('tr'),role=editable(item.role,'role'),artist=editable(item.artist,'artist'),active=document.createElement('td'),checkbox=document.createElement('input'),equipment=document.createElement('td'),slots=document.createElement('div'),add=document.createElement('button');if(roleStart)row.classList.add('role-start');if(item.active)row.classList.add('active');active.className='check';checkbox.type='checkbox';checkbox.checked=Boolean(item.active);checkbox.dataset.key='active';checkbox.onchange=()=>row.classList.toggle('active',checkbox.checked);active.append(checkbox);slots.className='equipment-slots';equipment.dataset.key='equipment_slots';function addSlot(slot={}){if(slots.children.length>=8)return;const line=document.createElement('div'),type=document.createElement('select'),value=document.createElement('input'),remove=document.createElement('button');line.className='equipment-slot';type.dataset.slotKey='type';['MICRO','IEM','ÉQUIPEMENT','AUTRE'].forEach(kind=>type.add(new Option(kind,kind)));type.value=slot.type||'ÉQUIPEMENT';value.dataset.slotKey='value';value.value=slot.value||'';remove.type='button';remove.textContent='×';remove.title='Supprimer cet équipement';remove.onclick=()=>{line.remove();add.disabled=false;markDirty()};line.append(type,value,remove);slots.append(line);add.disabled=slots.children.length>=8}add.type='button';add.className='add-equipment';add.textContent='+ ÉQUIPEMENT';add.onclick=()=>{addSlot();markDirty()};(item.equipment_slots||[]).forEach(addSlot);add.disabled=slots.children.length>=8;equipment.append(slots,add);row.append(role,artist,active,equipment,editable(item.notes,'notes'),removeButton(()=>row.remove()));return row}
 function builderTimecodeValue(value){
-    const match=String(value||'').trim().match(/^(\d{2}):(\d{2}):(\d{2}):(\d{2})$/);
-    if(!match)return null;
+const match=String(value||'').trim().match(/^(\d{2}):(\d{2}):(\d{2}):(\d{2})$/);
+if(!match)return null;
 
-    const h=Number(match[1]);
-    const m=Number(match[2]);
-    const s=Number(match[3]);
-    const f=Number(match[4]);
+const h=Number(match[1]);
+const m=Number(match[2]);
+const s=Number(match[3]);
+const f=Number(match[4]);
 
-    return (((h*60)+m)*60+s)*100+f;
+if(m>59 || s>59 || f>24)return null;
+
+return (((h*60)+m)*60+s)*25+f;
 }
 
 function orderedBuilderCues(cues){
-    /*
-     * Tri prudent :
-     * - jamais de mélange entre sections ;
-     * - chaque cue sans TC reste attaché au cue timé précédent ;
-     * - les groupes timés sont classés chronologiquement ;
-     * - le JSON source n'est pas modifié par cette fonction.
-     */
-    const result=[];
-    let start=0;
+/*
+ * Les cues sans TC sont des ancres fixes.
+ * Seuls les contenus des slots possédant un TC valide sont triés.
+ * Le tableau documentData source n'est pas réordonné ici.
+ */
+const result=[...cues];
 
-    while(start<cues.length){
-        const section=String(cues[start]?.section||'');
-        let end=start+1;
+const slots=cues
+.map((cue,index)=>({
+cue,
+index,
+tc:builderTimecodeValue(cue.timecode)
+}))
+.filter(item=>item.tc!==null);
 
-        while(
-            end<cues.length &&
-            String(cues[end]?.section||'')===section
-        ){
-            end+=1;
-        }
+const sorted=[...slots].sort((a,b)=>
+a.tc-b.tc ||
+a.index-b.index
+);
 
-        const sectionCues=cues.slice(start,end);
-        const prefix=[];
-        const groups=[];
-        let current=null;
+slots.forEach((slot,position)=>{
+result[slot.index]=sorted[position].cue;
+});
 
-        sectionCues.forEach((cue,originalIndex)=>{
-            const tc=builderTimecodeValue(cue.timecode);
-
-            if(tc===null){
-                if(current){
-                    current.items.push(cue);
-                }else{
-                    prefix.push(cue);
-                }
-                return;
-            }
-
-            current={
-                tc,
-                originalIndex,
-                items:[cue]
-            };
-
-            groups.push(current);
-        });
-
-        groups.sort((a,b)=>
-            a.tc-b.tc ||
-            a.originalIndex-b.originalIndex
-        );
-
-        result.push(...prefix);
-
-        groups.forEach(group=>{
-            result.push(...group.items);
-        });
-
-        start=end;
-    }
-
-    return result;
+return result;
 }
 
 function render(){
@@ -448,8 +531,9 @@ function render(){
         });
 
     refreshFilters();
-}function unique(key){if(key==='artist')return[...new Set(documentData.cues.map(cue=>(cue.resolved||{}).artist||cue.artist).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));return[...new Set(documentData.cues.map(cue=>cue[key]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'))}function refreshFilters(){readTables();[['filter-section','section'],['filter-type','type'],['filter-role','role'],['filter-artist','artist']].forEach(([id,key])=>{const select=$(id),value=select.value;select.innerHTML='<option value="">TOUT</option>';unique(key).forEach(item=>select.add(new Option(item,item)));select.value=value});applyFilters()}function applyFilters(){
+}function unique(key){if(key==='artist')return[...new Set(documentData.cues.map(cue=>(cue.resolved||{}).artist||cue.artist).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'));return[...new Set(documentData.cues.map(cue=>cue[key]).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'fr'))}function refreshFilters(){readTables();[['filter-phase','phase'],['filter-section','section'],['filter-type','type'],['filter-role','role'],['filter-artist','artist']].forEach(([id,key])=>{const select=$(id),value=select.value;select.innerHTML='<option value="">TOUT</option>';unique(key).forEach(item=>select.add(new Option(item,item)));select.value=value});applyFilters()}function applyFilters(){
     const filters={
+        phase:$('filter-phase').value,
         section:$('filter-section').value,
         type:$('filter-type').value,
         role:$('filter-role').value,

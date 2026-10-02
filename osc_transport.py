@@ -77,6 +77,8 @@ class OSCTransport:
         self._query_lock = threading.Lock()
         self._active_request: Optional[Dict[str, Any]] = None
         self._reply_server = None
+        self.foreign_reply_handler = None
+        self.last_song_tempo = None
         self.connected = False
         self.last_response_at: Optional[float] = None
         self.last_latency_ms: Optional[float] = None
@@ -227,6 +229,18 @@ class OSCTransport:
     def _receive(
         self, address: str, *args: Any, source_host: Optional[str] = None,
     ) -> None:
+        # A BACKUP response must never satisfy a PRIMARY query or update its state.
+        if (address.startswith("/live/") and source_host is not None
+                and source_host != self.resolved_host):
+            handler = self.foreign_reply_handler
+            if handler is not None:
+                try:
+                    handler(source_host, address, args)
+                except Exception:
+                    pass
+            return
+        if address == "/live/song/get/tempo" and len(args) == 1:
+            self.last_song_tempo = (args[0], time.monotonic())
         now = time.time()
         with self._state_lock:
             self.connected = True

@@ -96,7 +96,6 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("AutoScene uniquement", script)
         self.assertIn("CL_SUITE_COMPONENTS", script)
         self.assertIn("Ableton Live 10", script)
-        self.assertIn("Paradis Latin AutoScene - Live 10", script)
         self.assertIn("CL MIDI RTP Agent.app", script)
         self.assertNotIn("CL MIDI RTP Simulator.app", script)
         self.assertIn('RTP_AGENT_EXEC="$MIDI_NETWORK_APPS/CL MIDI RTP Agent.app/Contents/MacOS/CL MIDI RTP Agent"', script)
@@ -104,7 +103,8 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("l’état réel (processus + LaunchAgent) fait foi", script)
         self.assertIn("pgrep -f -x", script)
         self.assertIn("com.claudio.midi-rtp-agent.plist", script)
-        self.assertNotIn("com.claudio.midi-network-monitor.plist", script)
+        self.assertIn("com.claudio.midi-network-monitor.plist", script)
+        self.assertIn("retire_legacy_network_monitor", script)
         self.assertNotIn("--background-monitor", script)
         self.assertIn("INSTALL_MIDI_RECEIVER", script)
         self.assertIn("detect_live", script)
@@ -130,8 +130,6 @@ class PackagingTests(unittest.TestCase):
 
         self.assertIn("Installer la Suite CL.app", script)
         self.assertIn("Désinstaller la Suite CL.app", script)
-        self.assertIn("Paradis Latin AutoScene - Live 10.amxd", script)
-        self.assertIn("Paradis Latin AutoScene - Live 10.maxpat", script)
         self.assertIn("CL Arrangement Builder.app/", script)
         self.assertIn('"CL MIDI RTP Agent.app/"', script)
         self.assertNotIn('"CL MIDI RTP Simulator.app/"', script)
@@ -182,31 +180,20 @@ class PackagingTests(unittest.TestCase):
 
     def test_native_installer_has_branded_component_cards_and_keeps_the_existing_engines(self):
         source = (PROJECT_ROOT / "packaging" / "CLSuiteInstallerApp.m").read_text(encoding="utf-8")
-        self.assertIn("Mac Télécommande", source)
-        self.assertIn("CL Arrangement Builder", source)
-        self.assertIn("Paradis Latin AutoScene", source)
-        self.assertIn("CL MIDI Network Manager + simulateur", source)
-        self.assertIn("Mac Ableton Lecteur", source)
-        self.assertIn("Simulateur console", source)
-        self.assertIn("agent RTP léger", source)
-        self.assertIn("roleChanged:", source)
-        self.assertIn("Installer_Toute_La_Suite_CL.command", source)
-        self.assertIn("Desinstaller_La_Suite_CL.command", source)
-        self.assertIn("CL_SUITE_COMPONENTS", source)
-        self.assertIn("CL_SUITE_UNINSTALL_COMPONENTS", source)
-        self.assertIn("NSProgressIndicatorStyleBar", source)
-        self.assertIn("Installation terminée", source)
-        self.assertIn('@"ParadisLatin.jpg"', source)
-        self.assertIn('buttonWithTitle:@"Quitter"', source)
-        self.assertIn('quit.keyEquivalent = @"\\033"', source)
-        self.assertIn("failureMessageForLog", source)
-        self.assertIn('@"ERREUR : "', source)
-        installer_section = source.split("] : @[", 1)[1]
-        self.assertLess(installer_section.index("Paradis Latin AutoScene"), installer_section.index("Mac Télécommande"))
-        self.assertLess(installer_section.index("Mac Télécommande"), installer_section.index("CL Arrangement Builder"))
-        self.assertLess(installer_section.index("CL Arrangement Builder"), installer_section.index("CL MIDI Network Manager + simulateur"))
-        self.assertIn('@selector(terminate:)', source)
-        self.assertIn('keyEquivalent:@"q"', source)
+        for role in ("show_server","ableton_reader","mtc_logic","control_station","show_backup","diagnostics","custom"):
+            self.assertIn('@"'+role+'"',source)
+        for value in ("CL_SUITE_ROLE","CL_SUITE_ROLE_FEATURES","CL_SUITE_ROLE_COMPONENTS","CL_SUITE_MIGRATION",
+                      "role_install.py","auditSummary","Installer_Toute_La_Suite_CL.command","Desinstaller_La_Suite_CL.command",
+                      "NSProgressIndicatorStyleBar","Installation terminée","failureMessageForLog"):
+            self.assertIn(value,source)
+        self.assertIn('@"Option agent RTP"',source)
+        self.assertIn('@"Conserver"',source)
+        self.assertIn('@"Migrer"',source)
+        self.assertIn('@"Supprimer anciens composants"',source)
+        self.assertIn('quit.keyEquivalent = @"\\033"',source)
+        self.assertIn('@selector(terminate:)',source)
+        self.assertIn('keyEquivalent:@"q"',source)
+
 
     def test_desktop_kit_builder_is_a_macos_app_with_the_cl_icon(self):
         wrapper = (
