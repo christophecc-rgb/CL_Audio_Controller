@@ -170,13 +170,8 @@ cd "$PROJECT_ROOT"
 echo "========== BUILD $VERSION =========="
 "$CL_PYTHON" -c "import pypdf, PyInstaller"
 "$CL_PYTHON" "$PROJECT_ROOT/scripts/generate_app_icon_variants.py"
-export CL_MTC_BRIDGE_BINARY="$BUILD_ROOT/CLAbletonMTCBridge"
-clang -fobjc-arc -fblocks -arch arm64 -arch x86_64 -mmacosx-version-min=11.0 \
-  "$PROJECT_ROOT/tools/ableton_mtc_bridge/CLAbletonMTCBridge.m" \
-  -framework Foundation -framework CoreMIDI -o "$CL_MTC_BRIDGE_BINARY"
-verify_universal "$CL_MTC_BRIDGE_BINARY"
-sign_universal_binary "$CL_MTC_BRIDGE_BINARY"
-/usr/bin/codesign --verify --strict "$CL_MTC_BRIDGE_BINARY"
+export CL_MTC_BRIDGE_BINARY="${CL_MTC_BRIDGE_BINARY:-$BUILD_ROOT/CLAbletonMTCBridge}"
+"$PROJECT_ROOT/tools/ableton_mtc_bridge/build.command" "$CL_MTC_BRIDGE_BINARY"
 "$CL_PYTHON" -m PyInstaller \
   --noconfirm \
   --workpath "$BUILD_ROOT/build" \

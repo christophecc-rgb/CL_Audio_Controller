@@ -108,5 +108,19 @@
       "RemoteAbleton",
       "Télécommande Ableton"
     ]
+  },
+  {
+    "name": "CL MTC Bridge",
+    "icon": "CL_MIDI_RTP",
+    "label": "MTC BRIDGE",
+    "color": "#6557C8",
+    "legacy_names": []
+  },
+  {
+    "name": "CL Sync Meter",
+    "icon": "CL_MIDI_Performance",
+    "label": "SYNC METER",
+    "color": "#3974D8",
+    "legacy_names": []
   }
 ]

@@ -91,7 +91,7 @@ def test_global_revoke_audit_has_no_credentials(security,tmp_path):
     assert PASSWORD not in raw and one['token'] not in raw and two['token'] not in raw
 
 
-def test_http_boundary_qr_and_https_claim(tmp_path):
+def test_http_boundary_qr_and_https_claim(tmp_path,monkeypatch):
     app=Flask(__name__); obj=attach_security(app,directory=tmp_path)
     @app.route('/action',methods=['POST'])
     def action(): return jsonify(ok=True)
@@ -109,6 +109,10 @@ def test_http_boundary_qr_and_https_claim(tmp_path):
     assert client.post('/security/admin/unlock',json={'password':PASSWORD},base_url=local).status_code==200
     assert client.post('/security/admin/qr',json={'role':'admin','server_url':'https://server.local:8443'},base_url=local).status_code==403
     assert client.post('/security/admin/mode',json={'mode':'development'},base_url=local).status_code==200
+    # This boundary test uses a prevalidated TLS service; real handshakes are tested separately.
+    tls=app.extensions['cl_remote_tls']
+    monkeypatch.setattr(tls,'probe',lambda url=None:True)
+    monkeypatch.setattr(tls,'snapshot',lambda:{'phone_verified':True})
     qr=client.post('/security/admin/qr',json={'role':'operator','server_url':'https://server.local:8443'},base_url=local)
     assert qr.status_code==200 and '<svg' in qr.json['svg'] and PASSWORD not in qr.json['url']
     code=qr.json['url'].split('#code=')[1]

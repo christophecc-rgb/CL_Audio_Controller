@@ -19,6 +19,13 @@ class PackagingTests(unittest.TestCase):
         self.assertIn("'CFBundleVersion': '6'", spec)
         self.assertIn("('console_title_library.py', '.')", spec)
 
+    def test_iphone_security_sources_and_guide_are_packaged(self):
+        spec = (PROJECT_ROOT / "CL Audio Controller.spec").read_text()
+        for module in ("remote_tls", "remote_security", "security_http"):
+            self.assertIn(f"('{module}.py', '.')", spec)
+        export = (PROJECT_ROOT / "scripts/export_transport_kit.command").read_text()
+        self.assertIn('"$PROJECT_DIR/docs/IPHONE_FIRST_SETUP.md"', export)
+
     def test_release_contains_offline_dependencies_and_clear_installation_files(self):
         script = (PROJECT_ROOT / "scripts/build_release.sh").read_text(encoding="utf-8")
 

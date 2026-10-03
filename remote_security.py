@@ -143,7 +143,9 @@ class RemoteSecurity:
 
             self.save(); self.audit('password-set','accepted')
 
-    def unlock(self,password):
+    def unlock(self,password, *, duration="five_minutes"):
+        if duration not in ("five_minutes", "session"):
+            raise SecurityError("Durée de déverrouillage invalide")
         with self.lock:
             self.load(); self.refresh_password(); now=self.clock()
             self.failures=[stamp for stamp in self.failures if now-stamp<300]
@@ -157,14 +159,24 @@ class RemoteSecurity:
             if not valid:
                 self.failures.append(now); self.audit('admin-unlock','refused','invalid-password')
                 raise SecurityError('Mot de passe invalide')
-            token=secrets.token_urlsafe(32); self.admin_sessions[digest(token)]=now+300
+            token=secrets.token_urlsafe(32); self.admin_sessions[digest(token)]=None if duration=="session" else now+300
             self.audit('admin-unlock','accepted'); return token
 
     def admin(self,token):
         with self.lock:
             self.load(); self.refresh_password()
-            if not token or self.admin_sessions.get(digest(token),0)<=self.clock():
+            if not token or digest(token) not in self.admin_sessions or (self.admin_sessions[digest(token)] is not None and self.admin_sessions[digest(token)]<=self.clock()):
                 raise SecurityError('Déverrouillage administrateur local requis')
+
+    def admin_status(self, token):
+        with self.lock:
+            try:
+                self.admin(token)
+            except SecurityError:
+                return {'mode': 'locked', 'remaining_seconds': 0}
+            expires = self.admin_sessions[digest(token)]
+            return {'mode': 'session' if expires is None else 'five_minutes',
+                    'remaining_seconds': None if expires is None else max(0, int(expires-self.clock()))}
 
     def lock_admin(self):
         with self.lock:

@@ -348,6 +348,14 @@ static NSPasteboardType const CLSimulatorRowPasteboardType = @"com.cl-audio-cont
 @property MIDIPortRef simulatorMidiOutputPort;
 @property MIDIEndpointRef localReturnDestination;
 @property BOOL publishedLocalReturnAvailable;
+@property NSDictionary<NSString *, NSDictionary *> *publishedSimulatorStates;
+@property BOOL publishedSimulatorStateAvailable;
+@property NSString *publishedSimulatorControlPortName;
+@property BOOL publishedSimulatorControlAvailable;
+@property NSString *simulatorControlPortName;
+@property CFMessagePortRef simulatorControlPort;
+@property CFRunLoopSourceRef simulatorControlSource;
+@property NSMutableDictionary<NSString *, NSTask *> *simulatorCommandRetiringTasks;
 @property BOOL localReturnMode;
 @property BOOL operatingModeChangeInFlight;
 @property BOOL operatingModeSyncInFlight;
@@ -438,6 +446,9 @@ static NSPasteboardType const CLSimulatorRowPasteboardType = @"com.cl-audio-cont
 - (void)recordSimulatorProgram:(NSInteger)program deviceID:(NSString *)deviceID;
 - (void)updateSimulatorCompactStatus;
 - (void)restorePersistedSimulatorAutoDevices;
+- (NSDictionary *)handleSimulatorControlRequest:(NSDictionary *)request;
+- (void)startSimulatorControlServer;
+- (void)stopSimulatorControlServer;
 - (void)superviseLocalSimulatorsWithStatus:(NSDictionary *)status;
 - (void)reconcilePersistedSimulatorAutoDevicesAfterModeChange;
 - (BOOL)remoteSimulatorAutoPathReady;
@@ -783,6 +794,36 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     return remainingMinutes
         ? [NSString stringWithFormat:@"il y a %ld h %ld min", (long)hours, (long)remainingMinutes]
         : [NSString stringWithFormat:@"il y a %ld h", (long)hours];
+}
+
+static NSString *const CLSimulatorControlService = @"cl-midi-simulator-control-v1";
+
+// A bounded request/reply channel in the user's local bootstrap namespace.
+// The current lock owner advertises a new, unguessable port name each session.
+static NSDictionary *CLSimulatorControlRequest(NSString *portName, NSDictionary *request) {
+    if (!portName.length) return nil;
+    CFMessagePortRef remote = CFMessagePortCreateRemote(NULL, (__bridge CFStringRef)portName);
+    if (!remote) return nil;
+    NSData *encoded = [NSJSONSerialization dataWithJSONObject:request options:0 error:nil];
+    CFDataRef response = NULL;
+    SInt32 result = CFMessagePortSendRequest(remote, 1, (__bridge CFDataRef)encoded,
+                                           0.25, 0.5, kCFRunLoopDefaultMode, &response);
+    CFRelease(remote);
+    NSData *data = CFBridgingRelease(response);
+    id reply = result == kCFMessagePortSuccess && data.length <= 4096
+        ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
+    return [reply isKindOfClass:NSDictionary.class] ? reply : nil;
+}
+
+static CFDataRef CLSimulatorControlCallback(CFMessagePortRef port, SInt32 messageID,
+                                            CFDataRef data, void *info) {
+    NSDictionary *request = nil;
+    if (messageID == 1 && data && CFDataGetLength(data) <= 4096) {
+        id decoded = [NSJSONSerialization JSONObjectWithData:(__bridge NSData *)data options:0 error:nil];
+        if ([decoded isKindOfClass:NSDictionary.class]) request = decoded;
+    }
+    NSDictionary *reply = [(__bridge CLNetworkDelegate *)info handleSimulatorControlRequest:request];
+    return (__bridge_retained CFDataRef)[NSJSONSerialization dataWithJSONObject:reply options:0 error:nil];
 }
 
 @implementation CLNetworkDelegate
@@ -1252,8 +1293,12 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     self.modeSyncTimer = [NSTimer scheduledTimerWithTimeInterval:5.0 target:self selector:@selector(synchronizeOperatingModeTimer:) userInfo:nil repeats:YES];
     [self synchronizeOperatingMode];
     [self ensureGuardianRunning];
-    if (self.ownsPassiveReturnMonitor) [self setupPassiveReturnMonitor];
+    if (self.ownsPassiveReturnMonitor) {
+        [self startSimulatorControlServer];
+        [self setupPassiveReturnMonitor];
+    }
     else [self loadPublishedConsoleReturnState];
+    [self rebuildSimulatorDeviceRows];
     [self refreshAbletonSceneTitle];
 
     self.simulatorAutoRestoreAttempts = 0;
@@ -1280,10 +1325,28 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     NSData *data = [NSData dataWithContentsOfFile:@"/private/tmp/CL_MIDI_Console_State.json"];
     NSDictionary *payload = data.length ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
     self.publishedLocalReturnAvailable = NO;
+    self.publishedSimulatorStates = @{};
+    self.publishedSimulatorStateAvailable = NO;
+    self.publishedSimulatorControlPortName = nil;
+    self.publishedSimulatorControlAvailable = NO;
+    if (![payload isKindOfClass:NSDictionary.class]) return;
     if (![payload[@"service"] isEqualToString:@"cl-midi-console-monitor"]) return;
     NSTimeInterval publishedAt = [payload[@"updated_at"] doubleValue];
     BOOL publishedStateIsFresh = publishedAt > 0.0 &&
         MAX(0.0, NSDate.date.timeIntervalSince1970 - publishedAt) <= 6.0;
+    if (publishedStateIsFresh && [payload[@"simulators"] isKindOfClass:NSDictionary.class]) {
+        self.publishedSimulatorStates = payload[@"simulators"];
+        self.publishedSimulatorStateAvailable = YES;
+        id control = payload[@"simulator_control"];
+        if ([control isKindOfClass:NSDictionary.class] &&
+            [control[@"service"] isEqual:CLSimulatorControlService] &&
+            [control[@"port_name"] isKindOfClass:NSString.class]) {
+            self.publishedSimulatorControlPortName = control[@"port_name"];
+            NSDictionary *reply = CLSimulatorControlRequest(self.publishedSimulatorControlPortName,
+                @{@"service": CLSimulatorControlService, @"action": @"ping"});
+            self.publishedSimulatorControlAvailable = [reply[@"ok"] boolValue];
+        }
+    }
     self.publishedLocalReturnAvailable =
         publishedStateIsFresh &&
         [payload[@"online"] boolValue] &&
@@ -1394,6 +1457,36 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     id latencyValue =
         self.lastRTPTestLatencyMs ?: NSNull.null;
 
+    NSMutableDictionary *simulatorStates = [NSMutableDictionary dictionary];
+
+    for (NSDictionary *device in self.simulatorDevices ?: @[]) {
+        NSString *deviceID =
+            [device[@"id"] isKindOfClass:NSString.class]
+                ? device[@"id"]
+                : @"";
+
+        if (!deviceID.length)
+            continue;
+
+        NSTask *task = self.simulatorTasks[deviceID];
+        BOOL running = task.running;
+
+        simulatorStates[deviceID] = @{
+            @"running": @(running),
+            @"pid": running
+                ? @(task.processIdentifier)
+                : NSNull.null,
+            @"name": [device[@"name"] isKindOfClass:NSString.class]
+                ? device[@"name"]
+                : @"",
+            @"channel": [device[@"channel"] isKindOfClass:NSNumber.class]
+                ? device[@"channel"]
+                : @0,
+            @"enabled": @([device[@"enabled"] boolValue]),
+            @"built_in": @([device[@"built_in"] boolValue]),
+        };
+    }
+
     NSDictionary *payload = @{
         @"schema_version": @3,
         @"service": @"cl-midi-console-monitor",
@@ -1415,6 +1508,10 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
             ? (self.expectedDeviceStates ?: @{})
             : @{},
         @"returned_devices": self.returnedDeviceStates ?: @{},
+        @"simulators": simulatorStates,
+        @"simulator_control": self.simulatorControlPort && CFMessagePortIsValid(self.simulatorControlPort)
+            ? @{@"service": CLSimulatorControlService, @"port_name": self.simulatorControlPortName}
+            : @{},
 
         @"rtp": @{
             @"peer": peer,
@@ -2664,7 +2761,7 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     // CL MIDI Return Test reste uniquement disponible pour le simulateur/test.
     if (!preferredReturnSource.length && self.localReturnMode) {
         self.returnMonitorStatus =
-            self.localReturnDestination ? noErr : kMIDIUnknownEndpoint;
+            [self localReturnIsAvailable] ? noErr : kMIDIUnknownEndpoint;
     }
 
     [self writeConsoleReturnState];
@@ -3013,7 +3110,7 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     self.consoleLibrariesPanel.hidden = !detailed;
     self.programChangeReturnsPanel.hidden = !detailed;
     self.simulatorWindowButton.hidden = !detailed;
-    self.assistantTestBanner.hidden = detailed || self.simulatorTasks.count == 0;
+    self.assistantTestBanner.hidden = detailed || [self activeSimulatorCount] == 0;
     self.compactSummary.hidden = YES;
     self.showModeButton.title = detailed ? @"Vue Spectacle" : @"Diagnostic détaillé";
     self.remoteTargetTitleLabel.hidden = YES;
@@ -3682,11 +3779,16 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     (void)timer;
     [self refreshAbletonSceneTitle];
     [self ensureGuardianRunning];
+    BOOL previouslyOwnedMonitor = self.ownsPassiveReturnMonitor;
+    NSDictionary *previousSimulators = self.publishedSimulatorStates;
+    BOOL previousPublicationAvailable = self.publishedSimulatorStateAvailable;
+    BOOL previousControlAvailable = self.publishedSimulatorControlAvailable;
 
     if (!self.ownsPassiveReturnMonitor) {
         if (CLBackgroundMonitorLock >= 0 &&
             flock(CLBackgroundMonitorLock, LOCK_EX | LOCK_NB) == 0) {
             self.ownsPassiveReturnMonitor = YES;
+            [self startSimulatorControlServer];
             [self setupPassiveReturnMonitor];
             CLAppendDiagnostic(@"passive-monitor-takeover", @"le Dashboard a repris automatiquement l’écoute MIDI");
         } else {
@@ -3695,6 +3797,12 @@ static NSString *CLMidiAgeDescription(NSTimeInterval age) {
     } else {
         [self writeConsoleReturnState];
     }
+    if (previouslyOwnedMonitor != self.ownsPassiveReturnMonitor ||
+        previousPublicationAvailable != self.publishedSimulatorStateAvailable ||
+        previousControlAvailable != self.publishedSimulatorControlAvailable ||
+        (previousSimulators != self.publishedSimulatorStates &&
+         ![previousSimulators isEqual:self.publishedSimulatorStates]))
+        [self rebuildSimulatorDeviceRows];
 }
 - (void)verifyMidiMtc:(id)sender {
     (void)sender;
@@ -5061,9 +5169,133 @@ static void CLClearPersistedSimulatorAutoDeviceIDs(void) {
     return nil;
 }
 
-- (void)updateSimulatorSafetyStatus {
+// Only the passive-monitor owner owns NSTasks. Secondary windows use the
+// canonical publication, never a process inventory or a parallel supervisor.
+- (void)startSimulatorControlServer {
+    if (!self.ownsPassiveReturnMonitor || self.lifecycleStopping || self.simulatorControlPort) return;
+    NSString *name = [NSString stringWithFormat:@"com.cl-audio.simulators.%u.%@", getuid(), NSUUID.UUID.UUIDString];
+    CFMessagePortContext context = {0, (__bridge void *)self, NULL, NULL, NULL};
+    CFMessagePortRef port = CFMessagePortCreateLocal(NULL, (__bridge CFStringRef)name,
+                                                    CLSimulatorControlCallback, &context, NULL);
+    if (!port) return;
+    CFRunLoopSourceRef source = CFMessagePortCreateRunLoopSource(NULL, port, 0);
+    if (!source) { CFMessagePortInvalidate(port); CFRelease(port); return; }
+    self.simulatorControlPortName = name;
+    self.simulatorControlPort = port;
+    self.simulatorControlSource = source;
+    CFRunLoopAddSource(CFRunLoopGetMain(), source, kCFRunLoopCommonModes);
+}
+
+- (void)stopSimulatorControlServer {
+    if (self.simulatorControlSource) {
+        CFRunLoopRemoveSource(CFRunLoopGetMain(), self.simulatorControlSource, kCFRunLoopCommonModes);
+        CFRelease(self.simulatorControlSource);
+        self.simulatorControlSource = NULL;
+    }
+    if (self.simulatorControlPort) {
+        CFMessagePortInvalidate(self.simulatorControlPort);
+        CFRelease(self.simulatorControlPort);
+        self.simulatorControlPort = NULL;
+    }
+    self.simulatorControlPortName = nil;
+}
+
+- (BOOL)canControlSimulators {
+    return !self.lifecycleStopping && (self.ownsPassiveReturnMonitor || self.publishedSimulatorControlAvailable);
+}
+
+// Retain only known owned tasks while STOP drains. AUTO cannot replace a task
+// that is still terminating; a later STOP also cancels this deferred intent.
+- (void)resumeCommandSimulatorDeviceID:(NSString *)deviceID {
+    if (!self.ownsPassiveReturnMonitor || self.lifecycleStopping ||
+        ![CLPersistedSimulatorAutoDeviceIDs() containsObject:deviceID]) return;
+    if (self.simulatorCommandRetiringTasks[deviceID].running) {
+        __weak typeof(self) weakSelf = self;
+        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)),
+                       dispatch_get_main_queue(), ^{ [weakSelf resumeCommandSimulatorDeviceID:deviceID]; });
+        return;
+    }
+    [self.simulatorCommandRetiringTasks removeObjectForKey:deviceID];
+    NSMutableDictionary *device = [self simulatorDeviceForID:deviceID];
+    if ([device[@"enabled"] boolValue]) [self startSimulatorDevice:device];
+}
+
+- (NSDictionary *)handleSimulatorControlRequest:(NSDictionary *)request {
+    if (!self.ownsPassiveReturnMonitor || self.lifecycleStopping)
+        return @{@"ok": @NO, @"error": @"Instance principale indisponible"};
+    if (![request isKindOfClass:NSDictionary.class] ||
+        ![request[@"service"] isEqual:CLSimulatorControlService])
+        return @{@"ok": @NO, @"error": @"Commande invalide"};
+    NSString *action = request[@"action"];
+    if ([action isEqual:@"ping"]) return @{@"ok": @YES};
+    if (![@[@"auto", @"stop"] containsObject:action ?: @""] ||
+        ![request[@"deadline"] isKindOfClass:NSNumber.class] ||
+        [request[@"deadline"] doubleValue] < NSDate.date.timeIntervalSince1970)
+        return @{@"ok": @NO, @"error": @"Commande invalide ou expirée"};
+    id deviceID = request[@"device_id"];
+    if (deviceID && (![deviceID isKindOfClass:NSString.class] || ![deviceID length]))
+        return @{@"ok": @NO, @"error": @"Appareil invalide"};
+    NSMutableArray *devices = [NSMutableArray array];
+    for (NSMutableDictionary *device in self.simulatorDevices) {
+        if (deviceID && ![device[@"id"] isEqual:deviceID]) continue;
+        // Global AUTO covers configured devices, not the empty test-channel placeholders.
+        if (!deviceID && [action isEqual:@"auto"] && [device[@"test_only"] boolValue]) continue;
+        if (![[device[@"signal_type"] lowercaseString] isEqual:@"program_change"]) continue;
+        [devices addObject:device];
+    }
+    if (deviceID && !devices.count) return @{@"ok": @NO, @"error": @"Appareil inconnu"};
+    if (!deviceID && [action isEqual:@"stop"]) CLClearPersistedSimulatorAutoDeviceIDs();
+    if (!self.simulatorCommandRetiringTasks) self.simulatorCommandRetiringTasks = [NSMutableDictionary dictionary];
+    for (NSMutableDictionary *device in devices) {
+        NSString *identifier = device[@"id"];
+        if ([action isEqual:@"stop"]) {
+            NSTask *task = self.simulatorTasks[identifier];
+            if (task.running) self.simulatorCommandRetiringTasks[identifier] = task;
+            [self stopSimulatorDeviceID:identifier];
+        } else if ([device[@"enabled"] boolValue]) {
+            CLPersistSimulatorAutoDeviceID(identifier, YES);
+            [self resumeCommandSimulatorDeviceID:identifier];
+        }
+    }
+    [self writeConsoleReturnState];
+    return @{@"ok": @YES}; // Accepted; running/PID remain canonical JSON state.
+}
+
+- (void)sendSimulatorControlAction:(NSString *)action deviceID:(NSString *)deviceID {
+    if (![self canControlSimulators] || self.ownsPassiveReturnMonitor) return;
+    NSMutableDictionary *request = [@{@"service": CLSimulatorControlService, @"action": action,
+        @"deadline": @(NSDate.date.timeIntervalSince1970 + 2.0)} mutableCopy];
+    if (deviceID.length) request[@"device_id"] = deviceID;
+    NSDictionary *reply = CLSimulatorControlRequest(self.publishedSimulatorControlPortName, request);
+    if (![reply[@"ok"] boolValue]) {
+        self.publishedSimulatorControlAvailable = reply != nil;
+        [self showSimulatorOperatorMessage:reply[@"error"] ?: @"Instance principale injoignable · commande non confirmée" error:YES];
+    } else {
+        [self showSimulatorOperatorMessage:@"Commande AUTO/STOP acceptée par l’instance principale" error:NO];
+        [self loadPublishedConsoleReturnState];
+    }
+    [self rebuildSimulatorDeviceRows];
+}
+
+- (BOOL)simulatorIsRunningForDeviceID:(NSString *)deviceID {
+    if (self.ownsPassiveReturnMonitor) return self.simulatorTasks[deviceID].running;
+    id state = self.publishedSimulatorStates[deviceID];
+    return [state isKindOfClass:NSDictionary.class] && [state[@"running"] boolValue];
+}
+
+- (NSUInteger)activeSimulatorCount {
     NSUInteger running = 0;
-    for (NSTask *task in self.simulatorTasks.allValues) if (task.running) running += 1;
+    if (self.ownsPassiveReturnMonitor) {
+        for (NSTask *task in self.simulatorTasks.allValues) if (task.running) running++;
+    } else {
+        for (NSString *deviceID in self.publishedSimulatorStates)
+            if ([self simulatorIsRunningForDeviceID:deviceID]) running++;
+    }
+    return running;
+}
+
+- (void)updateSimulatorSafetyStatus {
+    NSUInteger running = [self activeSimulatorCount];
     if (running) {
         self.simulatorActivityLabel.stringValue = [NSString stringWithFormat:@"AUTO · %lu ACTIF%@", (unsigned long)running, running > 1 ? @"S" : @""];
         self.simulatorActivityLabel.textColor = [NSColor colorWithRed:0.92 green:0.58 blue:0.26 alpha:1.0];
@@ -5080,6 +5312,22 @@ static void CLClearPersistedSimulatorAutoDeviceIDs(void) {
         self.simulatorStartButton.toolTip = @"Démarre les appareils de simulation activés.";
         self.simulatorStopAllButton.enabled = NO;
         self.assistantTestBanner.hidden = YES;
+    }
+    self.simulatorStartButton.title = @"▶ AUTO";
+    self.simulatorStartButton.toolTip = @"Active AUTO pour les appareils configurés et activés";
+    self.simulatorStartButton.enabled = [self canControlSimulators];
+    self.simulatorStopAllButton.enabled = [self canControlSimulators];
+    self.assistantStopTestsButton.enabled = [self canControlSimulators];
+    if (!self.ownsPassiveReturnMonitor) {
+        NSString *controlHelp = self.publishedSimulatorControlAvailable
+            ? @"Commandes transmises à l’instance principale"
+            : @"Instance principale injoignable · commandes indisponibles";
+        self.simulatorStartButton.title = @"▶ AUTO";
+        self.simulatorActivityLabel.toolTip = controlHelp;
+        self.simulatorStartButton.toolTip = controlHelp;
+        self.simulatorStopAllButton.toolTip = controlHelp;
+        if (!self.publishedSimulatorStateAvailable)
+            self.simulatorActivityLabel.stringValue = @"AUTO · ÉTAT INDISPONIBLE";
     }
 }
 
@@ -5134,7 +5382,7 @@ static void CLClearPersistedSimulatorAutoDeviceIDs(void) {
         visibleDeviceCount += 1;
         NSString *signalType = [device[@"signal_type"] lowercaseString] ?: @"program_change";
         BOOL programChange = [signalType isEqualToString:@"program_change"];
-        BOOL running = self.simulatorTasks[deviceID].running;
+        BOOL running = [self simulatorIsRunningForDeviceID:deviceID];
 
         NSDictionary *profile = [self deviceProfileForSimulatorID:deviceID];
         NSString *protocol = [profile[@"protocol"] isKindOfClass:NSString.class]
@@ -5256,13 +5504,17 @@ static void CLClearPersistedSimulatorAutoDeviceIDs(void) {
                    frame:NSMakeRect(500, 3, 58, 22)
                   action:@selector(toggleSimulatorDeviceRunning:)];
         startStop.identifier = deviceID;
-        startStop.enabled = programChange;
+        startStop.enabled = programChange && [self canControlSimulators];
         startStop.title = running ? @"■ Stop" : @"▶ Auto";
         startStop.font = [NSFont systemFontOfSize:8.0];
         startStop.accessibilityLabel = running ? @"Arrêter l’automatisation de cette ligne" : @"Démarrer l’automatisation de cette ligne";
         startStop.toolTip = programChange
             ? (running ? @"Arrêter ce simulateur" : @"Démarrer ce simulateur")
             : @"Auto disponible uniquement pour Program Change · utiliser Envoyer";
+        if (!self.ownsPassiveReturnMonitor)
+            startStop.toolTip = self.publishedSimulatorControlAvailable
+                ? @"Commande AUTO/STOP transmise à l’instance principale"
+                : @"Instance principale injoignable · commandes indisponibles";
         [row addSubview:startStop];
 
         NSTextField *state =
@@ -5547,7 +5799,11 @@ static void CLClearPersistedSimulatorAutoDeviceIDs(void) {
     self.simulatorJournalView.textColor = [NSColor colorWithWhite:0.78 alpha:1.0];
     journalScroll.documentView = self.simulatorJournalView; [content addSubview:journalScroll];
 
-    self.simulatorStartButton = nil;
+    self.simulatorStartButton = [self button:@"▶ AUTO"
+        frame:NSMakeRect(486, 636, 108, 22) action:@selector(autoIntegratedSimulators:)];
+    self.simulatorStartButton.font = [NSFont systemFontOfSize:8.0];
+    self.simulatorStartButton.autoresizingMask = NSViewMinXMargin | NSViewMinYMargin;
+    [content addSubview:self.simulatorStartButton];
     self.simulatorCL5MemoryField = nil;
     self.simulatorQL1MemoryField = nil;
 
@@ -5707,7 +5963,7 @@ static void CLClearPersistedSimulatorAutoDeviceIDs(void) {
         if (![CLSimulatorInputEndpointNames() containsObject:CLExpectedEndpointName]) {
             self.simulatorStatusLabel.stringValue = @"EXPECTED absent : CL Show Control IAC introuvable (alias legacy acceptés)";
             self.simulatorStatusLabel.textColor = NSColor.systemRedColor;
-        } else if (!self.localReturnDestination) {
+        } else if (![self localReturnIsAvailable]) {
             self.simulatorStatusLabel.stringValue = @"RETURNED absent : CL MIDI Return Test introuvable";
             self.simulatorStatusLabel.textColor = NSColor.systemRedColor;
         }
@@ -5751,6 +6007,7 @@ static void CLClearPersistedSimulatorAutoDeviceIDs(void) {
 }
 
 - (NSTask *)launchSimulatorDevice:(NSMutableDictionary *)device transport:(NSString *)transport endpoint:(NSString *)endpoint delay:(NSInteger)delay {
+    if (!self.ownsPassiveReturnMonitor) return nil;
     if (self.lifecycleStopping) return nil;
     if ([transport isEqualToString:@"iac"] && [@[@"CL5", @"QL1"] containsObject:device[@"name"]] && !self.supervisingLocalLaunch) {
         CLPersistSimulatorAutoDeviceID(device[@"id"], YES);
@@ -5946,6 +6203,7 @@ static void CLClearPersistedSimulatorAutoDeviceIDs(void) {
 }
 
 - (void)startSimulatorDevice:(NSMutableDictionary *)device {
+    if (!self.ownsPassiveReturnMonitor) return;
     if (!device || self.simulatorTasks[device[@"id"]].running) return;
     if (![[device[@"signal_type"] lowercaseString] isEqualToString:@"program_change"]) return;
     NSString *transport, *endpoint; NSInteger delay;
@@ -5964,6 +6222,7 @@ static void CLClearPersistedSimulatorAutoDeviceIDs(void) {
 }
 
 - (void)stopSimulatorDeviceID:(NSString *)deviceID {
+    if (!self.ownsPassiveReturnMonitor) return;
     NSTask *task = self.simulatorTasks[deviceID];
 
     if (task.running)
@@ -5981,6 +6240,16 @@ static void CLClearPersistedSimulatorAutoDeviceIDs(void) {
 - (void)updateSimulatorCompactStatus {
     if (!self.simulatorCompactStatus)
         return;
+
+    if (!self.ownsPassiveReturnMonitor) {
+        NSUInteger targetCount = self.publishedSimulatorStates.count;
+        self.simulatorCompactStatus.stringValue = self.publishedSimulatorStateAvailable
+            ? [NSString stringWithFormat:@"● SIMULATEURS %lu/%lu", (unsigned long)[self activeSimulatorCount], (unsigned long)targetCount]
+            : @"● SIMULATEURS · ÉTAT INDISPONIBLE";
+        self.simulatorCompactStatus.textColor = [self activeSimulatorCount] > 0
+            ? NSColor.systemGreenColor : NSColor.secondaryLabelColor;
+        return;
+    }
 
     NSSet<NSString *> *persisted =
         CLPersistedSimulatorAutoDeviceIDs();
@@ -6082,6 +6351,7 @@ static void CLClearPersistedSimulatorAutoDeviceIDs(void) {
 }
 
 - (void)reconcilePersistedSimulatorAutoDevicesAfterModeChange {
+    if (!self.ownsPassiveReturnMonitor) return;
     if (self.backgroundMonitorOnly)
         return;
 
@@ -6209,6 +6479,7 @@ static void CLClearPersistedSimulatorAutoDeviceIDs(void) {
 }
 
 - (void)restorePersistedSimulatorAutoDevices {
+    if (!self.ownsPassiveReturnMonitor) return;
     if (self.backgroundMonitorOnly)
         return;
 
@@ -6315,7 +6586,20 @@ static void CLClearPersistedSimulatorAutoDeviceIDs(void) {
     );
 }
 
+- (void)autoIntegratedSimulators:(id)sender {
+    if (!self.ownsPassiveReturnMonitor) {
+        [self sendSimulatorControlAction:@"auto" deviceID:nil];
+        return;
+    }
+    [self handleSimulatorControlRequest:@{@"service": CLSimulatorControlService, @"action": @"auto",
+        @"deadline": @(NSDate.date.timeIntervalSince1970 + 2.0)}];
+}
+
 - (void)startIntegratedSimulator:(id)sender {
+    if (!self.ownsPassiveReturnMonitor) {
+        if (sender != nil) [self sendSimulatorControlAction:@"auto" deviceID:nil];
+        return;
+    }
     (void)sender;
     [self stopIntegratedSimulator:nil];
     NSString *transport, *endpoint; NSInteger delay;
@@ -6340,6 +6624,11 @@ static void CLClearPersistedSimulatorAutoDeviceIDs(void) {
 }
 
 - (void)stopIntegratedSimulator:(id)sender {
+    if (!self.ownsPassiveReturnMonitor) {
+        // nil is application teardown: closing a client must never stop its owner.
+        if (sender != nil) [self sendSimulatorControlAction:@"stop" deviceID:nil];
+        return;
+    }
     (void)sender;
     NSArray *tasks = self.simulatorTasks.allValues.copy;
     [self.simulatorTasks removeAllObjects];
@@ -6357,6 +6646,7 @@ static void CLClearPersistedSimulatorAutoDeviceIDs(void) {
 }
 
 - (void)toggleSimulatorDeviceEnabled:(NSButton *)sender {
+    if (!self.ownsPassiveReturnMonitor) return;
     NSMutableDictionary *device = [self simulatorDeviceForID:sender.identifier];
     device[@"enabled"] = @(sender.state == NSControlStateValueOn); [self persistSimulatorDevices];
     if (![device[@"enabled"] boolValue]) [self stopSimulatorDeviceID:device[@"id"]];
@@ -6365,6 +6655,10 @@ static void CLClearPersistedSimulatorAutoDeviceIDs(void) {
 - (void)toggleSimulatorDeviceRunning:(NSButton *)sender {
     NSString *deviceID = sender.identifier; NSMutableDictionary *device = [self simulatorDeviceForID:deviceID];
     if (![[device[@"signal_type"] lowercaseString] isEqualToString:@"program_change"]) return;
+    if (!self.ownsPassiveReturnMonitor) {
+        [self sendSimulatorControlAction:[self simulatorIsRunningForDeviceID:deviceID] ? @"stop" : @"auto" deviceID:deviceID];
+        return;
+    }
     if (self.simulatorTasks[deviceID].running) [self stopSimulatorDeviceID:deviceID]; else [self startSimulatorDevice:device];
 }
 
@@ -7187,6 +7481,7 @@ static void CLClearPersistedSimulatorAutoDeviceIDs(void) {
     (void)sender;
     if (self.lifecycleStopping) return NSTerminateLater;
     self.lifecycleStopping = YES;
+    [self stopSimulatorControlServer];
     [self.localSupervisor shutdown];
     NSMutableArray *children = self.simulatorTasks.allValues.mutableCopy;
     if (self.guardianTask) [children addObject:self.guardianTask];

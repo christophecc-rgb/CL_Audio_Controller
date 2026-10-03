@@ -17,6 +17,20 @@ if not CATALOG_PATH.exists():
     CATALOG_PATH = Path(__file__).resolve().parent.parent / 'config/installation_roles.json'
 
 
+def is_external(item):
+    return item.get('external') is True
+
+
+def local_component_items(details):
+    """External integrations are visible in plans, but never locally owned."""
+    return ((name, item) for name, item in details.items() if not is_external(item))
+
+
+def local_services(role_manifest):
+    labels = {item.get('service') for _, item in local_component_items(role_manifest['component_details'])}
+    return [label for label in role_manifest['services'] if label in labels]
+
+
 def private_directory(path):
     missing=[];cursor=Path(path)
     while not cursor.exists():
@@ -41,18 +55,20 @@ def manifest(role, features=(), custom=()):
             raise ValueError('Option interdite pour ce rôle : ' + feature)
         for field in ('components', 'services', 'network_transports', 'ports'):
             result[field] = list(dict.fromkeys(result[field] + option[field]))
-    for name in result['components']:
-        service = catalog['components'][name].get('service')
+    for _, item in local_component_items({name: catalog['components'][name] for name in result['components']}):
+        service = item.get('service')
         if service and service not in result['services']:
             result['services'].append(service)
     if role == 'custom':
         for field in ('network_transports','ports','permissions','dependencies'):
             result[field] = list(dict.fromkeys(value for name in result['components'] for value in catalog['components'][name].get(field,[])))
     result['forbidden_components'] = sorted(set(catalog['components']) - set(result['components']))
-    result['forbidden_services'] = sorted({'com.claudio.midi-network-monitor','com.claudio.midi-rtp-agent'} - set(result['services']))
     result['visible_tools'] = list(result['components'])
     result['features'] = list(features)
     result['component_details'] = {name: copy.deepcopy(catalog['components'][name]) for name in result['components']}
+    result['services'] = local_services(result)
+    external_services = {item.get('service') for item in catalog['components'].values() if is_external(item)}
+    result['forbidden_services'] = sorted({'com.claudio.midi-network-monitor','com.claudio.midi-rtp-agent'} - set(result['services']) - external_services)
     return result
 
 
@@ -72,7 +88,17 @@ class RoleInstaller:
 
     def audit(self, role_manifest):
         found = []
-        for name, item in self.catalog['components'].items():
+        external_paths = set()
+        external_services = set()
+        for item in self.catalog['components'].values():
+            if not is_external(item):
+                continue
+            target = self.target(item)
+            external_paths.add(Path(os.path.abspath(target)))
+            external_services.add(item.get('service'))
+            for pattern in (target.name + '.sauvegarde_*', target.stem + '.backup-*.app'):
+                external_paths.update(Path(os.path.abspath(backup)) for backup in target.parent.glob(pattern))
+        for name, item in local_component_items(self.catalog['components']):
             target = self.target(item)
             if target.exists() or target.is_symlink():
                 found.append({'kind':'component','component':name,'path':str(target),'required':name in role_manifest['components']})
@@ -80,26 +106,31 @@ class RoleInstaller:
                 for backup in target.parent.glob(pattern):
                     found.append({'kind':'old_backup','path':str(backup),'required':False})
         for label in ['com.claudio.midi-network-monitor','com.claudio.midi-rtp-agent']:
+            if label in external_services:
+                continue
             plist = self.home / 'Library/LaunchAgents' / (label + '.plist')
             if plist.exists():
-                found.append({'kind':'agent','label':label,'path':str(plist),'required':label in role_manifest['services']})
+                found.append({'kind':'agent','label':label,'path':str(plist),'required':label in local_services(role_manifest)})
         for root in [self.record.parent, self.home/'Library/Application Support/CL Audio Show Control', self.home/'Applications/CL Audio/CL_Transport']:
             if root.exists():
                 found.append({'kind':'configuration','path':str(root),'action':'preserve'})
         for name in ['CL Audio Controller.app','CL Audio Show Control.app']:
             target = self.home/'Applications'/name
-            if target.exists():
+            if target.exists() and target not in external_paths:
                 found.append({'kind':'legacy_app','path':str(target),'required':False})
         legacy = self.record.parent/'CL_Suite_install_manifest.tsv'
         if legacy.exists() and not legacy.is_symlink():
             known = {item['path'] for item in found}
-            required_paths = {str(self.target(item)) for item in role_manifest['component_details'].values()}
+            required_paths = {str(self.target(item)) for _, item in local_component_items(role_manifest['component_details'])}
             for line in legacy.read_text().splitlines():
                 columns = line.split('\t')
                 for value in columns:
                     if not value.startswith('/'):
                         continue
                     path = Path(value)
+                    normalized = Path(os.path.abspath(path))
+                    if any(normalized == external or normalized.is_relative_to(external) for external in external_paths):
+                        continue
                     # Historical manifests are data, not authority to remove arbitrary paths.
                     managed = (path.suffix=='.app' and path.is_relative_to(self.home/'Applications')) or (
                         path.is_relative_to(self.live/'Remote Scripts') and path != self.live/'Remote Scripts') or (
@@ -135,7 +166,7 @@ class RoleInstaller:
             self.retire(plist)
 
     def preflight(self, m, url=''):
-        requires_live = any(item['target'].startswith('@LIVE/') for item in m['component_details'].values())
+        requires_live = any(item['target'].startswith('@LIVE/') for _, item in local_component_items(m['component_details']))
         if requires_live:
             configured = os.environ.get('CL_SUITE_LIVE_APPS','')
             live_apps = [Path(path) for path in configured.split(':') if path] if configured else list((self.home/'Applications').glob('Ableton Live 1[12]*.app'))
@@ -144,15 +175,15 @@ class RoleInstaller:
             live_apps = [path for path in live_apps if path.is_dir()]
             if not live_apps:
                 raise ValueError('Ce rôle nécessite Ableton Live 11/12 ; préciser CL_SUITE_LIVE_APPS si nécessaire')
-            requires_max = any('Max for Live' in item.get('dependencies',[]) for item in m['component_details'].values())
+            requires_max = any('Max for Live' in item.get('dependencies',[]) for _, item in local_component_items(m['component_details']))
             if requires_max and os.environ.get('CL_SUITE_ASSUME_M4L') != '1' and not any('Suite' in path.name or (path/'Contents/App-Resources/Max').exists() for path in live_apps):
                 raise ValueError('Max for Live requis pour les devices sélectionnés ; confirmer sa licence explicitement')
-        for item in m['component_details'].values():
+        for _, item in local_component_items(m['component_details']):
             if item.get('service'):
                 executable = self.kit/item['source']/'Contents/MacOS'/Path(item['source']).stem
                 if not executable.is_file():
                     raise FileNotFoundError('Exécutable agent absent du kit : ' + str(executable))
-        for item in m['component_details'].values():
+        for _, item in local_component_items(m['component_details']):
             target = self.target(item)
             if not target.resolve().is_relative_to(self.home.resolve()) and not (item['target'].startswith('@LIVE/') and target.resolve().is_relative_to(self.live.resolve())):
                 raise ValueError('Destination hors installation')
@@ -173,7 +204,7 @@ class RoleInstaller:
                 if len(line) > 66:
                     digest, name = line[:64], line[66:].lstrip('*')
                     hashes[name] = digest
-            for item in m['component_details'].values():
+            for _, item in local_component_items(m['component_details']):
                 if item.get('generated'):
                     continue
                 source = self.kit/item['source']
@@ -186,7 +217,7 @@ class RoleInstaller:
 
     def install(self, m, migration='keep', url=''):
         self.preflight(m,url)
-        if self.home == Path.home().absolute() and 'show_control' in m['components'] and sys.platform == 'darwin':
+        if self.home == Path.home().absolute() and 'show_control' in dict(local_component_items(m['component_details'])) and sys.platform == 'darwin':
             import socket
             for port in (5050,5055):
                 with socket.socket() as probe:
@@ -205,7 +236,7 @@ class RoleInstaller:
                     self.agent(item['label'])
                 else:
                     self.retire(item['path'])
-        for name, item in m['component_details'].items():
+        for name, item in local_component_items(m['component_details']):
             target = self.target(item)
             self.retire(target)
             target.parent.mkdir(parents=True,exist_ok=True)
@@ -218,8 +249,8 @@ class RoleInstaller:
             else:
                 source = self.kit/item['source']
                 shutil.copytree(source,target,symlinks=True) if source.is_dir() else shutil.copy2(source,target)
-        for label in m['services']:
-            item = next(item for item in m['component_details'].values() if item.get('service') == label)
+        for label in local_services(m):
+            item = next(item for _, item in local_component_items(m['component_details']) if item.get('service') == label)
             target = self.target(item)
             executable = target/'Contents/MacOS'/target.stem
             if not executable.exists():
@@ -230,14 +261,14 @@ class RoleInstaller:
             self.agent(label,enable=True)
         private_directory(self.record.parent)
         previous = json.loads(self.record.read_text()) if self.record.exists() else None
-        record = {'manifest':m,'migration':migration,'audit_before':audit,'previous_role':previous.get('manifest',{}).get('role') if previous else None,'preserved_configurations':True,'installed_paths':[str(self.target(item)) for item in m['component_details'].values()]}
+        record = {'manifest':m,'migration':migration,'audit_before':audit,'previous_role':previous.get('manifest',{}).get('role') if previous else None,'preserved_configurations':True,'installed_paths':[str(self.target(item)) for _, item in local_component_items(m['component_details'])]}
         if self.record.exists():
             shutil.copy2(self.record,self.record.with_name('role-installation.previous.json'))
         self.record.write_text(json.dumps(record,indent=2,ensure_ascii=False)); self.record.chmod(0o600)
         return self.validate(m)
 
     def uninstall(self, m):
-        if self.home == Path.home().absolute() and 'show_control' in m['components'] and sys.platform == 'darwin':
+        if self.home == Path.home().absolute() and 'show_control' in dict(local_component_items(m['component_details'])) and sys.platform == 'darwin':
             import socket
             for port in (5050,5055):
                 with socket.socket() as probe:
@@ -249,18 +280,18 @@ class RoleInstaller:
             if recorded.get('role') == m['role']:
                 # Resolve through the trusted catalog; installed paths are never executable instructions.
                 m = manifest(recorded['role'],recorded.get('features',()), recorded.get('components',()) if recorded['role']=='custom' else ())
-        for label in m['services']:
+        for label in local_services(m):
             self.agent(label)
-        for item in m['component_details'].values():
+        for _, item in local_component_items(m['component_details']):
             self.retire(self.target(item))
         # Retain a documented record and all user configs for reinstall/recovery.
         private_directory(self.record.parent)
         self.record.with_name('role-uninstalled.json').write_text(json.dumps({'role':m['role'],'configurations':'preserved','trash':str(self.trash)},indent=2))
-        return {'role':m['role'],'removed_components':m['components'],'configurations':'preserved','trash':str(self.trash)}
+        return {'role':m['role'],'removed_components':[name for name, _ in local_component_items(m['component_details'])],'configurations':'preserved','trash':str(self.trash)}
 
     def validate(self,m):
-        missing = [name for name,item in m['component_details'].items() if not self.target(item).exists()]
-        missing_agents = [label for label in m['services'] if not (self.home/'Library/LaunchAgents'/(label+'.plist')).exists()]
+        missing = [name for name,item in local_component_items(m['component_details']) if not self.target(item).exists()]
+        missing_agents = [label for label in local_services(m) if not (self.home/'Library/LaunchAgents'/(label+'.plist')).exists()]
         extras = [item for item in self.audit(m) if item['kind'] != 'configuration' and not item.get('required')]
         return {'role':m['role'],'ok':not missing and not missing_agents and not extras,'missing':missing,'missing_agents':missing_agents,'migration_remaining':extras}
 

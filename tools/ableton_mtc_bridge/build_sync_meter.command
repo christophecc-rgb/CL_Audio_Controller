@@ -18,6 +18,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <key>CFBundleIdentifier</key><string>com.claudio.syncmeter</string>
 <key>CFBundleName</key><string>CL Sync Meter</string>
 <key>CFBundleDisplayName</key><string>CL Sync Meter</string>
+<key>CFBundleIconFile</key><string>CL_MIDI_Performance.icns</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>1.2</string>
 <key>CFBundleVersion</key><string>2</string>
@@ -26,6 +27,7 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
 <key>NSPrincipalClass</key><string>NSApplication</string>
 </dict></plist>
 PLIST
+cp "$ROOT/../../assets/app_icons/CL_MIDI_Performance.icns" "$APP/Contents/Resources/CL_MIDI_Performance.icns"
 /usr/bin/codesign --force --sign - "$APP"
 /usr/bin/codesign --verify --strict --verbose=2 "$APP"
 /usr/bin/lipo "$APP/Contents/MacOS/CLSyncMeter" -verify_arch arm64 x86_64

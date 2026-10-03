@@ -1,10 +1,12 @@
 """Small Flask boundary around remote security; musical handlers stay unchanged."""
 import ipaddress
 import os
+import subprocess
 from pathlib import Path
 from urllib.parse import urlsplit
 from flask import g, jsonify, make_response, request, send_file
 from remote_security import RemoteSecurity, SecurityError
+from remote_tls import RemoteTLS, network_identity, prepare_certificate, read_settings, save_settings, server_address
 
 LOCAL_HOSTS={'localhost','127.0.0.1','::1'}
 LOCAL_EXEMPT={'/shutdown','/ownership/verify'}
@@ -43,6 +45,9 @@ def attach_security(app, *, launcher=False, directory=None):
         directory = Path(override) if override else Path.home()/'Library/Application Support/CL Audio Controller/Security'
     manager=RemoteSecurity(directory, namespace="launcher" if launcher else "backend")
     app.extensions['cl_security']=manager
+    tls = None if launcher else RemoteTLS(app, manager.directory)
+    if tls is not None:
+        app.extensions['cl_remote_tls'] = tls
     cookie_name='cl_admin_launcher' if launcher else 'cl_admin_backend'
 
     def local_admin():
@@ -124,6 +129,7 @@ def attach_security(app, *, launcher=False, directory=None):
         try: local_admin(); snapshot['unlocked']=True
         except SecurityError:
             snapshot['unlocked']=False; snapshot.pop('pending'); snapshot.pop('devices')
+        snapshot["admin_unlock"]=manager.admin_status(request.cookies.get(cookie_name) or request.headers.get("X-CL-Admin"))
         return jsonify(snapshot)
 
     @app.route('/security/admin/<operation>',methods=['POST'])
@@ -138,8 +144,9 @@ def attach_security(app, *, launcher=False, directory=None):
                 manager.set_password(data.get('password'),initial=True)
                 return jsonify(ok=True)
             if operation=='unlock':
-                token=manager.unlock(data.get('password'))
-                response=make_response(jsonify(ok=True)); response.set_cookie(cookie_name,token,max_age=300,httponly=True,samesite='Strict',secure=request.is_secure,path='/')
+                duration=data.get('duration','five_minutes')
+                token=manager.unlock(data.get('password'),duration=duration)
+                response=make_response(jsonify(ok=True)); response.set_cookie(cookie_name,token,max_age=None if duration=='session' else 300,httponly=True,samesite='Strict',secure=request.is_secure,path='/')
                 return response
             local_admin()
             if operation=='lock': manager.lock_admin()
@@ -149,6 +156,27 @@ def attach_security(app, *, launcher=False, directory=None):
             elif operation=='revoke': manager.revoke(data.get('device_id'))
             elif operation=='role': settings_allowed(); manager.change_role(data.get('device_id'),data.get('role'))
             elif operation=='approve': manager.approve(data.get('request_id'),data.get('lifetime',43200),data.get('authorization_type','temporary'))
+            elif operation in ('tls-setup', 'tls-start', 'tls-enroll'):
+                settings_allowed()
+                if launcher:
+                    raise SecurityError('Ouvrir Première configuration dans le backend local sur 5050')
+                with tls.lock:
+                    if operation == 'tls-setup':
+                        identity = network_identity()
+                        base = str(data.get('server_url') or identity['suggested_url']).rstrip('/')
+                        settings = prepare_certificate(manager.directory, base, identity)
+                        tls.identity = identity
+                        tls.start(settings)
+                        tls.probe()
+                        save_settings(manager.directory, settings)
+                        manager.audit('tls-setup', 'accepted')
+                        return jsonify(ok=True, https=tls.snapshot(), enrollment=tls.enroll())
+                    if operation == 'tls-start':
+                        tls.start(read_settings(manager.directory))
+                        tls.probe()
+                        return jsonify(ok=True, https=tls.snapshot())
+                    enrollment = tls.enroll()
+                    return jsonify(ok=True, enrollment=enrollment, svg=qr_svg(enrollment['url']))
             elif operation=='tls':
                 settings_allowed()
                 if launcher:
@@ -181,24 +209,64 @@ def attach_security(app, *, launcher=False, directory=None):
                 settings_allowed()
                 if launcher:
                     raise SecurityError('Ouvrir la gestion des télécommandes du backend local sur 5050 : les QR appartiennent à ce serveur')
-                # QR destination is operator-selected HTTPS, never derived from Host/Bonjour.
                 base=str(data.get('server_url') or os.environ.get('CL_REMOTE_PUBLIC_URL','') or _tls_config(manager.directory).get('server_url','')).rstrip('/')
-                parsed=urlsplit(base)
-                if parsed.scheme!='https' or not parsed.hostname or parsed.username or parsed.password or parsed.query or parsed.fragment or parsed.path not in ('','/'):
-                    raise SecurityError('URL serveur HTTPS explicite requise')
+                tls.probe(base)
+                if not tls.snapshot()['phone_verified']:
+                    raise SecurityError('Vérifier d’abord HTTPS depuis l’iPhone avec le lien de test')
                 code=manager.new_code(data.get('role','operator'))
                 url=base+'/remote/pair#code='+code
                 # Fragment avoids leaking the one-use code through server/access logs.
-                import io
-                import qrcode
-                import qrcode.image.svg
-                image=qrcode.make(url,image_factory=qrcode.image.svg.SvgPathImage)
-                buffer=io.BytesIO(); image.save(buffer)
-                return jsonify(ok=True,url=url,svg=buffer.getvalue().decode(),expires=manager.clock()+120)
+                return jsonify(ok=True,url=url,svg=qr_svg(url),expires=manager.clock()+120)
             else: raise SecurityError('Opération inconnue')
             return jsonify(ok=True)
-        except (SecurityError,TypeError,ValueError,OSError) as error:
+        except (SecurityError,TypeError,ValueError,OSError,subprocess.SubprocessError) as error:
             return jsonify(ok=False,error=str(error)),403
+
+    @app.route('/remote/ready')
+    def remote_ready():
+        if tls is None or not request.is_secure:
+            return jsonify(error='HTTPS requis'),403
+        return jsonify(instance=tls.instance)
+
+    @app.route('/remote/check')
+    def remote_check():
+        if tls is None or not request.is_secure:
+            return jsonify(error='Ouvrir le lien de test HTTPS depuis Safari'),403
+        return send_file(Path(__file__).with_name('static')/'remote-check.html')
+
+    @app.route('/remote/verify',methods=['POST'])
+    def remote_verify():
+        import time
+        if tls is None or not request.is_secure:
+            return jsonify(error='HTTPS requis'),403
+        try:
+            if ipaddress.ip_address(request.remote_addr or '').is_loopback:
+                raise SecurityError('Effectuer le test depuis l’iPhone sur le même réseau')
+        except (SecurityError,ValueError) as error:
+            return jsonify(error=str(error)),403
+        try:
+            # DNS names are case-insensitive; Safari normalizes the Bonjour host.
+            configured_origin = server_address(tls.settings.get('server_url'))
+            request_origin = server_address(request.host_url)
+            origin = request.headers.get('Origin')
+            if request_origin != configured_origin or request.headers.get('Sec-Fetch-Site') == 'cross-site' or (origin and server_address(origin) != configured_origin):
+                raise SecurityError('Origine HTTPS différente')
+        except SecurityError:
+            return jsonify(error='Utiliser le lien HTTPS proposé sur le Mac'),403
+        tls.phone_seen=time.time()
+        return jsonify(ok=True,message='Connexion sécurisée confirmée. Revenez sur le Mac.')
+
+    @app.route('/remote/trust/<token>')
+    def remote_trust(token):
+        if tls is None:
+            return jsonify(error='Backend requis'),403
+        try:
+            response=make_response(tls.profile(token))
+            response.headers['Content-Type']='application/x-apple-aspen-config'
+            response.headers['Content-Disposition']='attachment; filename="CL-Show-Control.mobileconfig"'
+            return response
+        except (SecurityError,OSError,ValueError) as error:
+            return jsonify(error=str(error)),403
 
     @app.route('/remote/pair')
     def pair_page():
@@ -237,9 +305,21 @@ def attach_security(app, *, launcher=False, directory=None):
         if not local_request(): return jsonify(error='Local only'),403
         return send_file(Path(__file__).with_name('static')/'security-panel.html')
 
+    @app.route('/security/check-qr')
+    def check_qr():
+        try:
+            local_admin(); settings_allowed()
+            if tls is None: raise SecurityError('Backend local requis')
+            tls.probe()
+            return jsonify(svg=qr_svg(tls.settings['server_url']+'/remote/check'))
+        except (SecurityError,OSError,ValueError) as error:
+            return jsonify(error=str(error)),403
+
     @app.route('/security/diagnostics')
     def diagnostics():
-        result={'http':{'state':'OK','port':5055 if launcher else 5050},
+        if not local_request(): return jsonify(error='Diagnostics réservés au Mac local'),403
+        result={'http':{'state':'ACTIVE' if not request.is_secure else 'UNKNOWN', 'port':5055 if launcher else 5050},
+                'https': tls.snapshot() if tls else {'state':'BACKEND 5050 REQUIRED','ready':False},
                 'bonjour':{'state':'DISCOVERY ONLY','authorizes':False},
                 'remote_control':{'state':'ARMED' if manager.armed else 'DISARMED'}}
         if not launcher:
@@ -257,25 +337,29 @@ def attach_security(app, *, launcher=False, directory=None):
     return manager
 
 
+def qr_svg(url):
+    import io
+    import qrcode
+    import qrcode.image.svg
+    image=qrcode.make(url,image_factory=qrcode.image.svg.SvgPathImage)
+    buffer=io.BytesIO(); image.save(buffer)
+    return buffer.getvalue().decode()
+
+
 def start_remote_tls(app):
-    """Optional secure listener: local 5050 HTTP stays compatible with launcher."""
-    manager=app.extensions['cl_security']
-    settings=_tls_config(manager.directory)
-    cert,key=os.environ.get('CL_REMOTE_TLS_CERT',settings.get('certificate')),os.environ.get('CL_REMOTE_TLS_KEY',settings.get('private_key'))
-    if not cert and not key:
+    """Restore only explicit persisted TLS settings; failures never disable HTTP 5050."""
+    tls=app.extensions['cl_remote_tls']
+    try:
+        settings=read_settings(tls.directory)
+        for variable,field in (('CL_REMOTE_TLS_CERT','certificate'),('CL_REMOTE_TLS_KEY','private_key'),
+                               ('CL_REMOTE_TLS_PORT','port'),('CL_REMOTE_PUBLIC_URL','server_url')):
+            if os.environ.get(variable): settings[field]=os.environ[variable]
+        if not settings: return None
+        return tls.start(settings)
+    except (OSError,ValueError,SecurityError) as error:
+        tls.error=str(error)
         return None
-    if not cert or not key:
-        raise ValueError('Certificat ET clé TLS requis')
-    if Path(key).stat().st_mode & 0o077:
-        raise ValueError('Clé privée TLS : permissions 0600 requises')
-    from werkzeug.serving import make_server
-    import threading
-    server=make_server('0.0.0.0',int(os.environ.get('CL_REMOTE_TLS_PORT',str(settings.get('port',8443)))),app,threaded=True,ssl_context=(cert,key))
-    threading.Thread(target=server.serve_forever,name='CL Remote TLS',daemon=True).start()
-    return server
 
 
 def _tls_config(directory):
-    import json
-    path=Path(directory)/'remote-tls.json'
-    return json.loads(path.read_text()) if path.exists() else {}
+    return read_settings(directory)

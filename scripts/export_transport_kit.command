@@ -99,6 +99,8 @@ echo "Il ne réutilisera pas l'ancienne suite du 24 juillet."
 echo
 
 CONTROLLER_RELEASES="$BUILD_ROOT/controller-release"
+# Share the canonical bridge build with the release and the standalone role app.
+export CL_MTC_BRIDGE_BINARY="$BUILD_ROOT/CLAbletonMTCBridge"
 CL_RELEASE_OUTPUT_ROOT="$CONTROLLER_RELEASES" CL_RELEASE_SKIP_DMG=1 \
   "$PROJECT_DIR/scripts/build_release.sh" "$VERSION"
 CONTROLLER_RELEASE="$(find "$CONTROLLER_RELEASES" -maxdepth 1 -type d -name "CL_Audio_Controller_${VERSION}_*" -print -quit)"
@@ -187,13 +189,19 @@ echo
 echo "Assemblage des applications et composants…"
 # Native sync applications are separate role components, not background agents.
 MTC_ROLE_APP="$COMPONENTS_ROOT/Applications/CL MTC Bridge.app"
-mkdir -p "$MTC_ROLE_APP/Contents/MacOS"
-cp "$PROJECT_DIR/tools/ableton_mtc_bridge/CLAbletonMTCBridge" "$MTC_ROLE_APP/Contents/MacOS/CLAbletonMTCBridge"
+mkdir -p "$MTC_ROLE_APP/Contents/MacOS" "$MTC_ROLE_APP/Contents/Resources"
+require_file "$CL_MTC_BRIDGE_BINARY"
+/usr/bin/lipo "$CL_MTC_BRIDGE_BINARY" -verify_arch arm64 x86_64
+/usr/bin/codesign --verify --strict "$CL_MTC_BRIDGE_BINARY"
+cp "$CL_MTC_BRIDGE_BINARY" "$MTC_ROLE_APP/Contents/MacOS/CLAbletonMTCBridge"
+cp "$PROJECT_DIR/assets/app_icons/CL_MIDI_RTP.icns" "$MTC_ROLE_APP/Contents/Resources/CL_MIDI_RTP.icns"
 cat > "$MTC_ROLE_APP/Contents/Info.plist" <<'MTC_ROLE_PLIST'
 <?xml version="1.0" encoding="UTF-8"?><plist version="1.0"><dict>
 <key>CFBundleExecutable</key><string>CLAbletonMTCBridge</string>
 <key>CFBundleIdentifier</key><string>com.claudio.mtc-bridge</string>
 <key>CFBundleName</key><string>CL MTC Bridge</string>
+<key>CFBundleDisplayName</key><string>CL MTC Bridge</string>
+<key>CFBundleIconFile</key><string>CL_MIDI_RTP.icns</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>LSMinimumSystemVersion</key><string>11.0</string>
 </dict></plist>
@@ -262,6 +270,7 @@ cp "$PROJECT_DIR/packaging/BUILD_UNIVERSAL2.md" "$INSTALLER_RESOURCES/Documentat
 cp "$PROJECT_DIR/README.md" "$INSTALLER_RESOURCES/Documentation/README_CL_Audio_Controller.md"
 cp "$PROJECT_DIR/packaging/INSTALLATION_NOUVEAU_MAC.txt" "$INSTALLER_RESOURCES/Documentation/INSTALLATION_NOUVEAU_MAC.txt"
 cp "$PROJECT_DIR/docs/MIDI_RTP_NAMING.md" "$INSTALLER_RESOURCES/Documentation/MIDI_RTP_NAMING.md"
+cp "$PROJECT_DIR/docs/IPHONE_FIRST_SETUP.md" "$INSTALLER_RESOURCES/Documentation/IPHONE_FIRST_SETUP.md"
 cp "$PROJECT_DIR/packaging/Installer_Toute_La_Suite_CL.command" "$INSTALLER_RESOURCES/Installer_Toute_La_Suite_CL.command"
 cp "$PROJECT_DIR/assets/app_icons/CL_Install.icns" "$INSTALLER_RESOURCES/CL_AUDIO.icns"
 

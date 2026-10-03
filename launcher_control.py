@@ -246,7 +246,21 @@ def read_midi_console_state(expected_agent_host=None):
 
 
 def find_midi_network_assistant():
-    candidates = [
+    candidates = []
+
+    # Build/release transportée : privilégier le Network Manager
+    # fourni dans le même kit que CL Show Control.
+    if getattr(sys, "frozen", False):
+        try:
+            executable = Path(sys.executable).resolve()
+            kit_root = executable.parents[4]
+
+            for candidate in kit_root.glob("*/CL MIDI Network Manager.app"):
+                candidates.append(candidate)
+        except Exception:
+            pass
+
+    candidates.extend([
         # Installation actuelle de la suite d'analyse MIDI.
         Path.home() / "Applications" / "Analyse - Réseau - MIDI" / "CL MIDI Network Manager.app",
 
@@ -255,7 +269,8 @@ def find_midi_network_assistant():
         Path("/Applications/CL MIDI Network Manager.app"),
         Path.home() / "Applications" / "CL MIDI Network Assistant.app",
         Path("/Applications/CL MIDI Network Assistant.app"),
-    ]
+    ])
+
     return next((candidate for candidate in candidates if candidate.exists()), None)
 
 
@@ -384,24 +399,49 @@ def find_yamaha_console_simulator():
 
 
 def console_simulator_status():
+    """Lit l'état des simulateurs détenus par CL MIDI Network Manager.
+
+    Show Control ne possède pas ces processus : il consomme uniquement
+    l'état officiel publié dans CL_MIDI_Console_State.json.
+    """
     executable = find_yamaha_console_simulator()
+    midi_state = read_midi_console_state()
+    published = midi_state.get("simulators") or {}
+    manager_online = bool(midi_state.get("online")) and not bool(midi_state.get("stale"))
+
     result = {}
 
-    with CONSOLE_SIMULATOR_LOCK:
-        for device_id, config in CONSOLE_SIMULATOR_DEVICES.items():
-            process = CONSOLE_SIMULATOR_PROCESSES.get(device_id)
-            running = bool(process and process.poll() is None)
+    for device_id, config in CONSOLE_SIMULATOR_DEVICES.items():
+        state = published.get(device_id)
 
-            if process is not None and not running:
-                CONSOLE_SIMULATOR_PROCESSES.pop(device_id, None)
+        # Compatibilité avec des profils dont l'ID diffère du legacy key :
+        # on retrouve alors le simulateur par canal ou par nom.
+        if not isinstance(state, dict):
+            state = next(
+                (
+                    candidate
+                    for candidate in published.values()
+                    if isinstance(candidate, dict)
+                    and (
+                        candidate.get("channel") == config["channel"]
+                        or str(candidate.get("name") or "").upper() == config["label"]
+                    )
+                ),
+                {},
+            )
 
-            result[device_id] = {
-                "running": running,
-                "pid": process.pid if running else None,
-                "label": config["label"],
-                "channel": config["channel"],
-                "available": executable is not None,
-            }
+        running = bool(manager_online and state.get("running"))
+        pid = state.get("pid") if running else None
+
+        result[device_id] = {
+            "running": running,
+            "pid": pid,
+            "label": config["label"],
+            "channel": config["channel"],
+            "available": executable is not None,
+            "controllable": False,
+            "managed_by": "CL MIDI Network Manager",
+        }
 
     return result
 
@@ -2867,12 +2907,12 @@ function updateConsoleSimulatorControls(){
     status.textContent=state.running?'● Simulateur actif':'○ Simulateur arrêté';
     status.classList.toggle('running',Boolean(state.running));
 
-    button.textContent=state.running?'Arrêter':'Démarrer';
-    button.disabled=!state.available;
+    button.textContent=state.running?'Actif':'Arrêté';
+    button.disabled=true;
     button.dataset.running=state.running?'1':'0';
     button.title=!state.available
       ?'CLYamahaConsoleSimulator introuvable'
-      :(state.running?'Arrêter le simulateur de cette console':'Démarrer le simulateur de cette console');
+      :'Simulateur géré automatiquement par CL MIDI Network Manager';
   });
 
   updateConsoleSimulatorSummary();
@@ -3697,7 +3737,7 @@ def open_midi_network_assistant():
     assistant = find_midi_network_assistant()
     if assistant is None:
         return jsonify(error="CL MIDI Network Manager est introuvable. CL Show Control reste disponible."), 404
-    subprocess.Popen(["/usr/bin/open", str(assistant)])
+    subprocess.Popen(["/usr/bin/open", "-n", str(assistant)])
     event("CL MIDI Network Manager ouvert depuis Show Control")
     return jsonify(message="CL MIDI Network Manager ouvert")
 
@@ -3711,24 +3751,20 @@ def console_simulators_status():
 
 @app.route("/api/console-simulators/<device_id>/start", methods=["POST"])
 def console_simulator_start(device_id):
-    ok, message = start_console_simulator(device_id.lower())
-    payload = {
-        "ok": ok,
-        "message": message,
-        "simulators": console_simulator_status(),
-    }
-    return jsonify(payload), (200 if ok else 409)
+    return jsonify(
+        ok=False,
+        message="Simulateurs gérés par CL MIDI Network Manager",
+        simulators=console_simulator_status(),
+    ), 409
 
 
 @app.route("/api/console-simulators/<device_id>/stop", methods=["POST"])
 def console_simulator_stop(device_id):
-    ok, message = stop_console_simulator(device_id.lower())
-    payload = {
-        "ok": ok,
-        "message": message,
-        "simulators": console_simulator_status(),
-    }
-    return jsonify(payload), (200 if ok else 409)
+    return jsonify(
+        ok=False,
+        message="Simulateurs gérés par CL MIDI Network Manager",
+        simulators=console_simulator_status(),
+    ), 409
 
 
 @app.route("/quit")
