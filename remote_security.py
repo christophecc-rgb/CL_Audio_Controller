@@ -53,6 +53,7 @@ class RemoteSecurity:
         self.nonces = {}
         self.failures = []
         self.password_record = None
+        self.local_development_seen = False
         self.loaded = False
         self.runtime_seen = {}
 
@@ -97,6 +98,36 @@ class RemoteSecurity:
             if changed:
                 self.save()
 
+    def local_development_active(self):
+        path = self.directory/'local-development.json'
+        try:
+            grant = json.loads(path.read_text())
+            active = bool(self.password_revision and grant.get('password_revision') == self.password_revision
+                          and grant.get('enabled') is True)
+        except (OSError, ValueError, AttributeError):
+            active = False
+        if active:
+            self.mode = 'development'
+        elif self.local_development_seen:
+            self.mode = 'show'
+            self.admin_sessions.clear()
+        self.local_development_seen = active
+        return active
+
+    def disable_local_development(self):
+        (self.directory/'local-development.json').unlink(missing_ok=True)
+        self.local_development_seen = False
+
+    def enable_local_development(self):
+        private_directory(self.directory)
+        temporary = self.directory/('development.'+secrets.token_hex(8)+'.tmp')
+        fd = os.open(temporary, os.O_WRONLY|os.O_CREAT|os.O_EXCL, 0o600)
+        with os.fdopen(fd, 'w') as file:
+            json.dump({'enabled': True, 'password_revision': self.password_revision}, file)
+        os.replace(temporary, self.directory/'local-development.json')
+        self.local_development_seen = True
+        self.mode = 'development'
+
     def save(self):
         private_directory(self.directory)
         self.directory.chmod(0o700)
@@ -136,6 +167,8 @@ class RemoteSecurity:
                 json.dump(self.password_record,file)
             os.replace(temporary,self.directory/'admin-password.json')
             self.password_revision = digest(json.dumps(self.password_record,sort_keys=True))
+            self.disable_local_development()
+            self.mode = 'show'
             self.admin_sessions.clear(); self.codes.clear(); self.pending.clear(); self.armed=False
             self.session = secrets.token_hex(16)
             for device in self.devices.values():
@@ -144,7 +177,7 @@ class RemoteSecurity:
             self.save(); self.audit('password-set','accepted')
 
     def unlock(self,password, *, duration="five_minutes"):
-        if duration not in ("five_minutes", "session"):
+        if duration not in ("five_minutes", "session", "development"):
             raise SecurityError("Durée de déverrouillage invalide")
         with self.lock:
             self.load(); self.refresh_password(); now=self.clock()
@@ -159,18 +192,27 @@ class RemoteSecurity:
             if not valid:
                 self.failures.append(now); self.audit('admin-unlock','refused','invalid-password')
                 raise SecurityError('Mot de passe invalide')
-            token=secrets.token_urlsafe(32); self.admin_sessions[digest(token)]=None if duration=="session" else now+300
+            token=secrets.token_urlsafe(32)
+            if duration == 'development':
+                self.enable_local_development()
+            else:
+                self.admin_sessions[digest(token)]=None if duration=="session" else now+300
             self.audit('admin-unlock','accepted'); return token
 
-    def admin(self,token):
+    def admin(self,token, *, local=False):
         with self.lock:
             self.load(); self.refresh_password()
+            if local and self.local_development_active():
+                return
             if not token or digest(token) not in self.admin_sessions or (self.admin_sessions[digest(token)] is not None and self.admin_sessions[digest(token)]<=self.clock()):
                 raise SecurityError('Déverrouillage administrateur local requis')
 
     def admin_status(self, token):
         with self.lock:
             try:
+                self.load(); self.refresh_password()
+                if self.local_development_active():
+                    return {'mode': 'development', 'remaining_seconds': None}
                 self.admin(token)
             except SecurityError:
                 return {'mode': 'locked', 'remaining_seconds': 0}
@@ -180,6 +222,7 @@ class RemoteSecurity:
 
     def lock_admin(self):
         with self.lock:
+            self.disable_local_development()
             self.admin_sessions.clear(); self.mode='show'; self.codes.clear()
             self.audit('admin-lock','accepted')
 
@@ -187,6 +230,9 @@ class RemoteSecurity:
         if mode not in ('show','development'):
             raise SecurityError('Mode invalide')
         with self.lock:
+            if mode == 'show':
+                self.disable_local_development()
+                self.admin_sessions.clear()
             self.mode=mode; self.audit('mode-'+mode,'accepted')
 
     def set_armed(self,armed):
@@ -323,7 +369,7 @@ class RemoteSecurity:
 
     def snapshot(self):
         with self.lock:
-            self.load(); self.refresh_password(); now=self.clock()
+            self.load(); self.refresh_password(); self.local_development_active(); now=self.clock()
             devices=[]
             for item in self.devices.values():
                 public={k:v for k,v in item.items() if k not in ('key','password_revision')}

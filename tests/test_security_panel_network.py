@@ -18,6 +18,7 @@ async function render(network,launcher=false){
     constructor(){this.value='';this.dataset={};this.children=[];this.textContent='';this.style={};}
     replaceChildren(...nodes){this.children=nodes;}
     setAttribute(){}
+    contains(node){return this.children.includes(node);}
     append(...nodes){this.children.push(...nodes);}
     get firstChild(){return this.children[0];}
   }
@@ -43,7 +44,7 @@ async function render(network,launcher=false){
  assert.match(nodes['network-choice'].textContent,/Interface principale : en8 — 172.20.10.3/);
  assert.equal(nodes['server-choice'].value,'https://172.20.10.3:8443');
  assert.equal(nodes.url.value,network.suggested_url);
- assert.match(nodes['https-state'].textContent,/test iPhone requis/);
+ assert.match(nodes['https-state'].textContent,/test ponctuel non confirmé/);
  assert.equal(panel.qr.disabled,true);
  await panel.ready();
  assert.equal(panel.qr.disabled,true);
@@ -51,7 +52,7 @@ async function render(network,launcher=false){
  await panel.confirm();
  assert.match(nodes['https-state'].textContent,/iPhone vérifié/);
  assert.equal(panel.qr.disabled,false);
- assert.match(nodes['step-phone'].textContent,/iPhone vérifié/);
+ assert.match(nodes['step-phone'].textContent,/Test ponctuel confirmé/);
  await panel.update({pending:[{id:'pending1',name:'iPhone',operator:'Chris',role:'operator'}]});
  assert.equal(nodes.pending.children.length,1);
  assert.match(nodes['device-state'].textContent,/Demande reçue/);

@@ -53,7 +53,7 @@ def attach_security(app, *, launcher=False, directory=None):
     def local_admin():
         if not local_request():
             raise SecurityError('Administration réservée au serveur local')
-        manager.admin(request.cookies.get(cookie_name) or request.headers.get('X-CL-Admin',''))
+        manager.admin(request.cookies.get(cookie_name) or request.headers.get('X-CL-Admin',''), local=True)
 
     def settings_allowed():
         if manager.mode!='development':
@@ -304,6 +304,23 @@ def attach_security(app, *, launcher=False, directory=None):
     def panel():
         if not local_request(): return jsonify(error='Local only'),403
         return send_file(Path(__file__).with_name('static')/'security-panel.html')
+
+    @app.route('/security/showcue-qr')
+    def showcue_qr():
+        # Navigation only: no token, association, role or arm operation.
+        if not local_request(): return jsonify(error='Accès réservé au Mac local'),403
+        try:
+            if tls is None: raise SecurityError('Ouvrir les télécommandes sur le serveur 5050')
+            snapshot=tls.snapshot()
+            if not snapshot.get('ready'): raise SecurityError('Préparer ou démarrer HTTPS avant d’ouvrir ShowCue')
+            base=snapshot.get('server_url','').rstrip('/')
+            parsed=urlsplit(base)
+            if parsed.scheme!='https' or not parsed.hostname or parsed.username or parsed.password:
+                raise SecurityError('Adresse HTTPS configurée invalide')
+            url=base+'/show-info'
+            return jsonify(url=url,svg=qr_svg(url))
+        except (SecurityError,OSError,ValueError) as error:
+            return jsonify(error=str(error)),403
 
     @app.route('/security/check-qr')
     def check_qr():
