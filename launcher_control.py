@@ -2468,6 +2468,7 @@ body.show-mode .app{max-width:1440px;overflow-y:auto}body.show-mode .desktop-gri
   .console-diagnostic.matching .console-state{grid-column:1;grid-row:4;text-align:left}
   .console-diagnostic.matching .console-title{grid-row:5}.console-diagnostic.matching .console-detail{grid-row:6}
 }
+[hidden]{display:none!important}
 .ableton-discovery{display:grid;gap:3px;margin-top:5px;min-width:0}
 .ableton-discovery label,.ableton-discovery [role=status]{font-size:10px;color:#aeb9c8;line-height:14px}
 .ableton-discovery select{width:100%;min-width:0;height:30px;border:1px solid #465262;border-radius:6px;background:#151b22;color:#e3eaf3;font-size:11px;padding:0 6px}
@@ -2599,20 +2600,23 @@ body.show-mode .app{max-width:1440px;overflow-y:auto}body.show-mode .desktop-gri
 <div class="desktop-grid">
 <div class="operation-column"><div class="column-label">RÉSEAU / CONNEXIONS</div>
     <section class="card server-card">
-      <div class="access-head">Serveur CL Audio</div>
+      <div class="access-head">1 · Où tourne le moteur CL ?</div>
       <div class="network-grid">
-        <label>Connexion serveur<select id="clServerMode" onchange="clServerDirty=true;document.getElementById('clServerHost').disabled=this.value!=='manual'"><option value="local">Local</option><option value="paradis">Paradis Latin</option><option value="manual">Distant manuel</option></select></label>
-        <label>Adresse manuelle<input id="clServerHost" disabled placeholder="Nom du Mac ou adresse IP" oninput="clServerDirty=true"></label>
+        <label>Serveur CL Audio<select id="clServerMode" onchange="clServerDirty=true;updateCLServerFields()"><option value="local">Ce Mac — 127.0.0.1</option><option value="paradis">Paradis Latin</option><option value="manual">Distant manuel</option></select></label>
+        <label id="clServerHostField" hidden>Adresse du serveur<input id="clServerHost" disabled placeholder="Nom du Mac ou adresse IP" oninput="clServerDirty=true;updateCLServerFields()"></label>
       </div>
-      <button class="action" onclick="saveCLServer()">Appliquer / Rechercher</button>
+      <button class="action" onclick="saveCLServer()">Appliquer</button>
+      <div id="clServerDraft" role="status">Le choix devient actif après Appliquer.</div>
+      <div id="clServerApplyError" role="alert"></div>
       <div id="clServerDiagnostic" role="status" style="white-space:pre-line;overflow-wrap:anywhere;font-size:12px;margin-top:8px">Serveur local</div>
     </section>
 
     <section id="networkCard" class="card network-card local">
-      <div class="network-title-row"><div class="access-head">Connexion AbletonOSC</div><span id="modeBadge" class="mode-badge" hidden aria-hidden="true"></span><span id="networkLtc" class="network-timecode offline">--:--:--:--</span></div>
+      <div class="network-title-row"><div class="access-head">2 · Où tourne Ableton ?</div><span id="modeBadge" class="mode-badge" hidden aria-hidden="true"></span><span id="networkLtc" class="network-timecode offline">--:--:--:--</span></div>
       <div class="network-grid">
-        <label>MODE ABLETON<select id="abletonMode" onchange="updateNetworkFields()"><option value="local">Ableton local</option><option value="remote">Ableton distant</option></select></label>
-        <label>Adresse Ableton enregistrée<input id="abletonHost" value="127.0.0.1"></label>
+        <label>Connexion AbletonOSC<select id="abletonMode" onchange="updateNetworkFields()"><option value="local">Sur le Mac du moteur CL</option><option value="remote">Sur un autre Mac</option></select></label>
+        <label id="abletonHostField" hidden>Adresse du Mac Ableton<input id="abletonHost" value="127.0.0.1"></label>
+        <div id="abletonLocalAddress">Ce Mac — 127.0.0.1</div>
         <div class="ports-readonly"><span>Ports AbletonOSC fixes</span><strong><span id="abletonSendPort">11000</span> → <span id="abletonReplyPort">11001</span></strong></div>
       </div>
       <div class="ableton-discovery">
@@ -2620,6 +2624,8 @@ body.show-mode .app{max-width:1440px;overflow-y:auto}body.show-mode .desktop-gri
         <select id="abletonReaders" onchange="selectAbletonReader(this.value)" aria-describedby="abletonDiscoveryStatus"><option value="">Recherche Bonjour…</option></select>
         <div id="abletonDiscoveryStatus" role="status">Annonce Bonjour · connexion non validée</div>
       </div>
+      <div id="abletonConfiguration" role="status"></div>
+      <div id="abletonDraftStatus" role="status">Le choix devient actif après Appliquer. Tester vérifie la configuration appliquée.</div>
       <div class="network-buttons">
         <button class="action save-network" title="Appliquer et sauvegarder cette configuration" onclick="saveNetworkConfig()">Appliquer</button>
         <button class="action" onclick="testAbletonConnection()">Tester la connexion</button>
@@ -2631,7 +2637,8 @@ body.show-mode .app{max-width:1440px;overflow-y:auto}body.show-mode .desktop-gri
 </div>
 <div class="services-column"><div class="column-label">RETOURS / CONTRÔLE</div>
 <section class="card access-card server-access-card">
-  <div class="access-head">ACCÈS AU SERVEUR</div>
+  <div class="access-head">ADRESSES D’ACCÈS À PARTAGER</div>
+  <div class="state-detail">Pour ouvrir Remote et ShowCue sur les autres appareils.</div>
 
   <div class="server-access-grid">
     <div class="server-access-panel">
@@ -2655,7 +2662,7 @@ body.show-mode .app{max-width:1440px;overflow-y:auto}body.show-mode .desktop-gri
     </div>
 
     <div class="server-access-panel">
-      <div class="server-access-label">SHOWQ — CONDUITE</div>
+      <div class="server-access-label">SHOWCUE — CONDUITE</div>
       <div class="server-access-row">
         <div
           id="showqAddress"
@@ -3078,17 +3085,35 @@ function consolePanelUnavailable(){
 
 async function saveCLServer(){
   const payload={cl_server:{mode:el('clServerMode').value,host:el('clServerHost').value.trim()}};
-  el('clServerDiagnostic').textContent='Recherche du serveur CL…';
-  try{const response=await fetch('/network-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const r=await response.json();if(!response.ok)throw new Error(r.error);clServerDirty=false;clServerInitialized=false;networkFormInitialized=false;networkFormDirty=false;await refresh();}catch(e){el('clServerDiagnostic').textContent=String(e);}
+  el('clServerApplyError').textContent='Application et recherche du serveur CL…';
+  try{const response=await fetch('/network-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const r=await response.json();if(!response.ok)throw new Error(r.error);clServerDirty=false;clServerInitialized=false;networkFormInitialized=false;networkFormDirty=false;el('clServerApplyError').textContent='';await refresh();}catch(e){el('clServerApplyError').textContent='Application impossible : '+String(e);}
+}
+function updateCLServerFields(){
+  const manual=el('clServerMode').value==='manual';
+  el('clServerHostField').hidden=!manual;
+  el('clServerHost').disabled=!manual;
+  el('clServerDraft').textContent=clServerDirty?'Choix en cours · devient actif après Appliquer.':'Le choix devient actif après Appliquer.';
 }
 function renderCLServer(s){
-  const c=s.cl_server||{};
-  if(!clServerDirty&&!clServerInitialized){el('clServerMode').value=c.mode||'local';el('clServerHost').value=c.mode==='manual'?(c.hostname||''):'';el('clServerHost').disabled=c.mode!=='manual';clServerInitialized=true;}
+  const c=s.cl_server||{},savedServer=s.cl_server_config||{};
+  if(!clServerDirty&&!clServerInitialized){el('clServerMode').value=c.mode||'local';el('clServerHost').value=savedServer.host||(c.mode==='manual'?(c.hostname||''):'');el('clServerHost').disabled=c.mode!=='manual';clServerInitialized=true;}
+  updateCLServerFields();
   const target=s.server_valid?s.ableton_server_target:null;
   const ableton=target?target.host+':'+target.send_port:null;
   const diagnostic=el('clServerDiagnosticDetails');diagnostic.replaceChildren();
-  el('clServerDiagnostic').textContent=[(c.mode==='local'?'Serveur local':c.server||'Serveur distant')+' · '+(c.hostname||'—')+' · '+(c.address||'—'),c.validation==='Serveur possédé et validé'?'Validé · possédé':(c.validation||'Validation inconnue'),'Ableton · '+(ableton||'Non disponible')].join('\n');
-  ['Serveur recherché : '+(c.server||'—'),'Nom : '+(c.hostname||'—'),'Adresse retenue : '+(c.address||'—'),'Découverte : '+(c.discovery||'—'),'Validation : '+(c.validation||'—'),'Réseau : '+(c.network||'—'),...(ableton?['Cible Ableton du backend actif : '+ableton]:[])].forEach(text=>{const row=document.createElement('div');row.className='diagnostic-row';const split=text.indexOf(' : ');const label=document.createElement('span'),value=document.createElement('strong');label.textContent=text.slice(0,split);value.textContent=text.slice(split+3);row.append(label,value);diagnostic.appendChild(row);});
+  const saved=c.mode==='local'?'Ce Mac — 127.0.0.1':(c.server||'Serveur distant')+' · '+(c.hostname||'adresse absente');
+  el('clServerDiagnostic').textContent=[
+    'Configuration enregistrée : '+saved,
+    s.server_valid?'Connexion vérifiée : '+(c.remote?(c.address||'—'):'Ce Mac — 127.0.0.1'):'Connexion non vérifiée : '+(c.validation||'serveur indisponible'),
+    ...(!s.server_valid&&c.remote&&c.address?['Adresse recherchée : '+c.address]:[])
+  ].join('\n');
+  el('abletonConfiguration').textContent=c.remote
+    ?'AbletonOSC se configure sur le poste serveur CL. '+(target?'Cible du moteur : '+(target.mode==='local'?'Sur le Mac du moteur CL — 127.0.0.1':target.host)+' · '+(s.osc_transport?.connected?'Connexion vérifiée':'Connexion non vérifiée'):'Cible indisponible : serveur CL non vérifié.')
+    :'Configuration enregistrée : '+(s.ableton_config?.mode==='remote'?'Sur un autre Mac — '+s.ableton_config.host:'Ce Mac — 127.0.0.1')+' · '+(s.server_valid&&s.osc_transport?.connected&&target?.mode===s.ableton_config?.mode&&target?.host===s.ableton_config?.host?'Connexion vérifiée':'Connexion non vérifiée');
+  el('abletonHostField').hidden=!!c.remote||el('abletonMode').value==='local';
+  el('abletonLocalAddress').hidden=!c.remote&&el('abletonMode').value!=='local';
+  el('abletonLocalAddress').textContent=c.remote?'Local = le Mac du moteur CL, pas ce poste.':'Ce Mac — 127.0.0.1';
+  ['Serveur recherché : '+(c.server||'—'),'Nom : '+(c.hostname||'—'),(s.server_valid?'Adresse connectée : ':'Adresse recherchée : ')+(c.address||'—'),'Découverte : '+(c.discovery||'—'),'Validation : '+(c.validation||'—'),'Réseau : '+(c.network||'—'),...(ableton?['Cible Ableton du backend actif : '+ableton]:[])].forEach(text=>{const row=document.createElement('div');row.className='diagnostic-row';const split=text.indexOf(' : ');const label=document.createElement('span'),value=document.createElement('strong');label.textContent=text.slice(0,split);value.textContent=text.slice(split+3);row.append(label,value);diagnostic.appendChild(row);});
   el('networkCard').querySelectorAll('input,select,button').forEach(node=>node.disabled=!!c.remote);
   if(!c.remote)el('abletonHost').disabled=el('abletonMode').value==='local';
   el('abletonReaders').disabled=!!c.remote||el('abletonMode').value==='local';
@@ -3183,11 +3208,12 @@ function copyNetworkDraft(value,mode){
 }
 function initializeNetworkForm(s){
   networkDrafts.local=copyNetworkDraft(s.ableton_profiles.local,'local');
-  networkDrafts.remote=copyNetworkDraft(s.ableton_profiles.remote,'remote');
-  networkVisibleMode=s.ableton_active_mode;
+  networkDrafts.remote=copyNetworkDraft(s.cl_server?.remote ? (s.ableton_server_target?.mode==='remote'?s.ableton_server_target:null) : s.ableton_profiles.remote,'remote');
+  networkVisibleMode=s.cl_server?.remote ? (s.ableton_server_target?.mode||'local') : s.ableton_active_mode;
   el('abletonMode').value=networkVisibleMode;
   restoreNetworkDraft(networkVisibleMode);
   networkFormDirty=false;networkFormInitialized=true;
+  el('abletonDraftStatus').textContent='Le choix devient actif après Appliquer. Tester vérifie la configuration appliquée.';
 }
 function captureVisibleNetworkDraft(){
   if(!networkVisibleMode)return;
@@ -3203,6 +3229,8 @@ function restoreNetworkDraft(mode){
   const draft=networkDrafts[mode]||copyNetworkDraft(null,mode),local=mode==='local';
   el('abletonHost').value=local?'127.0.0.1':draft.host;
   el('abletonHost').disabled=local;
+  el('abletonHostField').hidden=local;
+  el('abletonLocalAddress').hidden=!local;
   el('abletonSendPort').textContent=draft.send_port;
   el('abletonReplyPort').textContent=draft.reply_port;
   applyNetworkCardMode(mode);
@@ -3213,9 +3241,10 @@ function updateNetworkFields(){
   networkVisibleMode=el('abletonMode').value;
   restoreNetworkDraft(networkVisibleMode);
   networkFormDirty=true;
+  el('abletonDraftStatus').textContent='Choix en cours · devient actif après Appliquer. Tester vérifie la configuration appliquée.';
   el('abletonReaders').disabled=networkVisibleMode==='local'||Boolean(latestState?.cl_server?.remote);
 }
-function markNetworkDraftDirty(){captureVisibleNetworkDraft();networkFormDirty=true;}
+function markNetworkDraftDirty(){captureVisibleNetworkDraft();networkFormDirty=true;el('abletonDraftStatus').textContent='Adresse en cours · devient active après Appliquer.';}
 async function saveNetworkConfig(){
   captureVisibleNetworkDraft();const draft=networkDrafts[networkVisibleMode];
   const payload={mode:networkVisibleMode,name:draft.name,host:draft.host,send_port:draft.send_port,reply_port:draft.reply_port};
@@ -3342,6 +3371,7 @@ def state():
         runtime_identity=runtime_identity(__file__, backend_path=APP),
         backend_runtime_identity=remote_state.get("runtime_identity"),
         cl_server=cl_server,
+        cl_server_config={"mode": configured_profiles.cl_server_mode, "host": configured_profiles.cl_server_host} if configured_profiles else None,
         web=web_ready,
         osc=osc_send_ready,
         ret=osc_return_ready,

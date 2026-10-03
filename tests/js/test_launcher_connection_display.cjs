@@ -1,0 +1,46 @@
+// Real panel functions; no network, process or user configuration access.
+const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
+const source=fs.readFileSync(require('path').resolve(__dirname,'../../launcher_control.py'),'utf8');
+const section=(a,b)=>source.slice(source.indexOf(a),source.indexOf(b,source.indexOf(a)));
+const nodes=new Map();
+const el=id=>{if(!nodes.has(id))nodes.set(id,{value:'',textContent:'',hidden:false,disabled:false,children:[],replaceChildren(){this.children=[]},appendChild(n){this.children.push(n)},append(){},querySelectorAll(){return [el('abletonHost'),el('abletonMode'),el('abletonReaders')]}});return nodes.get(id)};
+const context=vm.createContext({el,document:{createElement:()=>({append(){}})},fetch:async()=>({ok:false,json:async()=>({error:'Adresse absente'})})});
+vm.runInContext('let latestState,clServerDirty=false,clServerInitialized=false,networkFormInitialized=false,networkFormDirty=false,networkDrafts={},networkVisibleMode;'+section('async function saveCLServer(){','function render(s){')+section('function copyNetworkDraft(','async function testAbletonConnection()'),context);
+const local={mode:'local',host:'127.0.0.1',send_port:11000,reply_port:11001};
+const remote={...local,mode:'remote',host:'ableton.local'};
+const state={cl_server:{mode:'local',remote:false},ableton_profiles:{local,remote},ableton_active_mode:'local',ableton_config:local};
+context.state=state;
+vm.runInContext('initializeNetworkForm(state);renderCLServer(state)',context);
+assert.equal(el('clServerHostField').hidden,true);
+assert.equal(el('abletonHostField').hidden,true);
+assert.match(el('abletonConfiguration').textContent,/Ce Mac — 127.0.0.1/);
+for(const mode of ['remote','local','remote']){
+ el('abletonMode').value=mode;
+ vm.runInContext('updateNetworkFields();renderCLServer(state)',context);
+ assert.equal(el('abletonHost').value,mode==='local'?'127.0.0.1':'ableton.local');
+ assert.match(el('abletonDraftStatus').textContent,/après Appliquer/);
+ assert.match(el('abletonConfiguration').textContent,/Ce Mac — 127.0.0.1/);
+}
+// A restart restores the saved remote profile, including when unavailable.
+state.ableton_active_mode='remote';state.ableton_config=remote;
+vm.runInContext('initializeNetworkForm(state);renderCLServer(state)',context);
+assert.equal(el('abletonHost').value,'ableton.local');
+assert.match(el('abletonConfiguration').textContent,/Connexion non vérifiée/);
+state.cl_server={mode:'manual',hostname:'server.local',address:'192.168.3.64',remote:true,validation:'Serveur CL injoignable'};
+vm.runInContext('renderCLServer(state)',context);
+assert.match(el('clServerDiagnostic').textContent,/Adresse recherchée/);
+assert.doesNotMatch(el('clServerDiagnostic').textContent,/Connexion vérifiée :/);
+assert.match(el('abletonConfiguration').textContent,/poste serveur CL/);
+assert.equal(el('abletonMode').disabled,true);
+state.server_valid=true;state.ableton_server_target=local;
+vm.runInContext('initializeNetworkForm(state);renderCLServer(state)',context);
+assert.match(el('clServerDiagnostic').textContent,/Connexion vérifiée : 192.168.3.64/);
+assert.match(el('abletonConfiguration').textContent,/Sur le Mac du moteur CL/);
+(async()=>{
+ const previous=el('clServerDiagnostic').textContent;
+ await vm.runInContext('saveCLServer()',context);
+ vm.runInContext('renderCLServer(state)',context);
+ assert.equal(el('clServerDiagnostic').textContent,previous);
+ assert.match(el('clServerApplyError').textContent,/Adresse absente/);
+ console.log('PASS: saved, draft, verified, unavailable, remote engine and failed application displays.');
+})().catch(e=>{console.error(e);process.exitCode=1});
