@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const script = fs.readFileSync('static/showcue-sessions.js', 'utf8');
-const state = {active: 'session_initiale', sessions: [{id:'session_initiale',name:'Session actuelle'}], documents: {session_initiale: {revision:6,cues:[]}}, calls:[], reloads:0};
+const state = {active: 'session_initiale', sessions: [{id:'session_initiale',name:'Session actuelle'}], documents: {session_initiale: {revision:6,cues:[]}}, calls:[], reloads:0, prepared:0, allowNavigation:true};
 function element() { return {children:[], value:'', append(...x){this.children.push(...x)}, replaceChildren(){this.children=[]}, remove(){}, closest(){return this}}; }
 function page() {
     const elements = Object.fromEntries(['cl-session-upload','cl-saved-sessions','cl-open-session','cl-import-result','cl-session-archives','cl-libraries','session'].map(id=>[id,element()]));
@@ -13,6 +13,7 @@ function page() {
         fetch: async()=>({ok:true,arrayBuffer:async()=>new Uint8Array([1,2]).buffer}),
         pywebview:{api:{recover_builder:async(_,doc)=>({ok:true,document:{...doc,cues:Array.from({length:16},(_,i)=>({id:'b'+i}))}})}}};
     context.window=context;
+    context.clBuilderLifecycle={operation:task=>task(),prepareNavigation:async()=>{state.prepared++;return state.allowNavigation}};
     context.api=async(url,options={})=>{
         state.calls.push([url,options.method]);
         if(url==='/show-info/sessions') return {ok:true,active_session_id:state.active,sessions:state.sessions};
@@ -28,9 +29,9 @@ function page() {
         if(url==='/show-info/builder/sessions/import'){
             const file=options.body.file;
             const id='session_'+file.name;
-            const item={id,name:file.name};state.sessions.push(item);
+            const item={id,name:state.renamed?'MPC (2)':file.name};state.sessions.push(item);
             state.documents[id]={revision:file.revision,cues:Array(file.count).fill({})};
-            return {ok:true,imported_session:item};
+            return {ok:true,imported_session:item,...(state.renamed?{import_result:{original_name:'MPC',renamed:true}}:{})};
         }
         if(url.endsWith('/activate')){state.active=url.split('/')[3];return {ok:true};}
         throw Error(url);
@@ -49,7 +50,15 @@ function page() {
         p=page(); await vm.runInContext(script,p.context);
     }
     assert.equal(state.reloads,2);
+    assert.equal(state.prepared,2);
+    state.allowNavigation=false;const calls=state.calls.length;
+    await p.elements['cl-open-session'].onclick();
+    assert.equal(state.calls.length,calls);
+    await p.elements['cl-session-upload'].onchange({target:{files:[{name:'Cancelled'}],value:'file'}});
+    assert(!state.sessions.some(item=>item.name==='Cancelled'));
+    state.allowNavigation=true;
     assert.equal(p.elements['cl-saved-sessions'].children.length,3);
+    assert.equal(p.elements.session.textContent,'MPC');
     p.elements['cl-saved-sessions'].value='session_OP';
     await p.elements['cl-open-session'].onclick();
     assert.equal(state.active,'session_OP');
@@ -61,5 +70,12 @@ function page() {
     const count=p.elements['cl-saved-sessions'].children.length;
     await vm.runInContext(script,p.context);
     assert.equal(p.elements['cl-saved-sessions'].children.length,count);
+    const activeBefore=state.active,reloadsBefore=state.reloads;
+    state.renamed=true;p.context.confirm=()=>false;
+    await p.elements['cl-session-upload'].onchange({target:{files:[{name:'Duplicate',revision:1,count:2}],value:'file'}});
+    assert.equal(state.active,activeBefore);assert.equal(state.reloads,reloadsBefore);
+    assert(state.sessions.some(s=>s.name==='MPC (2)'));
+    assert.match(p.elements['cl-import-result'].textContent,/Copie conservée sans ouverture/);
+    assert.match(script,/tout le serveur ShowCue/);
     console.log('PASS: legacy desktop recovery, OP/MPC import, reload, selector, empty-save guard, idempotence');
 })().catch(error=>{console.error(error);process.exitCode=1});

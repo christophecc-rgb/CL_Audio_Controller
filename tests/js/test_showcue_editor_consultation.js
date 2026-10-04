@@ -11,7 +11,7 @@ const distribution=[
  {role:'MARCEL',artist:'Cyril',active:true,equipment_slots:[{type:'MICRO',value:'SHURE BETA 58A HF #2'},{type:'MICRO',value:'DPA 4088 #2'},{type:'IEM',value:'PSM 900 #2'}],notes:''},
  {role:'AVA',artist:'Ava',active:true,equipment_slots:[{type:'MICRO',value:'DPA 4088 #4'},{type:'MICRO',value:'MICRO TABLE #10'}],notes:''},
 ];
-const cue=(number,values)=>({id:'builder_test'+number,number:String(number),timecode:'',source:'SHOWGIRL',text:'TOP DIRECTRICE',type:'TOP MUSIQUE',section:'SHOW',role:'',artist:'',microphone:'',iem:'',equipment:'',foh:true,ret:true,plt:true,lum:true,origin:'IMPORT',notes:'PDF p.2',role_assignments:{},...values});
+const cue=(number,values)=>({id:'builder_test'+number,number:String(number),timecode:'',source:'SHOWGIRL',text:'TOP DIRECTRICE',type:'TOP MUSIQUE',section:'SHOW',phase:'',role:'',artist:'',microphone:'',iem:'',equipment:'',foh:true,ret:true,plt:true,lum:true,origin:'IMPORT',notes:'PDF p.2',role_assignments:{},...values});
 const fixtures=[
  cue(48,{timecode:'02:03:40:23',role:'DIRECTRICE',microphone:'DPA 4088 #3'}),
  cue(50,{timecode:'03:03:11:19',source:'RÉVÉLATION',text:'TALK DIRECTRICE/MARCEL',type:'AUTRE',role:'MARCEL / DIRECTRICE',microphone:'DPA 4088 #1',role_assignments:{DIRECTRICE:{microphone:'DPA 4088 #3'},MARCEL:{microphone:'SHURE BETA 58A HF #2'}}}),
@@ -51,6 +51,8 @@ test('full editor: isolated save roundtrip, cancel, details, roles, filtering an
       if(req.method()==='PUT'){const body=req.postDataJSON();writes.push(structuredClone(body));document={...body.document,revision:document.revision+1};}
       return route.fulfill({json:{ok:true,session_id:'session_test',document,validation}});
     }
+    if(url.pathname==='/show-info/sessions')return route.fulfill({json:{ok:true,active_session_id:'session_test',sessions:[{id:'session_test',name:'Show de test isolé'}]}});
+    if(['/static/showcue-sessions.js','/static/showcue-lifecycle.js'].includes(url.pathname))return route.fulfill({contentType:'application/javascript',body:fs.readFileSync(path.join(root,url.pathname.slice(1)),'utf8')});
     if(url.pathname==='/show-info/builder/resources')return route.fulfill({json:{ok:true,libraries:{},sessions:[]}});
     if(url.pathname==='/assets/paradis%20latin.jpg')return route.fulfill({contentType:'image/jpeg',body:fs.readFileSync(path.join(root,'assets/paradis latin.jpg'))});
     if(url.pathname.startsWith('/static/showcue-editor.'))return route.fulfill({contentType:url.pathname.endsWith('.js')?'application/javascript':'text/css',body:fs.readFileSync(path.join(root,url.pathname.slice(1)),'utf8')});

@@ -120,6 +120,27 @@ class SessionRestorationTests(unittest.TestCase):
             sid = response.json['imported_session']['id']
             self.assertEqual(len(load_builder_document(self.root / 'Sessions' / sid / 'showcue_builder.json')['cues']), 16)
 
+    def test_reconstruction_is_reported_and_full_builder_is_never_replaced(self):
+        plain = {'cues': [{'id': 'cue_plain', 'mode': 'manual', 'section': 'Acte É',
+                          'text': 'Entrée à vérifier', 'posts': ['FOH'], 'status': 'official'}]}
+        from show_cues import save_show_document
+        save_show_document(self.initial / 'show_cues.json', plain)
+        (self.initial / 'showcue_builder.json').unlink()
+        before_show = (self.initial / 'show_cues.json').read_bytes()
+        first = self.client.get('/show-info/builder/document').json
+        self.assertEqual(first['reconstruction'], {'cues': 1, 'without_metadata': 1})
+        self.assertEqual(first['document']['cues'][0]['text'], 'Entrée à vérifier')
+        self.assertEqual(first['document']['cues'][0]['type'], 'AUTRE')
+        self.assertEqual(first['document']['cues'][0]['role'], '')
+        self.assertEqual((self.initial / 'show_cues.json').read_bytes(), before_show)
+        before_builder = (self.initial / 'showcue_builder.json').read_bytes()
+        plain['cues'][0]['text'] = 'Autre texte dans la conduite'
+        save_show_document(self.initial / 'show_cues.json', plain)
+        second = self.client.get('/show-info/builder/document').json
+        self.assertIsNone(second['reconstruction'])
+        self.assertEqual(second['document']['cues'][0]['text'], 'Entrée à vérifier')
+        self.assertEqual((self.initial / 'showcue_builder.json').read_bytes(), before_builder)
+
     def test_invalid_or_missing_registry_never_resets_existing_sessions(self):
         op = self.upload('legacy_v1.showcue')
         registry = self.root / 'sessions.json'

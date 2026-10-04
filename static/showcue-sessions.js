@@ -7,16 +7,18 @@
     const panel = document.createElement('details');
     panel.className = 'validation cl-session-panel';
     panel.open = true;
-    panel.innerHTML = '<summary>SHOWS / SESSIONS</summary><label>Show enregistré <select id="cl-saved-sessions"></select></label> <button id="cl-open-session">OUVRIR</button><hr><label>IMPORTER ET OUVRIR UN SHOW <input id="cl-session-upload" type="file" accept=".showcue,.showcue.zip"></label><div id="cl-session-archives"></div><div id="cl-libraries"></div><a href="/show-info/builder/sessions/export">EXPORTER LE SHOW ACTIF</a><div id="cl-import-result" role="status"></div>';
+    panel.innerHTML = '<summary>SHOWS / SESSIONS</summary><p id="cl-session-scope" role="status">Ouvrir un show change la session active pour tout le serveur ShowCue et ses autres fenêtres.</p><label>Show enregistré <select id="cl-saved-sessions"></select></label> <button id="cl-open-session">OUVRIR</button><hr><label>IMPORTER UNE COPIE ET L’OUVRIR <input id="cl-session-upload" type="file" accept=".showcue,.showcue.zip"></label><div id="cl-session-archives"></div><div id="cl-libraries"></div><a href="/show-info/builder/sessions/export">SAUVEGARDER LE SHOW COMPLET .showcue</a><p>CSV/XLSX : tableau du Builder. .showcue : Builder, conduite et audio référencé ; pas les réglages de la suite.</p><div id="cl-import-result" role="status"></div>';
     document.querySelector('header.top').append(panel);
     const output = document.getElementById('cl-import-result');
     const selector = document.getElementById('cl-saved-sessions');
     const request = api;
     let busy = false;
+    let lastKnownServerSession=null;
     function message(error) { output.textContent = error.message || String(error); }
     async function registry() { return request('/show-info/sessions'); }
     async function refresh() {
         const data = await registry();
+        lastKnownServerSession=data.active_session_id;
         selector.replaceChildren();
         for (const session of data.sessions) {
             const option = document.createElement('option');
@@ -25,6 +27,13 @@
             selector.append(option);
         }
         selector.value = data.active_session_id;
+        const active=data.sessions.find(item=>item.id===data.active_session_id);
+        const displayed=data.sessions.find(item=>item.id===sessionId)||active;
+        if(displayed)document.getElementById('session').textContent=displayed.name;
+        const scope=document.getElementById('cl-session-scope');
+        if(scope)scope.textContent=active&&sessionId&&active.id!==sessionId
+            ?'Le serveur utilise « '+active.name+' ». Cette fenêtre affiche « '+(displayed?.name||sessionId)+' ». Rechargez avant de continuer ; le brouillon reste conservé.'
+            :'Ouvrir un show change la session active pour tout le serveur ShowCue et ses autres fenêtres.';
         return data;
     }
     async function recover(current) {
@@ -55,7 +64,8 @@
         return request(url, options);
     };
     async function openSession(id) {
-        await request('/show-info/sessions/' + encodeURIComponent(id) + '/activate', {method: 'POST', body: '{}'});
+        await request('/show-info/sessions/' + encodeURIComponent(id) + '/activate', {method: 'POST', body: JSON.stringify({session_id:sessionId||lastKnownServerSession})});
+        window.clBuilderAllowUnload=true;
         location.reload();
     }
     async function importArchive(body) {
@@ -64,11 +74,17 @@
         output.textContent = 'Import du show…';
         try {
             await ready;
-            // Never save the currently displayed table as a side effect of importing.
+            if(!window.clBuilderLifecycle)throw Error('Protection de sauvegarde indisponible. Rechargez l’éditeur.');
+            await window.clBuilderLifecycle.operation(async()=>{
+            if(!await window.clBuilderLifecycle.prepareNavigation())return;
             const result = await request('/show-info/builder/sessions/import', {method: 'POST', body});
             await refresh();
-            output.textContent = 'Show importé : ' + result.imported_session.name;
+            output.textContent = 'Nouvelle session créée : ' + result.imported_session.name;
+            if(result.import_result?.renamed && !window.confirm('Un show nommé « '+result.import_result.original_name+' » existe déjà. La copie a été créée sous « '+result.imported_session.name+' ». Ouvrir cette copie pour tout le serveur ShowCue ?')){
+                output.textContent+=' · Copie conservée sans ouverture.';return;
+            }
             await openSession(result.imported_session.id);
+            });
         } catch (error) { message(error); }
         finally { busy = false; }
     }
@@ -80,7 +96,12 @@
     document.getElementById('cl-open-session').onclick = async () => {
         if (busy) return;
         busy = true;
-        try { await ready; await openSession(selector.value); }
+        try { await ready;
+            if(!window.clBuilderLifecycle)throw Error('Protection de sauvegarde indisponible. Rechargez l’éditeur.');
+            await window.clBuilderLifecycle.operation(async()=>{
+                if(await window.clBuilderLifecycle.prepareNavigation())await openSession(selector.value);
+            });
+        }
         catch (error) { message(error); }
         finally { busy = false; }
     };
@@ -92,9 +113,9 @@
         const restored = await recover(current);
         if (restored !== current && !preview && (!documentData.cues.length || sessionId === restored.session_id)) {
             sessionId = restored.session_id; documentData = restored.document;
-            document.getElementById('session').textContent = sessionId;
+            await refresh();
             render(); showValidation(restored.validation);
-            output.textContent = 'Builder restauré depuis la conduite : ' + restored.document.cues.length + ' cues.';
+            output.textContent = 'Builder restauré depuis la conduite : ' + restored.document.cues.length + ' cues. Les métadonnées d’origine manquantes ne peuvent pas être recréées.';
         }
         } catch (error) {
             message(error); // A failed recovery must not block importing a healthy archive.

@@ -2619,10 +2619,11 @@ body.show-mode .app{max-width:1440px;overflow-y:auto}body.show-mode .desktop-gri
         <div id="abletonLocalAddress">Ce Mac — 127.0.0.1</div>
         <div class="ports-readonly"><span>Ports AbletonOSC fixes</span><strong><span id="abletonSendPort">11000</span> → <span id="abletonReplyPort">11001</span></strong></div>
       </div>
-      <div class="ableton-discovery">
-        <label for="abletonReaders">Lecteurs Ableton détectés</label>
-        <select id="abletonReaders" onchange="selectAbletonReader(this.value)" aria-describedby="abletonDiscoveryStatus"><option value="">Recherche Bonjour…</option></select>
-        <div id="abletonDiscoveryStatus" role="status">Annonce Bonjour · connexion non validée</div>
+      <div id="abletonDiscovery" class="ableton-discovery" hidden>
+        <label for="abletonReaders">Macs Ableton détectés sur le réseau</label>
+        <select id="abletonReaders" onchange="selectAbletonReader(this.value)" aria-describedby="abletonDiscoveryStatus abletonDiscoveryHelp"><option value="">Recherche Bonjour…</option></select>
+        <div id="abletonDiscoveryStatus" role="status">Recherche Bonjour…</div>
+        <div id="abletonDiscoveryHelp" class="state-detail">La détection nécessite une annonce réseau Bonjour active. Un Mac non détecté peut avoir Ableton ouvert et rester accessible.</div>
       </div>
       <div id="abletonConfiguration" role="status"></div>
       <div id="abletonDraftStatus" role="status">Le choix devient actif après Appliquer. Tester vérifie la configuration appliquée.</div>
@@ -3086,7 +3087,15 @@ function consolePanelUnavailable(){
 async function saveCLServer(){
   const payload={cl_server:{mode:el('clServerMode').value,host:el('clServerHost').value.trim()}};
   el('clServerApplyError').textContent='Application et recherche du serveur CL…';
-  try{const response=await fetch('/network-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const r=await response.json();if(!response.ok)throw new Error(r.error);clServerDirty=false;clServerInitialized=false;networkFormInitialized=false;networkFormDirty=false;el('clServerApplyError').textContent='';await refresh();}catch(e){el('clServerApplyError').textContent='Application impossible : '+String(e);}
+  try{const response=await fetch('/network-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const r=await response.json();if(!response.ok)throw new Error(r.error);clServerDirty=false;clServerInitialized=false;networkFormInitialized=false;networkFormDirty=false;el('clServerApplyError').textContent='';await refresh();}catch(e){el('clServerApplyError').textContent=networkApplyError(e);}
+}
+function networkApplyError(error){
+  const message=String(error?.message||error||'Erreur inconnue').replace(/^Error:\s*/, '');
+  const admin=message.includes('Déverrouillage administrateur local requis');
+  const configuration=/mode configuration|mode de configuration|mode développement/i.test(message);
+  if(admin)return 'Pour modifier ce réglage, déverrouillez l’administration dans Maintenance locale.'+(configuration?' Activez aussi le mode configuration (développement).':'');
+  if(configuration)return 'Pour modifier ce réglage, activez le mode configuration (développement) dans Maintenance locale.';
+  return 'Application impossible : '+message;
 }
 function updateCLServerFields(){
   const manual=el('clServerMode').value==='manual';
@@ -3116,7 +3125,7 @@ function renderCLServer(s){
   ['Serveur recherché : '+(c.server||'—'),'Nom : '+(c.hostname||'—'),(s.server_valid?'Adresse connectée : ':'Adresse recherchée : ')+(c.address||'—'),'Découverte : '+(c.discovery||'—'),'Validation : '+(c.validation||'—'),'Réseau : '+(c.network||'—'),...(ableton?['Cible Ableton du backend actif : '+ableton]:[])].forEach(text=>{const row=document.createElement('div');row.className='diagnostic-row';const split=text.indexOf(' : ');const label=document.createElement('span'),value=document.createElement('strong');label.textContent=text.slice(0,split);value.textContent=text.slice(split+3);row.append(label,value);diagnostic.appendChild(row);});
   el('networkCard').querySelectorAll('input,select,button').forEach(node=>node.disabled=!!c.remote);
   if(!c.remote)el('abletonHost').disabled=el('abletonMode').value==='local';
-  el('abletonReaders').disabled=!!c.remote||el('abletonMode').value==='local';
+  updateAbletonDiscoveryVisibility(s);
 }
 function render(s){
   latestState=s;const card=el('systemCard'),title=el('stateTitle'),detail=el('stateDetail');
@@ -3166,7 +3175,7 @@ function renderAbletonReaders(data){
   const select=el('abletonReaders');
   select.replaceChildren();
   const placeholder=document.createElement('option');placeholder.value='';
-  placeholder.textContent=abletonReaders.length?'Choisir un lecteur…':'Aucun lecteur Ableton annoncé';
+  placeholder.textContent=abletonReaders.length?'Choisir un Mac Ableton…':'Aucun Mac Ableton détecté — saisissez son adresse manuellement';
   select.appendChild(placeholder);
   abletonReaders.forEach(reader=>{
     const option=document.createElement('option');
@@ -3176,16 +3185,16 @@ function renderAbletonReaders(data){
     option.disabled=reader.state!=='resolved'||reader.port!==11000;
     select.appendChild(option);
   });
-  select.disabled=el('abletonMode').value==='local'||Boolean(latestState?.cl_server?.remote);
-  el('abletonDiscoveryStatus').textContent=data.error?'Découverte indisponible · saisie manuelle conservée':el('abletonMode').value==='local'?'Mode Local conservé · choisir Distant pour sélectionner un lecteur':'Bonjour ≠ connexion validée · sélectionner, Appliquer, puis Tester';
-  el('abletonDiscoveryDetails').textContent='Découverte Ableton · '+data.service+' · '+abletonReaders.length+' lecteur(s) · '+(data.refreshed_at?new Date(data.refreshed_at*1000).toLocaleTimeString('fr-FR'):'—')+' · interfaces ignorées : '+((data.ignored_interfaces||[]).join(', ')||'aucune')+(data.error?' · '+data.error:'')+' · '+abletonReaders.map(r=>r.host+' / '+r.addresses.join(', ')+' / UDP '+r.port+' / '+r.interfaces.join(', ')).join(' ; ');
+  updateAbletonDiscoveryVisibility();
+  el('abletonDiscoveryStatus').textContent=data.error?'Détection Bonjour indisponible — saisissez son adresse manuellement':abletonReaders.length?'Choisissez un Mac, puis cliquez sur Appliquer et Tester la connexion.':'Aucun Mac Ableton détecté — saisissez son adresse manuellement';
+  el('abletonDiscoveryDetails').textContent='Découverte Ableton · '+data.service+' · '+abletonReaders.length+' Mac(s) · '+(data.refreshed_at?new Date(data.refreshed_at*1000).toLocaleTimeString('fr-FR'):'—')+' · interfaces ignorées : '+((data.ignored_interfaces||[]).join(', ')||'aucune')+(data.error?' · '+data.error:'')+' · '+abletonReaders.map(r=>r.host+' / '+r.addresses.join(', ')+' / UDP '+r.port+' / '+r.interfaces.join(', ')).join(' ; ');
 }
 function selectAbletonReader(key){
   const reader=abletonReaders.find(r=>r.host+':'+r.port===key);
   if(!reader||reader.state!=='resolved'||reader.port!==11000||el('abletonMode').value!=='remote'||latestState?.cl_server?.remote)return;
   el('abletonHost').value=reader.host;
   markNetworkDraftDirty();
-  el('abletonDiscoveryStatus').textContent=reader.host+' sélectionné · cliquez Appliquer, puis Tester la connexion';
+  el('abletonDiscoveryStatus').textContent='Adresse sélectionnée — cliquez sur Appliquer, puis Tester la connexion';
 }
 async function refreshAbletonReaders(){
   const controller=new AbortController();
@@ -3205,6 +3214,11 @@ async function refreshAbletonReaders(){
 function copyNetworkDraft(value,mode){
   if(!value)return mode==='local'?{name:'',host:'127.0.0.1',send_port:11000,reply_port:11001}:{name:'',host:'',send_port:11000,reply_port:11001};
   return {name:value.name||'',host:mode==='local'?'127.0.0.1':(value.host||''),send_port:Number(value.send_port),reply_port:Number(value.reply_port)};
+}
+function updateAbletonDiscoveryVisibility(s=latestState){
+  const visible=el('abletonMode').value==='remote'&&!s?.cl_server?.remote;
+  el('abletonDiscovery').hidden=!visible;
+  el('abletonReaders').disabled=!visible;
 }
 function initializeNetworkForm(s){
   networkDrafts.local=copyNetworkDraft(s.ableton_profiles.local,'local');
@@ -3234,6 +3248,7 @@ function restoreNetworkDraft(mode){
   el('abletonSendPort').textContent=draft.send_port;
   el('abletonReplyPort').textContent=draft.reply_port;
   applyNetworkCardMode(mode);
+  updateAbletonDiscoveryVisibility();
 }
 function applyNetworkCardMode(mode){const remote=mode==='remote';el('networkCard').className='card network-card '+(remote?'remote':'local');el('modeBadge').textContent=remote?'ABLETON DISTANT':'ABLETON LOCAL';}
 function updateNetworkFields(){
@@ -3249,8 +3264,8 @@ async function saveNetworkConfig(){
   captureVisibleNetworkDraft();const draft=networkDrafts[networkVisibleMode];
   const payload={mode:networkVisibleMode,name:draft.name,host:draft.host,send_port:draft.send_port,reply_port:draft.reply_port};
   el('actionStatus').textContent='Application de la configuration OSC…';
-  try{const response=await fetch('/network-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const r=await response.json();el('actionStatus').textContent=response.ok?('✓ '+r.message):('! Refus : '+(r.error||response.status));if(response.ok){networkFormInitialized=false;networkFormDirty=false;setTimeout(refresh,500);}}
-  catch(e){el('actionStatus').textContent='! '+e;}
+  try{const response=await fetch('/network-config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});const r=await response.json();el('actionStatus').textContent=response.ok?('✓ '+r.message):networkApplyError(r.error||response.status);if(response.ok){networkFormInitialized=false;networkFormDirty=false;setTimeout(refresh,500);}}
+  catch(e){el('actionStatus').textContent=networkApplyError(e);}
 }
 async function testAbletonConnection(){
   el('actionStatus').textContent='Test de connexion Ableton…';

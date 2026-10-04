@@ -329,7 +329,7 @@ class ShowCueBuilderRouteTests(unittest.TestCase):
         self.assertIn("captureBuilderTc", page.get_data(as_text=True))
         self.assertIn("autosaveTimer=setTimeout", page.get_data(as_text=True))
         self.assertIn("},750);", page.get_data(as_text=True))
-        self.assertIn("MODIFICATIONS…", page.get_data(as_text=True))
+        self.assertIn("MODIFICATIONS EN COURS", page.get_data(as_text=True))
         self.assertIn("ERREUR DE SAUVEGARDE", page.get_data(as_text=True))
         self.assertNotIn("setInterval", page.get_data(as_text=True))
         self.assertNotIn("AbletonOSC", page.get_data(as_text=True))
@@ -366,6 +366,24 @@ class ShowCueBuilderRouteTests(unittest.TestCase):
         csv_response = self.client.get("/show-info/builder/export.csv")
         self.assertEqual(csv_response.status_code, 200)
         self.assertIn("ROXY — TEST EAR", csv_response.data.decode("utf-8-sig"))
+
+    def test_exports_have_download_headers_and_reject_stale_session_or_revision(self):
+        saved = self.client.put("/show-info/builder/document", json={
+            "session_id": self.session_id, "document": sample_document()}).get_json()
+        revision = saved["document"]["revision"]
+        for route, suffix in [("export.csv", ".csv"), ("export.xlsx", ".xlsx"), ("sessions/export", ".showcue")]:
+            url = "/show-info/builder/" + route
+            with self.subTest(route=route):
+                response = self.client.get(url, query_string={"session_id": self.session_id, "revision": revision})
+                self.assertEqual(response.status_code, 200)
+                self.assertIn("attachment;", response.headers["Content-Disposition"])
+                self.assertIn(suffix, response.headers["Content-Disposition"])
+                if suffix == ".csv":
+                    self.assertEqual(response.headers["Content-Type"], "text/csv; charset=utf-8")
+                self.assertIn("no-store", response.headers["Cache-Control"])
+                self.assertEqual(response.headers["X-Content-Type-Options"], "nosniff")
+                for query in [{"session_id": "other", "revision": revision}, {"session_id": self.session_id, "revision": revision-1}]:
+                    self.assertEqual(self.client.get(url, query_string=query).status_code, 409)
 
     def test_stale_session_cannot_overwrite_builder(self):
         response = self.client.put("/show-info/builder/document", json={

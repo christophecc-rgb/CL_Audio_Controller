@@ -1,4 +1,4 @@
-"""One portable .showcue.zip envelope around existing ShowCue documents."""
+"""One portable .showcue/.showcue.zip envelope around existing ShowCue documents."""
 import io
 import json
 import shutil
@@ -43,12 +43,19 @@ def export_session(root, registry, session_id):
             audio = cue.get('audio')
             if audio:
                 path = directory / 'show_cues_audio' / audio['filename']
-                if path.is_file() and 'show_cues_audio/' + path.name not in archive.namelist():
+                if not path.is_file():
+                    raise ValueError('Sauvegarde du show impossible : audio référencé absent — ' + path.name)
+                if 'show_cues_audio/' + path.name not in archive.namelist():
                     archive.write(path, 'show_cues_audio/' + path.name)
-    return output.getvalue()
+        if len(archive.infolist()) > 10000 or sum(item.file_size for item in archive.infolist()) > MAX_ARCHIVE_BYTES:
+            raise ValueError('Archive trop volumineuse pour être réimportée')
+    payload = output.getvalue()
+    if len(payload) > MAX_ARCHIVE_BYTES:
+        raise ValueError('Archive trop volumineuse pour être réimportée')
+    return payload
 
 
-def import_session(data, root, registry):
+def import_session(data, root, registry, *, report=None):
     if len(data) > MAX_ARCHIVE_BYTES:
         raise ValueError('Archive trop volumineuse')
     root = Path(root)
@@ -100,4 +107,6 @@ def import_session(data, root, registry):
             if destination.exists():
                 shutil.rmtree(destination)
             raise
+    if report is not None:
+        report.update(original_name=base, assigned_name=name, renamed=name != base)
     return updated

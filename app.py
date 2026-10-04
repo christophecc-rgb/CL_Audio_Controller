@@ -4378,7 +4378,14 @@ def showcue_session_export():
     from flask import send_file
     with SHOW_CUES_LOCK:
         registry, _, _ = ensure_show_cue_storage()
-        data = export_session(SHOW_CUES_DATA_DIRECTORY, registry, registry["active_session_id"])
+        try:
+            _, builder_path = active_builder_path(request.args if request.args else None)
+            builder = load_builder_document(builder_path)
+            if request.args.get("revision") is not None and int(request.args["revision"]) != builder["revision"]:
+                raise RuntimeError("Document Builder modifié. Relancez l’export après sauvegarde.")
+            data = export_session(SHOW_CUES_DATA_DIRECTORY, registry, registry["active_session_id"])
+        except (RuntimeError, ValueError) as exc:
+            return jsonify(ok=False, message=str(exc)), 409
     active_id = registry["active_session_id"]
     active = next(
         (item for item in registry["sessions"] if item["id"] == active_id),
@@ -4390,12 +4397,15 @@ def showcue_session_export():
         for char in export_name
     ).strip() or active_id
 
-    return send_file(
+    response = send_file(
         io.BytesIO(data),
         mimetype="application/zip",
         as_attachment=True,
         download_name=export_name + ".showcue",
     )
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 
@@ -4461,8 +4471,9 @@ def showcue_session_import():
                 data = stream.read(MAX_ARCHIVE_BYTES + 1)
         with SHOW_CUES_LOCK:
             registry, _, _ = ensure_show_cue_storage()
-            registry = import_session(data, SHOW_CUES_DATA_DIRECTORY, registry)
-        return jsonify({"ok": True, **registry, "imported_session": registry["sessions"][-1]}), 201
+            report = {}
+            registry = import_session(data, SHOW_CUES_DATA_DIRECTORY, registry, report=report)
+        return jsonify({"ok": True, **registry, "imported_session": registry["sessions"][-1], "import_result": report}), 201
     except (OSError, ValueError) as exc:
         return jsonify({"ok": False, "message": str(exc)}), 400
 
@@ -4563,10 +4574,19 @@ def show_info_builder_document():
     try:
         with SHOW_CUES_LOCK:
             registry, path = active_builder_path()
+            before = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+            had_cues = bool(before.get("cues")) if isinstance(before, dict) else False
             document = load_builder_document(path)
+            reconstruction = None
+            if not had_cues and document["cues"]:
+                source = load_show_document(path.parent / "show_cues.json")
+                reconstruction = {"cues": len(document["cues"]),
+                                  "without_metadata": sum(not cue.get("builder") for cue in source["cues"])}
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         return jsonify({"ok": False, "message": str(exc)}), 500
     return jsonify({"ok": True, "session_id": registry["active_session_id"],
+                    "reconstruction": reconstruction,
+                    "session_name": next(item["name"] for item in registry["sessions"] if item["id"] == registry["active_session_id"]),
                     "document": resolved_builder_document(document),
                     "sections": showcue_sections([], document),
                     "validation": validate_builder_document(document)})
@@ -4788,8 +4808,10 @@ def show_info_import_builder_pdf():
 def show_info_export_builder(format_name):
     try:
         with SHOW_CUES_LOCK:
-            _, path = active_builder_path()
+            _, path = active_builder_path(request.args if request.args else None)
             document = load_builder_document(path)
+            if request.args.get("revision") is not None and int(request.args["revision"]) != document["revision"]:
+                raise RuntimeError("Document Builder modifié. Relancez l’export après sauvegarde.")
 
             # Synchronise le TC du Builder avec la conduite officielle.
             _, cue_path, _ = ensure_show_cue_storage()
@@ -4844,10 +4866,14 @@ def show_info_export_builder(format_name):
             payload, mime = export_csv(document), "text/csv; charset=utf-8"
         else:
             return jsonify({"ok": False, "message": "Format inconnu"}), 404
+    except RuntimeError as exc:
+        return jsonify(ok=False, message=str(exc)), 409
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         return jsonify({"ok": False, "message": str(exc)}), 500
-    response = app.response_class(payload, mimetype=mime)
+    response = app.response_class(payload, content_type=mime)
     response.headers["Content-Disposition"] = f'attachment; filename="ShowCue_Builder.{format_name}"'
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
     return response
 
 
@@ -5152,7 +5178,12 @@ def show_info_activate_session(session_id):
     try:
         with SHOW_CUES_LOCK:
             registry, _, _ = ensure_show_cue_storage()
+            values = request.get_json(silent=True) or {}
+            if "session_id" in values:
+                require_active_show_session(values, registry)
             registry = activate_show_cue_session(SHOW_CUES_DATA_DIRECTORY, registry, session_id)
+    except RuntimeError as exc:
+        return jsonify(ok=False, message=str(exc)), 409
     except KeyError:
         return jsonify({"ok": False, "message": "Session inconnue"}), 404
     except (OSError, ValueError, json.JSONDecodeError) as exc:
