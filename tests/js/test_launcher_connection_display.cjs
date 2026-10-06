@@ -6,7 +6,12 @@ const nodes=new Map();
 const el=id=>{if(!nodes.has(id))nodes.set(id,{value:'',textContent:'',hidden:false,disabled:false,children:[],replaceChildren(){this.children=[]},appendChild(n){this.children.push(n)},append(){},querySelectorAll(){return [el('abletonHost'),el('abletonMode'),el('abletonReaders')]}});return nodes.get(id)};
 let refusal='Adresse absente';
 const context=vm.createContext({el,document:{createElement:()=>({append(){}})},fetch:async()=>({ok:false,json:async()=>({error:refusal})})});
-vm.runInContext('let latestState,clServerDirty=false,clServerInitialized=false,networkFormInitialized=false,networkFormDirty=false,networkDrafts={},networkVisibleMode;'+section('async function saveCLServer(){','function render(s){')+section('function copyNetworkDraft(','async function testAbletonConnection()'),context);
+vm.runInContext('let latestState,clServerDirty=false,clServerInitialized=false,networkFormInitialized=false,networkFormDirty=false,networkDrafts={},networkVisibleMode;'+section('let abletonReaders=[];', 'function renderAbletonReaders(data){')+section('async function saveCLServer(){','function render(s){')+section('function copyNetworkDraft(','async function testAbletonConnection()'),context);
+vm.runInContext("abletonReaders=[{host:'MacBook-Pro.local.',addresses:['192.168.1.138']}]; localBonjourName='MacChris.local';",context);
+assert.equal(vm.runInContext("abletonDisplayHost('192.168.1.138')",context),'MacBook-Pro.local');
+assert.equal(vm.runInContext("abletonDisplayHost('127.0.0.1')",context),'MacChris.local');
+assert.equal(vm.runInContext("abletonDisplayHost('192.168.1.222')",context),'192.168.1.222');
+vm.runInContext("abletonReaders=[]; localBonjourName='Ce Mac';",context);
 const local={mode:'local',host:'127.0.0.1',send_port:11000,reply_port:11001};
 const remote={...local,mode:'remote',host:'ableton.local'};
 const state={cl_server:{mode:'local',remote:false},ableton_profiles:{local,remote},ableton_active_mode:'local',ableton_config:local};
@@ -14,13 +19,13 @@ context.state=state;
 vm.runInContext('initializeNetworkForm(state);renderCLServer(state)',context);
 assert.equal(el('clServerHostField').hidden,true);
 assert.equal(el('abletonHostField').hidden,true);
-assert.match(el('abletonConfiguration').textContent,/Ce Mac — 127.0.0.1/);
+assert.match(el('abletonConfiguration').textContent,/Ce Mac/);
 for(const mode of ['remote','local','remote']){
  el('abletonMode').value=mode;
  vm.runInContext('updateNetworkFields();renderCLServer(state)',context);
  assert.equal(el('abletonHost').value,mode==='local'?'127.0.0.1':'ableton.local');
  assert.match(el('abletonDraftStatus').textContent,/après Appliquer/);
- assert.match(el('abletonConfiguration').textContent,/Ce Mac — 127.0.0.1/);
+ assert.match(el('abletonConfiguration').textContent,/Ce Mac/);
 }
 // A restart restores the saved remote profile, including when unavailable.
 state.ableton_active_mode='remote';state.ableton_config=remote;
@@ -35,8 +40,8 @@ assert.match(el('abletonConfiguration').textContent,/poste serveur CL/);
 assert.equal(el('abletonMode').disabled,true);
 state.server_valid=true;state.ableton_server_target=local;
 vm.runInContext('initializeNetworkForm(state);renderCLServer(state)',context);
-assert.match(el('clServerDiagnostic').textContent,/Connexion vérifiée : 192.168.3.64/);
-assert.match(el('abletonConfiguration').textContent,/Sur le Mac du moteur CL/);
+assert.match(el('clServerDiagnostic').textContent,/Connexion vérifiée : server.local/);
+assert.match(el('abletonConfiguration').textContent,/server.local/);
 (async()=>{
  const previous=el('clServerDiagnostic').textContent;
  await vm.runInContext('saveCLServer()',context);

@@ -44,14 +44,18 @@
   };
   document.addEventListener('DOMContentLoaded', () => {
     const zone = document.createElement('div'); zone.id = 'cl-remote-security-status';
-    zone.style.cssText = 'font:12px system-ui;padding:8px;border:1px solid #535b69;border-radius:6px;margin:5px;color:inherit';
+    zone.style.cssText = 'font:11px system-ui;padding:6px 8px;border:1px solid #535b69;border-radius:6px;margin:8px 5px 5px;color:inherit;text-align:center;line-height:1.4;overflow-wrap:anywhere';
     const paired = credential();
     zone.textContent = paired ? 'Télécommande appairée — vérification…' : 'Télécommandes : appairage requis pour le contrôle distant';
     if (['localhost','127.0.0.1','[::1]'].includes(location.hostname)) {
       const link = document.createElement('a'); link.href='/security/panel'; link.target='_blank';
       link.textContent=' — Gérer / QR / Désarmer'; zone.append(link);
     }
-    document.body.prepend(zone);
+    // Shared by mobile and desktop remotes: keep administration beside
+    // the product baseline instead of above the playback controls.
+    const footer = document.querySelector('footer.v2-statusbar');
+    if (footer) footer.before(zone);
+    else document.body.append(zone);
     if (paired) {
       const heartbeat = async () => {
         try {

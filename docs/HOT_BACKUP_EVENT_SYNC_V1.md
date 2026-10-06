@@ -1,3 +1,21 @@
+## Vérification réelle du 6 octobre 2026
+
+Le journal AbletonOSC du principal montre que les lancements immédiats peuvent notifier uniquement `is_triggered=False` après l’état initial False. Le filtre accepte désormais cette notification de fin ; un True suivi de False ne produit qu’une copie. Le rafraîchissement des écouteurs de clips ne supprime plus ceux du suivi backup.
+
+Après installation, un essai OSC directement vers Live principal (sans `/action` CL) a fait passer `direct_launches` de 0 à 1 et `sent` de 0 à 1. L’arrêt direct a porté `sent` à 2, sans événement perdu et avec BACKUP ONLINE. Cela confirme la détection et l’envoi UDP, pas à lui seul le démarrage audio ni son timing sur le distant. Confirmation visuelle du distant encore requise.
+
+# Extension du 6 octobre 2026 : suivi direct des scènes Session
+
+Le mode Hot Backup suit désormais les événements `Scene.is_triggered` du PRIMARY via AbletonOSC, ainsi que son passage de lecture à arrêt. Les scripts USB Lio Box restent inchangés. Le premier état de chaque abonnement ne déclenche aucune commande. Les notifications sont filtrées par adresse PRIMARY, token d’abonnement et génération du Set. Les clips individuels ne déclenchent pas de copie de scène.
+
+Un lancement Session effectué par CL est marqué avant son envoi au PRIMARY. Sa confirmation est consommée sans lancer une deuxième fois le BACKUP (intention bornée à 30 secondes). Un nouveau déclenchement de la même scène après retour de `is_triggered` à faux peut être reproduit. L’arrêt est idempotent ; une confirmation de Stop CL peut envoyer un second Stop, jamais un GO. Les erreurs BACKUP restent isolées de PRIMARY.
+
+Cette extension n’inclut pas la navigation de molette, la reprise directe après Pause, les déplacements en Arrangement ni une poursuite continue. Après un changement de Set, réarmer à l’arrêt. L’observation réseau ajoute un délai ; la quantification du BACKUP et le timing audio nécessitent un essai réel, sans garantie de synchronisation à l’échantillon.
+
+Validation : 195 tests et 22 sous-tests réussis, 1 test ignoré, sur les suites de suivi Session, Hot Backup, transactions et génération de Set. La configuration de sécurité des tests est isolée. Le protocole de lancement réel sur deux Macs reste à vérifier.
+
+Le document V1 ci-dessous décrit le périmètre initial, désormais étendu pour les scènes Session directes et l’arrêt.
+
 # Hot Backup V1 — événements Show Control, PRIMARY indépendant
 
 Implémentation du 30 septembre 2026. Le périmètre V1 retenu après l'audit est
@@ -188,3 +206,15 @@ ultérieur du code plutôt que remplacer globalement les fichiers déjà modifi�
 - `docs/HOT_BACKUP_EVENT_SYNC_V1.md` : cette procédure.
 
 Aucun reset, aucun commit, aucune activation sur les deux Lives depuis ces outils.
+
+## Activation dans Show Control
+
+Le panneau Synchronisation / Hot Backup propose « Activer le suivi à l'arrêt » et « Désactiver le suivi ». L'activation exige un principal arrêté et prêt, une adresse backup distincte, ainsi que les confirmations EXT OFF et mêmes sets / cartes de tempo. Elle prépare le suivi ; elle ne lance pas la lecture à elle seule. Le prochain lancement pris en charge du principal est copié au backup. La désactivation coupe la copie des commandes sans arrêter la lecture déjà engagée. Après redémarrage de Show Control, le suivi doit être réactivé.
+
+## Traitement OSC à 20 ms
+
+L'extension `INSTALLER_AbletonOSC/cl_fast_poll.py` utilise le timer natif de Live sur le thread qui l'a créée. Le polling habituel reste présent comme secours. Une erreur de traitement ou un callback sur un autre thread désactive le timer rapide ; la déconnexion de la surface de contrôle l'arrête également. Aucun thread de travail n'appelle l'API Live.
+
+Installation, Live fermé : `python3 install_fast_poll.py --target /chemin/AbletonOSC`. L'installateur conserve `manager.py.before-cl-fast-poll`. Restauration : même commande avec `--restore`, puis redémarrage de Live. Un fichier `.cl-fast-poll-disabled` dans le dossier AbletonOSC permet également de désactiver le rapide au prochain démarrage. Le premier déploiement validé concerne le backup distant ; le script LioBox et le Live principal ne sont pas modifiés.
+
+La courte comparaison CPU et les essais utilisateur sont concluants, mais ne constituent pas une validation de stabilité en longue exploitation. Voir `HOT_BACKUP_TIMING_2026-10-06.md`.

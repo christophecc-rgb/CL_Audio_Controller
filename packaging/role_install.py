@@ -49,6 +49,8 @@ def manifest(role, features=(), custom=()):
         if set(custom) - catalog['components'].keys():
             raise ValueError('Composant personnalisé inconnu')
         result['components'] = list(dict.fromkeys(custom))
+        if {'showcue', 'cue_editor'} & set(custom) and 'show_control' not in result['components']:
+            result['components'].insert(0, 'show_control')
     for feature in features:
         option = catalog['optional_features'][feature]
         if role not in option['roles']:

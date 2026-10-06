@@ -148,6 +148,7 @@ def test_actual_go_handoff_does_not_wait_for_backup_network():
                             type_ignores=[])), '<GO integration>', 'exec'), scope)
     try:
         started = time.monotonic()
+        scope['backup_scene_follow'] = Mock()
         assert scope['execute_go_transaction']('test-go', 1, 1)[0]
         assert time.monotonic() - started < .05
         assert sock.entered.wait(1)

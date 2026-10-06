@@ -14,11 +14,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def browse(name, index=4, action='Add'):
-    return f'12:00:00.000 {action} 2 {index} local. _cl-ableton._udp. {name}\n'
+    return f' 0:25:26.135 {action} 2 {index} local. _cl-ableton._udp. {name}\n'
 
 
 def address(host, ip, index=4, action='Add'):
-    return f'12:00:00.000 {action} 2 {index} {host}. {ip} 120\n'
+    return f' 0:25:26.135 {action} 2 {index} {host}. {ip} 120\n'
 
 
 class DiscoveryTests(unittest.TestCase):
@@ -88,12 +88,17 @@ class DiscoveryTests(unittest.TestCase):
         route = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'ableton_discovery_status')
         app = Flask(__name__)
         cache = discovery.DiscoveryCache(lambda: {'readers': []})
-        scope = {'app': app, 'jsonify': jsonify, 'ableton_discovery_cache': cache}
+        import subprocess
+        from types import SimpleNamespace
+        scope = {'app': app, 'jsonify': jsonify, 'ableton_discovery_cache': cache,
+                 'subprocess': SimpleNamespace(run=lambda *args, **kwargs: SimpleNamespace(stdout='Fixture-Mac'), TimeoutExpired=subprocess.TimeoutExpired),
+                 'socket': SimpleNamespace(gethostname=lambda: 'Fixture-Mac.local')}
         exec(compile(ast.Module(body=[route], type_ignores=[]), '<route>', 'exec'), scope)
         response = app.test_client().get('/api/ableton-discovery')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.headers['Cache-Control'], 'no-store')
         self.assertEqual(response.json['readers'], [])
+        self.assertEqual(response.json['local_host'], 'Fixture-Mac.local')
 
 
 

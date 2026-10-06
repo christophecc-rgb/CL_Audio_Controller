@@ -279,7 +279,7 @@ def test_explicit_settings_route_no_transport_commands(monkeypatch):
         assert response.status_code == 200
         assert b.config.mode == 'hot_backup' and b.config.expected_tempo == 120
         assert b.events.empty()
-        send.assert_not_called()
+        assert all('/start_listen/' in call.args[0] or '/stop_listen/' in call.args[0] for call in send.call_args_list)
         assert client.post('/api/hot-backup', json={'mode': 'mtc'}).json['mode'] == 'mtc'
 
 

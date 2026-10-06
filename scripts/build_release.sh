@@ -424,6 +424,13 @@ codesign --force --deep --sign - "$KIT_ROOT/CL MIDI Network Manager.app"
 git -C "$ABLETONOSC_ROOT" archive --format=tar HEAD |
   tar -xf - -C "$KIT_ROOT/AbletonOSC CL/AbletonOSC"
 
+# Inclure les extensions CL validées même si le dépôt AbletonOSC voisin
+# ne les contient pas encore dans son dernier commit.
+"$CL_PYTHON" "$PROJECT_ROOT/INSTALLER_AbletonOSC/install_bonjour.py" \
+  --target "$KIT_ROOT/AbletonOSC CL/AbletonOSC"
+"$CL_PYTHON" "$PROJECT_ROOT/INSTALLER_AbletonOSC/install_fast_poll.py" \
+  --target "$KIT_ROOT/AbletonOSC CL/AbletonOSC"
+
 cp "$PACKAGING_SOURCE/Installer_CL_Audio_Controller.command" "$KIT_ROOT/Installer la Suite CL.command"
 cp "$PACKAGING_SOURCE/Verifier_SHA256.command" "$KIT_ROOT/"
 cp "$PACKAGING_SOURCE/INSTALLATION_NOUVEAU_MAC.txt" "$KIT_ROOT/LISEZ_MOI_INSTALLATION.txt"

@@ -241,6 +241,36 @@
         "Local Network",
         "MIDI/IAC"
       ]
+    },
+    "showcue": {
+      "source": "Applications/CL ShowCue.app",
+      "target": "Applications/CL ShowCue.app",
+      "owner": "interactive",
+      "dependencies": [
+        "CL Show Control local"
+      ],
+      "network_transports": [
+        "http"
+      ],
+      "ports": [
+        "5050/TCP loopback"
+      ],
+      "permissions": []
+    },
+    "cue_editor": {
+      "source": "Applications/CL Cue Editor.app",
+      "target": "Applications/CL Cue Editor.app",
+      "owner": "interactive",
+      "dependencies": [
+        "CL Show Control local"
+      ],
+      "network_transports": [
+        "http"
+      ],
+      "ports": [
+        "5050/TCP loopback"
+      ],
+      "permissions": []
     }
   },
   "roles": {
@@ -248,6 +278,8 @@
       "role": "show_server",
       "components": [
         "show_control",
+        "showcue",
+        "cue_editor",
         "network_manager",
         "network_tools"
       ],
@@ -280,6 +312,8 @@
       ],
       "visible_tools": [
         "show_control",
+        "showcue",
+        "cue_editor",
         "network_manager",
         "network_tools"
       ],
@@ -339,6 +373,7 @@
       "forbidden_components": [
         "analyzer",
         "control_client",
+        "cue_editor",
         "mtc_bridge",
         "network_manager",
         "network_tools",
@@ -347,6 +382,7 @@
         "rtp_diagnostic",
         "show_backup",
         "show_control",
+        "showcue",
         "sync_meter"
       ],
       "forbidden_services": [
@@ -384,6 +420,7 @@
         "absolute_mtc",
         "analyzer",
         "control_client",
+        "cue_editor",
         "live_devices",
         "network_manager",
         "network_tools",
@@ -391,7 +428,8 @@
         "rtp_agent",
         "rtp_diagnostic",
         "show_backup",
-        "show_control"
+        "show_control",
+        "showcue"
       ],
       "forbidden_services": [
         "com.claudio.midi-network-monitor",
@@ -428,6 +466,7 @@
         "ableton_osc",
         "absolute_mtc",
         "analyzer",
+        "cue_editor",
         "live_devices",
         "mtc_bridge",
         "network_manager",
@@ -437,6 +476,7 @@
         "rtp_diagnostic",
         "show_backup",
         "show_control",
+        "showcue",
         "sync_meter"
       ],
       "forbidden_services": [
@@ -475,6 +515,7 @@
         "absolute_mtc",
         "analyzer",
         "control_client",
+        "cue_editor",
         "live_devices",
         "mtc_bridge",
         "network_manager",
@@ -483,6 +524,7 @@
         "rtp_agent",
         "rtp_diagnostic",
         "show_control",
+        "showcue",
         "sync_meter"
       ],
       "forbidden_services": [
@@ -531,11 +573,13 @@
         "ableton_osc",
         "absolute_mtc",
         "control_client",
+        "cue_editor",
         "live_devices",
         "mtc_bridge",
         "rtp_agent",
         "show_backup",
         "show_control",
+        "showcue",
         "sync_meter"
       ],
       "forbidden_services": [
@@ -558,6 +602,7 @@
         "absolute_mtc",
         "analyzer",
         "control_client",
+        "cue_editor",
         "live_devices",
         "mtc_bridge",
         "network_manager",
@@ -567,6 +612,7 @@
         "rtp_diagnostic",
         "show_backup",
         "show_control",
+        "showcue",
         "sync_meter"
       ],
       "forbidden_services": [

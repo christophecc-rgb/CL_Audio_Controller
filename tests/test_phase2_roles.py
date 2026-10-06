@@ -205,3 +205,25 @@ def test_local_component_still_required_verified_copied_and_removed(tmp_path):
     assert json.loads(engine.record.read_text())['installed_paths'] == [str(target)]
     assert engine.uninstall(m)['removed_components'] == ['network_manager']
     assert not target.exists()
+
+
+def test_show_server_installs_cue_apps_and_custom_keeps_local_engine(tmp_path):
+    server = manifest('show_server')
+    assert {'show_control', 'showcue', 'cue_editor'} <= set(server['components'])
+    m = manifest('custom', custom=['showcue', 'cue_editor'])
+    assert set(m['components']) == {'show_control', 'showcue', 'cue_editor'}
+    kit = tmp_path / 'kit'
+    home = tmp_path / 'home'
+    for item in m['component_details'].values():
+        source = kit / item['source']
+        source.mkdir(parents=True)
+        (source / 'fixture').write_text(item['source'])
+    sessions = home / 'Library/Application Support/CL Audio Show Control/ShowCue/sessions.json'
+    sessions.parent.mkdir(parents=True)
+    sessions.write_text('user shows preserved')
+    engine = RoleInstaller(home, kit)
+    assert engine.install(m, 'migrate')['ok']
+    for item in m['component_details'].values():
+        assert (engine.target(item) / 'fixture').read_text() == item['source']
+    engine.uninstall(m)
+    assert sessions.read_text() == 'user shows preserved'

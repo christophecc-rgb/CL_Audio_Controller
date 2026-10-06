@@ -52,6 +52,7 @@ import socket
 from pythonosc import udp_client
 from osc_transport import OSCTransport
 from hot_backup_sync import HotBackup
+from backup_scene_follow import BackupSceneFollow
 from scene_backup_udp import SceneBackupUDP
 from runtime_identity import runtime_identity
 from security_http import attach_security, start_remote_tls
@@ -1417,6 +1418,7 @@ _NOT_RECEIVED = object()
 _playing_listener_generation: Optional[int] = None
 _playing_listener_token: Optional[str] = None
 _playing_listener_tracks: Dict[int, Optional[int]] = {}
+backup_scene_follow = BackupSceneFollow()
 _playing_listener_install_lock = threading.Lock()
 _playing_listener_shutdown = False
 
@@ -1869,6 +1871,57 @@ def generation_log(event: str, **details: Any) -> None:
     print(f"[SET_GENERATION] {event}{' ' + suffix if suffix else ''}", flush=True)
 
 
+def stop_backup_scene_follow_locked():
+    token = backup_scene_follow.token
+    scenes = tuple(backup_scene_follow.values)
+    backup_scene_follow.reset()
+    if token:
+        ableton_transport.send("/live/song/stop_listen/is_playing", token)
+        for scene in scenes:
+            ableton_transport.send("/live/scene/stop_listen/is_triggered", scene, token)
+
+
+def start_backup_scene_follow():
+    with lock:
+        stop_backup_scene_follow_locked()
+        if hot_backup_generation != state.get("set_generation") or not state.get("set_ready"):
+            return
+        token = f"{SERVER_INSTANCE_ID}:backup-scene:{uuid.uuid4()}"
+        backup_scene_follow.reset(token, state.get("scenes", {}))
+        ableton_transport.send("/live/song/start_listen/is_playing", token)
+        for scene in backup_scene_follow.values:
+            if ableton_transport.send("/live/scene/start_listen/is_triggered", scene, token) is False:
+                stop_backup_scene_follow_locked()
+                return
+
+
+def receive_backup_transport_event(args, source_host=None):
+    if len(args) != 2:
+        return
+    token, playing = args
+    with lock:
+        if (source_host == ableton_transport.resolved_host
+                and hot_backup_generation == state.get("set_generation")
+                and state.get("set_ready")
+                and backup_scene_follow.receive_transport_stop(token, playing)):
+            copy_to_backup("/live/song/stop_playing")
+
+
+def receive_backup_scene_trigger(args, source_host=None):
+    if len(args) != 3:
+        return
+    scene, token, triggered = args
+    if type(scene) is not int or not isinstance(token, str):
+        return
+    with lock:
+        if (source_host != ableton_transport.resolved_host
+                or hot_backup_generation != state.get("set_generation")
+                or not state.get("set_ready")):
+            return
+        if backup_scene_follow.receive(scene, token, triggered):
+            copy_to_backup("/live/scene/fire", scene)
+
+
 def stop_playing_scene_listeners_locked() -> None:
     """Invalidate callbacks before removing this process's subscriptions."""
     global _playing_listener_generation, _playing_listener_token
@@ -1886,6 +1939,7 @@ def stop_playing_scene_listeners() -> None:
     global _playing_listener_shutdown
     with lock:
         _playing_listener_shutdown = True
+        stop_backup_scene_follow_locked()
         stop_playing_scene_listeners_locked()
 
 
@@ -2030,6 +2084,7 @@ def reset_live_set_state_locked(set_id: Optional[str], reason: str) -> int:
     """Ouvre atomiquement une génération et efface tout état propre au Set précédent."""
     global _track_count_cache, _cue_points_cache, _bootstrap_generation, _selected_duration_request
 
+    stop_backup_scene_follow_locked()
     stop_playing_scene_listeners_locked()
     previous_generation = int(state.get("set_generation", 0))
     previous_set_id = state.get("current_set_id")
@@ -2137,6 +2192,12 @@ def start_midi_expected_udp_listener():
 
 
 def osc_reply(address, *args, source_host=None):
+    if address == "/live/song/get/is_playing" and len(args) == 2:
+        receive_backup_transport_event(args, source_host)
+        return
+    if address == "/live/scene/get/is_triggered":
+        receive_backup_scene_trigger(args, source_host)
+        return
     if address == "/live/track/get/playing_slot_index":
         receive_playing_slot_event(args, source_host=source_host)
         return
@@ -2389,6 +2450,13 @@ def hot_backup_settings():
     global hot_backup_generation
     if request.method == "GET":
         result = hot_backup.snapshot()
+        with lock:
+            result["live_scene_follow"] = {
+                "active": bool(backup_scene_follow.token),
+                "subscribed_scenes": len(backup_scene_follow.values),
+                "direct_launches": backup_scene_follow.forwarded,
+                "cl_confirmations_ignored": backup_scene_follow.suppressed_cl,
+            }
         if result["mode"] == "hot_backup" and hot_backup_generation != state.get("set_generation"):
             result.update(state="NOT READY", detail="Set PRIMARY changé : réarmer à l'arrêt")
         return jsonify(result)
@@ -2398,6 +2466,8 @@ def hot_backup_settings():
         if mode == "mtc":
             hot_backup.configure("mtc")
             hot_backup_generation = None
+            with lock:
+                stop_backup_scene_follow_locked()
         elif mode == "hot_backup":
             if data.get("ext_off") is not True or data.get("same_set") is not True:
                 raise ValueError("Confirmer EXT OFF et les mêmes sets / cartes de tempo")
@@ -2422,6 +2492,7 @@ def hot_backup_settings():
                 raise ValueError("Set PRIMARY changé pendant la préparation")
             hot_backup.configure(mode, host, name, tempo)
             hot_backup_generation = generation
+            start_backup_scene_follow()
         else:
             raise ValueError("Mode invalide")
     except (ValueError, OSError, TypeError) as exc:
@@ -7744,6 +7815,8 @@ def execute_go_transaction(request_id: str, expected_generation: int, scene_numb
             record_go_midi_expectations(scene_index, intent_started_at)
 
             # Le lancement utilise l'index de la transaction, jamais selected_scene.
+            with lock:
+                backup_scene_follow.note_cl_launch(scene_index)
             send("/live/scene/fire_as_selected", scene_index)
 
             # Human-facing scene number for CL Show Backup:

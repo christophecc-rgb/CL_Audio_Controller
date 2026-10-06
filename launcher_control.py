@@ -17,7 +17,7 @@ from pathlib import Path
 from flask import Flask, jsonify, render_template_string, request, send_file
 from build_identity import BUILD_ID, IDENTITY_PROTOCOL_VERSION, SERVICE_NAME
 from runtime_identity import runtime_identity
-from security_http import attach_security
+from security_http import attach_security, local_request
 from ableton_targets import (
     AbletonTargetError,
     load_profiles,
@@ -2362,6 +2362,7 @@ body.show-mode .console-title{
   align-items:center;
 }
 .server-access-url{
+  grid-row:1;
   grid-column:1 / -1;
   min-width:0;
   width:100%;
@@ -2378,6 +2379,7 @@ body.show-mode .console-title{
   box-sizing:border-box;
 }
 .server-access-row button{
+  grid-row:2;
   min-height:30px;
   padding:0 11px;
   font-size:11px;
@@ -2385,6 +2387,12 @@ body.show-mode .console-title{
 .server-access-row button:first-of-type{
   grid-column:2;
 }
+.server-access-row button:last-of-type{grid-column:3}
+#cl-sync-settings{font-family:inherit;font-size:12px;line-height:1.4}
+#cl-sync-settings label,#cl-sync-settings small,#cl-backup-current,#cl-backup-status,#cl-backup-name{font-family:inherit;font-size:12px;line-height:1.4}
+#cl-sync-settings small{display:block;margin-top:6px}
+#cl-sync-settings button,#cl-sync-settings select,#cl-sync-settings input{font-family:inherit;font-size:12px}
+#cl-backup-status{margin-top:6px}
 .server-mtc-row{
   margin-top:14px;
 }
@@ -2497,6 +2505,14 @@ body.show-mode .app{max-width:1440px;overflow-y:auto}body.show-mode .desktop-gri
   text-decoration:underline;
 }
 
+.remote-arm-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;font-size:12px}
+.remote-arm-tools span{margin-right:auto}
+.remote-arm-tools button{font-size:11px;padding:5px 12px;min-height:28px}
+#remoteArmUnlock{max-width:360px;border:1px solid #46505d;border-radius:10px;background:#1b2028;color:#e3eaf3;font-size:12px}
+#remoteArmUnlock::backdrop{background:rgba(0,0,0,.6)}
+#remoteArmUnlock label{display:grid;gap:6px}
+#remoteArmUnlock input{background:#11161d;color:#e3eaf3;border:1px solid #46505d;border-radius:5px;padding:8px}
+#remoteArmUnlock button{font-size:12px;padding:6px 10px}
 /* Outils : titre et deux actions secondaires sur la même ligne. */
 .rtp-card .tools-head{
   display:flex;
@@ -2550,6 +2566,25 @@ body.show-mode .app{max-width:1440px;overflow-y:auto}body.show-mode .desktop-gri
   .tools-actions{gap:6px}
   .tools-actions .rtp-open{padding:0 6px !important}
 }
+/* Compact operation view; detailed information remains reachable. */
+.app{max-width:1180px}.topbar{margin-bottom:12px}.brand img{max-height:44px}.product{font-size:20px!important}
+.system{padding:12px 16px!important;min-height:70px!important}.state-title{font-size:23px!important}.state-detail{font-size:12px!important}
+.column-label{display:none}.card{padding:14px!important;margin-bottom:12px!important}.access-head{font-size:14px!important;margin-bottom:8px!important}
+.compact-remote-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:12px 0}.compact-remote-row>.primary{flex:1;min-height:44px!important;font-size:14px!important}
+.remote-arm-tools{margin:0;gap:8px}.remote-arm-tools span{font-size:13px;padding:8px 10px;border-radius:18px;background:#242b35}.remote-arm-tools span.confirmed{color:#80e1a4;background:#183a2b}
+.remote-arm-tools button,#cl-backup-apply,#cl-backup-disable{font-size:14px!important;padding:9px 14px!important;min-height:40px!important;border-radius:7px;border:1px solid #46566a;cursor:pointer}
+#remoteArm,#cl-backup-apply{background:#276bb1;color:white;border-color:#569cdd}#remoteDisarm,#cl-backup-disable{background:#3c3020;color:#f4c779;border-color:#765833}
+.remote-arm-tools button:disabled,#cl-backup-apply:disabled{opacity:.45;cursor:default}.remote-arm-tools button[hidden],#cl-backup-apply[hidden],#cl-backup-disable[hidden]{display:none}
+#remoteArm:disabled{display:none}#remoteDisarm:disabled{display:none}
+.compact-machine{font-size:16px!important;font-weight:600;line-height:1.5;overflow-wrap:anywhere}.compact-status{font-size:12px;line-height:1.45;margin:5px 0;overflow-wrap:anywhere}.compact-status.confirmed{color:#80e1a4!important}.compact-status.attention{color:#f4c779!important}
+.compact-settings{margin-top:10px!important;padding:0!important;border:none!important;background:transparent!important}.compact-settings>summary{font-size:13px!important;color:#b6c5d9;padding:5px 0!important}.compact-settings[open]>summary{margin-bottom:10px}
+#cl-sync-settings,#cl-sync-settings small,#cl-sync-settings label,#cl-sync-settings div{font-size:12px;line-height:1.45}#cl-sync-settings .compact-machine{font-size:16px}
+#cl-backup-current{margin-bottom:6px!important}#cl-backup-host{width:100%!important;min-height:36px}
+.network-grid label,.ableton-discovery label,.ableton-discovery [role=status]{font-size:12px!important}.network-grid select,.ableton-discovery select{font-size:13px!important;min-height:36px}
+#showDevices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.console-return{padding:12px!important;min-height:0!important}.console-card-header{flex-wrap:wrap}.console-title{font-size:15px!important}.console-program{font-size:28px!important}.console-state,.console-received{font-size:12px!important}.console-simulator-control{font-size:11px!important}.console-simulator-button{font-size:11px!important}.console-health{font-size:12px!important}
+.tools-actions .rtp-open{height:40px!important;min-height:40px!important;font-size:13px!important}.tools-actions .midi-assistant-button{font-size:12px!important}
+.compact-services .secondary-actions{display:flex;gap:8px}.compact-services .action{font-size:13px;min-height:38px}.network-timecode{display:none}
+@media(max-width:760px){.desktop-grid{grid-template-columns:1fr!important}.compact-remote-row>.primary{flex-basis:100%}#showDevices{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
@@ -2586,6 +2621,7 @@ body.show-mode .app{max-width:1440px;overflow-y:auto}body.show-mode .desktop-gri
     <button class="primary" onclick="runAction('/remote-window','Ouverture de la télécommande')">OUVRIR LA TÉLÉCOMMANDE</button>
   </div>
   <div id="actionStatus" class="action-status"></div>
+  <div class="card" style="padding:8px 12px;font-size:12px" role="status">Démarrage · <span id="startupBackup">Backup : vérification…</span> · <span id="startupReturns">Simulateurs : vérification…</span> · <span id="startupRemote">Télécommandes : vérification…</span></div>
 
   <section id="orphanCard" class="card orphan">
     <div class="access-head">Instance précédente détectée</div>
@@ -2600,9 +2636,9 @@ body.show-mode .app{max-width:1440px;overflow-y:auto}body.show-mode .desktop-gri
 <div class="desktop-grid">
 <div class="operation-column"><div class="column-label">RÉSEAU / CONNEXIONS</div>
     <section class="card server-card">
-      <div class="access-head">1 · Où tourne le moteur CL ?</div>
+      <div class="access-head">1 · CL Show Control</div>
       <div class="network-grid">
-        <label>Serveur CL Audio<select id="clServerMode" onchange="clServerDirty=true;updateCLServerFields()"><option value="local">Ce Mac — 127.0.0.1</option><option value="paradis">Paradis Latin</option><option value="manual">Distant manuel</option></select></label>
+        <label>Mac qui héberge CL Show Control<select id="clServerMode" onchange="clServerDirty=true;updateCLServerFields()"><option value="local">Ce Mac — 127.0.0.1</option><option value="paradis">Paradis Latin</option><option value="manual">Distant manuel</option></select></label>
         <label id="clServerHostField" hidden>Adresse du serveur<input id="clServerHost" disabled placeholder="Nom du Mac ou adresse IP" oninput="clServerDirty=true;updateCLServerFields()"></label>
       </div>
       <button class="action" onclick="saveCLServer()">Appliquer</button>
@@ -2612,9 +2648,9 @@ body.show-mode .app{max-width:1440px;overflow-y:auto}body.show-mode .desktop-gri
     </section>
 
     <section id="networkCard" class="card network-card local">
-      <div class="network-title-row"><div class="access-head">2 · Où tourne Ableton ?</div><span id="modeBadge" class="mode-badge" hidden aria-hidden="true"></span><span id="networkLtc" class="network-timecode offline">--:--:--:--</span></div>
+      <div class="network-title-row"><div class="access-head">2 · Lecteur Ableton principal</div><span id="modeBadge" class="mode-badge" hidden aria-hidden="true"></span><span id="networkLtc" class="network-timecode offline">--:--:--:--</span></div>
       <div class="network-grid">
-        <label>Connexion AbletonOSC<select id="abletonMode" onchange="updateNetworkFields()"><option value="local">Sur le Mac du moteur CL</option><option value="remote">Sur un autre Mac</option></select></label>
+        <label>Mac du lecteur principal<select id="abletonMode" onchange="updateNetworkFields()"><option value="local">Ce Mac</option><option value="remote">Sur un autre Mac</option></select></label>
         <label id="abletonHostField" hidden>Adresse du Mac Ableton<input id="abletonHost" value="127.0.0.1"></label>
         <div id="abletonLocalAddress">Ce Mac — 127.0.0.1</div>
         <div class="ports-readonly"><span>Ports AbletonOSC fixes</span><strong><span id="abletonSendPort">11000</span> → <span id="abletonReplyPort">11001</span></strong></div>
@@ -2634,6 +2670,10 @@ body.show-mode .app{max-width:1440px;overflow-y:auto}body.show-mode .desktop-gri
         <div class="ltc-destination" role="button" tabindex="0" onclick="copyLtcDestination()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();copyLtcDestination();}"><span id="ltcDestinationLabel">Destination LTC Display v2 · cliquer pour copier</span><strong id="ltcDestination">127.0.0.1:63123</strong></div>
     </section>
 
+    <section class="card" id="backupCard">
+      <div class="access-head">3 · Synchronisation / Hot Backup</div>
+      <div id="cl-sync-native-slot"></div>
+    </section>
 
 </div>
 <div class="services-column"><div class="column-label">RETOURS / CONTRÔLE</div>
@@ -2701,6 +2741,21 @@ body.show-mode .app{max-width:1440px;overflow-y:auto}body.show-mode .desktop-gri
       <button id="consoleManager" class="rtp-open midi-assistant-button" onclick="runAction('/midi-network-assistant','Ouverture de CL MIDI Network Manager')">Ouvrir CL MIDI Network Manager</button>
     </div>
   </div>
+  <div class="remote-arm-tools">
+    <span id="remoteArmStatus" role="status">Télécommandes · vérification…</span>
+    <button id="remoteArm" type="button" onclick="setRemoteArmed(true)">Armer</button>
+    <button id="remoteDisarm" type="button" onclick="setRemoteArmed(false)">Désarmer</button>
+  </div>
+  <dialog id="remoteArmUnlock">
+    <form id="remoteArmUnlockForm">
+      <strong>Déverrouiller les télécommandes</strong>
+      <p>Le mot de passe administrateur est requis pour modifier l’armement.</p>
+      <label>Mot de passe administrateur<input id="remoteArmPassword" type="password" autocomplete="current-password" required></label>
+      <p id="remoteArmUnlockError" role="status"></p>
+      <button type="button" onclick="closeRemoteArmUnlock()">Annuler</button>
+      <button type="submit">Déverrouiller et appliquer</button>
+    </form>
+  </dialog>
   <div class="console-components">
       <div class="console-component"><strong>Moniteur retour</strong><span id="consoleMonitor">Non renseigné</span></div>
       <div class="console-component"><strong>Endpoint retour</strong><span id="consoleEndpoint">Non renseigné</span></div>
@@ -2944,6 +2999,8 @@ async function refreshConsoleSimulatorState(force=false){
         ...consoleSimulatorState,
         ...data.simulators
       };
+      const sims=Object.values(data.simulators);
+      el('startupReturns').textContent=sims.every(s=>s.running)?'Simulateurs actifs':sims.some(s=>s.available)?'Simulateurs à vérifier dans Network Manager':'Network Manager à installer';
       updateConsoleSimulatorControls();
     }
   }catch(_){
@@ -3062,13 +3119,11 @@ function renderConsoleDiagnostic(card,item,offsets,state){
   const compactMatch=matching&&(item.status==='synced'||item.status==='stale');
   card.className='console-return console-diagnostic '+(different?'mismatch':{synced:'ok',waiting:'waiting',stale:'remembered',mismatch:'mismatch',unavailable:'unavailable'}[item.status])+(compactMatch?' matching':'');
   const describe=(pc,memory,title)=>'PC '+(pc??'—')+' · Sc '+(memory??'—')+(title?'   « '+String(title)+' »':'');
-  card.querySelector('.console-program span').textContent=waitingForLiveSet
-    ?'Attendu   En attente du Live Set…'
-    :'Attendu   '+describe(item.expected,v.expected_scene_memory,matching?'':v.expected_title);
-  card.querySelector('.console-received').textContent='Reçu       '+describe(item.returned,v.returned_scene_memory,matching?'':v.returned_title);
+  card.querySelector('.console-program span').textContent=String(item.returned??'—');
+  card.querySelector('.console-received').textContent='Attendu PC '+(item.expected??'—')+' · Reçu PC '+(item.returned??'—');
   const title=card.querySelector('.console-title');
-  title.textContent=matching?'« '+(v.returned_title||v.expected_title||'—')+' »':'';
-  title.title=title.textContent;title.hidden=!matching;
+  title.textContent=item.returned!==null?(v.returned_title||'Titre non renseigné'):(waitingForLiveSet?'En attente du Live Set':'Aucun retour reçu');
+  title.title=title.textContent;title.hidden=false;
   card.querySelector('.console-return-values').textContent='Attendu · '+describe(item.expected,v.expected_scene_memory,v.expected_title)+' / Reçu · '+describe(item.returned,v.returned_scene_memory,v.returned_title);
   card.querySelector('.console-age').textContent='Dernier retour · '+consoleAgeLabel(item.age);
   card.querySelector('.console-delay').textContent='Délai · '+(item.latency===null?'Non renseigné':Math.round(item.latency)+' ms');
@@ -3110,18 +3165,18 @@ function renderCLServer(s){
   const target=s.server_valid?s.ableton_server_target:null;
   const ableton=target?target.host+':'+target.send_port:null;
   const diagnostic=el('clServerDiagnosticDetails');diagnostic.replaceChildren();
-  const saved=c.mode==='local'?'Ce Mac — 127.0.0.1':(c.server||'Serveur distant')+' · '+(c.hostname||'adresse absente');
+  const saved=c.mode==='local'?localBonjourName:(c.server||'Serveur distant')+' · '+(c.hostname||'adresse absente');
   el('clServerDiagnostic').textContent=[
     'Configuration enregistrée : '+saved,
-    s.server_valid?'Connexion vérifiée : '+(c.remote?(c.address||'—'):'Ce Mac — 127.0.0.1'):'Connexion non vérifiée : '+(c.validation||'serveur indisponible'),
+    s.server_valid?'Connexion vérifiée : '+(c.remote?abletonDisplayHost(c.hostname||c.address||'—'):localBonjourName):'Connexion non vérifiée : '+(c.validation||'serveur indisponible'),
     ...(!s.server_valid&&c.remote&&c.address?['Adresse recherchée : '+c.address]:[])
   ].join('\n');
   el('abletonConfiguration').textContent=c.remote
-    ?'AbletonOSC se configure sur le poste serveur CL. '+(target?'Cible du moteur : '+(target.mode==='local'?'Sur le Mac du moteur CL — 127.0.0.1':target.host)+' · '+(s.osc_transport?.connected?'Connexion vérifiée':'Connexion non vérifiée'):'Cible indisponible : serveur CL non vérifié.')
-    :'Configuration enregistrée : '+(s.ableton_config?.mode==='remote'?'Sur un autre Mac — '+s.ableton_config.host:'Ce Mac — 127.0.0.1')+' · '+(s.server_valid&&s.osc_transport?.connected&&target?.mode===s.ableton_config?.mode&&target?.host===s.ableton_config?.host?'Connexion vérifiée':'Connexion non vérifiée');
+    ?'AbletonOSC se configure sur le poste serveur CL. '+(target?'Cible du moteur : '+(target.mode==='local'?(c.hostname||c.address||localBonjourName):abletonDisplayHost(target.host))+' · '+(s.osc_transport?.connected?'Connexion vérifiée':'Connexion non vérifiée'):'Cible indisponible : serveur CL non vérifié.')
+    :'Configuration enregistrée : '+(s.ableton_config?.mode==='remote'?abletonDisplayHost(s.ableton_config.host):localBonjourName)+' · '+(s.server_valid&&s.osc_transport?.connected&&target?.mode===s.ableton_config?.mode&&target?.host===s.ableton_config?.host?'Connexion vérifiée':'Connexion non vérifiée');
   el('abletonHostField').hidden=!!c.remote||el('abletonMode').value==='local';
   el('abletonLocalAddress').hidden=!c.remote&&el('abletonMode').value!=='local';
-  el('abletonLocalAddress').textContent=c.remote?'Local = le Mac du moteur CL, pas ce poste.':'Ce Mac — 127.0.0.1';
+  el('abletonLocalAddress').textContent=c.remote?'Mac de CL Show Control : '+(c.hostname||c.address||'—'):localBonjourName;
   ['Serveur recherché : '+(c.server||'—'),'Nom : '+(c.hostname||'—'),(s.server_valid?'Adresse connectée : ':'Adresse recherchée : ')+(c.address||'—'),'Découverte : '+(c.discovery||'—'),'Validation : '+(c.validation||'—'),'Réseau : '+(c.network||'—'),...(ableton?['Cible Ableton du backend actif : '+ableton]:[])].forEach(text=>{const row=document.createElement('div');row.className='diagnostic-row';const split=text.indexOf(' : ');const label=document.createElement('span'),value=document.createElement('strong');label.textContent=text.slice(0,split);value.textContent=text.slice(split+3);row.append(label,value);diagnostic.appendChild(row);});
   el('networkCard').querySelectorAll('input,select,button').forEach(node=>node.disabled=!!c.remote);
   if(!c.remote)el('abletonHost').disabled=el('abletonMode').value==='local';
@@ -3135,8 +3190,8 @@ function render(s){
   else if(s.web){card.className='card system error';title.textContent='SERVEUR NON VALIDÉ';detail.textContent=s.identity_message||'Instance inconnue ou incompatible sur le port 5050';}
   else{card.className='card system error';title.textContent='SYSTÈME ARRÊTÉ';detail.textContent='Démarrez le serveur avant le spectacle';}
   const now=new Date();el('stateTime').textContent=now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
-  el('remoteAddress').textContent=s.lan_url||'—';
-const showqBase=String(s.lan_url||'').replace(/\/+$/,'');
+  el('remoteAddress').textContent=bonjourShareURL(s.lan_url||'—');
+const showqBase=String(bonjourShareURL(s.lan_url||'')).replace(/\/+$/,'');
 el('showqAddress').textContent=showqBase ? showqBase+'/show-info' : '—';
 el('localAddress').textContent=String(s.local_url||'').replace(/^https?:\/\//,'');
   updateShowCurrent(s);
@@ -3146,7 +3201,7 @@ el('localAddress').textContent=String(s.local_url||'').replace(/^https?:\/\//,''
   if(s.orphan_actions_available)el('orphanDetail').textContent='Instance '+s.orphan_instance_id+' · PID '+s.orphan_process_id+' · '+s.build_id;
   if(!networkFormInitialized&&s.ableton_profiles)initializeNetworkForm(s);
   if(s.ableton_config){el('techAbletonMode').textContent='Ableton · '+(s.ableton_config.mode==='local'?'Local':'Distant');el('techAbletonAddress').textContent=s.ableton_config.host+':'+s.ableton_config.send_port+' → '+s.ableton_config.reply_port;el('techOscLabel').textContent='OSC aller · '+s.ableton_config.send_port;el('techReturnLabel').textContent='OSC retour · '+s.ableton_config.reply_port;}
-  el('ltcDestination').textContent=s.ltc_destination+':'+s.ltc_port;
+  el('ltcDestination').textContent=abletonDisplayHost(s.ltc_destination)+':'+s.ltc_port;el('ltcDestination').title='Adresse réseau : '+s.ltc_destination+':'+s.ltc_port;
   if(s.osc_transport){el('techAbletonLatency').textContent='Dernière réponse · '+(s.osc_transport.last_latency_ms==null?'—':Math.round(s.osc_transport.last_latency_ms)+' ms');el('techAbletonTimeouts').textContent='Timeouts · '+s.osc_transport.timeout_count;}
   const midi=s.midi_console||{},cl5=midi.cl5||{},ql1=midi.ql1||{};
   const rtp=midi.rtp||{},rtpBadge=el('rtpBadge');
@@ -3168,10 +3223,69 @@ async function refresh(){try{render(await(await fetch('/state')).json());}catch(
 async function changeTitleOffset(consoleName,delta,reset=false){const current=Number(latestState?.console_title_offsets?.[consoleName]||0),offset=reset?0:current+delta;try{const response=await fetch('/console-title-offset',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({console:consoleName,offset})});const result=await response.json();if(!response.ok)throw new Error(result.error||result.message||'Réglage refusé');el('actionStatus').textContent='✓ '+result.message;await refresh();}catch(error){el('actionStatus').textContent='! '+error;}}
 async function runAction(path,label){setBusy(label);el('actionStatus').textContent=label+'…';try{const response=await fetch(path);const r=await response.json();el('actionStatus').textContent=response.ok?('✓ '+(r.message||'Action terminée')):('! Refus : '+(r.error||response.status));}catch(e){el('actionStatus').textContent='! '+e;}setTimeout(refresh,450);}
 async function runPostAction(path,label){setBusy(label);el('actionStatus').textContent=label+'…';try{const response=await fetch(path,{method:'POST'});const r=await response.json();el('actionStatus').textContent=response.ok?('✓ '+(r.message||'Action terminée')):('! Refus : '+(r.error||response.status));}catch(e){el('actionStatus').textContent='! '+e;}setTimeout(refresh,450);}
+let pendingRemoteArm=null;
+async function refreshRemoteArm(){
+  try{
+    const response=await fetch('/security/remote-control/status',{cache:'no-store'});
+    const state=await response.json();
+    if(!response.ok)throw new Error(state.error||'Serveur indisponible');
+    el('startupRemote').textContent=state.armed?'Télécommandes armées':'Télécommandes à armer';
+    el('remoteArmStatus').textContent='Télécommandes · '+(state.armed?'armées':'désarmées');
+    el('remoteArm').disabled=state.armed;el('remoteDisarm').disabled=!state.armed;
+  }catch(error){el('remoteArmStatus').textContent='Télécommandes · '+error.message;el('remoteArm').disabled=true;el('remoteDisarm').disabled=true;}
+}
+function closeRemoteArmUnlock(){el('remoteArmPassword').value='';pendingRemoteArm=null;el('remoteArmUnlock').close();}
+async function setRemoteArmed(armed){
+  el('remoteArm').disabled=true;el('remoteDisarm').disabled=true;
+  try{
+    const response=await fetch('/security/remote-control/arm',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({armed})});
+    const state=await response.json();
+    if(!response.ok){
+      if(response.status===403 && /Déverrouillage administrateur/.test(state.error||'')){
+        pendingRemoteArm=armed;el('remoteArmUnlockError').textContent='';el('remoteArmUnlock').showModal();el('remoteArmPassword').focus();
+      }else throw new Error(state.error||'Armement refusé');
+    }
+    await refreshRemoteArm();
+  }catch(error){el('remoteArmStatus').textContent=error.message;await refreshRemoteArm();}
+}
+el('remoteArmUnlock').addEventListener('cancel',()=>{el('remoteArmPassword').value='';pendingRemoteArm=null;});
+el('remoteArmUnlockForm').addEventListener('submit',async event=>{
+  event.preventDefault();
+  const password=el('remoteArmPassword').value;el('remoteArmPassword').value='';
+  try{
+    const response=await fetch('/security/remote-control/unlock',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password,duration:'five_minutes'})});
+    const state=await response.json();
+    if(!response.ok)throw new Error(state.error||'Déverrouillage refusé');
+    const armed=pendingRemoteArm;closeRemoteArmUnlock();if(armed!==null)await setRemoteArmed(armed);
+  }catch(error){el('remoteArmUnlockError').textContent=error.message;}
+});
+refreshRemoteArm();setInterval(refreshRemoteArm,5000);
+
 // ABLETON_DISCOVERY_BEGIN: informational discovery; only Appliquer persists a target.
 let abletonReaders=[];
+let localBonjourName='Ce Mac';
+function abletonDisplayHost(host){
+  const value=String(host||'').replace(/\.$/,'');
+  const reader=abletonReaders.find(r=>String(r.host||'').replace(/\.$/,'')===value||(r.addresses||[]).includes(value));
+  if(reader)return String(reader.host||'').replace(/\.$/,'');
+  const server=latestState?.cl_server||{};
+  if(['127.0.0.1','localhost','::1'].includes(value))return server.remote?(server.hostname||server.address||value):localBonjourName;
+  if(server.address===value&&server.hostname)return server.hostname.replace(/\.$/,'');
+  if(!server.remote){
+    try{if(new URL(latestState?.lan_url||'').hostname===value)return localBonjourName;}catch(_){}
+  }
+  return value;
+}
+function bonjourShareURL(value){
+  try{const url=new URL(value);if(url.protocol==='http:'){const name=abletonDisplayHost(url.hostname);if(name.endsWith('.local'))url.hostname=name;}return url.href;}catch(_){return value;}
+}
 function renderAbletonReaders(data){
   abletonReaders=Array.isArray(data.readers)?data.readers:[];
+  localBonjourName=data.local_host||localBonjourName;
+  el('clServerMode').querySelector('[value=local]').textContent=localBonjourName;
+  el('abletonMode').querySelector('[value=local]').textContent=latestState?.cl_server?.remote?'Mac de CL Show Control':localBonjourName;
+  const remoteHost=latestState?.ableton_config?.host;
+  el('abletonMode').querySelector('[value=remote]').textContent=latestState?.ableton_config?.mode==='remote'?abletonDisplayHost(remoteHost):'Choisir un autre Mac…';
   const select=el('abletonReaders');
   select.replaceChildren();
   const placeholder=document.createElement('option');placeholder.value='';
@@ -3308,6 +3422,82 @@ async function toggleShowMode(){
 let telemetryBusy=false;
 async function refreshTelemetry(){if(telemetryBusy)return;telemetryBusy=true;try{const t=await(await fetch('/telemetry')).json();const ltc=t.ltc_connected?t.ltc_timecode:'--:--:--:--';el('systemLtc').textContent=ltc;el('systemLtc').className='system-ltc'+(t.ltc_connected?'':' offline');el('networkLtc').textContent=ltc;el('networkLtc').className='network-timecode'+(t.ltc_connected?'':' offline');updateShowCurrent(t);}catch(e){}finally{telemetryBusy=false;}}
 refresh();refreshTelemetry();refreshAbletonReaders();setInterval(refresh,1500);setInterval(refreshTelemetry,100);
+</script>
+<script>
+// Presentation only: preserve existing controls, endpoints and validation.
+(function(){
+function initCompactLayout(){
+ const get=id=>document.getElementById(id);
+ if(get('compactRemoteRow')||!get('cl-sync-settings'))return;
+ function fold(parent,nodes,label,id){
+   const details=document.createElement('details');details.className='compact-settings';details.id=id;
+   const summary=document.createElement('summary');summary.textContent=label;details.appendChild(summary);
+   nodes.filter(Boolean).forEach(n=>details.appendChild(n));parent.appendChild(details);return details;
+ }
+ const command=document.querySelector('.command-row');
+ const arm=document.querySelector('.remote-arm-tools');
+ const row=document.createElement('div');row.id='compactRemoteRow';row.className='compact-remote-row';
+ row.appendChild(command.querySelector('.primary'));row.appendChild(arm);command.replaceWith(row);
+ const services=document.createElement('section');services.className='card compact-services';
+ const secondary=document.querySelector('.secondary-actions');
+ // secondary belongs to the detached old row; preserve the actual button nodes.
+ const controls=command.querySelector('.secondary-actions')||secondary;
+ const serviceNodes=[controls,document.querySelector('.server-mtc-row')];
+ fold(services,serviceNodes,'Services · serveur et MTC','compactServices');
+ document.querySelector('.services-column').appendChild(services);
+ const server=document.querySelector('.server-card');
+ const serverInfo=document.createElement('div');serverInfo.id='compactServerInfo';serverInfo.className='compact-machine';
+ const serverStatus=document.createElement('div');serverStatus.id='compactServerStatus';serverStatus.className='compact-status';
+ const serverNodes=Array.from(server.children).filter(n=>!n.classList.contains('access-head')&&n.id!=='clServerApplyError');
+ server.append(serverInfo,serverStatus);fold(server,serverNodes,'Modifier la machine','compactServerSettings');
+ const network=get('networkCard');
+ const readerInfo=document.createElement('div');readerInfo.id='compactReaderInfo';readerInfo.className='compact-machine';
+ const readerStatus=document.createElement('div');readerStatus.id='compactReaderStatus';readerStatus.className='compact-status';
+ const networkNodes=Array.from(network.children).filter(n=>!n.classList.contains('network-title-row'));
+ network.append(readerInfo,readerStatus);fold(network,networkNodes,'Modifier ou tester la connexion','compactReaderSettings');
+ const backup=get('cl-sync-settings');
+ const configNodes=Array.from(backup.children).filter(n=>n.id==='cl-sync-mode'||n.id==='cl-backup-host'||n.id==='cl-backup-name'||n.tagName==='LABEL'||n.tagName==='SMALL'||n.id==='cl-sync-summary');
+ fold(backup,configNodes,'Configurer le backup','compactBackupSettings');
+ const access=document.querySelector('.server-access-card');
+ fold(access,Array.from(access.children).filter(n=>!n.classList.contains('access-head')),'Adresses à partager','compactShare');
+ access.querySelector('.access-head').remove();
+ const tools=document.querySelector('.rtp-card');tools.appendChild(get('compactShare'));access.remove();
+ const diagnostic=document.querySelector('main.app > details');
+ const components=tools.querySelector('.console-components');if(components)diagnostic.appendChild(components);
+ const heading=tools.querySelector('.tools-head');if(heading)heading.querySelector('strong').textContent='OUTILS';
+ // Defaults stay collapsed; drafts and errors surface themselves without erasing edits.
+ function refreshCompact(){
+   const state=typeof latestState==='object'&&latestState?latestState:{};
+   const cl=state.cl_server||{};
+   serverInfo.textContent=cl.remote?(cl.hostname||cl.address||'Serveur distant'):(typeof localBonjourName==='string'?localBonjourName:'Ce Mac');
+   serverStatus.textContent=state.server_valid?'● Serveur connecté':'● '+(cl.validation||'Connexion non vérifiée');
+   serverStatus.className='compact-status '+(state.server_valid?'confirmed':'attention');
+   const text=get('abletonConfiguration').textContent||'';
+   readerInfo.textContent=text.replace(/^Configuration enregistrée : /,'').split(' · ')[0];
+   const connected=text.includes('Connexion vérifiée');
+   readerStatus.textContent=connected?'● Lecteur connecté':'● '+text;
+   readerStatus.className='compact-status '+(connected?'confirmed':'attention');
+   if(get('clServerApplyError').textContent.trim())get('compactServerSettings').open=true;
+   if(typeof networkFormDirty==='boolean'&&networkFormDirty)get('compactReaderSettings').open=true;
+   const remoteStatus=get('remoteArmStatus');
+   remoteStatus.classList.toggle('confirmed',get('remoteArm').disabled&&!get('remoteDisarm').disabled);
+   const backupCurrent=get('cl-backup-current'),backupStatus=get('cl-backup-status');
+   const active=backupCurrent.textContent.includes('Mode actif : Hot Backup');
+   const online=active&&backupStatus.textContent.includes('BACKUP : ONLINE');
+   backupCurrent.className='compact-machine';backupStatus.className='compact-status '+(online?'confirmed':active?'attention':'');
+   const label=active?'Suivi actif':'Suivi inactif';
+   backupCurrent.setAttribute('aria-label',label+' · '+backupCurrent.textContent);
+   const disable=get('cl-backup-disable');disable.hidden=!active;
+   get('cl-backup-apply').hidden=active&&!get('compactBackupSettings').open;
+   if(backupStatus.textContent.includes('Confirmer')||backupStatus.textContent.includes('Armer Hot Backup'))get('compactBackupSettings').open=true;
+   if(state.server_valid===false)get('compactServices').open=true;
+ }
+ refreshCompact();setInterval(refreshCompact,1000);
+}
+window.addEventListener('load',initCompactLayout);
+if(document.readyState==='complete')initCompactLayout();
+})();
+
 </script>
 </body>
 </html>
@@ -3540,7 +3730,14 @@ def validate_remote_target_host(candidate) -> None:
 
 @app.route("/api/ableton-discovery", methods=["GET"])
 def ableton_discovery_status():
-    response = jsonify(ableton_discovery_cache.snapshot())
+    snapshot = ableton_discovery_cache.snapshot()
+    try:
+        local_name = subprocess.run(["/usr/sbin/scutil", "--get", "LocalHostName"],
+                                    capture_output=True, text=True, timeout=2).stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        local_name = ""
+    snapshot["local_host"] = local_name + ".local" if local_name else socket.gethostname()
+    response = jsonify(snapshot)
     response.headers["Cache-Control"] = "no-store"
     return response
 
@@ -3958,6 +4155,49 @@ def cl_mtc_bridge_restart():
     return _cl_mtc_bridge_start_process()
 
 
+@app.route("/security/remote-control/<operation>", methods=["GET", "POST"])
+def remote_control_proxy(operation):
+    # Preserve the backend's authentication and arm state; never the launcher's.
+    if not local_request():
+        return jsonify(error="Commande réservée à ce Mac"), 403
+    if cl_server_is_remote():
+        return jsonify(error="Armement à effectuer sur le Mac de CL Show Control"), 409
+    if (operation == "status" and request.method != "GET") or (operation in {"arm", "unlock"} and request.method != "POST"):
+        return jsonify(error="Méthode refusée"), 405
+    if operation not in {"status", "arm", "unlock"}:
+        return jsonify(error="Commande inconnue"), 404
+    data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return jsonify(error="Objet JSON requis"), 400
+    if operation == "arm":
+        if not isinstance(data.get("armed"), bool):
+            return jsonify(error="Armement invalide"), 400
+        data = {"armed": data["armed"]}
+    elif operation == "unlock":
+        data = {"password": data.get("password"), "duration": "five_minutes"}
+    path = "security/status" if operation == "status" else "security/admin/" + operation
+    headers = {"Content-Type": "application/json"}
+    token = request.cookies.get("cl_admin_backend")
+    if token:
+        headers["Cookie"] = "cl_admin_backend=" + token
+    upstream_request = urllib.request.Request(
+        "http://127.0.0.1:5050/" + path,
+        data=json.dumps(data).encode("utf-8") if request.method == "POST" else None,
+        headers=headers, method=request.method)
+    try:
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        with opener.open(upstream_request, timeout=3) as upstream:
+            result = json.loads(upstream.read())
+            response = jsonify({"armed": result.get("armed", False)} if operation == "status" else result)
+            if operation == "unlock" and upstream.headers.get("Set-Cookie"):
+                response.headers["Set-Cookie"] = upstream.headers["Set-Cookie"]
+            return response, upstream.status
+    except urllib.error.HTTPError as error:
+        return jsonify(json.loads(error.read())), error.code
+    except (OSError, ValueError):
+        return jsonify(error="Serveur CL Show Control indisponible"), 503
+
+
 @app.route("/api/hot-backup", methods=["GET", "POST"])
 def hot_backup_proxy():
     # Reuse the selected CL backend. No bridge lifecycle or PRIMARY control here.
@@ -3993,7 +4233,7 @@ def cl_mtc_bridge_inject_control(response):
         if 'id="cl-mtc-bridge-control"' in html:
             return response
 
-        widget = '''
+        widget = r'''
 <div id="cl-mtc-bridge-control"
      style="position:fixed;right:16px;bottom:16px;z-index:99999;padding:9px 10px;border-radius:10px;background:rgba(18,18,18,.92);color:white;font-family:-apple-system,BlinkMacSystemFont,sans-serif;font-size:12px;box-shadow:0 4px 14px rgba(0,0,0,.20);min-width:175px;flex:0 0 auto;flex-wrap:wrap;">
 
@@ -4020,19 +4260,24 @@ def cl_mtc_bridge_inject_control(response):
       Relancer
     </button>
   </div>
-  <details style="flex-basis:100%;margin-top:6px;max-width:320px;">
-    <summary id="cl-sync-summary" style="cursor:pointer">Sync : MTC continu</summary>
-    <select id="cl-sync-mode" aria-label="Mode de synchronisation">
-      <option value="mtc">MTC continu</option><option value="hot_backup">Hot Backup</option>
-    </select>
-    <input id="cl-backup-host" placeholder="IPv4 BACKUP" aria-label="Adresse BACKUP" style="width:135px">
+  <div id="cl-sync-settings" style="width:100%;">
+    <div id="cl-backup-current" role="status" style="margin-bottom:10px;white-space:pre-line">Configuration active : recherche…</div>
+    <div id="cl-sync-summary" style="font-weight:600;margin-bottom:8px">Sync : MTC continu</div>
+    <input id="cl-sync-mode" type="hidden" value="hot_backup">
+    <input id="cl-backup-host" placeholder="Mac-backup.local" aria-label="Nom Bonjour ou adresse du backup" style="width:135px">
+    <div id="cl-backup-name" role="status"></div>
     <label style="display:block"><input id="cl-backup-ext" type="checkbox"> EXT désactivé sur BACKUP</label>
     <label style="display:block"><input id="cl-backup-set" type="checkbox"> Mêmes sets et cartes de tempo</label>
-    <button id="cl-backup-apply" type="button">Appliquer à l'arrêt</button>
+    <div style="display:flex;gap:8px;margin:8px 0">
+      <button id="cl-backup-apply" type="button">Activer le suivi à l'arrêt</button>
+      <button id="cl-backup-disable" type="button" disabled>Désactiver le suivi</button>
+    </div>
+    <small>Activer prépare le backup : le prochain lancement du principal le déclenche.
+    Désactiver arrête la copie des commandes, sans arrêter la lecture en cours.</small>
     <div id="cl-backup-status" role="status"></div>
-    <small>Commandes Show Control uniquement. EXT se règle manuellement.
+    <small>Session : lancements directs et arrêt suivis. Arrangement : commandes CL uniquement. EXT se règle manuellement.
     Après redémarrage : MTC continu, Hot Backup à réarmer.</small>
-  </details>
+  </div>
 </div>
 
 <script>
@@ -4044,37 +4289,77 @@ def cl_mtc_bridge_inject_control(response):
 
 
     const backupStatus = document.getElementById("cl-backup-status");
-    let backupFormInitialized = false;
+    let backupFormDirty = false;
+    let backupActiveIP = '';
+    const backupCurrent = document.getElementById("cl-backup-current");
+    ["cl-sync-mode", "cl-backup-host", "cl-backup-ext", "cl-backup-set"].forEach(id => {
+        document.getElementById(id).addEventListener("input", () => { backupFormDirty = true; });
+        document.getElementById(id).addEventListener("change", () => { backupFormDirty = true; });
+    });
     async function refreshBackup() {
         try {
             const r = await fetch('/api/hot-backup');
             const s = await r.json();
-            if (!backupFormInitialized && s.mode) {
+            const startupBackup=document.getElementById('startupBackup');
+            if(startupBackup)startupBackup.textContent=s.mode==='hot_backup'?(s.state==='ONLINE'?'Backup : suivi actif':'Backup : '+(s.state||'indisponible')):'Backup désactivé · confirmer le projet et EXT, puis activer à l’arrêt';
+            backupActiveIP = s.host || backupActiveIP;
+            if (!backupFormDirty && s.mode) {
                 document.getElementById('cl-sync-mode').value = s.mode;
-                document.getElementById('cl-backup-host').value = s.host || '';
-                backupFormInitialized = true;
+                if (s.host) document.getElementById('cl-backup-host').value = typeof abletonDisplayHost === 'function' ? abletonDisplayHost(s.host) : s.host;
+
             }
+            document.getElementById('cl-backup-disable').disabled = s.mode !== 'hot_backup';
+            document.getElementById('cl-backup-apply').disabled = s.mode === 'hot_backup' && !backupFormDirty;
+            const reader = typeof abletonReaders !== 'undefined'
+                ? abletonReaders.find(r => r.host === s.host || (r.addresses || []).includes(s.host)) : null;
+            const backupAddress = reader ? reader.host : (s.host || 'Non renseigné');
+            document.getElementById('cl-backup-current').title = s.host ? 'Adresse réseau : '+s.host : '';
+            document.getElementById('cl-backup-name').textContent = reader ? 'Mac backup : ' + reader.host : '';
+            backupCurrent.textContent = s.mode === 'hot_backup'
+                ? 'Mode actif : Hot Backup\nMac backup actif : ' + backupAddress
+                : s.mode === 'mtc' ? 'Mode actif : MTC continu · copie backup désactivée'
+                : 'Configuration active indisponible';
             document.getElementById('cl-sync-summary').textContent =
                 s.mode === 'hot_backup' ? 'Sync : Hot Backup' : 'Sync : MTC continu';
             backupStatus.textContent = s.mode === 'mtc' ? 'Copie BACKUP désactivée' :
                 'BACKUP : ' + (s.state || 'OFFLINE') + ' — ' + (s.detail || s.error || '');
         } catch (_) { backupStatus.textContent = 'BACKUP : état indisponible'; }
     }
+    function resolveBackupAddress(value) {
+        const host=value.trim().replace(/\.$/,'');
+        if(!host.toLowerCase().endsWith('.local'))return host;
+        const readers=typeof abletonReaders!=='undefined'?abletonReaders:[];
+        const reader=readers.find(r=>String(r.host||'').replace(/\.$/,'').toLowerCase()===host.toLowerCase());
+        const address=reader?.addresses?.includes(backupActiveIP)?backupActiveIP:reader?.addresses?.find(ip=>/^\d+\.\d+\.\d+\.\d+$/.test(ip));
+        if(!address)throw new Error('Nom Bonjour non résolu : attendre la découverte ou renseigner une adresse IP.');
+        return address;
+    }
     document.getElementById('cl-backup-apply').onclick = async function () {
         this.disabled = true;
         try {
             const r = await fetch('/api/hot-backup', {method:'POST',
                 headers:{'Content-Type':'application/json'}, body:JSON.stringify({
-                    mode:document.getElementById('cl-sync-mode').value,
-                    host:document.getElementById('cl-backup-host').value.trim(),
+                    mode:'hot_backup',
+                    host:resolveBackupAddress(document.getElementById('cl-backup-host').value),
                     ext_off:document.getElementById('cl-backup-ext').checked,
                     same_set:document.getElementById('cl-backup-set').checked
                 })});
             const s = await r.json();
             if (!r.ok) backupStatus.textContent = s.error || 'Réglage refusé';
-            else await refreshBackup();
-        } catch (_) { backupStatus.textContent = 'BACKUP : serveur indisponible'; }
+            else { backupFormDirty = false; await refreshBackup(); }
+        } catch (error) { backupStatus.textContent = error.message || 'BACKUP : serveur indisponible'; }
         finally { this.disabled = false; }
+    };
+    document.getElementById('cl-backup-disable').onclick = async function () {
+        this.disabled = true;
+        try {
+            const r = await fetch('/api/hot-backup', {method:'POST',
+                headers:{'Content-Type':'application/json'}, body:JSON.stringify({mode:'mtc'})});
+            const s = await r.json();
+            if (!r.ok) backupStatus.textContent = s.error || 'Désactivation refusée';
+            else { backupFormDirty = false; await refreshBackup(); }
+        } catch (_) { backupStatus.textContent = 'BACKUP : serveur indisponible'; }
+        finally { await refreshBackup(); }
     };
     refreshBackup();
     setInterval(refreshBackup, 3000);
@@ -4090,6 +4375,9 @@ def cl_mtc_bridge_inject_control(response):
             return;
         }
 
+        const syncSlot = document.getElementById("cl-sync-native-slot");
+        const syncSettings = document.getElementById("cl-sync-settings");
+        if (syncSlot && syncSettings) syncSlot.appendChild(syncSettings);
         slot.appendChild(widget);
 
         widget.style.position = "static";
@@ -4379,7 +4667,11 @@ if __name__ == "__main__":
             role_components = set(json.loads(role_record.read_text())["manifest"]["components"])
         except (OSError, ValueError, KeyError):
             role_components = set()  # Damaged manifest never starts extra services.
-    if role_components is None or "network_manager" in role_components:
+    # Le Manager interactif ne démarre aucun agent RTP permanent.
+    # Ouvrir la copie installée même après une réinstallation du serveur seul.
+    assistant = find_midi_network_assistant()
+    if assistant is not None:
+        subprocess.Popen(["/usr/bin/open", str(assistant)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         ensure_midi_console_monitor()
     if role_components is None or "mtc_bridge" in role_components:
         _cl_mtc_bridge_autostart()

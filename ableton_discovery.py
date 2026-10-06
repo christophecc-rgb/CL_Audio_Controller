@@ -81,7 +81,7 @@ VPN, peer-to-peer and unknown interfaces are not discovery candidates.
 def parse_browse(output, interfaces):
     """Apply Add/Rmv events within this snapshot, keeping interface identity."""
     found = {}
-    pattern = r'^\S+\s+(Add|Rmv)\s+\S+\s+(\d+)\s+local\.\s+_cl-ableton\._udp\.?\s+(.+?)\s*$'
+    pattern = r'^\s*\S+\s+(Add|Rmv)\s+\S+\s+(\d+)\s+local\.\s+_cl-ableton\._udp\.?\s+(.+?)\s*$'
     for line in output.splitlines():
         match = re.match(pattern, line)
         if not match:
@@ -112,7 +112,7 @@ def parse_resolution(output):
 def parse_addresses(output, index, host):
     addresses = set()
     # dns-sd -G: timestamp Add/Rmv flags interface hostname address TTL
-    pattern = r'^\S+\s+(Add|Rmv)\s+\S+\s+(\d+)\s+(\S+)\s+(\d+\.\d+\.\d+\.\d+)\s+\d+'
+    pattern = r'^\s*\S+\s+(Add|Rmv)\s+\S+\s+(\d+)\s+(\S+)\s+(\d+\.\d+\.\d+\.\d+)\s+\d+'
     for line in output.splitlines():
         match = re.match(pattern, line)
         if not match:

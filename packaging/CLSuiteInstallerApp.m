@@ -15,13 +15,22 @@ static void CLInstallApplicationMenu(void) {
     NSApp.mainMenu = mainMenu;
 }
 
+@interface CLInstallerDocumentView : NSView
+@end
+@implementation CLInstallerDocumentView
+- (BOOL)isFlipped { return YES; }
+@end
+
 @interface CLSuiteAppDelegate : NSObject <NSApplicationDelegate>
 @property NSWindow *window;
 @property NSMutableDictionary<NSString *, NSButton *> *checks;
 @property NSMutableDictionary<NSString *, NSView *> *cards;
+@property NSMutableDictionary<NSString *, NSStackView *> *componentGroups;
+@property NSTextField *roleHelp;
 @property NSSegmentedControl *liveSelector;
 @property NSSegmentedControl *roleSelector;
 @property NSView *liveSection;
+@property NSScrollView *componentScroll;
 @property NSButton *actionButton;
 @property NSProgressIndicator *progress;
 @property NSTextField *statusLabel;
@@ -36,6 +45,7 @@ static void CLInstallApplicationMenu(void) {
     if (self) {
         _checks = [NSMutableDictionary dictionary];
         _cards = [NSMutableDictionary dictionary];
+        _componentGroups = [NSMutableDictionary dictionary];
         _resources = NSBundle.mainBundle.resourceURL;
         _uninstaller = [NSBundle.mainBundle.bundleIdentifier containsString:@"uninstaller"];
     }
@@ -66,13 +76,13 @@ static void CLInstallApplicationMenu(void) {
     icon.image = [[NSImage alloc] initWithContentsOfURL:[self.resources URLByAppendingPathComponent:iconName]];
     icon.translatesAutoresizingMaskIntoConstraints = NO;
 
-    NSButton *check = [NSButton checkboxWithTitle:title target:nil action:nil];
+    NSButton *check = [NSButton checkboxWithTitle:title target:self action:@selector(componentChanged:)];
     check.state = NSControlStateValueOn;
-    check.font = [NSFont systemFontOfSize:17 weight:NSFontWeightSemibold];
+    check.font = [NSFont systemFontOfSize:13 weight:NSFontWeightSemibold];
     check.contentTintColor = NSColor.whiteColor;
     self.checks[identifier] = check;
 
-    NSTextField *detail = [self label:subtitle size:13 weight:NSFontWeightRegular color:[NSColor colorWithCalibratedWhite:0.76 alpha:1]];
+    NSTextField *detail = [self label:subtitle size:11 weight:NSFontWeightRegular color:[NSColor colorWithCalibratedWhite:0.76 alpha:1]];
     NSStackView *labels = [NSStackView stackViewWithViews:@[check, detail]];
     labels.orientation = NSUserInterfaceLayoutOrientationVertical;
     labels.alignment = NSLayoutAttributeLeading;
@@ -81,14 +91,14 @@ static void CLInstallApplicationMenu(void) {
     NSStackView *row = [NSStackView stackViewWithViews:@[icon, labels]];
     row.orientation = NSUserInterfaceLayoutOrientationHorizontal;
     row.alignment = NSLayoutAttributeCenterY;
-    row.spacing = 16;
-    row.edgeInsets = NSEdgeInsetsMake(12, 14, 12, 14);
+    row.spacing = 8;
+    row.edgeInsets = NSEdgeInsetsMake(6, 8, 6, 8);
     row.translatesAutoresizingMaskIntoConstraints = NO;
     box.contentView = row;
     [NSLayoutConstraint activateConstraints:@[
-        [icon.widthAnchor constraintEqualToConstant:54],
-        [icon.heightAnchor constraintEqualToConstant:54],
-        [box.heightAnchor constraintEqualToConstant:78]
+        [icon.widthAnchor constraintEqualToConstant:30],
+        [icon.heightAnchor constraintEqualToConstant:30],
+        [box.heightAnchor constraintEqualToConstant:48]
     ]];
     self.cards[identifier] = box;
     return box;
@@ -98,8 +108,8 @@ static void CLInstallApplicationMenu(void) {
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
     CLInstallApplicationMenu();
     NSRect visibleFrame = NSScreen.mainScreen.visibleFrame;
-    CGFloat width = MIN(780.0, visibleFrame.size.width - 60.0);
-    CGFloat height = MIN(700.0, visibleFrame.size.height - 60.0);
+    CGFloat width = MIN(960.0, visibleFrame.size.width - 60.0);
+    CGFloat height = MIN(820.0, visibleFrame.size.height - 60.0);
     NSRect frame = NSMakeRect(0, 0, width, height);
 
     self.window = [[NSWindow alloc] initWithContentRect:frame
@@ -107,7 +117,7 @@ static void CLInstallApplicationMenu(void) {
                                                 backing:NSBackingStoreBuffered
                                                   defer:NO];
     self.window.title = self.uninstaller ? @"Désinstaller la Suite CL" : @"Installer la Suite CL";
-    self.window.minSize = NSMakeSize(680.0, 520.0);
+    self.window.minSize = NSMakeSize(860.0, 600.0);
     [self.window center];
 
     NSView *background = [[NSView alloc] initWithFrame:frame];
@@ -129,7 +139,7 @@ static void CLInstallApplicationMenu(void) {
                                 size:27 weight:NSFontWeightBold color:NSColor.whiteColor];
     NSString *introText = self.uninstaller
         ? @"Choisissez uniquement les éléments à retirer. Ils resteront récupérables dans la Corbeille."
-        : @"Choisissez le rôle de ce Mac. Les anciennes versions remplacées seront déplacées dans la Corbeille et resteront récupérables.";
+        : @"Choisissez un usage pour voir ses applications, ou Personnalisé pour les sélectionner vous-même.";
     NSTextField *intro = [self label:introText size:14 weight:NSFontWeightRegular color:[NSColor colorWithCalibratedWhite:0.72 alpha:1]];
     NSStackView *titles = [NSStackView stackViewWithViews:@[title, intro]];
     titles.orientation = NSUserInterfaceLayoutOrientationVertical;
@@ -162,30 +172,62 @@ static void CLInstallApplicationMenu(void) {
         [mainViews addObject:self.roleSelector];
     }
 
-    NSTextField *componentsTitle = [self label:(self.uninstaller ? @"Éléments à retirer" : @"Composants inclus") size:14 weight:NSFontWeightSemibold color:NSColor.whiteColor];
+    NSTextField *componentsTitle = [self label:(self.uninstaller ? @"Éléments à retirer" : @"2. Applications et outils") size:14 weight:NSFontWeightSemibold color:NSColor.whiteColor];
     [mainViews addObject:componentsTitle];
+    self.roleHelp = [self label:@"" size:13 weight:NSFontWeightRegular color:NSColor.lightGrayColor];
+    [mainViews addObject:self.roleHelp];
 
     NSStackView *componentStack = [[NSStackView alloc] initWithFrame:NSZeroRect];
     componentStack.orientation = NSUserInterfaceLayoutOrientationVertical;
     componentStack.spacing = 8;
     NSArray<NSArray<NSString *> *> *components = @[
-        @[@"show_control", @"CL Show Control — serveur", @"Backend, launcher, bibliothèques et Scene Backup TX ; aucun agent RTP implicite.", @"Controller.png"],
-        @[@"control_client", @"Client Show Control / ShowQ", @"Navigateur vers le serveur HTTPS, aucun backend ou daemon local.", @"ShowCue.png"],
+        @[@"show_control", @"CL Show Control — moteur", @"Démarre le serveur local et le panneau de contrôle.", @"Controller.png"],
+        @[@"showcue", @"CL ShowCue — conduite", @"Affiche les cues du show. Moteur local requis.", @"ShowCue.png"],
+        @[@"cue_editor", @"CL Cue Editor — édition", @"Prépare les cues et sauvegarde les shows. Moteur local requis.", @"CueEditor.png"],
+        @[@"control_client", @"Accès à un serveur distant", @"Ouvre le serveur HTTPS dans votre navigateur.", @"ShowCue.png"],
         @[@"ableton_osc", @"AbletonOSC", @"Extension Live 11/12 pour les commandes OSC.", @"Controller.png"],
-        @[@"live_devices", @"Devices Live LTC / X-Fader", @"Max for Live requis uniquement pour ces devices.", @"Controller.png"],
+        @[@"live_devices", @"Devices Live LTC / X-Fader", @"Devices de timecode et de fondu pour Ableton.", @"Controller.png"],
         @[@"absolute_mtc", @"CL Absolute MTC", @"Device Live de synchronisation temporelle.", @"MIDIConsole.png"],
         @[@"mtc_bridge", @"MTC Bridge", @"Application de synchro ouverte explicitement.", @"MIDIConsole.png"],
         @[@"sync_meter", @"Sync Meter", @"Diagnostic de synchro MTC.", @"Diagnostic.png"],
-        @[@"show_backup", @"CL Show Backup — externe", @"Installation bloquée jusqu’à validation du récepteur HMAC.", @"Controller.png"],
-        @[@"network_manager", @"Network Manager", @"Diagnostic interactif et moniteur possédé par Show Control.", @"MIDIConsole.png"],
-        @[@"network_tools", @"Helpers et simulateurs", @"Outils ponctuels, aucun LaunchAgent permanent.", @"MIDIConsole.png"],
+        @[@"show_backup", @"CL Show Backup — externe", @"Intégration externe à valider avant installation.", @"Controller.png"],
+        @[@"network_manager", @"Network Manager", @"Vérifie les connexions MIDI et réseau.", @"MIDIConsole.png"],
+        @[@"network_tools", @"Helpers et simulateurs", @"Tests et simulation des connexions MIDI.", @"MIDIConsole.png"],
         @[@"analyzer", @"MIDI Analyzer", @"Analyse ponctuelle.", @"Diagnostic.png"],
         @[@"performance_monitor", @"Performance Monitor", @"Mesures ponctuelles.", @"Diagnostic.png"],
         @[@"rtp_diagnostic", @"MIDI & RTP Diagnostic", @"Diagnostic ponctuel.", @"Diagnostic.png"],
-        @[@"rtp_agent", @"Option agent RTP", @"Lecteur Ableton seulement, ou choix personnalisé explicite ; propriétaire launchd.", @"MIDIConsole.png"]
+        @[@"rtp_agent", @"Option agent RTP", @"Connexion MIDI réseau automatique en arrière-plan.", @"MIDIConsole.png"]
     ];
-    for (NSArray<NSString *> *item in components) {
-        [componentStack addArrangedSubview:[self componentCard:item[0] title:item[1] subtitle:item[2] iconName:item[3]]];
+    NSArray *groups = @[
+        @[@"Show et conduite", @[@"show_control", @"showcue", @"cue_editor", @"control_client"]],
+        @[@"Ableton et synchronisation", @[@"ableton_osc", @"live_devices", @"absolute_mtc", @"mtc_bridge", @"sync_meter", @"show_backup"]],
+        @[@"MIDI et réseau", @[@"network_manager", @"network_tools", @"analyzer", @"performance_monitor", @"rtp_diagnostic", @"rtp_agent"]]
+    ];
+    for (NSArray *group in groups) {
+        NSStackView *section = [[NSStackView alloc] initWithFrame:NSZeroRect];
+        section.orientation = NSUserInterfaceLayoutOrientationVertical;
+        section.alignment = NSLayoutAttributeLeading;
+        section.spacing = 4;
+        [section addArrangedSubview:[self label:group[0] size:12 weight:NSFontWeightSemibold color:NSColor.lightGrayColor]];
+        self.componentGroups[group[0]] = section;
+        NSArray *ids = group[1];
+        for (NSUInteger index = 0; index < ids.count; index += 2) {
+            NSStackView *pair = [[NSStackView alloc] initWithFrame:NSZeroRect];
+            pair.orientation = NSUserInterfaceLayoutOrientationHorizontal;
+            pair.distribution = NSStackViewDistributionFillEqually;
+            pair.spacing = 8;
+            for (NSUInteger column = index; column < MIN(index + 2, ids.count); column++) {
+                for (NSArray<NSString *> *item in components) {
+                    if ([item[0] isEqualToString:ids[column]]) {
+                        [pair addArrangedSubview:[self componentCard:item[0] title:item[1] subtitle:item[2] iconName:item[3]]];
+                    }
+                }
+            }
+            [section addArrangedSubview:pair];
+            [pair.widthAnchor constraintEqualToAnchor:section.widthAnchor].active = YES;
+        }
+        [componentStack addArrangedSubview:section];
+        [section.widthAnchor constraintEqualToAnchor:componentStack.widthAnchor].active = YES;
     }
     [mainViews addObject:componentStack];
 
@@ -224,12 +266,12 @@ static void CLInstallApplicationMenu(void) {
     scrollContent.translatesAutoresizingMaskIntoConstraints = NO;
 
     for (NSView *view in mainViews) {
-        if (view != buttons) {
+        if (view == componentStack) {
             [scrollContent addArrangedSubview:view];
         }
     }
 
-    NSView *documentView = [[NSView alloc] initWithFrame:NSZeroRect];
+    NSView *documentView = [[CLInstallerDocumentView alloc] initWithFrame:NSZeroRect];
     documentView.translatesAutoresizingMaskIntoConstraints = NO;
     [documentView addSubview:scrollContent];
 
@@ -241,8 +283,11 @@ static void CLInstallApplicationMenu(void) {
     scrollView.borderType = NSNoBorder;
     scrollView.drawsBackground = NO;
     scrollView.documentView = documentView;
+    self.componentScroll = scrollView;
 
-    root = [NSStackView stackViewWithViews:@[scrollView, buttons]];
+    NSMutableArray *fixedViews = [NSMutableArray array];
+    for (NSView *view in mainViews) [fixedViews addObject:view == componentStack ? scrollView : view];
+    root = [NSStackView stackViewWithViews:fixedViews];
     root.orientation = NSUserInterfaceLayoutOrientationVertical;
     root.alignment = NSLayoutAttributeLeading;
     root.spacing = 12;
@@ -267,7 +312,7 @@ static void CLInstallApplicationMenu(void) {
         [scrollContent.topAnchor constraintEqualToAnchor:documentView.topAnchor],
         [scrollContent.bottomAnchor constraintEqualToAnchor:documentView.bottomAnchor],
 
-        [header.widthAnchor constraintEqualToAnchor:scrollContent.widthAnchor],
+        [header.widthAnchor constraintEqualToAnchor:scrollView.widthAnchor],
         [componentStack.widthAnchor constraintEqualToAnchor:scrollContent.widthAnchor]
     ]];
     [self.window makeKeyAndOrderFront:nil];
@@ -280,7 +325,7 @@ static void CLInstallApplicationMenu(void) {
 - (void)roleChanged:(id)sender {
     (void)sender;
     NSInteger role = self.roleSelector.selectedSegment;
-    NSArray *roles = @[@[@"show_control", @"network_manager", @"network_tools"],
+    NSArray *roles = @[@[@"show_control", @"showcue", @"cue_editor", @"network_manager", @"network_tools"],
         @[@"ableton_osc", @"live_devices", @"absolute_mtc"], @[@"mtc_bridge", @"sync_meter"],
         @[@"control_client"], @[@"show_backup", @"ableton_osc"],
         @[@"network_manager", @"network_tools", @"analyzer", @"performance_monitor", @"rtp_diagnostic"], @[]];
@@ -288,11 +333,46 @@ static void CLInstallApplicationMenu(void) {
         BOOL selected = role < 6 && [roles[role] containsObject:key];
         check.state = selected ? NSControlStateValueOn : NSControlStateValueOff;
         check.enabled = role == 6 || (role == 1 && ([key isEqualToString:@"rtp_agent"] || [key isEqualToString:@"mtc_bridge"]));
-        self.cards[key].alphaValue = selected || check.enabled ? 1.0 : 0.28;
+        self.cards[key].hidden = !(selected || check.enabled);
     }];
+    for (NSStackView *section in self.componentGroups.allValues) {
+        BOOL visible = NO;
+        for (NSView *view in section.arrangedSubviews) {
+            if (![view isKindOfClass:NSStackView.class]) continue;
+            NSStackView *pair = (NSStackView *)view;
+            BOOL pairVisible = NO;
+            for (NSView *card in pair.arrangedSubviews) if (!card.hidden) pairVisible = YES;
+            pair.hidden = !pairVisible;
+            visible |= pairVisible;
+        }
+        section.hidden = !visible;
+    }
+    NSArray *descriptions = @[
+        @"Sur ce Mac : moteur CL, conduite ShowCue, éditeur de cues et outils réseau.",
+        @"Sur le Mac qui lit Ableton : extensions Live. MTC Bridge et agent RTP sont optionnels.",
+        @"Pour recevoir et vérifier le timecode dans Logic ou un autre lecteur MTC.",
+        @"Pour accéder à un autre Mac : adresse HTTPS du serveur demandée à l’installation.",
+        @"Pour le poste de secours : intégration CL Show Backup externe requise.",
+        @"Pour vérifier les connexions et mesurer les performances MIDI.",
+        @"Cochez les applications souhaitées. ShowCue et Cue Editor utilisent le moteur local."
+    ];
+    self.roleHelp.stringValue = descriptions[role];
     self.liveSelector.enabled = role == 1 || role == 4 || role == 6;
     self.liveSection.hidden = !self.liveSelector.enabled;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self.window.contentView layoutSubtreeIfNeeded];
+        NSClipView *clip = self.componentScroll.contentView;
+        [clip scrollToPoint:NSZeroPoint];
+        [self.componentScroll reflectScrolledClipView:clip];
+    });
 
+}
+
+- (void)componentChanged:(id)sender {
+    if (self.roleSelector.selectedSegment == 6 && !self.uninstaller &&
+        (self.checks[@"showcue"].state == NSControlStateValueOn || self.checks[@"cue_editor"].state == NSControlStateValueOn)) {
+        self.checks[@"show_control"].state = NSControlStateValueOn;
+    }
 }
 
 - (void)cancelPressed:(id)sender { [NSApp terminate:nil]; }

@@ -1057,7 +1057,7 @@ static CFDataRef CLSimulatorControlCallback(CFMessagePortRef port, SInt32 messag
     targetPanel.wantsLayer = YES; targetPanel.layer.cornerRadius = 12; targetPanel.layer.borderWidth = 1;
     targetPanel.layer.backgroundColor = [NSColor colorWithRed:0.075 green:0.088 blue:0.11 alpha:1.0].CGColor;
     targetPanel.layer.borderColor = [NSColor colorWithWhite:0.24 alpha:1.0].CGColor; [content addSubview:targetPanel];
-    self.generalModeTitleLabel = [self label:@"CIBLE DISTANTE" frame:NSMakeRect(16, 72, 220, 18) size:10 bold:YES];
+    self.generalModeTitleLabel = [self label:@"CONNEXION RTP MANUELLE · DÉPANNAGE" frame:NSMakeRect(16, 72, 220, 18) size:10 bold:YES];
     [targetPanel addSubview:self.generalModeTitleLabel];
     self.remoteTargetTitleLabel = [self label:@"Bonjour · piloté par CL Show Control" frame:NSMakeRect(268, 72, 184, 18) size:8 bold:NO];
     [targetPanel addSubview:self.remoteTargetTitleLabel];
@@ -1239,7 +1239,7 @@ static CFDataRef CLSimulatorControlCallback(CFMessagePortRef port, SInt32 messag
     self.refreshButton.toolTip = @"Contrôle en lecture seule des ports IAC, RTP et du bridge MTC";
     [content addSubview:self.refreshButton];
     [self loadSimulatorDevices];
-    self.simulatorWindowButton = [self accentButton:@"Simulateur de retour…" frame:NSMakeRect(170, 53, 160, 32) action:@selector(openSimulatorWindow:) color:[NSColor colorWithRed:0.08 green:0.43 blue:0.39 alpha:1.0]];
+    self.simulatorWindowButton = [self accentButton:@"Simulateurs · AUTO / arrêt…" frame:NSMakeRect(170, 53, 160, 32) action:@selector(openSimulatorWindow:) color:[NSColor colorWithRed:0.08 green:0.43 blue:0.39 alpha:1.0]];
     [content addSubview:self.simulatorWindowButton];
     self.assistantTestBanner = [[NSView alloc] initWithFrame:NSMakeRect(80, 47, 340, 26)];
     self.assistantTestBanner.wantsLayer = YES;
@@ -1419,22 +1419,25 @@ static CFDataRef CLSimulatorControlCallback(CFMessagePortRef port, SInt32 messag
     NSString *endpoint = self.localReturnMode
         ? (self.returnMonitorSourceName ?: (self.localReturnDestination ? CLLocalReturnEndpointName : @"Aucun port MIDI détecté"))
         : (self.endpointMenu.selectedItem.title ?: @"");
-    NSString *returnMode = self.localReturnMode ? @"local_dedicated" : @"rtp_remote";
+    BOOL simulatedPath = [self activeSimulatorCount] > 0 && [self localReturnIsAvailable];
+    NSString *physicalEndpoint = endpoint;
+    if (simulatedPath) endpoint = CLLocalReturnEndpointName;
+    NSString *returnMode = simulatedPath ? @"simulated_local" : (self.localReturnMode ? @"local_dedicated" : @"rtp_remote");
     NSString *peer = self.targetMenu.selectedItem.title ?: @"";
     NSTimeInterval now = [[NSDate date] timeIntervalSince1970];
 
     BOOL endpointAvailable =
-        endpoint.length > 0 &&
-        ![endpoint hasPrefix:@"Aucun"];
+        physicalEndpoint.length > 0 &&
+        ![physicalEndpoint hasPrefix:@"Aucun"];
 
     BOOL endpointValidated =
         [self.lastRTPTestStatus isEqualToString:@"validated"] &&
         self.validatedEndpoint &&
-        [self.validatedEndpoint isEqualToString:endpoint];
+        [self.validatedEndpoint isEqualToString:physicalEndpoint];
 
     BOOL loopDetected =
         self.loopDetectedEndpoint &&
-        [self.loopDetectedEndpoint isEqualToString:endpoint];
+        [self.loopDetectedEndpoint isEqualToString:physicalEndpoint];
 
     NSString *testText =
         self.lastRTPTestMessage.length
@@ -1495,15 +1498,15 @@ static CFDataRef CLSimulatorControlCallback(CFMessagePortRef port, SInt32 messag
         @"online": @YES,
         @"return_mode": returnMode,
         @"return_source": endpoint,
-        @"monitor_source": self.localReturnMode ? CLLocalReturnEndpointName :
+        @"monitor_source": (self.localReturnMode || simulatedPath) ? CLLocalReturnEndpointName :
             (self.returnMonitorSource ? EndpointName(self.returnMonitorSource) : @""),
         @"monitor_status": @(self.returnMonitorStatus),
         @"expected_monitor_source": self.expectedMonitorSource
             ? EndpointName(self.expectedMonitorSource) : @"",
         @"expected_monitor_status": @(self.expectedMonitorStatus),
-        @"return_monitor_source": self.localReturnMode ? CLLocalReturnEndpointName :
+        @"return_monitor_source": (self.localReturnMode || simulatedPath) ? CLLocalReturnEndpointName :
             (self.returnMonitorSource ? EndpointName(self.returnMonitorSource) : @""),
-        @"return_monitor_status": @(self.returnMonitorStatus),
+        @"return_monitor_status": @(simulatedPath ? noErr : self.returnMonitorStatus),
         @"expected_devices": self.localReturnMode
             ? (self.expectedDeviceStates ?: @{})
             : @{},
@@ -1515,7 +1518,7 @@ static CFDataRef CLSimulatorControlCallback(CFMessagePortRef port, SInt32 messag
 
         @"rtp": @{
             @"peer": peer,
-            @"endpoint": endpoint,
+            @"endpoint": physicalEndpoint,
             @"available": @(endpointAvailable),
             @"validated": @(endpointValidated),
             @"loop_detected": @(loopDetected),
@@ -3098,7 +3101,7 @@ static CFDataRef CLSimulatorControlCallback(CFMessagePortRef port, SInt32 messag
 
 - (void)applyPresentationMode {
     BOOL detailed = self.showModeEnabled;
-    self.targetPanel.hidden = NO;
+    self.targetPanel.hidden = !detailed;
     self.technicalPanel.hidden = !detailed; self.settingsButton.hidden = !detailed;
     self.refreshButton.hidden = !detailed;
     self.assistantReturnPanel.hidden = detailed;
@@ -3109,13 +3112,13 @@ static CFDataRef CLSimulatorControlCallback(CFMessagePortRef port, SInt32 messag
     self.assistantDevicesButton.action = @selector(openDevicesEditor:);
     self.consoleLibrariesPanel.hidden = !detailed;
     self.programChangeReturnsPanel.hidden = !detailed;
-    self.simulatorWindowButton.hidden = !detailed;
-    self.assistantTestBanner.hidden = detailed || [self activeSimulatorCount] == 0;
+    self.simulatorWindowButton.hidden = NO;
+    self.assistantTestBanner.hidden = YES;
     self.compactSummary.hidden = YES;
-    self.showModeButton.title = detailed ? @"Vue Spectacle" : @"Diagnostic détaillé";
+    self.showModeButton.title = detailed ? @"Fermer diagnostic" : @"Diagnostic détaillé";
     self.remoteTargetTitleLabel.hidden = YES;
-    self.targetMenu.hidden = self.localReturnMode;
-    self.connectButton.hidden = self.localReturnMode;
+    self.targetMenu.hidden = !detailed || self.localReturnMode;
+    self.connectButton.hidden = !detailed || self.localReturnMode;
     self.localRTPNoteLabel.hidden = !detailed || !self.localReturnMode;
     self.localRTPDetailLabel.hidden = !detailed || !self.localReturnMode;
     self.operatingModeReasonLabel.hidden = YES;
@@ -3135,7 +3138,7 @@ static CFDataRef CLSimulatorControlCallback(CFMessagePortRef port, SInt32 messag
         CGFloat actionsY = 190.0;
 
         CGFloat programY =
-            actionsY + 41.0;
+            actionsY + 91.0;
 
         // Le diagnostic round-trip distant historique est retiré
         // du workflow principal. Le backend suit directement les
@@ -3149,7 +3152,7 @@ static CFDataRef CLSimulatorControlCallback(CFMessagePortRef port, SInt32 messag
         CGFloat toolsY =
             backendY + 116.0 + 12.0;
 
-        CGFloat toolsHeight = 38.0;
+        CGFloat toolsHeight = 0.0;
 
         CGFloat targetHeight =
             self.localReturnMode ? 58.0 : 90.0;
@@ -3186,7 +3189,7 @@ static CFDataRef CLSimulatorControlCallback(CFMessagePortRef port, SInt32 messag
             NSMakeRect(0, 0, 1, 1);
 
         self.showModeButton.frame =
-            NSMakeRect(348, appTitleY - 4.0, 120, 32);
+            NSMakeRect(332, appTitleY - 4.0, 152, 32);
 
         /*
          * Statut général
@@ -3205,7 +3208,7 @@ static CFDataRef CLSimulatorControlCallback(CFMessagePortRef port, SInt32 messag
         self.generalModeTitleLabel.stringValue =
             self.localReturnMode
                 ? @"PILOTÉ PAR CL SHOW CONTROL"
-                : @"CIBLE DISTANTE";
+                : @"CONNEXION RTP MANUELLE · DÉPANNAGE";
 
         self.generalModeTitleLabel.frame =
             self.localReturnMode
@@ -3245,10 +3248,10 @@ static CFDataRef CLSimulatorControlCallback(CFMessagePortRef port, SInt32 messag
          */
 
         self.assistantDevicesButton.frame =
-            NSMakeRect(16, toolsY, 228, toolsHeight);
+            NSMakeRect(16, actionsY + 50.0, 228, 38);
 
         self.simulatorWindowButton.frame =
-            NSMakeRect(256, toolsY, 228, toolsHeight);
+            NSMakeRect(256, actionsY + 50.0, 228, 38);
 
         /*
          * Backend & bibliothèques
@@ -3618,8 +3621,8 @@ static CFDataRef CLSimulatorControlCallback(CFMessagePortRef port, SInt32 messag
      * Le diagnostic RTP historique ayant disparu, le mode distant
      * n'a plus besoin des 104 px verticaux supplémentaires.
      */
-    CGFloat offset = 0.0;
-    NSSize targetContentSize = NSMakeSize(500, 650);
+    CGFloat offset = -90.0;
+    NSSize targetContentSize = NSMakeSize(500, 560);
     NSSize currentContentSize = self.window.contentView.bounds.size;
     if (fabs(currentContentSize.width - targetContentSize.width) > 0.5 ||
         fabs(currentContentSize.height - targetContentSize.height) > 0.5) {
@@ -3635,7 +3638,7 @@ static CFDataRef CLSimulatorControlCallback(CFMessagePortRef port, SInt32 messag
         : NSMakeRect(16, 392, 468, 58);
     self.testPanel.frame = NSMakeRect(0, 0, 1, 1);
     self.testPanel.hidden = YES;
-    self.generalModeTitleLabel.stringValue = self.localReturnMode ? @"PILOTÉ PAR CL SHOW CONTROL" : @"CIBLE DISTANTE";
+    self.generalModeTitleLabel.stringValue = self.localReturnMode ? @"PILOTÉ PAR CL SHOW CONTROL" : @"CONNEXION RTP MANUELLE · DÉPANNAGE";
     self.generalModeTitleLabel.frame = rtpMode ? NSMakeRect(16, 52, 230, 18) : NSMakeRect(16, 31, 250, 18);
     self.returnModeMenu.frame = rtpMode ? NSMakeRect(16, 23, 168, 30) : NSMakeRect(276, 12, 176, 34);
     self.remoteTargetTitleLabel.frame = NSMakeRect(240, 52, 212, 18);
@@ -3644,7 +3647,9 @@ static CFDataRef CLSimulatorControlCallback(CFMessagePortRef port, SInt32 messag
     self.connectButton.frame = NSMakeRect(324, 20, 128, 32);
     self.operatingModeReasonLabel.frame = rtpMode ? NSMakeRect(16, 3, 436, 15) : NSMakeRect(16, 6, 436, 18);
     self.assistantDevicesTitleLabel.frame = NSMakeRect(20, 313, 250, 22);
-    self.assistantDevicesButton.frame = NSMakeRect(246, 527 + offset, 106, 30);
+    self.assistantDevicesButton.frame = NSMakeRect(16, 47, 228, 32);
+    self.simulatorWindowButton.frame = NSMakeRect(256, 47, 228, 32);
+    self.targetPanel.hidden = YES;
     self.assistantReturnPanel.frame = NSMakeRect(16, 90, 468, 215);
     self.assistantDevicesScroll.frame = self.assistantReturnPanel.bounds;
     self.assistantTestBanner.frame = NSMakeRect(80, 47, 340, 26);
@@ -3673,24 +3678,11 @@ static CFDataRef CLSimulatorControlCallback(CFMessagePortRef port, SInt32 messag
 - (void)setLamp:(NSColor *)color title:(NSString *)title detail:(NSString *)detail {
     self.transportHeadline = title ?: @"";
     self.transportDetail = detail ?: @"";
-    if (!self.showModeEnabled) { [self updateAssistantPrimaryStatus]; return; }
-    self.lamp.layer.backgroundColor = color.CGColor;
-    self.lamp.layer.shadowColor = color.CGColor;
-    self.lamp.layer.shadowOpacity = 0.75;
-    self.lamp.layer.shadowRadius = 8;
-    self.headline.stringValue = title;
-    self.detail.stringValue = detail;
+    [self updateAssistantPrimaryStatus];
+
 }
 
 - (void)updateAssistantPrimaryStatus {
-    if (self.showModeEnabled) {
-        self.headline.stringValue =
-            self.transportHeadline.length
-                ? self.transportHeadline
-                : @"DIAGNOSTIC";
-        self.detail.stringValue = self.transportDetail ?: @"";
-        return;
-    }
 
     NSString *mode =
         self.localReturnMode ? @"Ableton local" : @"Ableton distant";
@@ -3757,7 +3749,12 @@ static CFDataRef CLSimulatorControlCallback(CFMessagePortRef port, SInt32 messag
     self.lamp.layer.shadowOpacity = 0.65;
     self.lamp.layer.shadowRadius = 7.0;
 
-    if (!self.localReturnMode) {
+    if ([self activeSimulatorCount] > 0 && [self localReturnIsAvailable]) {
+        self.headline.stringValue = @"SIMULATEURS LOCAUX · ACTIFS";
+        explanation = self.localReturnMode
+            ? @"Ableton local → simulateurs CL5 / QL1 → retour local."
+            : @"Ableton distant · simulateurs et retours sur ce Mac.";
+    } else if (!self.localReturnMode) {
         NSString *remoteState =
             [verdict isEqualToString:@"PRÊT"]
                 ? @"RTP DISTANT · PRÊT"
@@ -3974,8 +3971,8 @@ static CFDataRef CLSimulatorControlCallback(CFMessagePortRef port, SInt32 messag
             : @"Aucune cible RTP distante n’est actuellement détectée.");
     self.remoteTargetTitleLabel.hidden = YES;
     self.remoteTargetTitleLabel.stringValue = @"Bonjour · piloté par CL Show Control";
-    self.targetMenu.hidden = local;
-    self.connectButton.hidden = local;
+    self.targetMenu.hidden = !self.showModeEnabled || local;
+    self.connectButton.hidden = !self.showModeEnabled || local;
     self.localRTPNoteLabel.hidden = !self.showModeEnabled || !local;
     self.localRTPDetailLabel.hidden = !self.showModeEnabled || !local;
     if (self.simulatorModeLabel) self.simulatorModeLabel.stringValue = local ? @"Ableton local · piloté par CL Show Control" : @"Ableton distant · piloté par CL Show Control";
@@ -5244,6 +5241,9 @@ static void CLClearPersistedSimulatorAutoDeviceIDs(void) {
         [devices addObject:device];
     }
     if (deviceID && !devices.count) return @{@"ok": @NO, @"error": @"Appareil inconnu"};
+    if ([action isEqual:@"auto"] && !self.localReturnMode &&
+        ![self simulatorTransport:NULL endpoint:NULL delay:NULL])
+        return @{@"ok": @NO, @"error": self.simulatorStatusLabel.stringValue ?: @"Source MIDI automatique indisponible"};
     if (!deviceID && [action isEqual:@"stop"]) CLClearPersistedSimulatorAutoDeviceIDs();
     if (!self.simulatorCommandRetiringTasks) self.simulatorCommandRetiringTasks = [NSMutableDictionary dictionary];
     for (NSMutableDictionary *device in devices) {
@@ -5304,7 +5304,7 @@ static void CLClearPersistedSimulatorAutoDeviceIDs(void) {
         self.simulatorStopAllButton.enabled = YES;
         self.assistantTestStatusLabel.stringValue = [NSString stringWithFormat:@"Mode test actif · %lu appareil%@ simulé%@",
             (unsigned long)running, running > 1 ? @"s" : @"", running > 1 ? @"s" : @""];
-        self.assistantTestBanner.hidden = self.showModeEnabled;
+        self.assistantTestBanner.hidden = YES;
     } else {
         self.simulatorActivityLabel.stringValue = @"AUTO · ARRÊTÉ";
         self.simulatorActivityLabel.textColor = NSColor.secondaryLabelColor;
@@ -5842,12 +5842,18 @@ static void CLClearPersistedSimulatorAutoDeviceIDs(void) {
         [self appendSimulatorJournalKind:@"TX" message:[NSString stringWithFormat:@"%@  Ch.%ld  → %@  ERREUR destination", deviceName, (long)channel, endpoint]];
         return;
     }
-    if (!self.localReturnMode && ![CLLocalRTPEndpointNames() containsObject:endpoint]) {
+    BOOL dedicatedReturn = [endpoint isEqualToString:CLLocalReturnEndpointName];
+    if (dedicatedReturn && ![EndpointNames(NO) containsObject:endpoint]) {
+        [self showSimulatorOperatorMessage:@"CL MIDI Return Test indisponible" error:YES];
+        [self appendSimulatorJournalKind:@"TX" message:@"ERREUR destination de retour simulé absente"];
+        return;
+    }
+    if (!self.localReturnMode && !dedicatedReturn && ![CLLocalRTPEndpointNames() containsObject:endpoint]) {
         [self showSimulatorOperatorMessage:[NSString stringWithFormat:@"%@ · ÉCHEC D’ENVOI MIDI", operatorName] error:YES];
         [self appendSimulatorJournalKind:@"TX" message:[NSString stringWithFormat:@"%@  Ch.%ld  → %@  ERREUR endpoint RTP", deviceName, (long)channel, endpoint]];
         return;
     }
-    if (self.localReturnMode || !programChange) {
+    if (dedicatedReturn || self.localReturnMode || !programChange) {
         // CL MIDI Return Test est volontairement une destination virtuelle
         // uniquement. Un envoi local ne doit donc pas exiger de source
         // CoreMIDI homonyme ni passer par CLMIDIRoundTripTester.
@@ -6009,7 +6015,7 @@ static void CLClearPersistedSimulatorAutoDeviceIDs(void) {
 - (NSTask *)launchSimulatorDevice:(NSMutableDictionary *)device transport:(NSString *)transport endpoint:(NSString *)endpoint delay:(NSInteger)delay {
     if (!self.ownsPassiveReturnMonitor) return nil;
     if (self.lifecycleStopping) return nil;
-    if ([transport isEqualToString:@"iac"] && [@[@"CL5", @"QL1"] containsObject:device[@"name"]] && !self.supervisingLocalLaunch) {
+    if ([transport isEqualToString:@"iac"] && [@[@"CL5", @"QL1"] containsObject:device[@"name"]] && self.localReturnMode && !self.supervisingLocalLaunch) {
         CLPersistSimulatorAutoDeviceID(device[@"id"], YES);
         return nil; // The lock owner reconciles this request on the next backend observation.
     }
@@ -6352,8 +6358,6 @@ static void CLClearPersistedSimulatorAutoDeviceIDs(void) {
 
 - (void)reconcilePersistedSimulatorAutoDevicesAfterModeChange {
     if (!self.ownsPassiveReturnMonitor) return;
-    if (self.backgroundMonitorOnly)
-        return;
 
     NSSet<NSString *> *persisted =
         CLPersistedSimulatorAutoDeviceIDs();
@@ -6480,8 +6484,6 @@ static void CLClearPersistedSimulatorAutoDeviceIDs(void) {
 
 - (void)restorePersistedSimulatorAutoDevices {
     if (!self.ownsPassiveReturnMonitor) return;
-    if (self.backgroundMonitorOnly)
-        return;
 
     NSSet<NSString *> *persisted =
         CLPersistedSimulatorAutoDeviceIDs();

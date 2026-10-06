@@ -91,7 +91,7 @@ class HotBackup:
             info = {'state': 'OFFLINE', 'detail': 'Worker BACKUP sans réponse'}
         return {**info, 'mode': 'hot_backup', 'host': self.config.host,
                 'sent': self.sent, 'dropped': self.dropped,
-                'detail_note': 'EXT OFF manuel ; actions Show Control uniquement'}
+                'detail_note': 'EXT OFF manuel ; commandes CL et scènes Session directes'}
 
     def _write(self, sock, cfg, address, args=()):
         builder = OscMessageBuilder(address=address)

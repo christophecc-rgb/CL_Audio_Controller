@@ -23,6 +23,10 @@ SRC="$(find "$TMP" -maxdepth 1 -type d -name 'AbletonOSC-*' | head -1)"
 if [ -z "$SRC" ]; then echo "❌ Dossier AbletonOSC introuvable après extraction."; exit 1; fi
 rm -rf "$TARGET/AbletonOSC"
 cp -R "$SRC" "$TARGET/AbletonOSC"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if command -v python3 >/dev/null 2>&1 && [ -f "$SCRIPT_DIR/install_fast_poll.py" ]; then
+    python3 "$SCRIPT_DIR/install_fast_poll.py" --target "$TARGET/AbletonOSC"
+fi
 echo "✅ AbletonOSC copié dans :"
 echo "$TARGET/AbletonOSC"
 echo ""
