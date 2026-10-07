@@ -1,6 +1,9 @@
 #import <AppKit/AppKit.h>
 #import <CoreMIDI/CoreMIDI.h>
 #import <stdatomic.h>
+#import <ifaddrs.h>
+#import <net/if.h>
+#import <net/if_dl.h>
 
 static atomic_ulong CLMessageCount;
 static atomic_ulong CLByteCount;
@@ -54,6 +57,15 @@ static void CLInstallApplicationMenu(void) {
 @property NSTimer *timer;
 @property NSFileHandle *report;
 @property NSString *reportPath;
+@property NSTextField *networkLabel;
+@property NSTextField *protocolLabel;
+@property NSFileHandle *detailReport;
+@property NSMutableArray *samples;
+@property NSMutableDictionary *previousInterfaces;
+@property NSURLSession *session;
+@property BOOL telemetryBusy;
+@property NSDate *startedAt;
+@property NSString *recordingID;
 @property MIDIClientRef midiClient;
 @property MIDIPortRef midiInput;
 @property BOOL measuring;
@@ -80,7 +92,7 @@ static void CLInstallApplicationMenu(void) {
     self.window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0,0,520,390)
                                               styleMask:NSWindowStyleMaskTitled|NSWindowStyleMaskClosable|NSWindowStyleMaskMiniaturizable
                                                 backing:NSBackingStoreBuffered defer:NO];
-    self.window.title = @"CL MIDI Performance Monitor";
+    self.window.title = @"CL MIDI Performance Monitor · Rapport détaillé";
     self.window.backgroundColor = [NSColor colorWithRed:.035 green:.045 blue:.06 alpha:1];
     [self.window center]; [self.window makeKeyAndOrderFront:nil]; [NSApp activateIgnoringOtherApps:YES];
     NSView *view = self.window.contentView;
@@ -95,6 +107,12 @@ static void CLInstallApplicationMenu(void) {
     self.reportLabel = [self label:@"Le rapport sera enregistré sur le Bureau." frame:NSMakeRect(24,105,472,28) size:10 bold:NO]; [view addSubview:self.reportLabel];
     self.toggleButton = [[NSButton alloc] initWithFrame:NSMakeRect(24,35,472,58)];
     self.toggleButton.title = @"DÉMARRER LA MESURE"; self.toggleButton.bezelStyle = NSBezelStyleRounded;
+    NSRect expanded=self.window.frame; expanded.size.height+=130; [self.window setFrame:expanded display:YES];
+    for(NSView *item in view.subviews){NSRect f=item.frame;f.origin.y+=130;item.frame=f;}
+    self.toggleButton.frame=NSMakeRect(24,35,472,58);
+    self.networkLabel=[self label:@"Réseau du Mac · en attente" frame:NSMakeRect(24,190,472,30) size:12 bold:YES];[view addSubview:self.networkLabel];
+    self.protocolLabel=[self label:@"OSC / Backup / LTC · en attente" frame:NSMakeRect(24,150,472,36) size:11 bold:NO];[view addSubview:self.protocolLabel];
+    [view addSubview:[self label:@"Réseau : toutes applications · CPU : un cœur ≠ tout le Mac" frame:NSMakeRect(24,108,472,28) size:10 bold:NO]];
     self.toggleButton.target = self; self.toggleButton.action = @selector(toggle:); [view addSubview:self.toggleButton];
 }
 
@@ -134,11 +152,62 @@ static void CLInstallApplicationMenu(void) {
 
 - (void)toggle:(id)sender { (void)sender; self.measuring ? [self stop] : [self start]; }
 
+- (NSDictionary *)interfaceSnapshot {
+    NSMutableDictionary *result=NSMutableDictionary.dictionary;
+    struct ifaddrs *list=NULL;
+    if(getifaddrs(&list)!=0)return result;
+    for(struct ifaddrs *item=list;item;item=item->ifa_next){
+        if(!item->ifa_addr || item->ifa_addr->sa_family!=AF_LINK || !item->ifa_data || (item->ifa_flags&IFF_LOOPBACK) || !(item->ifa_flags&IFF_UP))continue;
+        struct if_data *data=item->ifa_data;
+        result[@(item->ifa_name)]=@{@"rx_bytes":@(data->ifi_ibytes),@"tx_bytes":@(data->ifi_obytes),@"input_errors":@(data->ifi_ierrors),@"output_errors":@(data->ifi_oerrors)};
+    }
+    freeifaddrs(list);return result;
+}
+
+- (void)collectTelemetry:(NSMutableDictionary *)sample {
+    if(self.telemetryBusy){sample[@"telemetry_status"]=@"previous_request_pending";return;}
+    self.telemetryBusy=YES;NSString *recording=self.recordingID;
+    dispatch_group_t group=dispatch_group_create();NSMutableDictionary *responses=NSMutableDictionary.dictionary;
+    NSDictionary *paths=@{@"status":@"/status",@"backup":@"/api/hot-backup"};
+    for(NSString *name in paths){
+        dispatch_group_enter(group);
+        NSURL *url=[NSURL URLWithString:[@"http://127.0.0.1:5050" stringByAppendingString:paths[name]]];
+        NSMutableURLRequest *request=[NSMutableURLRequest requestWithURL:url];request.timeoutInterval=0.8;
+        [[self.session dataTaskWithRequest:request completionHandler:^(NSData *data,NSURLResponse *response,NSError *error){
+            id parsed=data?[NSJSONSerialization JSONObjectWithData:data options:0 error:nil]:nil;
+            dispatch_async(dispatch_get_main_queue(),^{
+                if(!error && [(NSHTTPURLResponse *)response statusCode]==200 && [parsed isKindOfClass:NSDictionary.class])responses[name]=parsed;
+                dispatch_group_leave(group);
+            });
+        }] resume];
+    }
+    dispatch_group_notify(group,dispatch_get_main_queue(),^{
+        if(![self.recordingID isEqual:recording])return;
+        self.telemetryBusy=NO;NSDictionary *status=responses[@"status"],*backup=responses[@"backup"];
+        if(!status){sample[@"telemetry_status"]=@"unavailable";self.protocolLabel.stringValue=@"Show Control indisponible · mesures locales conservées";}
+        else{
+            sample[@"telemetry_status"]=@"available";
+            for(NSString *key in @[@"server_instance_id",@"ableton_target",@"osc_transport",@"ltc_connected",@"ltc_timecode",@"midi_devices",@"console_return_mode"]){if(status[key])sample[key]=status[key];}
+            NSDictionary *osc=status[@"osc_transport"]?:@{};
+            self.protocolLabel.stringValue=[NSString stringWithFormat:@"OSC %@ ms · Backup %@ · LTC %@",[osc[@"last_latency_ms"] isKindOfClass:NSNumber.class]?[NSString stringWithFormat:@"%.2f",[osc[@"last_latency_ms"] doubleValue]]:@"—",backup[@"state"]?:@"indisponible",[status[@"ltc_connected"] boolValue]?@"reçu":@"absent"];
+        }
+        if(backup)sample[@"hot_backup"]=backup;
+        else sample[@"backup_telemetry_status"]=@"unavailable";
+        if(self.measuring){NSData *json=[NSJSONSerialization dataWithJSONObject:sample options:0 error:nil];[self.detailReport writeData:json];[self.detailReport writeData:[@"\n" dataUsingEncoding:NSUTF8StringEncoding]];}
+    });
+}
+
 - (void)start {
     NSDateFormatter *formatter = [[NSDateFormatter alloc] init]; formatter.dateFormat = @"yyyy-MM-dd_HHmmss";
-    self.reportPath = [NSHomeDirectory() stringByAppendingPathComponent:[NSString stringWithFormat:@"Desktop/CL_Performance_%@.csv",[formatter stringFromDate:NSDate.date]]];
+    NSString *reportDirectory=NSProcessInfo.processInfo.environment[@"CL_PERF_REPORT_DIR"] ?: [NSHomeDirectory() stringByAppendingPathComponent:@"Desktop"];
+    self.reportPath = [reportDirectory stringByAppendingPathComponent:[NSString stringWithFormat:@"CL_Performance_%@.csv",[formatter stringFromDate:NSDate.date]]];
     [NSFileManager.defaultManager createFileAtPath:self.reportPath contents:[@"timestamp,ableton_cpu_one_core_percent,ableton_cpu_total_mac_percent,ableton_memory_mb,cl_tools_cpu_one_core_percent,cl_tools_cpu_total_mac_percent,cl_tools_memory_mb,midi_messages_per_second,midi_bytes_per_second,program_changes_per_second,program_changes_total,last_program_channel,last_program_number\n" dataUsingEncoding:NSUTF8StringEncoding] attributes:nil];
     self.report = [NSFileHandle fileHandleForWritingAtPath:self.reportPath]; [self.report seekToEndOfFile];
+    self.startedAt=NSDate.date;self.recordingID=NSUUID.UUID.UUIDString;self.samples=NSMutableArray.array;
+    self.previousInterfaces=NSMutableDictionary.dictionary;
+    self.session=[NSURLSession sessionWithConfiguration:NSURLSessionConfiguration.ephemeralSessionConfiguration];
+    NSString *detailPath=[[self.reportPath stringByDeletingPathExtension] stringByAppendingPathExtension:@"jsonl"];
+    [NSFileManager.defaultManager createFileAtPath:detailPath contents:nil attributes:nil];self.detailReport=[NSFileHandle fileHandleForWritingAtPath:detailPath];
     self.peakCPU=0; self.peakMessages=0; self.peakBytes=0; self.lastMessages=0; self.lastBytes=0; self.lastPrograms=0;
     [self startMidi]; self.measuring=YES; self.toggleButton.title=@"ARRÊTER ET ENREGISTRER";
     self.headline.stringValue=@"MESURE EN COURS"; self.headline.textColor=[NSColor colorWithRed:.35 green:.85 blue:.55 alpha:1];
@@ -162,18 +231,77 @@ static void CLInstallApplicationMenu(void) {
     NSString *lastProgramText = lastProgram >= 0
         ? [NSString stringWithFormat:@"dernier PC · ch.%d n°%d",lastProgramChannel,lastProgram]
         : @"aucun PC reçu";
-    self.midiLabel.stringValue=[NSString stringWithFormat:@"MIDI · %lu msg/s · PC %lu/s · total %lu · %@",messages,programs,totalPrograms,lastProgramText];
+    self.midiLabel.stringValue=[NSString stringWithFormat:@"MIDI estimé · %lu msg/s · PC %lu/s · total %lu · %@",messages,programs,totalPrograms,lastProgramText];
     self.peakLabel.stringValue=[NSString stringWithFormat:@"Pics · CPU %.1f %% · MIDI %lu msg/s · %lu octets/s",self.peakCPU,self.peakMessages,self.peakBytes];
-    BOOL red=cpu>=85||messages>=1000, orange=cpu>=60||messages>=250;
-    self.headline.stringValue=red?@"CHARGE ÉLEVÉE":(orange?@"À SURVEILLER":@"MESURE NORMALE");
-    self.headline.textColor=red?NSColor.systemRedColor:(orange?NSColor.systemOrangeColor:NSColor.systemGreenColor);
+    self.headline.stringValue=@"MESURE EN COURS";
+    self.headline.textColor=[NSColor colorWithRed:.35 green:.85 blue:.55 alpha:1];
     NSString *line=[NSString stringWithFormat:@"%.3f,%.2f,%.2f,%.2f,%.2f,%.2f,%.2f,%lu,%lu,%lu,%lu,%d,%d\n",NSDate.date.timeIntervalSince1970,cpu,totalMacCPU,memory,clCPU,clTotalMacCPU,clMemory,messages,bytes,programs,totalPrograms,lastProgramChannel,lastProgram];
     [self.report writeData:[line dataUsingEncoding:NSUTF8StringEncoding]];
+    NSDictionary *interfaces=[self interfaceSnapshot];NSMutableDictionary *deltas=NSMutableDictionary.dictionary;
+    double rx=0,tx=0;
+    for(NSString *name in interfaces){NSDictionary *now=interfaces[name],*old=self.previousInterfaces[name];if(!old)continue;
+        NSMutableDictionary *delta=NSMutableDictionary.dictionary;
+        for(NSString *key in now){unsigned long long a=[now[key] unsignedLongLongValue],b=[old[key] unsignedLongLongValue];delta[key]=a>=b?@(a-b):NSNull.null;}
+        deltas[name]=delta;if(delta[@"rx_bytes"]!=NSNull.null)rx+=[delta[@"rx_bytes"] doubleValue];if(delta[@"tx_bytes"]!=NSNull.null)tx+=[delta[@"tx_bytes"] doubleValue];
+    }
+    self.previousInterfaces=[interfaces mutableCopy];
+    NSTimeInterval timestamp=NSDate.date.timeIntervalSince1970;
+    NSDictionary *last=self.samples.lastObject;
+    double interval=last?timestamp-[last[@"timestamp"] doubleValue]:timestamp-self.startedAt.timeIntervalSince1970;
+    NSMutableDictionary *sample=[@{@"timestamp":@(timestamp),@"interval_seconds":@(interval),@"ableton_cpu_one_core_percent":@(cpu),@"ableton_cpu_total_mac_percent":@(totalMacCPU),@"ableton_memory_mb":@(memory),@"cl_cpu_one_core_percent":@(clCPU),@"cl_memory_mb":@(clMemory),@"network_interfaces_delta":deltas,@"network_rx_bytes":@(rx),@"network_tx_bytes":@(tx),@"midi_bytes":@(bytes),@"midi_message_estimate":@(messages),@"telemetry_status":@"pending"} mutableCopy];
+    [self.samples addObject:sample];
+    self.networkLabel.stringValue=interval>0?[NSString stringWithFormat:@"Réseau Mac · RX %.1f kbit/s · TX %.1f kbit/s",rx*8/interval/1000,tx*8/interval/1000]:@"Réseau : référence initiale";
+    [self collectTelemetry:sample];
 }
 
 - (void)stop {
     [self.timer invalidate]; self.timer=nil; if(self.midiInput) MIDIPortDispose(self.midiInput); if(self.midiClient) MIDIClientDispose(self.midiClient); self.midiInput=0; self.midiClient=0;
-    [self.report closeFile]; self.report=nil; self.measuring=NO; self.toggleButton.title=@"DÉMARRER UNE NOUVELLE MESURE";
+    [self.report closeFile]; self.report=nil;[self.detailReport closeFile];self.detailReport=nil;
+    [self.session invalidateAndCancel];self.recordingID=nil;self.telemetryBusy=NO;
+    NSMutableData *allDetails=NSMutableData.data;
+    for(NSDictionary *sample in self.samples){NSData *data=[NSJSONSerialization dataWithJSONObject:sample options:0 error:nil];if(data){[allDetails appendData:data];[allDetails appendData:[@"\n" dataUsingEncoding:NSUTF8StringEncoding]];}}
+    [allDetails writeToFile:[[self.reportPath stringByDeletingPathExtension] stringByAppendingPathExtension:@"jsonl"] atomically:YES];
+    double totalCPU=0,totalRX=0,totalTX=0,peakTotalCPU=0;NSUInteger available=0;
+    for(NSDictionary *sample in self.samples){double value=[sample[@"ableton_cpu_total_mac_percent"] doubleValue];totalCPU+=value;peakTotalCPU=MAX(peakTotalCPU,value);totalRX+=[sample[@"network_rx_bytes"] doubleValue];totalTX+=[sample[@"network_tx_bytes"] doubleValue];if([sample[@"telemetry_status"] isEqual:@"available"])available++;}
+    NSString *summary=[NSString stringWithFormat:@"CL PERFORMANCE — %@\nMachine : %@\nDurée : %.1f s · %lu échantillons\nAbleton CPU moyen : %.2f %% du Mac · pic : %.2f %% du Mac\nRéseau RX : %.0f octets · TX : %.0f octets\nTélémétrie disponible : %lu / %lu\n\nPÉRIMÈTRE ET LIMITES\nCPU macOS, pas le CPU audio interne de Live. Réseau : toutes applications et interfaces actives hors boucle locale ; les interfaces virtuelles peuvent compter le même trafic plusieurs fois. Deltas de compteurs réseau, pas une capture de paquets. MIDI : octets reçus par CoreMIDI ; nombre de messages estimé. OSC : dernier délai de réponse du moteur, pas un décalage audio ni un délai exact du backup. Aucun CPU du Mac distant sans mesure sur ce Mac. Les compteurs cumulatifs peuvent repartir à zéro après redémarrage : consulter server_instance_id. Pas de conclusion automatique de saturation. La collecte ajoute deux requêtes HTTP locales par seconde et le coût de ps ; elle doit rester identique entre essais comparés. Les détails JSONL contiennent les mesures et états disponibles, avec les titres de retours consoles disponibles.\n",[NSDateFormatter localizedStringFromDate:self.startedAt dateStyle:NSDateFormatterMediumStyle timeStyle:NSDateFormatterMediumStyle],NSProcessInfo.processInfo.hostName,[NSDate.date timeIntervalSinceDate:self.startedAt],(unsigned long)self.samples.count,self.samples.count?totalCPU/self.samples.count:0,peakTotalCPU,totalRX,totalTX,(unsigned long)available,(unsigned long)self.samples.count];
+    double cpuCL=0,peakCL=0,maxMemory=0,backupOnline=0,backupOffline=0,ltcPresent=0;
+    NSMutableArray<NSNumber *> *latencies=NSMutableArray.array;
+    NSMutableSet *seenResponses=NSMutableSet.set;
+    NSMutableDictionary *interfaceTotals=NSMutableDictionary.dictionary;
+    NSDictionary *firstOSC=nil,*lastOSC=nil,*firstBackup=nil,*lastBackup=nil;
+    BOOL counterReset=NO;
+    id instance=nil;
+    for(NSDictionary *sample in self.samples){
+        cpuCL+=[sample[@"cl_cpu_one_core_percent"] doubleValue];peakCL=MAX(peakCL,[sample[@"cl_cpu_one_core_percent"] doubleValue]);maxMemory=MAX(maxMemory,[sample[@"ableton_memory_mb"] doubleValue]);
+        double interval=[sample[@"interval_seconds"] doubleValue];
+        if([sample[@"ltc_connected"] boolValue])ltcPresent+=interval;
+        NSDictionary *backup=sample[@"hot_backup"];
+        if([backup[@"state"] isEqual:@"ONLINE"])backupOnline+=interval;
+        else if([backup[@"mode"] isEqual:@"hot_backup"])backupOffline+=interval;
+        if(backup[@"sent"]){if(!firstBackup)firstBackup=backup;lastBackup=backup;}
+        if(instance && sample[@"server_instance_id"] && ![instance isEqual:sample[@"server_instance_id"]])counterReset=YES;
+        if(sample[@"server_instance_id"])instance=sample[@"server_instance_id"];
+        NSDictionary *osc=sample[@"osc_transport"];
+        if(osc){if(!firstOSC)firstOSC=osc;lastOSC=osc;}
+        NSNumber *at=osc[@"last_response_at"],*latency=osc[@"last_latency_ms"];
+        if(at && at!= (id)NSNull.null && latency && latency!=(id)NSNull.null && ![seenResponses containsObject:at]){[seenResponses addObject:at];[latencies addObject:latency];}
+        NSDictionary *interfaces=sample[@"network_interfaces_delta"];
+        for(NSString *name in interfaces){NSMutableDictionary *total=interfaceTotals[name];if(!total){total=NSMutableDictionary.dictionary;interfaceTotals[name]=total;}
+            for(NSString *key in interfaces[name]){id value=interfaces[name][key];if(value!=NSNull.null)total[key]=@([total[key] unsignedLongLongValue]+[value unsignedLongLongValue]);}
+        }
+    }
+    [latencies sortUsingSelector:@selector(compare:)];
+    double latencySum=0;for(NSNumber *n in latencies)latencySum+=n.doubleValue;
+    NSMutableString *details=[NSMutableString stringWithFormat:@"\nCOMPLÉMENTS\nOutils CL CPU moyen : %.2f %% d’un cœur · pic : %.2f %%\nAbleton mémoire maximale : %.0f Mo\nBackup observé ONLINE : %.1f s · actif mais non ONLINE : %.1f s\nLTC reçu observé : %.1f s\n",self.samples.count?cpuCL/self.samples.count:0,peakCL,maxMemory,backupOnline,backupOffline,ltcPresent];
+    if(latencies.count){NSUInteger p95=(NSUInteger)ceil(latencies.count*.95)-1;[details appendFormat:@"Derniers délais OSC distincts observés (%lu) : moyenne %.2f ms · médiane %.2f ms · P95 %.2f ms · maximum %.2f ms\n",(unsigned long)latencies.count,latencySum/latencies.count,(latencies[(latencies.count-1)/2].doubleValue+latencies[latencies.count/2].doubleValue)/2,latencies[p95].doubleValue,latencies.lastObject.doubleValue];}
+    else [details appendString:@"Délais OSC : indisponibles\n"];
+    if(!counterReset && firstOSC && lastOSC && [lastOSC[@"timeout_count"] longLongValue]>=[firstOSC[@"timeout_count"] longLongValue])[details appendFormat:@"Timeouts OSC entre premières et dernières mesures : %lld\n",[lastOSC[@"timeout_count"] longLongValue]-[firstOSC[@"timeout_count"] longLongValue]];
+    else [details appendString:@"Timeouts OSC : indisponibles ou redémarrage détecté\n"];
+    if(!counterReset && firstBackup && lastBackup && [lastBackup[@"sent"] longLongValue]>=[firstBackup[@"sent"] longLongValue] && [lastBackup[@"dropped"] longLongValue]>=[firstBackup[@"dropped"] longLongValue]) [details appendFormat:@"Backup commandes envoyées : %lld · abandonnées : %lld (ne mesure pas les pertes réseau)\n",[lastBackup[@"sent"] longLongValue]-[firstBackup[@"sent"] longLongValue],[lastBackup[@"dropped"] longLongValue]-[firstBackup[@"dropped"] longLongValue]];
+    else [details appendString:@"Compteurs backup : indisponibles ou réinitialisés\n"];
+    [details appendFormat:@"Réseau PAR INTERFACE (octets et erreurs du pilote) :\n%@\nLes durées sont estimées aux points d’échantillonnage, pas une mesure continue. Les délais OSC sont des derniers délais observés, pas chaque échange réseau. Retours consoles détaillés dans le fichier JSONL.\n",interfaceTotals];
+    summary=[summary stringByAppendingString:details];
+    [summary writeToFile:[[self.reportPath stringByDeletingPathExtension] stringByAppendingPathExtension:@"txt"] atomically:YES encoding:NSUTF8StringEncoding error:nil]; self.measuring=NO; self.toggleButton.title=@"DÉMARRER UNE NOUVELLE MESURE";
     self.headline.stringValue=@"RAPPORT ENREGISTRÉ"; self.headline.textColor=NSColor.systemGreenColor;
     self.reportLabel.stringValue=self.reportPath;
 }
@@ -182,4 +310,14 @@ static void CLInstallApplicationMenu(void) {
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender { (void)sender; return YES; }
 @end
 
-int main(int argc,const char *argv[]){(void)argc;(void)argv;@autoreleasepool{NSApplication *app=NSApplication.sharedApplication;CLPerformanceDelegate *delegate=[[CLPerformanceDelegate alloc]init];app.delegate=delegate;[app setActivationPolicy:NSApplicationActivationPolicyRegular];[app run];}return 0;}
+int main(int argc,const char *argv[]){@autoreleasepool{
+    NSApplication *app=NSApplication.sharedApplication;CLPerformanceDelegate *delegate=[[CLPerformanceDelegate alloc]init];
+    if(argc==3 && strcmp(argv[1],"--self-test-report")==0){
+        setenv("CL_PERF_REPORT_DIR",argv[2],1);
+        [delegate start];
+        NSDate *until=[NSDate dateWithTimeIntervalSinceNow:3.2];
+        while(until.timeIntervalSinceNow>0)[NSRunLoop.currentRunLoop runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:.1]];
+        [delegate stop];printf("%s\n",delegate.reportPath.UTF8String);return 0;
+    }
+    app.delegate=delegate;[app setActivationPolicy:NSApplicationActivationPolicyRegular];[app run];
+}return 0;}

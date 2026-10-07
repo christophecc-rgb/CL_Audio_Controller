@@ -16,15 +16,16 @@ for(const device of [
  {...devices[0],expected_activated_at:999.5,returned_at:999},
  {...devices[0],returned_at:960,validation_status:'confirmed'},
 ])assert.notEqual(health(state,[device,devices[1]]).level,'ok');
+// Waiting and old returns are neutral; mismatch and unavailable remain warnings/errors.
 let result=health(state,devices.map(d=>({...d,returned_at:null,returned_midi_program:null})));
-assert.equal(result.level,'warning');assert.match(result.title,/AUCUN RETOUR/);assert.doesNotMatch(result.title,/SIMULATEURS ARRÊTÉS/);
+assert.equal(result.level,'neutral');assert.equal(result.title,'MONITEUR RETOURS ACTIF');assert.match(result.detail,/premier retour/);assert.doesNotMatch(result.title,/SIMULATEURS ARRÊTÉS/);
 result=health(state,[{...devices[0],returned_midi_program:43},devices[1]]);assert.equal(result.cards[0].status,'mismatch');assert.equal(result.level,'warning');
-result=health(state,devices.map(d=>({...d,returned_at:950})));assert.equal(result.cards[0].status,'stale');assert.equal(result.level,'warning');
-assert.equal(health(state,devices.map(d=>({...d,expected_activated_at:null}))).level,'warning');
+result=health(state,devices.map(d=>({...d,returned_at:950})));assert.equal(result.cards[0].status,'stale');assert.equal(result.level,'neutral');
+assert.equal(health(state,devices.map(d=>({...d,expected_activated_at:null}))).level,'neutral');
 assert.equal(health(state,devices.map(d=>({...d,expected_midi_program:0,returned_midi_program:0}))).level,'ok');
-assert.equal(health(state,devices.map(d=>({...d,expected_midi_program:null}))).level,'warning');
-assert.equal(health(state,devices.map(d=>({...d,returned_at:1010}))).level,'warning');
+assert.equal(health(state,devices.map(d=>({...d,expected_midi_program:null}))).level,'neutral');
+assert.equal(health(state,devices.map(d=>({...d,returned_at:1010}))).level,'neutral');
 console.log('PASS console health: null, missing monitor/endpoint, OK, waiting, mismatch, stale, old matching, PC 0, missing intent, future clock');
 
-result=health(state,devices.map(d=>({...d,returned_at:950})));assert.equal(result.title,'BACKEND ACTIF · RETOUR ANCIEN');assert.match(result.detail,/conforme.*50 s.*seuil 30 s/);
+result=health(state,devices.map(d=>({...d,returned_at:950})));assert.equal(result.title,'MONITEUR RETOURS ACTIF');assert.match(result.detail,/conforme.*50 s/);
 result=health(state,devices.map((d,i)=>({...d,returned_at:i?940:950})));assert.match(result.detail,/CL5 50 s.*QL1 1 min/);

@@ -10,10 +10,11 @@ let active='local',posts=[];
 const fixture=()=>({ableton_profiles:{local,remote},ableton_active_mode:active,
  ableton_server_target:{...local}, // Old process deliberately disagrees with saved remote target.
  ableton_config:active==='remote'?remote:local,events:[],midi_console:{}});
-const context=vm.createContext({el,console,setTimeout:fn=>fn(),
- setTech(){},updateShowCurrent(){},showDevicesForState:()=>[],syncShowDeviceDom(){},renderConsoleHealth:()=>({cards:[]}),renderCLServer(){},
+const context=vm.createContext({el,console,URL,setTimeout:fn=>fn(),
+ updateLtcReception(){},setTech(){},updateShowCurrent(){},showDevicesForState:()=>[],syncShowDeviceDom(){},renderConsoleHealth:()=>({cards:[]}),renderCLServer(){},
  fetch:async(url,opts)=>{const p=JSON.parse(opts.body);posts.push(p);if(!p.cl_server){active=p.mode;assert.equal(p.host,active==='remote'?'192.168.1.53':'127.0.0.1')}return {ok:true,json:async()=>({message:'OK'})}}});
 vm.runInContext(`let latestState,networkDrafts={},networkVisibleMode,networkFormDirty=false,networkFormInitialized=false,clServerDirty=false,clServerInitialized=false;\n`+
+ section('// ABLETON_DISCOVERY_BEGIN','// ABLETON_DISCOVERY_END')+
  section('function render(s){','async function refresh()')+
  section('function copyNetworkDraft(','async function testAbletonConnection()')+
  section('async function saveCLServer(){','function renderCLServer(s)')+

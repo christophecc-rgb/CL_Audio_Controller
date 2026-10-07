@@ -13,7 +13,7 @@ vm.runInContext(source.slice(a,b),ctx);
 (async()=>{
  el('cl-backup-host').value='192.168.1.138';el('cl-backup-ext').checked=true;el('cl-backup-set').checked=true;
  await el('cl-backup-apply').onclick.call(el('cl-backup-apply'));
- assert.deepEqual(calls[0],{mode:'hot_backup',host:'192.168.1.138',ext_off:true,same_set:true});
+ assert.deepEqual(calls[0],{mode:'hot_backup',host:'192.168.1.138',bonjour_name:'192.168.1.138',ext_off:true,same_set:true});
  assert.equal(el('cl-backup-disable').disabled,false);
  await el('cl-backup-disable').onclick.call(el('cl-backup-disable'));
  assert.deepEqual(calls[1],{mode:'mtc'});
@@ -23,6 +23,7 @@ vm.runInContext(source.slice(a,b),ctx);
  el('cl-backup-host').value='MacBook-Pro.local';
  await el('cl-backup-apply').onclick.call(el('cl-backup-apply'));
  assert.equal(calls[2].host,'192.168.1.138');
+ assert.equal(calls[2].bonjour_name,'MacBook-Pro.local');
  el('cl-backup-host').value='Absent.local';
  await el('cl-backup-apply').onclick.call(el('cl-backup-apply'));
  assert.equal(calls.length,3);

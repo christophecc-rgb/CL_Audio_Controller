@@ -112,6 +112,7 @@
       if (clock) {
         clock.baseFrames = active ? parseLtcFrames(value, clock.fps) : null;
         clock.syncedAt = performance.now();
+        clock.playing = active && state.is_playing === true && state.is_paused !== true;
       }
       const display = element.closest('.ltc-display');
       if (display) {
@@ -173,7 +174,6 @@
       currentCard.classList.contains('live')
     );
     document.body.classList.toggle('v2-playing', Boolean(playing));
-    if (sharedLtcTimecode) window.CLRemoteLTC.setPlaying(sharedLtcTimecode, Boolean(playing));
   };
 
   if (status) new MutationObserver(syncState).observe(status, {attributes: true, childList: true, subtree: true});

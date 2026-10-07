@@ -118,11 +118,42 @@ class OSCTransportTests(unittest.TestCase):
         self.assertEqual(received, [("/live/scene/get/name", (8, "Autre"))])
         self.assertEqual(transport.timeout_count, 1)
 
+    def test_priority_query_overtakes_queued_background_reads(self):
+        transport = self.make_transport()
+        order = []
+        def enter(label, priority=False):
+            with transport.serialized_queries(priority=priority):
+                order.append(label)
+        with transport.serialized_queries():
+            background = threading.Thread(target=enter, args=("background",))
+            urgent = threading.Thread(target=enter, args=("go", True))
+            background.start()
+            urgent.start()
+            deadline = time.monotonic() + 1
+            while transport._priority_query_waiters == 0 and time.monotonic() < deadline:
+                time.sleep(0.001)
+            self.assertEqual(transport._priority_query_waiters, 1)
+        background.join(1)
+        urgent.join(1)
+        self.assertEqual(order, ["go", "background"])
+
     def test_timeout_updates_diagnostics(self):
         transport = self.make_transport()
         self.assertIsNone(transport.query("/live/song/get/name", timeout=0.01))
         self.assertFalse(transport.connected)
         self.assertEqual(transport.timeout_count, 1)
+
+    def test_timeout_details_are_bounded_and_snapshot_is_independent(self):
+        transport = self.make_transport()
+        for index in range(66):
+            transport.query("/live/scene/get/name", index, timeout=0.001)
+        details = transport.diagnostics()
+        self.assertEqual(details["timeouts_by_address"], {"/live/scene/get/name": 66})
+        self.assertEqual(len(details["recent_timeouts"]), 64)
+        self.assertEqual(details["recent_timeouts"][-1]["args"], [65])
+        self.assertEqual(details["recent_timeouts"][-1]["timeout_ms"], 1)
+        details["timeouts_by_address"].clear()
+        self.assertEqual(transport.diagnostics()["timeouts_by_address"]["/live/scene/get/name"], 66)
 
     def test_response_after_timeout_restores_transport_connection(self):
         transport = self.make_transport()

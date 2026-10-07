@@ -14,6 +14,7 @@ try:
 except ModuleNotFoundError:
     webview = None
 from pathlib import Path
+AUTONOMOUS_MODE = (Path(__file__).resolve().parent / "autonomous-mode.json").exists()
 from flask import Flask, jsonify, render_template_string, request, send_file
 from build_identity import BUILD_ID, IDENTITY_PROTOCOL_VERSION, SERVICE_NAME
 from runtime_identity import runtime_identity
@@ -2667,7 +2668,7 @@ body.show-mode .app{max-width:1440px;overflow-y:auto}body.show-mode .desktop-gri
         <button class="action save-network" title="Appliquer et sauvegarder cette configuration" onclick="saveNetworkConfig()">Appliquer</button>
         <button class="action" onclick="testAbletonConnection()">Tester la connexion</button>
       </div>
-        <div class="ltc-destination" role="button" tabindex="0" onclick="copyLtcDestination()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();copyLtcDestination();}"><span id="ltcDestinationLabel">Destination LTC Display v2 · cliquer pour copier</span><strong id="ltcDestination">127.0.0.1:63123</strong></div>
+        <div class="ltc-destination" role="button" tabindex="0" onclick="copyLtcDestination()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();copyLtcDestination();}"><span id="ltcDestinationLabel">Adresse IP LTC · cliquer pour copier</span><strong id="ltcDestination">127.0.0.1:63123</strong></div>
     </section>
 
     <section class="card" id="backupCard">
@@ -2726,6 +2727,14 @@ body.show-mode .app{max-width:1440px;overflow-y:auto}body.show-mode .desktop-gri
   <div class="server-mtc-row">
     <div id="cl-mtc-native-slot"></div>
   </div>
+</section>
+<section class="card" id="ltcCard">
+  <div class="access-head">LTC · TIMECODE</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px"><strong id="ltcReceiveStatus" role="status">Vérification du signal…</strong><strong id="ltcReceiveTime" style="font:20px ui-monospace,monospace">--:--:--:--</strong></div>
+  <p id="ltcSourceMachine" class="state-detail" style="font-size:12px">Source : lecteur Ableton principal</p>
+  <div id="ltcDestinationSlot"></div><p id="ltcIpDetails" class="state-detail" style="font-size:12px">Adresse IP : vérification… · Port : 63123</p>
+  <div style="display:flex;gap:8px;margin-top:8px"><button type="button" onclick="copyLtcDestination()">Copier l’adresse IP</button><button type="button" onclick="copyLtcPort()">Copier le port</button><button type="button" onclick="document.getElementById('ltcSetupDetails').open=true;refreshTelemetry()">Vérifier le LTC</button></div>
+  <details id="ltcSetupDetails" class="compact-settings"><summary>Réglages dans Ableton</summary><p style="font-size:12px;line-height:1.5">Sur le lecteur Ableton principal, activez le device LTC Display v2 et son envoi réseau vers la destination ci-dessus (UDP 63123). Lancez la lecture avec une source LTC. Le voyant passe au vert dès qu’un signal valide est reçu. Le MTC Bridge est indépendant : son démarrage n’active pas le LTC.</p></details>
 </section>
 <section class="card console-card">
     <div class="console-head"><strong>CONSOLES / RETOURS PROGRAM CHANGE</strong></div>
@@ -2801,6 +2810,14 @@ let networkVisibleMode=null;
 let networkDrafts={local:null,remote:null};
 const el=id=>document.getElementById(id);
 function setTech(id,on){el(id).className='tech-item '+(on?'on':'');}
+function updateLtcReception(state){
+  const status=el('ltcReceiveStatus'),clock=el('ltcReceiveTime');
+  if(!status||!clock)return;
+  const received=Boolean(state.ltc_connected);
+  status.textContent=received?'● Signal LTC reçu':'○ Aucun signal LTC reçu';
+  status.style.color=received?'#77dca0':'#efb54f';
+  clock.textContent=received?state.ltc_timecode:'--:--:--:--';
+}
 function setBusy(label){el('systemCard').className='card system busy';el('stateTitle').textContent=label.toUpperCase();el('stateDetail').textContent='Veuillez patienter…';}
 function cleanPlayingSceneName(value){
   const raw=String(value||'').trim();
@@ -3201,7 +3218,10 @@ el('localAddress').textContent=String(s.local_url||'').replace(/^https?:\/\//,''
   if(s.orphan_actions_available)el('orphanDetail').textContent='Instance '+s.orphan_instance_id+' · PID '+s.orphan_process_id+' · '+s.build_id;
   if(!networkFormInitialized&&s.ableton_profiles)initializeNetworkForm(s);
   if(s.ableton_config){el('techAbletonMode').textContent='Ableton · '+(s.ableton_config.mode==='local'?'Local':'Distant');el('techAbletonAddress').textContent=s.ableton_config.host+':'+s.ableton_config.send_port+' → '+s.ableton_config.reply_port;el('techOscLabel').textContent='OSC aller · '+s.ableton_config.send_port;el('techReturnLabel').textContent='OSC retour · '+s.ableton_config.reply_port;}
+  updateLtcReception(s);
+  el('ltcSourceMachine').textContent='Source : '+abletonDisplayHost(s.ableton_config?.host||s.ableton_server_target?.host||'127.0.0.1');
   el('ltcDestination').textContent=abletonDisplayHost(s.ltc_destination)+':'+s.ltc_port;el('ltcDestination').title='Adresse réseau : '+s.ltc_destination+':'+s.ltc_port;
+  el('ltcIpDetails').textContent='Adresse IP : '+s.ltc_destination+' · Port : '+s.ltc_port;
   if(s.osc_transport){el('techAbletonLatency').textContent='Dernière réponse · '+(s.osc_transport.last_latency_ms==null?'—':Math.round(s.osc_transport.last_latency_ms)+' ms');el('techAbletonTimeouts').textContent='Timeouts · '+s.osc_transport.timeout_count;}
   const midi=s.midi_console||{},cl5=midi.cl5||{},ql1=midi.ql1||{};
   const rtp=midi.rtp||{},rtpBadge=el('rtpBadge');
@@ -3402,11 +3422,14 @@ async function copyShowQAddress(){
     el('actionStatus').textContent='ShowQ : '+value;
   }
 }
-function openShowQ(){
-  const value=currentShowQAddress();
-  if(value)window.open(value,'_blank');
+function openShowQ(){runAction('/open-showq','Ouverture de ShowQ');}
+async function copyLtcValue(value,label){
+  if(!value)return;
+  try{await navigator.clipboard.writeText(value);el('ltcDestinationLabel').textContent='✓ '+label+' : '+value;}
+  catch(e){el('actionStatus').textContent=label+' : '+value;}
 }
-async function copyLtcDestination(){const value=el('ltcDestination').textContent;if(!value)return;try{await navigator.clipboard.writeText(value);el('ltcDestinationLabel').textContent='✓ Destination copiée';setTimeout(()=>el('ltcDestinationLabel').textContent='Destination LTC Display v2 · cliquer pour copier',1400);}catch(e){el('actionStatus').textContent='Destination LTC : '+value;}}
+async function copyLtcDestination(){await copyLtcValue(String(latestState?.ltc_destination||''),'Adresse IP');}
+async function copyLtcPort(){await copyLtcValue(String(latestState?.ltc_port||63123),'Port');}
 async function resizePanelWindow(width,height){
   try{
     if(window.pywebview&&window.pywebview.api&&window.pywebview.api.resize_panel){await window.pywebview.api.resize_panel(width,height);return;}
@@ -3420,7 +3443,7 @@ async function toggleShowMode(){
 }
 ['abletonHost'].forEach(id=>el(id).addEventListener('input',markNetworkDraftDirty));
 let telemetryBusy=false;
-async function refreshTelemetry(){if(telemetryBusy)return;telemetryBusy=true;try{const t=await(await fetch('/telemetry')).json();const ltc=t.ltc_connected?t.ltc_timecode:'--:--:--:--';el('systemLtc').textContent=ltc;el('systemLtc').className='system-ltc'+(t.ltc_connected?'':' offline');el('networkLtc').textContent=ltc;el('networkLtc').className='network-timecode'+(t.ltc_connected?'':' offline');updateShowCurrent(t);}catch(e){}finally{telemetryBusy=false;}}
+async function refreshTelemetry(){if(telemetryBusy)return;telemetryBusy=true;try{const t=await(await fetch('/telemetry')).json();const ltc=t.ltc_connected?t.ltc_timecode:'--:--:--:--';updateLtcReception(t);el('systemLtc').textContent=ltc;el('systemLtc').className='system-ltc'+(t.ltc_connected?'':' offline');el('networkLtc').textContent=ltc;el('networkLtc').className='network-timecode'+(t.ltc_connected?'':' offline');updateShowCurrent(t);}catch(e){}finally{telemetryBusy=false;}}
 refresh();refreshTelemetry();refreshAbletonReaders();setInterval(refresh,1500);setInterval(refreshTelemetry,100);
 </script>
 <script>
@@ -3453,6 +3476,8 @@ function initCompactLayout(){
  const network=get('networkCard');
  const readerInfo=document.createElement('div');readerInfo.id='compactReaderInfo';readerInfo.className='compact-machine';
  const readerStatus=document.createElement('div');readerStatus.id='compactReaderStatus';readerStatus.className='compact-status';
+ const ltcDestination=get('ltcDestination').closest('.ltc-destination');
+ get('ltcDestinationSlot').appendChild(ltcDestination);
  const networkNodes=Array.from(network.children).filter(n=>!n.classList.contains('network-title-row'));
  network.append(readerInfo,readerStatus);fold(network,networkNodes,'Modifier ou tester la connexion','compactReaderSettings');
  const backup=get('cl-sync-settings');
@@ -3482,7 +3507,7 @@ function initCompactLayout(){
    const remoteStatus=get('remoteArmStatus');
    remoteStatus.classList.toggle('confirmed',get('remoteArm').disabled&&!get('remoteDisarm').disabled);
    const backupCurrent=get('cl-backup-current'),backupStatus=get('cl-backup-status');
-   const active=backupCurrent.textContent.includes('Mode actif : Hot Backup');
+   const active=backupCurrent.textContent.includes('Suivi Hot Backup actif');
    const online=active&&backupStatus.textContent.includes('BACKUP : ONLINE');
    backupCurrent.className='compact-machine';backupStatus.className='compact-status '+(online?'confirmed':active?'attention':'');
    const label=active?'Suivi actif':'Suivi inactif';
@@ -3519,7 +3544,13 @@ class ControlPanelWindowApi:
 
 @app.route("/")
 def index():
-    return render_template_string(PANEL_HTML_V2)
+    html = PANEL_HTML_V2
+    if AUTONOMOUS_MODE:
+        html = html.replace('</head>', '<style>#ltcCard,#backupCard,.console-card,.tools-actions,.console-components,.advanced-console,#systemLtc,#startupBackup,#startupReturns,.server-mtc-row,#compactShare .server-access-panel:nth-child(2){display:none!important}.network-column{width:100%}.column-label{display:none}</style></head>', 1)
+        html = html.replace('CL AUDIO SHOW CONTROL</', 'CL AUDIO SHOW CONTROL · AUTONOME</')
+        html = html.replace('Services · serveur et MTC', 'Services · serveur')
+        html = html.replace('Démarrage · <span id="startupBackup">Backup : vérification…</span> · <span id="startupReturns">Simulateurs : vérification…</span> · ', '<span id="startupBackup" hidden></span><span id="startupReturns" hidden></span>')
+    return render_template_string(html)
 
 @app.route("/logo")
 def logo():
@@ -3924,6 +3955,18 @@ def open_web():
     return jsonify(message=f"Onglet Session ouvert en {mode}", url=selected_cl_url())
 
 
+@app.route("/open-showq")
+def open_showq():
+    ok, message = ensure_selected_cl_server()
+    if not ok:
+        return jsonify(error=message), 409
+    url = selected_cl_url().rstrip("/") + "/show-info"
+    if not webbrowser.open(url):
+        return jsonify(error="Impossible d’ouvrir ShowQ dans le navigateur"), 500
+    event("ShowQ ouvert dans le navigateur")
+    return jsonify(message="ShowQ ouvert", url=url)
+
+
 @app.route("/local-page")
 def local_page():
     ok, message = ensure_selected_cl_server()
@@ -4262,7 +4305,7 @@ def cl_mtc_bridge_inject_control(response):
   </div>
   <div id="cl-sync-settings" style="width:100%;">
     <div id="cl-backup-current" role="status" style="margin-bottom:10px;white-space:pre-line">Configuration active : recherche…</div>
-    <div id="cl-sync-summary" style="font-weight:600;margin-bottom:8px">Sync : MTC continu</div>
+    <div id="cl-sync-summary" style="font-weight:600;margin-bottom:8px">Suivi backup désactivé</div>
     <input id="cl-sync-mode" type="hidden" value="hot_backup">
     <input id="cl-backup-host" placeholder="Mac-backup.local" aria-label="Nom Bonjour ou adresse du backup" style="width:135px">
     <div id="cl-backup-name" role="status"></div>
@@ -4276,7 +4319,7 @@ def cl_mtc_bridge_inject_control(response):
     Désactiver arrête la copie des commandes, sans arrêter la lecture en cours.</small>
     <div id="cl-backup-status" role="status"></div>
     <small>Session : lancements directs et arrêt suivis. Arrangement : commandes CL uniquement. EXT se règle manuellement.
-    Après redémarrage : MTC continu, Hot Backup à réarmer.</small>
+    Après redémarrage : suivi backup désactivé, à réarmer à l’arrêt.</small>
   </div>
 </div>
 
@@ -4305,23 +4348,23 @@ def cl_mtc_bridge_inject_control(response):
             backupActiveIP = s.host || backupActiveIP;
             if (!backupFormDirty && s.mode) {
                 document.getElementById('cl-sync-mode').value = s.mode;
-                if (s.host) document.getElementById('cl-backup-host').value = typeof abletonDisplayHost === 'function' ? abletonDisplayHost(s.host) : s.host;
+                if (s.host) document.getElementById('cl-backup-host').value = s.bonjour_name || (typeof abletonDisplayHost === 'function' ? abletonDisplayHost(s.host) : s.host);
 
             }
             document.getElementById('cl-backup-disable').disabled = s.mode !== 'hot_backup';
             document.getElementById('cl-backup-apply').disabled = s.mode === 'hot_backup' && !backupFormDirty;
             const reader = typeof abletonReaders !== 'undefined'
                 ? abletonReaders.find(r => r.host === s.host || (r.addresses || []).includes(s.host)) : null;
-            const backupAddress = reader ? reader.host : (s.host || 'Non renseigné');
+            const backupAddress = reader ? reader.host : (s.bonjour_name || s.host || 'Non renseigné');
             document.getElementById('cl-backup-current').title = s.host ? 'Adresse réseau : '+s.host : '';
-            document.getElementById('cl-backup-name').textContent = reader ? 'Mac backup : ' + reader.host : '';
+            document.getElementById('cl-backup-name').textContent = s.host ? 'Mac backup : ' + backupAddress : '';
             backupCurrent.textContent = s.mode === 'hot_backup'
-                ? 'Mode actif : Hot Backup\nMac backup actif : ' + backupAddress
-                : s.mode === 'mtc' ? 'Mode actif : MTC continu · copie backup désactivée'
+                ? 'Suivi Hot Backup actif\nMac backup : ' + backupAddress
+                : s.mode === 'mtc' ? 'Suivi backup désactivé'
                 : 'Configuration active indisponible';
             document.getElementById('cl-sync-summary').textContent =
-                s.mode === 'hot_backup' ? 'Sync : Hot Backup' : 'Sync : MTC continu';
-            backupStatus.textContent = s.mode === 'mtc' ? 'Copie BACKUP désactivée' :
+                s.mode === 'hot_backup' ? 'Suivi Hot Backup actif' : 'Suivi backup désactivé';
+            backupStatus.textContent = s.mode === 'mtc' ? 'Choisir le backup et confirmer les deux réglages avant activation' :
                 'BACKUP : ' + (s.state || 'OFFLINE') + ' — ' + (s.detail || s.error || '');
         } catch (_) { backupStatus.textContent = 'BACKUP : état indisponible'; }
     }
@@ -4341,6 +4384,7 @@ def cl_mtc_bridge_inject_control(response):
                 headers:{'Content-Type':'application/json'}, body:JSON.stringify({
                     mode:'hot_backup',
                     host:resolveBackupAddress(document.getElementById('cl-backup-host').value),
+                    bonjour_name:document.getElementById('cl-backup-host').value.trim(),
                     ext_off:document.getElementById('cl-backup-ext').checked,
                     same_set:document.getElementById('cl-backup-set').checked
                 })});
@@ -4670,10 +4714,10 @@ if __name__ == "__main__":
     # Le Manager interactif ne démarre aucun agent RTP permanent.
     # Ouvrir la copie installée même après une réinstallation du serveur seul.
     assistant = find_midi_network_assistant()
-    if assistant is not None:
+    if assistant is not None and not AUTONOMOUS_MODE:
         subprocess.Popen(["/usr/bin/open", str(assistant)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         ensure_midi_console_monitor()
-    if role_components is None or "mtc_bridge" in role_components:
+    if not AUTONOMOUS_MODE and (role_components is None or "mtc_bridge" in role_components):
         _cl_mtc_bridge_autostart()
     server_start_thread = threading.Thread(
         target=auto_start_web_server,

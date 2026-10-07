@@ -28,6 +28,7 @@ from xml.etree import ElementTree as ET
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Tuple
 from pathlib import Path
+AUTONOMOUS_MODE = (Path(__file__).resolve().parent / "autonomous-mode.json").exists()
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
 from show_audio_print_engine import PrintEngineError, capture_clean
@@ -52,10 +53,11 @@ import socket
 from pythonosc import udp_client
 from osc_transport import OSCTransport
 from hot_backup_sync import HotBackup
+from backup_preferences import load_backup_destination, save_backup_destination
 from backup_scene_follow import BackupSceneFollow
 from scene_backup_udp import SceneBackupUDP
 from runtime_identity import runtime_identity
-from security_http import attach_security, start_remote_tls
+from security_http import attach_security, start_remote_tls, local_request
 from midi_endpoint_names import SHOW_IAC, RETURN_RTP, DIRECT_RTP, endpoint_matches
 from ltc_receiver import LTCReceiver, LTC_BIND_HOST, LTC_PORT
 from show_cues import (
@@ -364,7 +366,9 @@ CHECK_MUTE_DURING_PLAYING_SCAN = False
 # Réglages anti-gel / stabilité
 BACKGROUND_REFRESH_SECONDS = 0.25
 FULL_REFRESH_SECONDS = 1.0
-OSC_TIMEOUT = 0.06
+# Read requests need to tolerate Live's 100 ms fallback polling and scheduling.
+# Responses complete immediately; this ceiling does not delay playback commands.
+OSC_TIMEOUT = 0.25
 OSC_BOOTSTRAP_DRAIN_SECONDS = 0.25
 BOOTSTRAP_TRANSACTION_TIMEOUT = 2.0
 BOOTSTRAP_RETRY_PAUSE_SECONDS = 0.02
@@ -388,6 +392,8 @@ ableton_transport = OSCTransport(
     reply_port=ableton_target.reply_port,
 )
 # Optional copy only: PRIMARY retains its transport and confirmation path.
+BACKUP_PREFERENCES_PATH = DEFAULT_CONFIG_PATH.with_name("backup-destination.json")
+backup_destination = load_backup_destination(BACKUP_PREFERENCES_PATH)
 hot_backup = HotBackup()
 ableton_transport.foreign_reply_handler = hot_backup.receive
 hot_backup_generation = None
@@ -615,7 +621,7 @@ def decorate_remote_page_html(response):
     if "</head>" in html:
         assets = (
             '<link rel="stylesheet" href="/static/remote-v2.css?v=20260829-animation-audit">\n'
-            '<script src="/static/remote-v2.js?v=20260829-animation-audit" defer></script>\n'
+            '<script src="/static/remote-v2.js?v=20261006-ltc-playback" defer></script>\n'
         )
         html = html.replace("</head>", assets + "</head>", 1)
     else:
@@ -633,6 +639,8 @@ def decorate_remote_page_html(response):
     else:
         html += footer_html
 
+    if AUTONOMOUS_MODE:
+        html = html.replace("</head>", "<style>.devices-grid,.midi-return-panel,.ltc-panel,[id$=Devices]{display:none!important}</style></head>", 1)
     response.set_data(html)
     response.headers["Content-Length"] = str(len(response.get_data()))
     return response
@@ -2447,9 +2455,11 @@ def scene_backup_settings():
 
 @app.route("/api/hot-backup", methods=["GET", "POST"])
 def hot_backup_settings():
-    global hot_backup_generation
+    global hot_backup_generation, backup_destination
     if request.method == "GET":
         result = hot_backup.snapshot()
+        result["host"] = result.get("host") or backup_destination["host"]
+        result["bonjour_name"] = backup_destination["bonjour_name"]
         with lock:
             result["live_scene_follow"] = {
                 "active": bool(backup_scene_follow.token),
@@ -2490,6 +2500,9 @@ def hot_backup_settings():
             tempo = float(cached_tempo[0])
             if not generation_is_current(generation):
                 raise ValueError("Set PRIMARY changé pendant la préparation")
+            backup_destination = save_backup_destination(
+                BACKUP_PREFERENCES_PATH, host, data.get("bonjour_name", "")
+            )
             hot_backup.configure(mode, host, name, tempo)
             hot_backup_generation = generation
             start_backup_scene_follow()
@@ -2731,9 +2744,12 @@ def query(
     expected_generation: Optional[int] = None,
     allow_during_bootstrap: bool = False,
     apply_response: bool = True,
+    still_current=None,
 ):
     """Exécute une requête OSC corrélée, sérialisée avec les transactions de scène."""
     with ableton_transport.serialized_queries():
+        if still_current is not None and not still_current():
+            return None
         return _query_with_query_lock_held(
             address,
             *args,
@@ -3278,7 +3294,7 @@ def refresh_live_set_identity(expected_generation: Optional[int] = None) -> Opti
 
     file_path_response = query(
         "/live/song/get/file_path",
-        timeout=0.08,
+        timeout=OSC_TIMEOUT,
         expected_generation=expected_generation,
         allow_during_bootstrap=True,
         apply_response=False,
@@ -3290,7 +3306,7 @@ def refresh_live_set_identity(expected_generation: Optional[int] = None) -> Opti
 
     set_name_response = query(
         "/live/song/get/name",
-        timeout=0.06,
+        timeout=OSC_TIMEOUT,
         expected_generation=expected_generation,
         allow_during_bootstrap=True,
         apply_response=False,
@@ -3302,7 +3318,7 @@ def refresh_live_set_identity(expected_generation: Optional[int] = None) -> Opti
 
     confirmation_response = query(
         "/live/song/get/file_path",
-        timeout=0.08,
+        timeout=OSC_TIMEOUT,
         expected_generation=expected_generation,
         allow_during_bootstrap=True,
         apply_response=False,
@@ -3994,7 +4010,7 @@ def refresh_scene_name_async(scene_index: int):
         query(
             "/live/scene/get/name",
             int(scene_index),
-            timeout=0.08,
+            timeout=OSC_TIMEOUT,
             expected_generation=generation,
         )
         with lock:
@@ -4032,7 +4048,7 @@ def scan_scene_names_async(limit: int = 120, clear_before_scan: bool = False):
             query(
                 "/live/scene/get/name",
                 scene_index,
-                timeout=0.05,
+                timeout=OSC_TIMEOUT,
                 expected_generation=generation,
             )
         except Exception:
@@ -4172,7 +4188,7 @@ def scan_playing_scene_from_tracks():
             query(
                 "/live/scene/get/name",
                 detected_slot,
-                timeout=0.05,
+                timeout=OSC_TIMEOUT,
                 expected_generation=generation,
             )
         if should_resolve_clip_duration:
@@ -4428,8 +4444,8 @@ def protect_local_builder_routes():
     """Protège le Builder complet selon l'adresse réelle de la connexion."""
     if not request.path.startswith("/show-info/builder"):
         return None
-    if not request_is_loopback():
-        return jsonify({"ok": False, "message": "CL Cue Editor est disponible uniquement en local"}), 403
+    if request.method not in ("GET", "HEAD", "OPTIONS") and not local_request():
+        return jsonify({"ok": False, "message": "Les modifications du Builder sont réservées au poste local"}), 403
     return None
 
 
@@ -4552,7 +4568,7 @@ def showcue_session_import():
 @app.route("/show-info/builder")
 def show_info_builder_page():
     return render_template("showcue_builder.html", types=BUILDER_TYPES,
-                           sections=BUILDER_SECTIONS, origins=ORIGINS)
+                           sections=BUILDER_SECTIONS, origins=ORIGINS, builder_local=local_request())
 
 
 def active_builder_path(values=None):
@@ -4697,20 +4713,21 @@ def show_info_preview_builder_import():
     payload = upload.read()
     if len(payload) > 10 * 1024 * 1024:
         return jsonify({"ok": False, "message": "Fichier trop volumineux"}), 413
+    diagnostics = {}
     try:
         if str(upload.filename or "").lower().endswith(".xlsx"):
-            document, unknown = import_xlsx(payload)
+            document, unknown = import_xlsx(payload, diagnostics)
         elif str(upload.filename or "").lower().endswith(".csv"):
-            document, unknown = import_csv(payload)
+            document, unknown = import_csv(payload, diagnostics)
         else:
             raise ValueError("Format attendu : XLSX ou CSV")
     except (ValueError, UnicodeError, zipfile.BadZipFile, KeyError, ET.ParseError) as exc:
-        return jsonify({"ok": False, "message": str(exc)}), 400
+        return jsonify({"ok": False, "message": str(exc), "diagnostics": getattr(exc, "diagnostics", diagnostics)}), 400
     with SHOW_CUES_LOCK:
         _, current_path = active_builder_path()
         document["revision"] = load_builder_document(current_path)["revision"]
     return jsonify({"ok": True, "document": resolved_builder_document(document), "unknown_columns": unknown,
-                    "validation": validate_builder_document(document), "saved": False})
+                    "validation": validate_builder_document(document), "saved": False, "diagnostics": diagnostics})
 
 
 
@@ -5192,7 +5209,7 @@ def cleanup_show_calls_locked(now: Optional[float] = None) -> None:
     for call_id, item in SHOW_CALLS.items():
         if item["state"] == "acknowledged":
             reference = float(item.get("acknowledged_at") or item["created_at"])
-            lifetime = SHOW_CALL_ACK_SECONDS
+            lifetime = 30.0 if item.get("reply") else SHOW_CALL_ACK_SECONDS
         else:
             reference = float(item["created_at"])
             lifetime = SHOW_CALL_TIMEOUT_SECONDS
@@ -5455,11 +5472,19 @@ def show_info_status():
                     **selected})
 
 
+def show_call_text(values: Dict[str, Any], key: str) -> str:
+    value = values.get(key, "")
+    if not isinstance(value, str) or len(value.strip()) > 160:
+        raise ValueError("Message limité à 160 caractères")
+    return value.strip()
+
+
 @app.route("/show-info/call", methods=["POST"])
 def show_info_create_call():
     values = request.get_json(silent=True)
     try:
         source = request_show_post(values, "source")
+        message = show_call_text(values, "message")
         destination = request_show_post(values, "destination")
         if source == destination:
             raise ValueError("Un poste ne peut pas s’appeler lui-même")
@@ -5467,6 +5492,7 @@ def show_info_create_call():
         item = {
             "id": str(uuid.uuid4()), "source": source, "destination": destination,
             "state": "calling", "created_at": now, "acknowledged_at": None,
+            "message": message, "reply": "",
         }
         with SHOW_CALLS_LOCK:
             cleanup_show_calls_locked(now)
@@ -5481,6 +5507,7 @@ def show_info_ack_call(call_id):
     values = request.get_json(silent=True)
     try:
         post = request_show_post(values, "post")
+        reply = show_call_text(values, "reply")
         with SHOW_CALLS_LOCK:
             cleanup_show_calls_locked()
             item = SHOW_CALLS.get(call_id)
@@ -5492,6 +5519,7 @@ def show_info_ack_call(call_id):
                 return jsonify({"ok": False, "message": "CALL déjà acquitté"}), 409
             item["state"] = "acknowledged"
             item["acknowledged_at"] = time.time()
+            item["reply"] = reply
             result = dict(item)
     except ValueError as exc:
         return jsonify({"ok": False, "message": str(exc)}), 400
@@ -5803,6 +5831,39 @@ def show_info_update_cue(cue_id):
     except (OSError, ValueError, json.JSONDecodeError) as exc:
         return jsonify({"ok": False, "message": str(exc)}), 400
     return jsonify({"ok": True, "cue": cue})
+
+
+@app.route('/show-info/cues/<cue_id>/notes/<post>', methods=['PUT'])
+def show_info_update_post_note(cue_id, post):
+    values = request.get_json(silent=True)
+    if not isinstance(values, dict) or set(values) != {'session_id', 'text'}:
+        return jsonify(ok=False, message='Seuls session_id et text sont acceptés'), 400
+    if post not in (*SHOW_POSTS, 'GENERAL') or not isinstance(values['text'], str) or len(values['text']) > 10000:
+        return jsonify(ok=False, message='Poste ou note invalide (10000 caractères maximum)'), 400
+    try:
+        with SHOW_CUES_LOCK:
+            registry, cue_path, _ = ensure_show_cue_storage()
+            require_active_show_session(values, registry)
+            document = load_show_document(cue_path)
+            current = next((cue for cue in document['cues'] if cue['id'] == cue_id), None)
+            if current is None:
+                raise KeyError(cue_id)
+            # Merge only the requested note into the latest document under lock.
+            builder = dict(current.get('builder', {}))
+            if post == 'GENERAL':
+                builder['notes'] = values['text']
+            else:
+                builder['notes_by_post'] = {**builder.get('notes_by_post', {}), post: values['text']}
+            current['builder'] = builder
+            document, cue = update_show_cue(document, cue_id, {})
+            save_show_document(cue_path, document)
+    except RuntimeError as exc:
+        return jsonify(ok=False, message=str(exc)), 409
+    except KeyError:
+        return jsonify(ok=False, message='Cue inconnu'), 404
+    except (OSError, ValueError) as exc:
+        return jsonify(ok=False, message=str(exc)), 400
+    return jsonify(ok=True, cue=cue)
 
 
 @app.route("/show-info/cues/<cue_id>", methods=["DELETE"])
@@ -7493,6 +7554,7 @@ def clamp_scene_number(value: Any) -> Optional[int]:
 def read_scene_clip_duration_seconds(
     scene_index: int,
     expected_generation: int,
+    still_current=None,
 ) -> Optional[float]:
     """Lit la durée réelle d'une scène depuis ses clips Ableton.
 
@@ -7501,6 +7563,8 @@ def read_scene_clip_duration_seconds(
     Les pistes sont lues par petits groupes afin d'éviter un gros datagramme
     OSC lorsque le Live Set contient beaucoup de scènes.
     """
+    if still_current is not None and not still_current():
+        return None
     with lock:
         scene_count = max(
             len(state.get("scenes", {})),
@@ -7511,6 +7575,7 @@ def read_scene_clip_duration_seconds(
         timeout=0.30,
         expected_generation=expected_generation,
         apply_response=False,
+        still_current=still_current,
     )
     if not track_names_response or scene_count <= 0:
         return None
@@ -7521,7 +7586,7 @@ def read_scene_clip_duration_seconds(
     chunk_size = 6
 
     for start in range(0, len(track_names), chunk_size):
-        if not generation_is_current(expected_generation):
+        if not generation_is_current(expected_generation) or (still_current is not None and not still_current()):
             return None
         end = min(len(track_names), start + chunk_size)
         response = query(
@@ -7532,6 +7597,7 @@ def read_scene_clip_duration_seconds(
             timeout=0.45,
             expected_generation=expected_generation,
             apply_response=False,
+            still_current=still_current,
         )
         if not response:
             continue
@@ -7556,6 +7622,7 @@ def read_scene_clip_duration_seconds(
         timeout=0.20,
         expected_generation=expected_generation,
         apply_response=False,
+        still_current=still_current,
     )
     tempo = safe_float(list(tempo_response)[-1]) if tempo_response else None
     if tempo is None or tempo <= 0:
@@ -7567,7 +7634,13 @@ def refresh_selected_scene_duration_async(scene_index: int, expected_generation:
     """Publie la durée réelle uniquement si la sélection est toujours courante."""
     global _selected_duration_request
     try:
-        duration_seconds = read_scene_clip_duration_seconds(scene_index, expected_generation)
+        def still_current():
+            with lock:
+                return (int(state.get("set_generation", 0)) == int(expected_generation)
+                        and int(state.get("selected_scene", -1)) == int(scene_index))
+        duration_seconds = read_scene_clip_duration_seconds(
+            scene_index, expected_generation, still_current=still_current
+        )
         if duration_seconds is None:
             return
         with lock:
@@ -7600,6 +7673,8 @@ def schedule_selected_scene_duration_refresh(scene_index: int, expected_generati
         state["selected_scene_duration_seconds"] = parse_scene_duration_seconds(selected_name)
         state["selected_scene_duration_index"] = int(scene_index)
         state["selected_scene_duration_is_clip"] = False
+        if state["selected_scene_duration_seconds"] is not None:
+            return
         _selected_duration_request = request_key
     threading.Thread(
         target=refresh_selected_scene_duration_async,
@@ -7626,7 +7701,8 @@ def select_scene(scene_index: int, source: str = "Télécommande"):
             state["selected_scene_duration_is_clip"] = False
             state["message"] = f"Scène {scene_index + 1} sélectionnée"
             state["sync_source"] = source
-    threading.Thread(target=refresh_scene_name_async, args=(scene_index,), daemon=True).start()
+    if not cached_name:
+        threading.Thread(target=refresh_scene_name_async, args=(scene_index,), daemon=True).start()
     with lock:
         generation = int(state.get("set_generation", 0))
     schedule_selected_scene_duration_refresh(scene_index, generation)
@@ -7699,7 +7775,7 @@ def resolve_scene_clip_duration_async(
                 "/live/clip/get/length",
                 int(track_index),
                 int(scene_index),
-                timeout=0.15,
+                timeout=OSC_TIMEOUT,
                 expected_generation=expected_generation,
                 apply_response=False,
             )
@@ -7770,9 +7846,14 @@ def execute_go_transaction(request_id: str, expected_generation: int, scene_numb
             return False, "Scène absente du Live Set courant"
 
         confirmed = False
-        confirmation_deadline = time.monotonic() + 0.8
+        confirmation_wait_started = time.monotonic()
+        last_confirmation = None
 
-        with ableton_transport.serialized_queries():
+        with ableton_transport.serialized_queries(priority=True):
+            # Metadata queries may occupy this lock after NEXT/PREV. Their wait
+            # must not consume the budget before GO can even query Live.
+            confirmation_lock_wait_ms = round((time.monotonic() - confirmation_wait_started) * 1000, 2)
+            confirmation_deadline = time.monotonic() + 0.8
             while time.monotonic() < confirmation_deadline:
                 if not generation_is_current(expected_generation):
                     return False, "Live Set modifié pendant le GO"
@@ -7786,6 +7867,7 @@ def execute_go_transaction(request_id: str, expected_generation: int, scene_numb
                     expected_generation=expected_generation,
                     apply_response=False,
                 )
+                last_confirmation = response
                 if response:
                     try:
                         confirmed = int(response[0]) == scene_index
@@ -7795,6 +7877,13 @@ def execute_go_transaction(request_id: str, expected_generation: int, scene_numb
                     break
 
             if not confirmed:
+                write_keyboard_diagnostic({
+                    "event": "go-selection-confirmation-failed",
+                    "requestId": request_id,
+                    "requestedSceneIndex": scene_index,
+                    "lastConfirmation": last_confirmation,
+                    "queryLockWaitMs": confirmation_lock_wait_ms,
+                })
                 return False, "Sélection de scène non confirmée par Ableton"
             if not generation_is_current(expected_generation):
                 return False, "Live Set modifié pendant le GO"
@@ -7818,6 +7907,13 @@ def execute_go_transaction(request_id: str, expected_generation: int, scene_numb
             with lock:
                 backup_scene_follow.note_cl_launch(scene_index)
             send("/live/scene/fire_as_selected", scene_index)
+            write_keyboard_diagnostic({
+                "event": "go-scene-command-sent",
+                "requestId": request_id,
+                "requestedSceneIndex": scene_index,
+                "queryLockWaitMs": confirmation_lock_wait_ms,
+                "confirmationElapsedMs": round((time.monotonic() - confirmation_wait_started) * 1000, 2),
+            })
 
             # Human-facing scene number for CL Show Backup:
             # Ableton index 0 -> scene 1.

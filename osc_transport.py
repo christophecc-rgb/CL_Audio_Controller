@@ -74,7 +74,9 @@ class OSCTransport:
         self._response_matcher = response_matcher or self._default_response_matcher
         self._unsolicited_handler = unsolicited_handler
         self._state_lock = threading.RLock()
-        self._query_lock = threading.Lock()
+        self._query_condition = threading.Condition()
+        self._query_busy = False
+        self._priority_query_waiters = 0
         self._active_request: Optional[Dict[str, Any]] = None
         self._reply_server = None
         self.foreign_reply_handler = None
@@ -83,6 +85,8 @@ class OSCTransport:
         self.last_response_at: Optional[float] = None
         self.last_latency_ms: Optional[float] = None
         self.timeout_count = 0
+        self._timeouts_by_address = {}
+        self._recent_timeouts = deque(maxlen=64)
 
         # Mesure légère du trafic AbletonOSC principal 11000 ↔ 11001.
         # Les octets comptés correspondent au payload OSC, hors en-têtes
@@ -280,9 +284,23 @@ class OSCTransport:
         server.serve_forever()
 
     @contextmanager
-    def serialized_queries(self):
-        with self._query_lock:
+    def serialized_queries(self, *, priority=False):
+        with self._query_condition:
+            if priority:
+                self._priority_query_waiters += 1
+            try:
+                while self._query_busy or (not priority and self._priority_query_waiters):
+                    self._query_condition.wait()
+                self._query_busy = True
+            finally:
+                if priority:
+                    self._priority_query_waiters -= 1
+        try:
             yield
+        finally:
+            with self._query_condition:
+                self._query_busy = False
+                self._query_condition.notify_all()
 
     def query(
         self,
@@ -334,6 +352,14 @@ class OSCTransport:
                 self._active_request = None
             self.connected = False
             self.timeout_count += 1
+            self._timeouts_by_address[address] = self._timeouts_by_address.get(address, 0) + 1
+            self._recent_timeouts.append({
+                "address": address,
+                "args": list(args),
+                "timeout_ms": round(timeout * 1000, 2),
+                "elapsed_ms": round((time.time() - request["sent_at"]) * 1000, 2),
+                "at": time.time(),
+            })
         return None
 
     def cancel_pending(self) -> None:
@@ -356,5 +382,7 @@ class OSCTransport:
                 "last_response_at": self.last_response_at,
                 "last_latency_ms": self.last_latency_ms,
                 "timeout_count": int(self.timeout_count),
+                "timeouts_by_address": dict(self._timeouts_by_address),
+                "recent_timeouts": [dict(event) for event in self._recent_timeouts],
                 "traffic": self._traffic_snapshot_locked(),
             }

@@ -139,7 +139,8 @@ def test_actual_go_handoff_does_not_wait_for_backup_network():
                  lock=threading.RLock(), completed_go_requests={},
                  state={'set_generation': 1, 'set_ready': True, 'scenes': {0: 'Test'}},
                  clamp_scene_number=lambda n: n - 1, generation_is_current=lambda n: True,
-                 ableton_transport=Mock(serialized_queries=lambda: nullcontext()),
+                 ableton_transport=Mock(serialized_queries=Mock(side_effect=lambda *, priority=False: nullcontext())),
+                 write_keyboard_diagnostic=Mock(),
                  _query_with_query_lock_held=lambda *a, **kw: [0], send=Mock(),
                  send_midi_monitor_scene_context=Mock(), record_go_midi_expectations=Mock(),
                  scene_backup_udp=obj, copy_to_backup=Mock(), parse_scene_duration_seconds=lambda n: 10,
@@ -151,6 +152,9 @@ def test_actual_go_handoff_does_not_wait_for_backup_network():
         scope['backup_scene_follow'] = Mock()
         assert scope['execute_go_transaction']('test-go', 1, 1)[0]
         assert time.monotonic() - started < .05
+        scope['ableton_transport'].serialized_queries.assert_called_once_with(priority=True)
+        scope['write_keyboard_diagnostic'].assert_called_once()
+        assert scope['write_keyboard_diagnostic'].call_args.args[0]['event'] == 'go-scene-command-sent'
         assert sock.entered.wait(1)
         assert not gate.is_set()
         scope['send'].assert_any_call('/live/scene/fire_as_selected', 0)
