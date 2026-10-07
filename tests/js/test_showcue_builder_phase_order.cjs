@@ -1,0 +1,14 @@
+const assert=require('assert');const {phase,organize}=require('../../static/showcue-phase-order.js');
+const make=(section,timecode,id)=>({section,timecode,id});
+const input=[make('SHOW','00:02:00:00','s2'),make('PRESHOW','18:10:00:00','p2'),make('SHOW','00:01:00:00','s1'),make('FIN','','fin'),make('PRE-SHOW','18:00:00:00','p1'),make('ENTRACTE','','e'),make('PRÉSHOW','','pn'),make('SHOW','','sn'),make('SHOW','00:10:00:00','s3'),make('PRESHOW','18:20:00:00','p3')];
+const grouped=organize(input);
+assert.deepEqual(grouped.map(phase),['PRESHOW','PRESHOW','PRESHOW','PRESHOW','ENTRACTE','SHOW','SHOW','SHOW','SHOW','FIN']);
+assert.deepEqual(grouped.slice(0,4).map(x=>x.id),['p2','p1','pn','p3']);
+const sorted=organize(input,'SHOW');assert.deepEqual(sorted.filter(x=>phase(x)==='SHOW').map(x=>x.id),['s1','s2','sn','s3']);
+assert.deepEqual(sorted.slice(0,4),grouped.slice(0,4));
+const manual=[...grouped];const item=manual.splice(2,1)[0];manual.splice(1,0,item);
+assert.deepEqual(JSON.parse(JSON.stringify(manual)).map(x=>x.id),manual.map(x=>x.id));
+assert.deepEqual(organize(manual).slice(0,4).map(x=>x.id),['p2','pn','p1','p3']);
+assert.equal(phase({section:'PRÉPARATION'}),'PRESHOW');assert.equal(phase({section:'PARTIE PARLÉE'}),'SHOW');
+assert.equal(phase({phase:'FIN',section:'SHOW'}),'FIN');
+console.log('Phase grouping, timed peers, stable untimed slots and manual array order: passed');

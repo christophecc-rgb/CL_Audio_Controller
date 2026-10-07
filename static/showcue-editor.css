@@ -474,3 +474,9 @@ body.ce-enabled{
     margin:1px 0 0!important;
     font-size:.59rem!important;
 }
+
+.cl-session-actions{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}.cl-session-actions button{padding:7px 12px}
+
+header.top button.primary,header.top .primary{background:#632924!important;border-color:#b5564d!important;color:#ffe6e0!important}
+
+header.top .cl-session-panel{display:block!important;max-width:100%;white-space:normal!important;overflow-wrap:anywhere}#cl-session-archives,#cl-libraries{display:block!important}#cl-session-archives>div,#cl-libraries>div{display:block!important;margin:5px 0;white-space:normal!important;overflow-wrap:anywhere}

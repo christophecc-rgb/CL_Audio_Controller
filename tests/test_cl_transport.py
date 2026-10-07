@@ -101,7 +101,18 @@ class TransportTests(unittest.TestCase):
             self.assertEqual(response.status_code,201,response.data)
             self.assertEqual(response.json['imported_session']['name'],'Session actuelle (2)')
             self.assertEqual(client.get('/show-info/builder/resources').status_code,200)
-            self.assertEqual(client.get('/show-info/builder/resources',environ_base={'REMOTE_ADDR':'192.168.1.2'}).status_code,403)
+            # Remote consultation is allowed; import remains a local-only mutation.
+            remote = {'REMOTE_ADDR': '192.168.1.2'}
+            resources = client.get('/show-info/builder/resources', environ_overrides=remote)
+            self.assertEqual(resources.status_code, 200)
+            self.assertEqual(resources.json, client.get('/show-info/builder/resources').json)
+            before_rejected_import = (root/'sessions.json').read_bytes()
+            rejected = client.post('/show-info/builder/sessions/import',
+                                   json={'source':str(self.transport),'name':'OP.showcue'},
+                                   environ_overrides=remote)
+            self.assertEqual(rejected.status_code, 403)
+            self.assertTrue(rejected.json.get('message') or rejected.json.get('error'))
+            self.assertEqual((root/'sessions.json').read_bytes(), before_rejected_import)
             self.assertEqual(client.get('/show-info/builder/sessions/export').status_code,200)
 
     def test_save_transport_route_creates_portable_showcue(self):

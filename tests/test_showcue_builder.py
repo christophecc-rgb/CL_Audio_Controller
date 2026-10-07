@@ -446,7 +446,7 @@ class ShowCueBuilderRouteTests(unittest.TestCase):
         for method, path in paths:
             with self.subTest(path=path):
                 response = getattr(self.client, method)(path, environ_base=remote)
-                self.assertEqual(response.status_code, 403)
+                self.assertEqual(response.status_code, 200 if method == "get" else 403)
 
     def test_plateau_switches_distribution_persistently_without_touching_showcue(self):
         original = self.cue_path.read_bytes()

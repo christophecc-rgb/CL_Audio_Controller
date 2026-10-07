@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>CL Cue Editor</title>
 <style>
-:root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--bg:#090807;--panel:#151311;--line:#3c352d;--text:#f5f1e9;--muted:#a29a90;--gold:#c79b50;--green:#62df91;--blue:#315f89;--violet:#5b4c7c}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text)}button,input,select{font:inherit;color:inherit}button,select,input{border:1px solid #514940;border-radius:6px;background:#24201c;padding:7px 9px}button{cursor:pointer;font-weight:800}.primary{border-color:#43865d;background:#2c5f3e}.action-blue{border-color:#47769e;background:#294d6d}.action-violet{border-color:#756395;background:#4b4066}.action-amber{display:inline-flex;align-items:center;border:1px solid #806637;border-radius:6px;background:#3b301d;color:#ead6b3!important;padding:7px 9px}.shell{padding:12px 14px 24px;max-width:1800px;margin:auto}.top{position:sticky;top:0;z-index:4;background:#090807f5;border-bottom:1px solid var(--line);padding:4px 0 10px}.bar,.tools,.filters,.tool-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.bar{justify-content:space-between}.title{display:flex;align-items:baseline;gap:12px;min-width:0}.title h1{margin:0;font-size:1.25rem}.header-right{display:flex;align-items:center;gap:12px}.header-right a{color:#d6c7ae;text-decoration:none;font-size:.76rem;font-weight:800}.builder-logo{display:block;width:104px;height:34px;object-fit:contain}.muted{color:var(--muted);font-size:.78rem}.tools{margin-top:8px;align-items:stretch}.tool-group{border-right:1px solid var(--line);padding-right:10px}.tool-group:last-child{border:0}.tool-label{color:var(--muted);font-size:.58rem;font-weight:900;letter-spacing:.08em}.tools a{text-decoration:none}.file{position:relative;overflow:hidden}.file input{position:absolute;inset:0;opacity:0;cursor:pointer}.filters{margin:10px 0}.filters label{display:flex;align-items:center;gap:5px;font-size:.68rem;color:var(--muted);font-weight:900}.filters select{padding:5px 7px}.summary{display:grid;grid-template-columns:repeat(6,minmax(100px,1fr));gap:6px;margin:8px 0}.metric{border:1px solid var(--line);border-radius:7px;background:var(--panel);padding:7px 9px}.metric strong{display:block;font-size:1.05rem}.warning{color:#ffbd72}.ok{color:var(--green)}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--panel)}table{border-collapse:collapse;min-width:1500px;width:100%;font-size:.75rem}th{position:sticky;top:0;z-index:2;background:#211d19;color:#d8c29d;font-size:.64rem;letter-spacing:.04em}th,td{border-right:1px solid #302b26;border-bottom:1px solid #302b26;padding:6px;vertical-align:top}td[contenteditable],span[contenteditable]{min-width:55px;white-space:pre-wrap}td[contenteditable]:focus,span[contenteditable]:focus{outline:2px solid var(--gold);outline-offset:1px;background:#29231c}.tc{color:var(--green);font-family:ui-monospace,monospace;white-space:nowrap}.tc button{padding:2px 4px;margin-left:4px;font-size:.58rem}.resolved{margin-top:3px;color:#80d89f;font-size:.66rem;white-space:normal}.override{max-width:82px}.text-cell{min-width:260px}.check{text-align:center;vertical-align:middle}.check input{width:17px;height:17px}.row-actions{width:38px;white-space:nowrap;text-align:center}.row-actions button{min-width:25px;min-height:25px;padding:2px 5px;font-size:.72rem;line-height:1}.origin-builder{color:#e0aa54}.origin-import{color:#74a8ec}.origin-ableton{color:#7ddca0}.section{margin-top:20px}.section h2{font-size:1rem}.distribution table{table-layout:fixed;min-width:760px}.distribution col.role{width:14%}.distribution col.artist{width:14%}.distribution col.active{width:8%}.distribution col.equipment{width:48%}.distribution col.notes{width:16%}.distribution col.actions{width:40px}.distribution tr.role-start td{border-top:2px solid #80683f}.distribution tr.active{background:#173221}.equipment-slots{display:flex;align-items:center;gap:4px;flex-wrap:wrap;min-width:0}.equipment-slot{display:grid;grid-template-columns:82px minmax(90px,150px) 23px;gap:3px;align-items:center}.equipment-slot select,.equipment-slot input{min-width:0;width:100%;padding:2px 4px;font-size:.66rem}.equipment-slot button{width:23px;height:23px;padding:0;font-size:.68rem;line-height:1}.add-equipment{margin-top:3px;padding:2px 6px;font-size:.6rem;font-weight:750;color:#bcb3a8;background:#1b1916}.add-equipment:disabled{display:none}.duplicate-assignment{color:#ffbd72;font-size:.64rem;font-weight:900}.validation{margin-top:6px;white-space:pre-wrap}.validation.ok{font-size:.7rem}.danger{color:#ff9494}.hidden{display:none}@media(max-width:1050px){.tools{align-items:flex-start}.tool-group{padding-right:7px}.distribution col.role,.distribution col.artist{width:15%}.distribution col.active{width:8%}.distribution col.equipment{width:45%}.distribution col.notes{width:17%}.equipment-slot{grid-template-columns:76px minmax(82px,135px) 23px}}@media(max-width:760px){.summary{grid-template-columns:repeat(3,1fr)}.bar{align-items:flex-start}.title{display:block}.header-right{margin-left:auto}.builder-logo{width:82px;height:28px}.tools button,.tools a{flex:0 1 auto;text-align:center}.tool-group{width:100%;border-right:0;border-bottom:1px solid var(--line);padding-bottom:6px}.shell{padding:8px}.distribution table{min-width:700px}}
+:root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--bg:#090807;--panel:#151311;--line:#3c352d;--text:#f5f1e9;--muted:#a29a90;--gold:#c79b50;--green:#62df91;--blue:#315f89;--violet:#7c4c44}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text)}button,input,select{font:inherit;color:inherit}button,select,input{border:1px solid #514940;border-radius:6px;background:#24201c;padding:7px 9px}button{cursor:pointer;font-weight:800}.primary{border-color:#43865d;background:#2c5f3e}.action-blue{border-color:#47769e;background:#294d6d}.action-violet{border-color:#956351;background:#664038}.action-amber{display:inline-flex;align-items:center;border:1px solid #806637;border-radius:6px;background:#3b301d;color:#ead6b3!important;padding:7px 9px}.shell{padding:12px 14px 24px;max-width:1800px;margin:auto}.top{position:sticky;top:0;z-index:4;background:#090807f5;border-bottom:1px solid var(--line);padding:4px 0 10px}.bar,.tools,.filters,.tool-group{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.bar{justify-content:space-between}.title{display:flex;align-items:baseline;gap:12px;min-width:0}.title h1{margin:0;font-size:1.25rem}.header-right{display:flex;align-items:center;gap:12px}.header-right a{color:#d6c7ae;text-decoration:none;font-size:.76rem;font-weight:800}.builder-logo{display:block;width:104px;height:34px;object-fit:contain}.muted{color:var(--muted);font-size:.78rem}.tools{margin-top:8px;align-items:stretch}.tool-group{border-right:1px solid var(--line);padding-right:10px}.tool-group:last-child{border:0}.tool-label{color:var(--muted);font-size:.58rem;font-weight:900;letter-spacing:.08em}.tools a{text-decoration:none}.file{position:relative;overflow:hidden}.file input{position:absolute;inset:0;opacity:0;cursor:pointer}.filters{margin:10px 0}.filters label{display:flex;align-items:center;gap:5px;font-size:.68rem;color:var(--muted);font-weight:900}.filters select{padding:5px 7px}.summary{display:grid;grid-template-columns:repeat(6,minmax(100px,1fr));gap:6px;margin:8px 0}.metric{border:1px solid var(--line);border-radius:7px;background:var(--panel);padding:7px 9px}.metric strong{display:block;font-size:1.05rem}.warning{color:#ffbd72}.ok{color:var(--green)}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--panel)}table{border-collapse:collapse;min-width:1500px;width:100%;font-size:.75rem}th{position:sticky;top:0;z-index:2;background:#211d19;color:#d8c29d;font-size:.64rem;letter-spacing:.04em}th,td{border-right:1px solid #302b26;border-bottom:1px solid #302b26;padding:6px;vertical-align:top}td[contenteditable],span[contenteditable]{min-width:55px;white-space:pre-wrap}td[contenteditable]:focus,span[contenteditable]:focus{outline:2px solid var(--gold);outline-offset:1px;background:#29231c}.tc{color:var(--green);font-family:ui-monospace,monospace;white-space:nowrap}.tc button{padding:2px 4px;margin-left:4px;font-size:.58rem}.resolved{margin-top:3px;color:#80d89f;font-size:.66rem;white-space:normal}.override{max-width:82px}.text-cell{min-width:260px}.check{text-align:center;vertical-align:middle}.check input{width:17px;height:17px}.row-actions{width:38px;white-space:nowrap;text-align:center}.row-actions button{min-width:25px;min-height:25px;padding:2px 5px;font-size:.72rem;line-height:1}.origin-builder{color:#e0aa54}.origin-import{color:#74a8ec}.origin-ableton{color:#7ddca0}.section{margin-top:20px}.section h2{font-size:1rem}.distribution table{table-layout:fixed;min-width:760px}.distribution col.role{width:14%}.distribution col.artist{width:14%}.distribution col.active{width:8%}.distribution col.equipment{width:48%}.distribution col.notes{width:16%}.distribution col.actions{width:40px}.distribution tr.role-start td{border-top:2px solid #80683f}.distribution tr.active{background:#173221}.equipment-slots{display:flex;align-items:center;gap:4px;flex-wrap:wrap;min-width:0}.equipment-slot{display:grid;grid-template-columns:82px minmax(90px,150px) 23px;gap:3px;align-items:center}.equipment-slot select,.equipment-slot input{min-width:0;width:100%;padding:2px 4px;font-size:.66rem}.equipment-slot button{width:23px;height:23px;padding:0;font-size:.68rem;line-height:1}.add-equipment{margin-top:3px;padding:2px 6px;font-size:.6rem;font-weight:750;color:#bcb3a8;background:#1b1916}.add-equipment:disabled{display:none}.duplicate-assignment{color:#ffbd72;font-size:.64rem;font-weight:900}.validation{margin-top:6px;white-space:pre-wrap}.validation.ok{font-size:.7rem}.danger{color:#ff9494}.hidden{display:none}@media(max-width:1050px){.tools{align-items:flex-start}.tool-group{padding-right:7px}.distribution col.role,.distribution col.artist{width:15%}.distribution col.active{width:8%}.distribution col.equipment{width:45%}.distribution col.notes{width:17%}.equipment-slot{grid-template-columns:76px minmax(82px,135px) 23px}}@media(max-width:760px){.summary{grid-template-columns:repeat(3,1fr)}.bar{align-items:flex-start}.title{display:block}.header-right{margin-left:auto}.builder-logo{width:82px;height:28px}.tools button,.tools a{flex:0 1 auto;text-align:center}.tool-group{width:100%;border-right:0;border-bottom:1px solid var(--line);padding-bottom:6px}.shell{padding:8px}.distribution table{min-width:700px}}
 
 /* ==========================================================
    CASTING & ÉQUIPEMENTS
@@ -252,8 +252,8 @@ td[data-key="type"].kind-action::after{
 }
 
 td[data-key="type"].kind-top::after{
-    border:1px solid #775aa8;
-    background:#291f3b;
+    border:1px solid #a85a5c;
+    background:#3b1f20;
     color:#e5d6ff;
 }
 </style>
@@ -268,8 +268,8 @@ td[data-key="type"].kind-top::after{
 .section-new-input{
     width:100%;
     min-width:140px;
-    border:1px solid #8b6bb2;
-    background:#241d2e;
+    border:1px solid #b26b61;
+    background:#2e1d19;
     color:#fff;
     border-radius:6px;
     padding:7px 8px;
@@ -277,7 +277,7 @@ td[data-key="type"].kind-top::after{
 }
 </style>
 
-<link rel="stylesheet" href="/static/showcue-editor.css?v=phase1">
+<link rel="stylesheet" href="/static/showcue-editor.css?v=compact-red-2">
 
 <style id="showcue-conduite-compact">
 .summary{
@@ -359,7 +359,7 @@ height:13px;
 }
 </style>
 
-</head><body><main class="shell" inert><header class="top"><div class="bar"><div class="title"><h1>CL Cue Editor</h1><span class="muted">SHOW ACTIF · <span id="session">—</span></span></div><div class="header-right"><a href="/show-info">← CL SHOWCUE</a><img class="builder-logo" src="/assets/paradis%20latin.jpg" alt="Paradis Latin Cabaret"></div></div><div class="tools"><div class="tool-group"><span class="tool-label">ÉDITION</span><button class="action-blue" id="add-cue">+ CUE</button><button class="action-violet" id="add-distribution">+ AFFECTATION</button><button class="primary" id="save">ENREGISTRER LE BUILDER</button></div><div class="tool-group"><span class="tool-label">ÉCHANGE</span><label class="file"><button>IMPORT XLSX / CSV</button><input id="import" type="file" accept=".xlsx,.csv"></label><label class="file pdf-import"><button>IMPORT PDF</button><input id="import-pdf" type="file" accept=".pdf,application/pdf"></label><button disabled title="Import ALS non implémenté">IMPORT ALS — À VENIR</button><a class="action-amber" href="/show-info/builder/export.xlsx">EXPORTER LE TABLEAU XLSX</a><a class="action-amber" href="/show-info/builder/export.csv">EXPORTER LE TABLEAU CSV</a></div><div class="tool-group"><span class="tool-label">VALIDATION</span><button id="adopt" class="hidden action-violet">ADOPTER LA PRÉVISUALISATION</button><button class="action-blue" id="validate">VALIDER</button></div></div><div id="builder-save-help" class="muted">Enregistrer le Builder conserve la préparation. Pour modifier la conduite ShowCue, prévisualisez puis confirmez sa mise à jour.</div><div id="builder-recovery" class="validation muted" role="status">Un Builder absent ou vide est reconstitué depuis la conduite. Un Builder rempli est conservé. Sans les métadonnées d’origine, certains rôles, affectations et équipements ne peuvent pas être recréés.</div><div id="message" class="validation muted">Enregistrer le Builder conserve la préparation. La conduite ShowCue change uniquement après prévisualisation et confirmation de sa mise à jour.</div></header>
+</head><body><main class="shell" inert data-builder-local="{{ 'true' if builder_local else 'false' }}"><section id="builder-access-mode" role="status" style="padding:10px;margin-bottom:10px;border:1px solid #6582a3;border-radius:6px;background:#182333">{% if builder_local %}BUILDER — MODE LOCAL{% else %}<strong>BUILDER — CONSULTATION DISTANTE</strong><br>Les modifications du Builder sont volontairement limitées au poste local. Cette page distante est disponible en lecture seule.{% endif %}</section><header class="top"><div class="bar"><div class="title"><h1>CL Cue Editor</h1><span class="muted">SHOW ACTIF · <span id="session">—</span></span></div><div class="header-right"><a href="/show-info">← CL SHOWCUE</a><img class="builder-logo" src="/assets/paradis%20latin.jpg" alt="Paradis Latin Cabaret"></div></div><div class="tools"><div class="tool-group"><span class="tool-label">ÉDITION</span><button class="action-blue" id="add-cue">+ CUE</button><button class="action-violet" id="add-distribution">+ AFFECTATION</button><button class="primary" id="save">ENREGISTRER LE BUILDER</button></div><div class="tool-group"><span class="tool-label">ÉCHANGE</span><label class="file"><button>IMPORT XLSX / CSV</button><input id="import" type="file" accept=".xlsx,.csv"></label><label class="file pdf-import"><button>IMPORT PDF</button><input id="import-pdf" type="file" accept=".pdf,application/pdf"></label><button disabled title="Import ALS non implémenté">IMPORT ALS — À VENIR</button><a class="action-amber" href="/show-info/builder/export.xlsx">EXPORTER LE TABLEAU XLSX</a><a class="action-amber" href="/show-info/builder/export.csv">EXPORTER LE TABLEAU CSV</a></div><div class="tool-group"><span class="tool-label">VALIDATION</span><button id="adopt" class="hidden action-violet">ADOPTER LA PRÉVISUALISATION</button><button class="action-blue" id="validate">VALIDER</button></div></div><div id="builder-save-help" class="muted">Enregistrer le Builder conserve la préparation. Pour modifier la conduite ShowCue, prévisualisez puis confirmez sa mise à jour.</div><div id="builder-recovery" class="validation muted" role="status">Un Builder absent ou vide est reconstitué depuis la conduite. Un Builder rempli est conservé. Sans les métadonnées d’origine, certains rôles, affectations et équipements ne peuvent pas être recréés.</div><div id="message" class="validation muted">Enregistrer le Builder conserve la préparation. La conduite ShowCue change uniquement après prévisualisation et confirmation de sa mise à jour.</div></header>
 <div class="summary" id="summary"></div><div class="filters"><label>PHASE <select id="filter-phase"><option value="">TOUT</option></select></label><label>SECTION <select id="filter-section"><option value="">TOUT</option></select></label><label>TYPE <select id="filter-type"><option value="">TOUT</option></select></label><label>RÔLE <select id="filter-role"><option value="">TOUT</option></select></label><label>ARTISTE <select id="filter-artist"><option value="">TOUT</option></select></label></div>
 <section><div class="table-wrap"><table><thead><tr><th>#</th><th>TC</th><th>PHASE</th><th>TABLEAU / MORCEAU</th><th>CUE / ACTION</th><th>CATÉGORIE</th><th>SECTION</th><th>RÔLE / AFFECTATION DU JOUR</th><th class="advanced-column">ARTISTE<br>FORCÉ</th><th class="advanced-column">MICRO<br>FORCÉ</th><th class="advanced-column">IEM<br>FORCÉ</th><th class="advanced-column">ÉQUIPEMENT<br>FORCÉ</th><th>FOH</th><th>RET</th><th>PLT</th><th>LUM</th><th class="advanced-column">ORIGINE</th><th class="advanced-column">NOTES</th><th></th></tr></thead><tbody id="cues"></tbody></table></div></section>
 <section class="section distribution casting-equipment-section">
@@ -404,10 +404,15 @@ async function api(url,options={}){
         }
     );
 
-    const data=await response.json();
+    const importRequest=url==='/show-info/builder/import';
+    let data;
+    try{data=await response.json();}catch(error){
+        if(importRequest)throw new Error('Erreur '+response.status+' — Réponse serveur non JSON. Format attendu : XLSX ou CSV');
+        throw error;
+    }
 
     if(!response.ok||!data.ok){
-        let message=data.message||'Erreur serveur';
+        let message=importRequest ? 'Erreur '+response.status+' — '+(data.message||data.error||'Requête refusée sans explication') : data.message||'Erreur serveur';
 
         if(
             url==='/show-info/builder/document' &&
@@ -513,7 +518,7 @@ function render(){
     cues.innerHTML='';
     distribution.innerHTML='';
 
-    orderedBuilderCues(documentData.cues)
+    documentData.cues
         .forEach((cue,index)=>cues.append(cueRow(cue,index)));
 
     let previousRole=null;
@@ -580,13 +585,14 @@ function setSaveState(value,error=false){
     saveState.className=error?'danger':'muted';
 }
 
-function markDirty(){
+function markDirty(event){
     if(preview)return;
     builderEditVersion++;
     if(autosaveBlocked)return;
 
-    setSaveState('MODIFICATIONS EN COURS');
     clearTimeout(autosaveTimer);
+    if(event?.target?.id==='adopt' && window.clImportExplicitSave){setSaveState('IMPORT ADOPTÉ — NON SAUVEGARDÉ');return;}
+    setSaveState('MODIFICATIONS EN COURS');
 
     autosaveTimer=setTimeout(()=>{
         save().catch(error=>{
@@ -3598,7 +3604,7 @@ header.top > details:not(.cue-v2-menu):not(.cue-v2-status-details){
             const btn=distributionLabel.querySelector('button');
 
             if(btn){
-                btn.textContent='IMPORTER LA DISTRIBUTION';
+                btn.textContent='IMPORTER UNIQUEMENT LA DISTRIBUTION CSV / XLSX';
                 btn.classList.add('cue-import-primary');
             }
 
@@ -3621,7 +3627,7 @@ header.top > details:not(.cue-v2-menu):not(.cue-v2-status-details){
             const btn=pdfLabel.querySelector('button');
 
             if(btn){
-                btn.textContent='IMPORTER UN PDF';
+                btn.textContent='IMPORTER DEPUIS UN PDF';
             }
 
             safe.append(pdfLabel);
@@ -3635,38 +3641,26 @@ header.top > details:not(.cue-v2-menu):not(.cue-v2-status-details){
             safe.append(alsButton);
         }
 
-        /* -----------------------------------------------
-           AVANCÉ : conduite complète
-           ----------------------------------------------- */
-
+        // Reuse the preview-only import handler and its existing file input.
         if(fullLabel){
-
-            const advanced=document.createElement('details');
-            advanced.className='cue-import-advanced';
-
-            const summary=document.createElement('summary');
-            summary.textContent='AVANCÉ — REMPLACER LA CONDUITE';
-
-            const danger=document.createElement('div');
-            danger.className='cue-import-danger-box';
-
-            const warning=document.createElement('div');
-            warning.className='cue-import-danger-note';
-            warning.textContent=
-                'Attention : cet import remplace la conduite complète '+
-                'et la distribution. À utiliser uniquement pour une '+
-                'migration ou un remplacement volontaire.';
-
             const btn=fullLabel.querySelector('button');
-
-            if(btn){
-                btn.textContent='REMPLACER LA CONDUITE COMPLÈTE';
-            }
-
-            danger.append(warning,fullLabel);
-            advanced.append(summary,danger);
-            safe.append(advanced);
+            if(btn)btn.textContent='IMPORTER UN BUILDER CSV / XLSX';
+            document.getElementById('import').accept='.csv,.xlsx';
+            safe.prepend(fullLabel);
+            const description=document.createElement('div');
+            description.className='cue-import-description';
+            description.textContent='Prévisualisation uniquement. Adoptez puis enregistrez explicitement le Builder. La mise à jour de la conduite reste séparée.';
+            fullLabel.after(description);
         }
+
+        const archive=document.createElement('button');
+        archive.type='button';
+        archive.textContent='IMPORTER / OUVRIR UN SHOWCUE';
+        archive.addEventListener('click',()=>{
+            const input=document.getElementById('cl-session-upload');
+            if(input)input.click();
+        });
+        safe.append(archive);
 
         panel.innerHTML='';
         panel.append(safe);
@@ -6841,9 +6835,17 @@ header.top > details:not(.cue-v2-menu):not(.cue-v2-status-details){
 })();
 </script>
 
+<script src="/static/showcue-import-feedback.js?v=1"></script>
 </body></html>
 
 <script src="/static/showcue-lifecycle.js"></script>
-<script src="/static/showcue-sessions.js"></script>
+<script src="/static/showcue-sessions.js?v=session-editor-2"></script>
 
 <script src="/static/showcue-editor.js?v=phase1"></script>
+
+<script src="/static/showcue-phase-order.js?v=1"></script>
+
+<script src="/static/showcue-builder-access.js?v=1"></script>
+
+<link rel="stylesheet" href="/static/showcue-builder-layout.css?v=1">
+<script src="/static/showcue-builder-layout.js?v=1"></script>

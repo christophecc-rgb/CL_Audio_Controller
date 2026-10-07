@@ -82,7 +82,7 @@ const selectionButton=button('Sélectionner',()=>{selectionMode=!selectionMode;r
 tools.append(el('span','ce-view-label','CONDUITE · VUE DE CONSULTATION'),selectionButton);
 const table=el('table','ce-table');table.setAttribute('aria-label','Cues');
 const head=el('thead'),hr=el('tr');
-for(const label of ['N°','REPÈRE','SOURCE / SCÈNE','TEXTE / ACTION','RÔLE · ARTISTE / MATÉRIEL']) hr.append(el('th','',label));
+for(const label of ['N°','REPÈRE','SOURCE / SCÈNE','TEXTE / ACTION','RÔLE · ARTISTE / MATÉRIEL','ACTIONS']) hr.append(el('th','',label));
 head.append(hr);const body=el('tbody');table.append(head,body);host.append(tools,table);
 const dialog=el('dialog','ce-dialog');dialog.id='cue-panel';dialog.setAttribute('aria-labelledby','cue-panel-title');
 const form=el('form'),panelHeader=el('header','ce-panel-header'),title=el('h2');title.id='cue-panel-title';
@@ -427,7 +427,7 @@ form.addEventListener('submit',async event=>{
     }catch(e){error.textContent=e.message;}finally{submit.disabled=false;}
 });
 function refresh(){
-    const distribution=distributionFromDom();body.replaceChildren();let lastSection=null;
+    const distribution=distributionFromDom();body.replaceChildren();let lastSection=null,lastPhase=null;
     const rows=[...source.rows];const count=rows.filter(r=>r.querySelector('.builder-bulk-cue-check')?.checked).length;
     const bar=$('builder-bulk-role-bar');if(bar)bar.classList.toggle('ce-bulk-hidden',count===0);
     selectionButton.textContent=selectionMode?'Terminer la sélection':'Sélectionner';
@@ -435,10 +435,14 @@ function refresh(){
     for(const sourceRow of rows){
         if(sourceRow.hidden)continue;
         const cue=cueFromRow(sourceRow),summary=summarizeCue(cue,distribution);
-        if(cue.section!==lastSection){const r=el('tr','ce-section'),td=el('th','',cue.section||'SANS SECTION');td.colSpan=5;td.scope='rowgroup';r.append(td);body.append(r);lastSection=cue.section;}
+        const phase=root.CLBuilderOrganization?.phase(cue)||cue.phase||cue.section||'SHOW';
+        if(phase!==lastPhase){const r=el('tr','ce-phase'),td=el('th','',phase);td.colSpan=6;r.append(td);body.append(r);lastPhase=phase;lastSection=null;}
+        if(cue.section!==phase && cue.section!==lastSection){const r=el('tr','ce-section'),td=el('th','',cue.section||'SANS SECTION');td.colSpan=6;td.scope='rowgroup';r.append(td);body.append(r);lastSection=cue.section;}
         const r=el('tr','ce-cue');r.dataset.cueId=cue.id;
         const num=el('td','ce-number');const select=el('input','ce-select');select.type='checkbox';select.checked=!!sourceRow.querySelector('.builder-bulk-cue-check')?.checked;select.setAttribute('aria-label','Sélectionner le cue '+cue.number);
-        select.onchange=()=>{const original=sourceRow.querySelector('.builder-bulk-cue-check');original.checked=select.checked;original.dispatchEvent(new Event('change',{bubbles:true}));refresh();};
+        select.onchange=()=>{if(root.CLBuilderSelection)return;const original=sourceRow.querySelector('.builder-bulk-cue-check');original.checked=select.checked;original.dispatchEvent(new Event('change',{bubbles:true}));refresh();};
+        select.addEventListener('click',event=>{if(root.CLBuilderSelection){event.preventDefault();root.CLBuilderSelection.select(cue.id,event,true);}});
+        r.addEventListener('click',event=>{if(root.CLBuilderSelection&&!event.target.closest('button,input,a'))root.CLBuilderSelection.select(cue.id,event,false);});
         num.append(select,el('span','',cue.number));
         const time=el('td','ce-time',cue.timecode||'SANS TC'),scene=el('td','ce-scene',cue.source||'—'),action=el('td','ce-action');action.append(el('div','ce-text',cue.text||'Cue à compléter'));
         const posts=postKeys.filter(k=>cue[k]);action.append(el('span','ce-posts',posts.length===4?'TOUS':posts.map(k=>k.toUpperCase()).join(' · ')||'AUCUN POSTE'));
@@ -458,11 +462,13 @@ function refresh(){
         }
         for(const warning of summary.warnings)technical.append(el('div','ce-warning','⚠ '+warning));
         if(summary.noteSignal)action.append(el('div','ce-note','• '+summary.noteSignal));
-        const actions=el('div','ce-row-actions');actions.append(button('Modifier',()=>openPanel(cue.id,'edit')),button('Détails',()=>openPanel(cue.id,'details')));technical.append(actions);
-        r.append(num,time,scene,action,technical);body.append(r);
+        const actions=el('div','ce-row-actions');actions.append(button('Modifier',()=>openPanel(cue.id,'edit')),button('Détails',()=>openPanel(cue.id,'details')));const actionsCell=el('td','ce-actions');actionsCell.append(actions);
+        r.append(num,time,scene,action,technical,actionsCell);body.append(r);
     }
-    if(!body.children.length){const r=el('tr'),td=el('td','','Aucun cue pour ces filtres.');td.colSpan=5;r.append(td);body.append(r);}
+    root.CLBuilderSelection?.refresh();
+    if(!body.children.length){const r=el('tr'),td=el('td','','Aucun cue pour ces filtres.');td.colSpan=6;r.append(td);body.append(r);}
 }
+root.CLBuilderRefresh=refresh;
 let scheduled=false;
 function schedule(){if(scheduled)return;scheduled=true;requestAnimationFrame(()=>{scheduled=false;refresh();});}
 // Observe source changes only; the consultation projection never feeds back into #cues.

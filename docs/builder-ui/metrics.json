@@ -1,0 +1,22 @@
+{
+  "after1512": {
+    "header": 119,
+    "height": 900,
+    "overflow": false,
+    "rowHeight": 32.458335876464844,
+    "visible": 19,
+    "width": 1512
+  },
+  "before1512": {
+    "header": 319.41668701171875,
+    "rowHeight": 78.63542175292969,
+    "visible": 4
+  },
+  "after1280": {
+    "header": 119,
+    "height": 800,
+    "overflow": false,
+    "visible": 16,
+    "width": 1280
+  }
+}

@@ -7,7 +7,7 @@
     const panel = document.createElement('details');
     panel.className = 'validation cl-session-panel';
     panel.open = true;
-    panel.innerHTML = '<summary>SHOWS / SESSIONS</summary><p id="cl-session-scope" role="status">Ouvrir un show change la session active pour tout le serveur ShowCue et ses autres fenêtres.</p><label>Show enregistré <select id="cl-saved-sessions"></select></label> <button id="cl-open-session">OUVRIR</button><hr><label>IMPORTER UNE COPIE ET L’OUVRIR <input id="cl-session-upload" type="file" accept=".showcue,.showcue.zip"></label><div id="cl-session-archives"></div><div id="cl-libraries"></div><a href="/show-info/builder/sessions/export">SAUVEGARDER LE SHOW COMPLET .showcue</a><p>CSV/XLSX : tableau du Builder. .showcue : Builder, conduite et audio référencé ; pas les réglages de la suite.</p><div id="cl-import-result" role="status"></div>';
+    panel.innerHTML = '<summary>SHOWS / SESSIONS</summary><p id="cl-session-scope" role="status">Ouvrir un show change la session active pour tout le serveur ShowCue et ses autres fenêtres.</p><label>Show enregistré <select id="cl-saved-sessions"></select></label> <button id="cl-open-session">OUVRIR</button><div class="cl-session-actions"><button id="cl-session-new">Nouvelle session</button><button id="cl-session-rename">Renommer</button><button id="cl-session-duplicate">Dupliquer</button><button id="cl-session-delete" class="danger">Supprimer</button></div><hr><label>IMPORTER UNE COPIE ET L’OUVRIR <input id="cl-session-upload" type="file" accept=".showcue,.showcue.zip"></label><div id="cl-session-archives"></div><div id="cl-libraries"></div><a href="/show-info/builder/sessions/export">SAUVEGARDER LE SHOW COMPLET .showcue</a><p>CSV/XLSX : tableau du Builder. .showcue : Builder, conduite et audio référencé ; pas les réglages de la suite.</p><div id="cl-import-result" role="status"></div>';
     document.querySelector('header.top').append(panel);
     const output = document.getElementById('cl-import-result');
     const selector = document.getElementById('cl-saved-sessions');
@@ -35,6 +35,42 @@
             ?'Le serveur utilise « '+active.name+' ». Cette fenêtre affiche « '+(displayed?.name||sessionId)+' ». Rechargez avant de continuer ; le brouillon reste conservé.'
             :'Ouvrir un show change la session active pour tout le serveur ShowCue et ses autres fenêtres.';
         return data;
+    }
+    for (const action of ['new', 'rename', 'duplicate', 'delete']) {
+        document.getElementById('cl-session-' + action).onclick = async () => {
+            if (busy) return;
+            busy = true;
+            try {
+                await ready;
+                if (!window.clBuilderLifecycle) throw Error('Protection de sauvegarde indisponible. Rechargez l’éditeur.');
+                await window.clBuilderLifecycle.operation(async () => {
+                    if (!await window.clBuilderLifecycle.prepareNavigation()) return;
+                    const data = await registry();
+                    if (data.active_session_id !== sessionId) throw Error('La session active a changé. Rechargez l’éditeur.');
+                    const active = data.sessions.find(item => item.id === data.active_session_id);
+                    const base = '/show-info/sessions/' + encodeURIComponent(active.id);
+                    let url = base, method = 'POST', body;
+                    if (action === 'delete') {
+                        if (data.sessions.length < 2) throw Error('Conservez au moins une session.');
+                        if (!window.confirm('Supprimer définitivement la session « ' + active.name + ' » ?')) return;
+                        const confirmation = window.prompt('Pour confirmer, saisissez exactement : ' + active.name);
+                        if (confirmation === null) return;
+                        method = 'DELETE'; body = {confirmation_name: confirmation};
+                    } else {
+                        const name = window.prompt(action === 'new' ? 'Nom de la nouvelle session :' : action === 'duplicate' ? 'Nom de la copie :' : 'Nouveau nom de la session :', action === 'new' ? '' : active.name + (action === 'duplicate' ? ' — copie' : ''));
+                        if (name === null) return;
+                        body = {name};
+                        if (action === 'new') url = '/show-info/sessions';
+                        else if (action === 'duplicate') url += '/duplicate';
+                        else method = 'PUT';
+                    }
+                    await request(url, {method, body: JSON.stringify(body)});
+                    window.clBuilderAllowUnload = true;
+                    location.reload();
+                });
+            } catch (error) { message(error); }
+            finally { busy = false; }
+        };
     }
     async function recover(current) {
         if (current.document.cues.length || !window.pywebview?.api?.recover_builder) return current;

@@ -5,7 +5,7 @@ const script = fs.readFileSync('static/showcue-sessions.js', 'utf8');
 const state = {active: 'session_initiale', sessions: [{id:'session_initiale',name:'Session actuelle'}], documents: {session_initiale: {revision:6,cues:[]}}, calls:[], reloads:0, prepared:0, allowNavigation:true};
 function element() { return {children:[], value:'', append(...x){this.children.push(...x)}, replaceChildren(){this.children=[]}, remove(){}, closest(){return this}}; }
 function page() {
-    const elements = Object.fromEntries(['cl-session-upload','cl-saved-sessions','cl-open-session','cl-import-result','cl-session-archives','cl-libraries','session'].map(id=>[id,element()]));
+    const elements = Object.fromEntries(['cl-session-new','cl-session-rename','cl-session-duplicate','cl-session-delete','cl-session-upload','cl-saved-sessions','cl-open-session','cl-import-result','cl-session-archives','cl-libraries','session'].map(id=>[id,element()]));
     const context = {document:{getElementById:id=>elements[id],createElement:element,querySelector:element}, console, Uint8Array, String, JSON, Error, encodeURIComponent,
         FormData: class {append(key,value){this[key]=value}},
         location:{reload(){state.reloads++}}, preview:null, sessionId:state.active, documentData:state.documents[state.active], render(){},showValidation(){},

@@ -13,7 +13,7 @@ import zipfile
 from pathlib import Path
 from xml.etree import ElementTree as ET
 from xml.sax.saxutils import escape
-from show_cues import SHOW_SECTIONS, timecode_to_units
+from show_cues import SHOW_SECTIONS, timecode_to_units, normalize_notes_by_post
 
 BUILDER_COLUMNS = (
     "#", "TC", "SCÈNE ABLETON", "TYPE", "SECTION", "RÔLE", "ARTISTE OVERRIDE", "TEXTE",
@@ -23,7 +23,12 @@ DISTRIBUTION_COLUMNS = (
     "RÔLE", "ARTISTE", "ACTIF",
     "ÉQUIPEMENT 1 TYPE", "ÉQUIPEMENT 1 VALEUR",
     "ÉQUIPEMENT 2 TYPE", "ÉQUIPEMENT 2 VALEUR",
-    "ÉQUIPEMENT 3 TYPE", "ÉQUIPEMENT 3 VALEUR", "NOTES",
+    "ÉQUIPEMENT 3 TYPE", "ÉQUIPEMENT 3 VALEUR",
+    "ÉQUIPEMENT 4 TYPE", "ÉQUIPEMENT 4 VALEUR",
+    "ÉQUIPEMENT 5 TYPE", "ÉQUIPEMENT 5 VALEUR",
+    "ÉQUIPEMENT 6 TYPE", "ÉQUIPEMENT 6 VALEUR",
+    "ÉQUIPEMENT 7 TYPE", "ÉQUIPEMENT 7 VALEUR",
+    "ÉQUIPEMENT 8 TYPE", "ÉQUIPEMENT 8 VALEUR", "NOTES",
 )
 LEGACY_DISTRIBUTION_COLUMNS = ("RÔLE", "ARTISTE", "MICRO", "IEM", "ÉQUIPEMENT", "ACTIF", "NOTES")
 EQUIPMENT_TYPES = ("MICRO", "IEM", "ÉQUIPEMENT", "AUTRE")
@@ -170,6 +175,7 @@ def normalize_builder_document(document):
             "plt": _boolean(raw.get("plt", True), "PLT"),
             "lum": _boolean(raw.get("lum", True), "LUM"),
             "origin": _text(raw.get("origin")) or "BUILDER", "notes": _text(raw.get("notes")),
+            "notes_by_post": normalize_notes_by_post(raw.get("notes_by_post", {})),
             "role_assignments": _normalize_role_assignments(
                 raw.get("role_assignments")
             ),
@@ -602,7 +608,32 @@ def builder_import_values(document):
     document = normalize_builder_document(document)
     validation = validate_builder_document(document)
     if not validation["ready"]:
-        raise ValueError("document Builder non valide")
+        details = []
+        for index, cue in enumerate(document["cues"], 1):
+            for key, field in (("invalid_timecodes", "timecode"), ("empty_texts", "text")):
+                if cue["id"] in validation[key]:
+                    details.append(f"cue index {index} ({cue['id']}), champ {field}, valeur {cue[field]!r}")
+        for index, row in enumerate(document["distribution"], 1):
+            label = f"distribution index {index} ({row['role']} / {row['artist']})"
+            if index in validation["empty_distribution_roles"]:
+                details.append(f"{label}, champ role vide")
+            if index in validation["empty_distribution_artists"]:
+                details.append(f"{label}, champ artist vide")
+            seen = set()
+            for slot_index, slot in enumerate(row["equipment_slots"], 1):
+                prefix = f"{label}, équipement {slot_index}"
+                if not slot["type"] or slot["type"] not in EQUIPMENT_TYPES:
+                    details.append(f"{prefix}, champ type invalide : {slot['type']!r}")
+                if not slot["value"]:
+                    details.append(f"{prefix}, champ value vide (type {slot['type']!r})")
+                key = (slot["type"].casefold(), slot["value"].casefold())
+                if all(key) and key in seen:
+                    details.append(f"{prefix}, équipement dupliqué : {slot['value']!r}")
+                seen.add(key)
+        for key, label in (("roles_with_multiple_active_artists", "Plusieurs artistes actifs pour le rôle"),
+                           ("duplicate_role_artists", "Affectation rôle/artiste dupliquée")):
+            details.extend(f"{label} : {value}" for value in validation[key])
+        raise ValueError("Document Builder non valide :\n" + "\n".join(details))
     values = []
     for cue in document["cues"]:
         posts = [post for enabled, post in ((cue["foh"], "FOH"), (cue["ret"], "RETOURS"),
@@ -616,7 +647,7 @@ def builder_import_values(document):
             "role": cue["role"], "artist_override": cue["artist"],
             "microphone_override": cue["microphone"], "iem_override": cue["iem"],
             "equipment_override": cue["equipment"], "origin": cue["origin"],
-            "notes": cue["notes"], "resolved_artist": resolved["artist"],
+            "notes": cue["notes"], "notes_by_post": cue.get("notes_by_post", {}), "resolved_artist": resolved["artist"],
             "resolved_microphone": resolved["microphone"], "resolved_iem": resolved["iem"],
             "resolved_equipment": resolved["equipment"],
             "resolved_participants": resolved.get("participants", []),
@@ -1039,10 +1070,95 @@ def export_xlsx(document):
 
     return output.getvalue()
 
+IMPORT_BUILDER_COLUMNS = (*BUILDER_COLUMNS, "PHASE")
+
+
+class BuilderImportError(ValueError):
+    def __init__(self, message, diagnostics):
+        self.diagnostics = diagnostics
+        context = {key: diagnostics[key] for key in ("format", "encoding", "separator", "sheets", "sheet") if key in diagnostics}
+        for key in ("conduite", "distribution", "conduite_candidates", "distribution_candidates"):
+            if key in diagnostics:
+                context[key] = diagnostics[key]
+        super().__init__(message + " — " + json.dumps(context, ensure_ascii=False))
+
+
+def _header_key(value):
+    import unicodedata
+    value = str(value or "").replace("\ufeff", "")
+    value = "".join(c for c in unicodedata.normalize("NFKD", value)
+                    if not unicodedata.combining(c) and unicodedata.category(c) != "Cf")
+    return re.sub(r"[^A-Z0-9#]+", " ", value.upper()).strip()
+
+
+def _import_column_name(value, distribution=False):
+    columns = (*DISTRIBUTION_COLUMNS, *LEGACY_DISTRIBUTION_COLUMNS) if distribution else IMPORT_BUILDER_COLUMNS
+    canonical = {_header_key(name): name for name in columns}
+    for index in range(1, MAX_EQUIPMENT_SLOTS + 1):
+        if distribution:
+            for suffix in ("TYPE", "VALEUR"):
+                name = f"ÉQUIPEMENT {index} {suffix}"
+                canonical[_header_key(name)] = name
+    aliases = {"TEXT": "TEXTE", "DESCRIPTION": "TEXTE", "TEXTE ACTION": "TEXTE",
+               "TIMECODE": "TC", "TIME CODE": "TC", "CODE TEMPOREL": "TC",
+               "NUMERO": "#", "N": "#", "SCENE SOURCE": "SCÈNE ABLETON",
+               "SCENE": "SCÈNE ABLETON", "SOURCE": "SCÈNE ABLETON",
+               "RETOUR": "RET", "RETOURS": "RET", "PLATEAU": "PLT", "LUMIERE": "LUM",
+               "LIGHT": "LUM", "FRONT OF HOUSE": "FOH", "PHASE DU SHOW": "PHASE",
+               "ARTISTE": "ARTISTE OVERRIDE", "MICRO": "MICRO OVERRIDE",
+               "IEM": "IEM OVERRIDE", "IEM EAR": "IEM OVERRIDE",
+               "EQUIPEMENT": "ÉQUIPEMENT OVERRIDE"} if not distribution else {"ROLE": "RÔLE", "ARTIST": "ARTISTE", "ACTIVE": "ACTIF", "ROLES": "RÔLE", "ARTISTES": "ARTISTE"}
+    key = _header_key(value)
+    return canonical.get(key, aliases.get(key, _text(value)))
+
+
+def _find_import_table(sheets, diagnostics, distribution=False):
+    required = {"RÔLE", "ARTISTE"} if distribution else {"TC", "TEXTE"}
+    candidates, inspected = [], []
+    for sheet, rows in sheets.items():
+        row_numbers = diagnostics.get("csv_record_lines", list(range(1, len(rows)+1)))[:len(rows)]
+        for index, values in enumerate(rows):
+            headers = [_import_column_name(v, distribution) for v in values]
+            recognized = [h for h in headers if h in required or h in (DISTRIBUTION_COLUMNS if distribution else IMPORT_BUILDER_COLUMNS)]
+            if not recognized:
+                continue
+            detail = {
+                "sheet": sheet, "header_row": row_numbers[index],
+                "row_numbers": row_numbers[index:], "original_headers": list(values),
+                "recognized_columns": recognized, "missing_columns": sorted(required - set(headers)),
+                "unknown_columns": [_text(v) for v, h in zip(values, headers)
+                                    if _text(v) and h not in recognized],
+            }
+            inspected.append(detail)
+            if not detail["missing_columns"]:
+                duplicates = sorted({h for h in headers if h in recognized and headers.count(h) > 1})
+                detail["duplicate_columns"] = duplicates
+                candidates.append((sheet, index, headers, detail))
+    key = "distribution" if distribution else "conduite"
+    diagnostics[key + "_candidates"] = [c[3] for c in candidates] or inspected
+    if not candidates:
+        if distribution:
+            relevant = [name for name,rows in sheets.items()
+                        if any(any(_text(v) for v in row) for row in rows)
+                        and any(word in _header_key(name) for word in ("DISTRIBUTION", "CASTING", "AFFECTATION"))]
+            if relevant:
+                raise BuilderImportError("En-têtes distribution introuvables : colonnes obligatoires RÔLE, ARTISTE", diagnostics)
+            return []
+        raise BuilderImportError("En-têtes introuvables : colonnes obligatoires TC, TEXTE", diagnostics)
+    if len(candidates) != 1:
+        raise BuilderImportError(f"Import ambigu : plusieurs tables {key} détectées", diagnostics)
+    sheet, index, headers, detail = candidates[0]
+    if detail["duplicate_columns"]:
+        raise BuilderImportError("Colonnes reconnues dupliquées", diagnostics)
+    diagnostics[key] = detail
+    diagnostics[key + "_preamble"] = sheets[sheet][:index]
+    return [headers, *sheets[sheet][index + 1:]]
+
+
 def _rows_to_document(conduite_rows, distribution_rows, unknown_columns=None):
     if not conduite_rows:
         raise ValueError("feuille CONDUITE vide")
-    headers = [_text(value).upper() for value in conduite_rows[0]]
+    headers = [_import_column_name(value) for value in conduite_rows[0]]
     required = {"TEXTE", "TC"}
     missing = sorted(required - set(headers))
     if missing:
@@ -1054,7 +1170,7 @@ def _rows_to_document(conduite_rows, distribution_rows, unknown_columns=None):
     }
     headers = [aliases.get(value, value) for value in headers]
     mapping = {name: index for index, name in enumerate(headers)}
-    known = set(BUILDER_COLUMNS)
+    known = set(IMPORT_BUILDER_COLUMNS)
     extras = [name for name in headers if name and name not in known]
     if extras and unknown_columns is not None:
         unknown_columns.extend(extras)
@@ -1067,14 +1183,19 @@ def _rows_to_document(conduite_rows, distribution_rows, unknown_columns=None):
         raw = {key: values[mapping[column]] if column in mapping and mapping[column] < len(values) else ""
                for key, column in zip(keys, BUILDER_COLUMNS)}
         raw["id"] = f"builder_{uuid.uuid4().hex[:12]}"
+        if "PHASE" in mapping and mapping["PHASE"] < len(values):
+            raw["phase"] = values[mapping["PHASE"]]
         for key in ("foh", "ret", "plt", "lum"):
             if not _text(raw[key]):
                 raw[key] = False
         cues.append(raw)
     distribution = []
     if distribution_rows:
-        d_headers = [_text(value).upper() for value in distribution_rows[0]]
+        d_headers = [_import_column_name(value, True) for value in distribution_rows[0]]
         d_mapping = {name: index for index, name in enumerate(d_headers)}
+        distribution_known = set(DISTRIBUTION_COLUMNS) | set(LEGACY_DISTRIBUTION_COLUMNS)
+        if unknown_columns is not None:
+            unknown_columns.extend(name for name in d_headers if name and name not in distribution_known)
         legacy = any(column in d_mapping for column in ("MICRO", "IEM", "ÉQUIPEMENT"))
         for values in distribution_rows[1:]:
             if not any(_text(value) for value in values):
@@ -1097,99 +1218,267 @@ def _rows_to_document(conduite_rows, distribution_rows, unknown_columns=None):
     return normalize_builder_document({"cues": cues, "distribution": distribution})
 
 
-def import_csv(payload):
-    text = payload.decode("utf-8-sig")
-    sample = text[:4096]
-    first_line = sample.splitlines()[0] if sample.splitlines() else ""
-    if first_line.count(";") > first_line.count(","):
-        dialect = csv.excel()
-        dialect.delimiter = ";"
+def import_csv(payload, diagnostics=None):
+    diagnostics = diagnostics if diagnostics is not None else {}
+    if payload.startswith((b"\xff\xfe", b"\xfe\xff")):
+        encoding = "utf-16"
+    elif len(payload) >= 4 and len(payload) % 2 == 0 and payload[:128:2].count(0) > len(payload[:128:2]) * 0.6:
+        encoding = "utf-16-be"
+    elif len(payload) >= 4 and len(payload) % 2 == 0 and payload[1:128:2].count(0) > len(payload[1:128:2]) * 0.6:
+        encoding = "utf-16-le"
     else:
         try:
-            dialect = csv.Sniffer().sniff(sample, delimiters=",;")
-        except csv.Error:
-            dialect = csv.excel
-    rows = list(csv.reader(io.StringIO(text), dialect))
-    marker = next((index for index, row in enumerate(rows)
-                   if row and _text(row[0]).upper() == "[DISTRIBUTION]"), None)
-    distribution_rows = rows[marker + 1:] if marker is not None else []
-    conduite_rows = rows[:marker] if marker is not None else rows
-    while conduite_rows and not any(_text(value) for value in conduite_rows[-1]):
-        conduite_rows.pop()
+            payload.decode("utf-8-sig")
+            encoding = "utf-8-sig" if payload.startswith(b"\xef\xbb\xbf") else "utf-8"
+        except UnicodeDecodeError:
+            encoding = "cp1252"
+    try:
+        text = payload.decode(encoding)
+    except UnicodeError as exc:
+        raise BuilderImportError("Encodage CSV non pris en charge", {"format": "CSV", "encoding": encoding}) from exc
+    diagnostics.update(format="CSV", encoding=encoding, sheets=["CSV"])
+    if encoding == "cp1252":
+        diagnostics["encoding_inferred"] = True
+        diagnostics["warnings"] = ["Encodage non UTF-8 : Windows-1252 présumé. Vérifiez les accents avant adoption ; un autre encodage ancien reste possible."]
+    if "\x00" in text:
+        raise BuilderImportError("CSV contient des octets nuls : encodage incorrect", diagnostics)
+    explicit = re.match(r"^sep=([;,\t|])\r?\n", text, re.I)
+    if explicit:
+        diagnostics["separator_directive"] = explicit.group(0).strip()
+        text = text[explicit.end():]
+    options = []
+    syntax_errors = {}
+    for delimiter in ([explicit.group(1)] if explicit else [";", ",", "\t", "|"]):
+        try:
+            reader = csv.reader(io.StringIO(text, newline=""), delimiter=delimiter, strict=True)
+            rows, lines = [], []
+            while True:
+                start_line = reader.line_num + 1
+                try:
+                    row = next(reader)
+                except StopIteration:
+                    break
+                rows.append(row)
+                lines.append(start_line + (1 if explicit else 0))
+        except csv.Error as exc:
+            syntax_errors[delimiter] = str(exc)
+            continue
+        if any({"TC", "TEXTE"} <= {_import_column_name(v) for v in row} for row in rows):
+            options.append((delimiter, rows, lines))
+    if len(options) != 1:
+        diagnostics["separator_candidates"] = [d for d,r,lines in options]
+        if not options:
+            if syntax_errors:
+                diagnostics["csv_syntax_errors"] = syntax_errors
+                raise BuilderImportError("Syntaxe CSV invalide : " + "; ".join(syntax_errors.values()), diagnostics)
+            rows = list(csv.reader(io.StringIO(text), delimiter=explicit.group(1) if explicit else ";"))
+            _find_import_table({"CSV": rows}, diagnostics)
+        raise BuilderImportError("Séparateur CSV ambigu", diagnostics)
+    delimiter, rows, lines = options[0]
+    diagnostics["csv_record_lines"] = ([1] if explicit else []) + lines
+    diagnostics["separator"] = delimiter
+    if explicit:
+        rows.insert(0, [explicit.group(0).strip()])
+    marker = next((i for i,row in enumerate(rows) if row and _header_key(row[0]) == "DISTRIBUTION"), None)
+    tables = {"CSV": rows[:marker] if marker is not None else rows}
+    conduite = _find_import_table(tables, diagnostics)
+    distribution = _find_import_table({"DISTRIBUTION": [[] for _ in range(marker+1)] + rows[marker+1:]}, diagnostics, True) if marker is not None else []
+    return _finish_import(conduite, distribution, diagnostics)
+
+
+def _import_row_number(diagnostics, name, index):
+    numbers = diagnostics[name].get("row_numbers", [])
+    return numbers[index] if index < len(numbers) else diagnostics[name]["header_row"] + index
+
+
+def _finish_import(conduite, distribution, diagnostics):
     unknown = []
-    return _rows_to_document(conduite_rows, distribution_rows, unknown), unknown
+    # Keep original additional cell values in the diagnostic instead of dropping them silently.
+    for name, rows in (("conduite", conduite), ("distribution", distribution)):
+        if not rows:
+            continue
+        headers = rows[0]
+        diagnostics[name + "_extra_values"] = [
+            {"row": _import_row_number(diagnostics, name, i),
+             "values": [{"column": j + 1, "header": h, "value": row[j]}
+                        for j,h in enumerate(headers) if h in diagnostics[name]["unknown_columns"] and j < len(row)]}
+            for i,row in enumerate(rows[1:], 1) if diagnostics[name]["unknown_columns"]]
+        for i,row in enumerate(rows[1:], 1):
+            unnamed = [j + 1 for j,value in enumerate(row[:len(headers)])
+                       if not _text(headers[j]) and _text(value)]
+            if unnamed:
+                diagnostics["unlabelled_columns"] = unnamed
+                raise BuilderImportError(f"{name}, ligne {_import_row_number(diagnostics, name, i)} : colonnes sans en-tête {unnamed}", diagnostics)
+            if len(row) > len(headers) and any(_text(v) for v in row[len(headers):]):
+                diagnostics["unlabelled_values"] = row[len(headers):]
+                raise BuilderImportError(f"{name}, ligne {_import_row_number(diagnostics, name, i)} : valeurs sans en-tête", diagnostics)
+    try:
+        document = _rows_to_document(conduite, distribution, unknown)
+    except ValueError as exc:
+        raise BuilderImportError(str(exc), diagnostics) from exc
+    validation = validate_builder_document(document)
+    diagnostics["validation"] = validation
+    if not validation["ready"]:
+        try:
+            builder_import_values(document)
+        except ValueError as exc:
+            raise BuilderImportError(str(exc), diagnostics) from exc
+    document["import_source"] = {
+        "format": diagnostics.get("format"), "encoding": diagnostics.get("encoding"),
+        "separator": diagnostics.get("separator"),
+        "tables": [{"kind": name, "sheet": diagnostics[name]["sheet"],
+                    "header_row": diagnostics[name]["header_row"],
+                    "headers": diagnostics[name]["original_headers"],
+                    "preamble": diagnostics.get(name + "_preamble", []), "rows": rows[1:]}
+                   for name, rows in (("conduite", conduite), ("distribution", distribution)) if rows]
+    }
+    return document, unknown
 
 
-def _read_xlsx_sheet(archive, target, shared_strings):
-    normalized_target = target.lstrip("/")
+def _xlsx_table_headers(archive, sheet_path, rows, ns):
+    """Use explicit OOXML table column names when the sheet header cells are absent."""
+    import posixpath
+    directory, filename = posixpath.split(sheet_path)
+    rel_path = f"{directory}/_rels/{filename}.rels"
+    if rel_path not in archive.namelist():
+        return rows
+    rels = ET.fromstring(archive.read(rel_path))
+    for rel in rels:
+        if not rel.get("Type", "").endswith("/table") or rel.get("TargetMode") == "External":
+            continue
+        target = rel.get("Target", "")
+        path = posixpath.normpath(target.lstrip("/") if target.startswith("/") else posixpath.join(directory, target))
+        table = ET.fromstring(archive.read(path))
+        if table.get("headerRowCount", "1") == "0":
+            continue
+        match = re.match(r"([A-Z]+)([0-9]+)", table.get("ref", ""))
+        if not match:
+            raise ValueError("Référence de tableau XLSX invalide")
+        column = 0
+        for letter in match.group(1):
+            column = column * 26 + ord(letter) - 64
+        row_index = int(match.group(2)) - 1
+        while len(rows) <= row_index:
+            rows.append([])
+        table_ns = {"m": table.tag.split("}")[0].lstrip("{")}
+        headers = [node.get("name", "") for node in table.findall("m:tableColumns/m:tableColumn", table_ns)]
+        while len(rows[row_index]) < column - 1 + len(headers):
+            rows[row_index].append("")
+        for offset, name in enumerate(headers, column - 1):
+            current = rows[row_index][offset]
+            if not _text(current):
+                rows[row_index][offset] = name
+            elif _header_key(current) != _header_key(name):
+                raise ValueError(f"En-tête de tableau contradictoire, ligne {row_index+1}, colonne {offset+1} : {current} / {name}")
+    return rows
+
+
+def _read_xlsx_sheet(archive, target, shared_strings, cell_errors=None, part_info=None):
+    cell_errors = cell_errors if cell_errors is not None else []
+    import posixpath
+    normalized_target = posixpath.normpath(target.lstrip("/") if target.startswith("/") or target.startswith("xl/") else "xl/" + target)
     if not normalized_target.startswith("xl/"):
-        normalized_target = "xl/" + normalized_target
-    root = ET.fromstring(archive.read(normalized_target))
-    ns = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+        raise ValueError("Chemin de feuille XLSX invalide")
+    xml_payload = archive.read(normalized_target)
+    if part_info is not None:
+        declaration = re.search(br'encoding=["\']([^"\']+)', xml_payload[:200])
+        encoding = "UTF-16" if xml_payload.startswith((b"\xff\xfe", b"\xfe\xff")) else declaration.group(1).decode("ascii") if declaration else "UTF-8"
+        part_info.update(path=normalized_target, encoding=encoding)
+    root = ET.fromstring(xml_payload)
+    ns = {"m": root.tag.split("}")[0].lstrip("{")}
     rows = []
     for row in root.findall(".//m:sheetData/m:row", ns):
+        row_number = int(row.get("r", len(rows) + 1))
+        if row_number <= len(rows):
+            raise ValueError("Lignes XLSX dupliquées ou désordonnées")
+        while len(rows) < row_number - 1:
+            rows.append([])
         values, position = [], 0
         for cell in row.findall("m:c", ns):
-            reference = cell.get("r", "A1")
-            letters = re.match(r"[A-Z]+", reference).group(0)
+            reference = cell.get("r", "")
+            match = re.fullmatch(r"([A-Z]+)[0-9]+", reference)
+            if reference and not match:
+                raise ValueError(f"Référence XLSX invalide : {reference}")
+            letters = match.group(1) if match else ""
             column = 0
             for letter in letters:
                 column = column * 26 + ord(letter) - 64
+            if not letters:
+                column = position + 1
+            if column <= position:
+                raise ValueError(f"Cellule XLSX dupliquée ou désordonnée : {reference}")
             while position < column - 1:
                 values.append("")
                 position += 1
+            if cell.get("t") == "e":
+                cell_errors.append(f"Erreur Excel dans la cellule {reference}")
+            if cell.find("m:f", ns) is not None and cell.find("m:v", ns) is None:
+                cell_errors.append(f"Formule XLSX sans résultat enregistré : {reference}")
             if cell.get("t") == "inlineStr":
                 value = "".join(node.text or "" for node in cell.findall(".//m:t", ns))
             else:
                 node = cell.find("m:v", ns)
                 value = node.text if node is not None else ""
                 if cell.get("t") == "s" and value:
-                    value = shared_strings[int(value)]
+                    try:
+                        string_index = int(value)
+                        if string_index < 0:
+                            raise ValueError()
+                        value = shared_strings[string_index]
+                    except (ValueError, IndexError) as exc:
+                        cell_errors.append(f"sharedStrings invalide : cellule {reference}, index {value}")
+                        value = ""
             values.append(value)
             position += 1
         rows.append(values)
-    return rows
+    return _xlsx_table_headers(archive, normalized_target, rows, ns)
 
 
-def import_xlsx(payload):
+def import_xlsx(payload, diagnostics=None):
+    diagnostics = diagnostics if diagnostics is not None else {}
+    diagnostics.update(format="XLSX", encoding="XML")
     with zipfile.ZipFile(io.BytesIO(payload)) as archive:
         shared = []
         if "xl/sharedStrings.xml" in archive.namelist():
             root = ET.fromstring(archive.read("xl/sharedStrings.xml"))
-            ns = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+            ns = {"m": root.tag.split("}")[0].lstrip("{")}
             shared = ["".join(node.text or "" for node in item.findall(".//m:t", ns))
                       for item in root.findall("m:si", ns)]
         workbook = ET.fromstring(archive.read("xl/workbook.xml"))
         relationships = ET.fromstring(archive.read("xl/_rels/workbook.xml.rels"))
         rels = {node.get("Id"): node.get("Target") for node in relationships}
-        ns = {"m": "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
-              "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships"}
-        sheets = {sheet.get("name").upper(): _read_xlsx_sheet(
-            archive, rels[sheet.get("{%s}id" % ns["r"])], shared)
-            for sheet in workbook.findall("m:sheets/m:sheet", ns)}
-    conduite_key = (
-        "CONDUITE"
-        if "CONDUITE" in sheets
-        else "CONDUITE — RÉF"
-        if "CONDUITE — RÉF" in sheets
-        else None
-    )
-    if conduite_key is None:
-        raise ValueError("feuille CONDUITE manquante")
-    distribution_key = (
-        "DISTRIBUTION"
-        if "DISTRIBUTION" in sheets
-        else "CASTING — RÉF"
-        if "CASTING — RÉF" in sheets
-        else None
-    )
-
-    unknown = []
-    return _rows_to_document(
-        sheets[conduite_key],
-        sheets[distribution_key] if distribution_key else [],
-        unknown,
-    ), unknown
+        ns = {"m": workbook.tag.split("}")[0].lstrip("{")}
+        sheets = {}
+        cell_errors = {}
+        diagnostics["sheet_encodings"] = {}
+        sheet_nodes = workbook.findall("m:sheets/m:sheet", ns)
+        diagnostics["sheets"] = [node.get("name") for node in sheet_nodes]
+        for sheet in sheet_nodes:
+            name = sheet.get("name")
+            if name in sheets:
+                raise BuilderImportError("Noms de feuilles dupliqués", diagnostics)
+            try:
+                cell_errors[name] = []
+                diagnostics["sheet_encodings"][name] = {}
+                sheets[name] = _read_xlsx_sheet(archive, rels[next((v for k,v in sheet.attrib.items() if k.endswith("}id")), None)], shared, cell_errors[name], diagnostics["sheet_encodings"][name])
+            except (ValueError, KeyError, ET.ParseError) as exc:
+                diagnostics["sheet"] = name
+                raise BuilderImportError(str(exc), diagnostics) from exc
+    diagnostics["sheets"] = list(sheets)
+    conduite = _find_import_table(sheets, diagnostics)
+    distribution = _find_import_table({k:v for k,v in sheets.items() if k != diagnostics["conduite"]["sheet"]}, diagnostics, True)
+    diagnostics["encoding"] = diagnostics["sheet_encodings"][diagnostics["conduite"]["sheet"]]["encoding"]
+    selected = {diagnostics[k]["sheet"] for k in ("conduite", "distribution") if k in diagnostics}
+    diagnostics["ignored_sheets"] = [name for name in sheets if name not in selected]
+    diagnostics["cell_errors"] = {name: errors for name,errors in cell_errors.items() if errors}
+    ignored_errors = [name for name in diagnostics["ignored_sheets"] if cell_errors[name]]
+    if ignored_errors:
+        diagnostics.setdefault("warnings", []).append("Erreurs sur des feuilles non importées : " + ", ".join(ignored_errors))
+    for name in selected:
+        if cell_errors[name]:
+            diagnostics["sheet"] = name
+            raise BuilderImportError(" ; ".join(cell_errors[name]), diagnostics)
+    return _finish_import(conduite, distribution, diagnostics)
 
 
 # CL_SHOWCUE_EQUIPMENT_CATALOG_V1
@@ -1270,6 +1559,15 @@ def normalize_builder_document(document):
     result["equipment_catalog"] = _normalize_equipment_catalog(
         supplied
     )
+    # Retain source cells (including additional columns) through explicit save/reload.
+    if "import_source" in source:
+        imported = source["import_source"]
+        if not isinstance(imported, dict) or not isinstance(imported.get("tables"), list):
+            raise ValueError("archive source d’import Builder invalide")
+        try:
+            result["import_source"] = json.loads(json.dumps(imported, ensure_ascii=False, allow_nan=False))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("archive source d’import Builder non JSON") from exc
 
     return result
 
@@ -1287,7 +1585,8 @@ def recover_builder_document(document, show_document):
             cue_id = "builder_recovered_" + source["id"]
         used.add(cue_id)
         cue = {key: metadata.get(key, "") for key in
-               ("source", "type", "phase", "role", "origin", "notes", "role_assignments")}
+               ("source", "type", "phase", "role", "origin", "notes", "notes_by_post", "role_assignments")}
+        cue["notes_by_post"] = metadata.get("notes_by_post", {})
         cue.update({"id": cue_id, "number": metadata.get("number") or str(source.get("order", index)),
                     "text": source.get("text", ""), "timecode": source.get("timecode", ""),
                     "section": metadata.get("section") or source.get("section", "")})
