@@ -9,6 +9,7 @@
 @property NSMutableDictionary *values;
 @end
 @implementation CLMemoryDefaults
+- (id)objectForKey:(NSString *)key { return self.values[key]; }
 - (NSArray *)arrayForKey:(NSString *)key { return self.values[key]; }
 - (void)setObject:(id)value forKey:(NSString *)key { self.values[key] = value; }
 - (void)removeObjectForKey:(NSString *)key { [self.values removeObjectForKey:key]; }

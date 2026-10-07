@@ -69,6 +69,9 @@ require_dir() {
 require_dir "$BUILDER_DIR/.git"
 require_dir "$ABLETONOSC_DIR/.git"
 require_file "$BUILDER_DIR/Arrangement Builder Live.spec"
+# Refuser un kit dont le Builder ne pourrait pas ouvrir son interface Qt.
+"$CL_PYTHON" -c 'from PySide6.QtCore import QDir, QLockFile; from PySide6.QtWidgets import QApplication, QMessageBox' \
+  || fail "PySide6 est absent ou inutilisable dans l’environnement de construction d’Arrangement Builder"
 require_dir "$BUILDER_DIR/RemoteScript"
 require_dir "$PROJECT_DIR/M4L/Install"
 require_file "$PROJECT_DIR/scripts/build_release.sh"

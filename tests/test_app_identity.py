@@ -12,8 +12,22 @@ ROOT = Path(__file__).resolve().parents[1]
 class AppIdentityTests(unittest.TestCase):
     def test_unique_names_colours_and_icon_labels(self):
         identities = json.loads((ROOT/'resources/app_identity.json').read_text())
-        for field in ('name', 'color', 'icon', 'label'):
+        # MTC Bridge and Sync Meter deliberately reuse canonical family icons.
+        for field in ('name', 'label'):
             self.assertEqual(len(identities), len({a[field] for a in identities}), field)
+        expected_shared = {
+            frozenset(('CL MIDI RTP Agent', 'CL MTC Bridge')),
+            frozenset(('CL MIDI Performance Monitor', 'CL Sync Meter')),
+        }
+        for field in ('color', 'icon'):
+            groups = {}
+            for identity in identities:
+                groups.setdefault(identity[field], set()).add(identity['name'])
+            self.assertEqual({frozenset(names) for names in groups.values() if len(names) > 1},
+                             expected_shared, field)
+        for identity in identities:
+            self.assertRegex(identity['color'], r'^#[0-9A-Fa-f]{6}$')
+            self.assertTrue((ROOT/'assets/app_icons'/(identity['icon']+'.icns')).is_file())
         self.assertEqual(next(a['label'] for a in identities if a['name'] == 'CL Cue Editor'), 'CUE EDITOR')
 
     def test_packaged_icon_mixup_and_missing_app_are_rejected(self):

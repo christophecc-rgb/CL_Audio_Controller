@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 import importlib.util
 import json
 import re
@@ -1988,6 +1989,21 @@ class LiveSetGenerationTests(unittest.TestCase):
         self.assertIn("gotoInput.innerHTML = '<option", session_source)
         self.assertIn("abSceneSelectEl.innerHTML = '<option", ab_source)
 
+    def test_go_confirmation_budget_starts_after_waiting_for_query_lock(self):
+        clock = [10.0]
+        @contextmanager
+        def occupied_queries(**kwargs):
+            clock[0] += 1.2
+            yield
+        sent = []
+        with (
+            mock.patch.object(self.app.time, "monotonic", side_effect=lambda: clock[0]),
+            mock.patch.object(self.app.ableton_transport, "serialized_queries", occupied_queries),
+        ):
+            ok, message = self.run_confirmed_go("go-busy-query-lock", 3, 8, sent)
+        self.assertTrue(ok, message)
+        self.assertIn(("/live/scene/fire_as_selected", (7,)), sent)
+
     def test_multiple_rapid_go_commands_launch_their_explicit_scenes(self):
         sent = []
         first = self.run_confirmed_go("go-1", 3, 8, sent)
@@ -2500,10 +2516,9 @@ class LiveSetGenerationTests(unittest.TestCase):
                 self.app.state["selected_scene_name"],
                 "Final ; 128 ; 03:45",
             )
-        self.assertEqual(thread_class.call_count, 2)
-        scheduled_targets = [call.kwargs.get("target") for call in thread_class.call_args_list]
-        self.assertIn(self.app.refresh_scene_name_async, scheduled_targets)
-        self.assertIn(self.app.refresh_selected_scene_duration_async, scheduled_targets)
+        # Cached title and explicit duration require no competing OSC reads.
+        self.assertEqual(thread_class.call_count, 0)
+        self.assertEqual(self.app.state["selected_scene_duration_seconds"], 225)
 
     def test_selected_scene_duration_prefers_the_tableaux_clip(self):
         with self.app.lock:

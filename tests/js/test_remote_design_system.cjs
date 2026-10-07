@@ -12,10 +12,10 @@ for(const [route,module]of [['/','session'],['/ab','ab'],['/arrangement','arrang
  states[route]=base(module);await p.goto('https://audit.invalid'+route);await p.waitForSelector('#sessionSkin',{state:'attached'});await p.waitForFunction(()=>document.querySelector('.sc-current').dataset.uiState==='playing');
  const apply=async patch=>{states[route]={...states[route],...patch};await p.evaluate(s=>applyStatus(s),states[route]);};
  for(const skin of ['original','broadcast','theatre','show-control','neon']){
-  await p.locator('details').evaluate(e=>e.open=true);const n=actions.length;
+  await p.locator('details.advanced-options').evaluate(e=>e.open=true);const n=actions.length;
   const before=await p.evaluate(()=>[...document.querySelectorAll('[id]')].map(e=>e.id));
   await p.selectOption('#sessionSkin',skin);await p.waitForTimeout(250);assert.equal(actions.length,n);assert.deepEqual(await p.evaluate(()=>[...document.querySelectorAll('[id]')].map(e=>e.id)),before);
-  await p.locator('details').evaluate(e=>e.open=false);
+  await p.locator('details.advanced-options').evaluate(e=>e.open=false);
   for(const [mode,patch]of [['paused',{is_playing:false,is_paused:true}],['stopped',{is_playing:false,is_paused:false,playing_scene:-1,last_fired_scene:-1,has_show_started:false}],['playing',{is_playing:true,is_paused:false,playing_scene:0,last_fired_scene:0,has_show_started:true}]]){
    if(module==='session'&&mode==='stopped')await p.evaluate(()=>{sessionWasPlaying=false;});
    await apply(patch);await p.waitForFunction(mode=>document.querySelector('.sc-current').dataset.uiState===mode,mode);
@@ -59,13 +59,13 @@ for(const [route,module]of [['/','session'],['/ab','ab'],['/arrangement','arrang
 }assert.ok(boxes.header.y>=boxes.current.y&&boxes.footer.bottom<=boxes.current.bottom,`${module}/${skin}/${w}: clipped header/footer`);if(boxes.deck)assert.ok(boxes.current.y>=boxes.deck.y,`${module}/${skin}/${w}: clipped deck`);for(const button of boxes.buttons)assert.ok(button.width>=44&&button.height>=44,`${module}/${skin}/${w}: target ${button.id} ${button.width}x${button.height}`);if(boxes.midi)assert.ok(boxes.midi.width>w*.6);}
    // Test real controls, including the native desktop wrapper's query flag.
    if(w===390 || w===1440) {
-    await p.locator('details').evaluate(e=>e.open=true);
+    await p.locator('details.advanced-options').evaluate(e=>e.open=true);
     await p.locator('#visual-goRelief').scrollIntoViewIfNeeded();
     assert.ok(await p.locator('#visual-goRelief').evaluate(e=>{const r=e.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;}),`${module}/${skin}: preferences unreachable`);
     const actionCount=actions.length;
     await p.selectOption('#visual-flowIntensity','high');
     assert.equal(await p.locator('body').getAttribute('data-flow-intensity'),'high');
-    await p.waitForTimeout(300);assert.equal(await p.locator('.cl-current-flow-layer').evaluate(e=>getComputedStyle(e).opacity),'1');
+    await p.waitForFunction(()=>getComputedStyle(document.querySelector('.cl-current-flow-layer')).opacity==='1');
     for(const value of ['sober','halo','wave','luminous']) {
       await p.selectOption('#visual-currentStyle',value);
       assert.equal(await p.locator('body').getAttribute('data-current-style'),value);
@@ -84,7 +84,7 @@ for(const [route,module]of [['/','session'],['/ab','ab'],['/arrangement','arrang
     assert.equal(actions.length,actionCount,'visual control sent an action');
     await p.locator('.cl-visual-reset').click();
     assert.equal(await p.locator('body').getAttribute('data-go-relief'),'default');
-    await p.locator('details').evaluate(e=>e.open=false);
+    await p.locator('details.advanced-options').evaluate(e=>e.open=false);
    }
    results.push({module,skin,viewport:`${w}x${h}`,boxes});
    await p.evaluate(()=>window.scrollTo(0,0));
@@ -93,18 +93,18 @@ for(const [route,module]of [['/','session'],['/ab','ab'],['/arrangement','arrang
  }
 }
 // A single preference travels through real shell links, including protected Arrangement navigation.
-await p.locator('details').evaluate(e=>e.open=true);await p.selectOption('#sessionSkin','show-control');
+await p.locator('details.advanced-options').evaluate(e=>e.open=true);await p.selectOption('#sessionSkin','show-control');
 await p.locator('.v2-tabs a[href="/"]').click();await p.waitForFunction(()=>document.body.dataset.skin==='show-control');
 await p.locator('.v2-tabs a[href="/ab"]').click();await p.waitForFunction(()=>document.body.dataset.skin==='show-control');
 p.once('dialog',d=>d.accept());await p.locator('.v2-tabs a[href="/arrangement"]').click();await p.waitForFunction(()=>document.querySelector('.v2-app').dataset.module==='arrangement');assert.equal(await p.locator('body').getAttribute('data-skin'),'show-control');assert.ok(actions.some(a=>a.action==='back_to_arrangement'));
-await p.locator('details').evaluate(e=>e.open=true);
+await p.locator('details.advanced-options').evaluate(e=>e.open=true);
 await p.selectOption('#sessionSkin','neon');await p.selectOption('#visual-goRelief','flat');
 await p.reload();await p.waitForFunction(()=>document.body.dataset.skin==='neon'&&document.body.dataset.goRelief==='flat');
 const second=await c.newPage();await second.goto('https://audit.invalid/ab?desktop=1');
 await second.waitForFunction(()=>document.body.dataset.skin==='neon'&&document.body.dataset.goRelief==='flat');
-await p.locator('details').evaluate(e=>e.open=true);await p.selectOption('#sessionSkin','original');
+await p.locator('details.advanced-options').evaluate(e=>e.open=true);await p.selectOption('#sessionSkin','original');
 await second.waitForFunction(()=>document.body.dataset.skin==='original');
-await second.locator('details').evaluate(e=>e.open=true);
+await second.locator('details.advanced-options').evaluate(e=>e.open=true);
 await second.locator('#visual-goRelief').scrollIntoViewIfNeeded();
 assert.ok(await second.locator('#visual-goRelief').evaluate(e=>{const r=e.getBoundingClientRect();return r.top>=0&&r.bottom<=innerHeight;}));
 await second.close();

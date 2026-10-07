@@ -76,3 +76,6 @@ tools/ableton_mtc_bridge/CLAbletonMTCBridge
 
 # Node / tests UI
 node_modules/
+
+# Copies de travail datées (les sources et fonctionnalités restent visibles)
+*.bak-[0-9]*
