@@ -1,11 +1,12 @@
 """Small Flask boundary around remote security; musical handlers stay unchanged."""
 import ipaddress
 import os
+import re
 import subprocess
 from pathlib import Path
 from urllib.parse import urlsplit
 from flask import g, jsonify, make_response, request, send_file
-from remote_security import RemoteSecurity, SecurityError
+from remote_security import RemoteSecurity, SecurityError, device_permissions
 from remote_tls import RemoteTLS, network_identity, prepare_certificate, read_settings, save_settings, server_address
 
 LOCAL_HOSTS={'localhost','127.0.0.1','::1'}
@@ -66,7 +67,7 @@ def attach_security(app, *, launcher=False, directory=None):
             return jsonify(error='Requête de sécurité trop grande'),413
         if path.startswith('/security/') or path.startswith('/remote/'):
             return None
-        if launcher and path in {'/quit','/stop','/open','/local-page','/open-ab','/open-arrangement','/remote-window'}:
+        if launcher and path in {'/quit','/stop','/open','/local-page','/open-ab','/open-arrangement','/remote-window','/open-showq','/midi-network-assistant'}:
             if not local_request():
                 return jsonify(ok=False,error='Commande locale requise'),403
             return None
@@ -84,14 +85,27 @@ def attach_security(app, *, launcher=False, directory=None):
         permission='show' if path=='/action' and data.get('action') not in ADMIN_ACTIONS else 'admin'
         if path=='/transport/test' or path=='/show-audio/print/capture-clean':
             permission='show'
+        if path == '/action' and data.get('action') == 'go':
+            permission = 'go'
+        cue_write = request.method == 'PUT' and re.fullmatch(r'/show-info/cues/[^/]+', path)
+        note_write = request.method == 'PUT' and re.fullmatch(r'/show-info/cues/[^/]+/notes/[^/]+', path)
+        if cue_write or (request.method == 'POST' and path == '/show-info/cues') or (request.method == 'DELETE' and re.fullmatch(r'/show-info/cues/[^/]+', path)):
+            permission = 'edit_cues'
+        if note_write:
+            permission = 'edit_cues' if path.endswith('/GENERAL') else 'edit_notes'
         command=str(data.get('action') or path)[:120]
         g.cl_command=command; g.cl_scene=data.get('scene') if isinstance(data.get('scene'),(str,int,float,type(None))) else None
         try:
             if local_request():
-                if permission=='admin':
-                    local_admin(); settings_allowed()
+                if permission in ('admin', 'edit_cues', 'edit_notes'):
+                    local_admin()
+                    if permission == 'admin': settings_allowed()
                 g.cl_device={'id':'local','role':'local','operator':''}
             else:
+                if permission in ('edit_cues', 'edit_notes') and not request.is_secure:
+                    raise SecurityError('Administration distante : HTTPS requis')
+                if permission in ('edit_cues', 'edit_notes') and isinstance(data.get('builder'), dict) and 'notes_by_post' in data['builder']:
+                    raise SecurityError('Utiliser la route de note par poste')
                 if permission=='admin':
                     if not request.is_secure:
                         raise SecurityError('Administration distante : HTTPS requis')
@@ -102,10 +116,22 @@ def attach_security(app, *, launcher=False, directory=None):
                 g.cl_device=manager.authorize(request.headers.get('X-CL-Device',''),request.headers.get('X-CL-Signature',''),
                     request.method,request.full_path.rstrip('?'),request.get_data(),request.headers.get('X-CL-Timestamp',''),
                     request.headers.get('X-CL-Nonce',''),permission,critical=True)
+                if note_write and permission == 'edit_notes' and path.rsplit('/', 1)[1] not in g.cl_device.get('posts', []):
+                    raise SecurityError('Appareil non autorisé pour le poste ' + path.rsplit('/', 1)[1])
         except SecurityError as error:
             identity = manager.devices.get(request.headers.get('X-CL-Device',''))
             manager.audit(command,'refused',str(error),device=identity,scene=g.cl_scene)
-            return jsonify(ok=False,error=str(error),security_required=True),403
+            result={'ok':False,'error':str(error),'security_required':True}
+            if path.startswith('/show-info/'):
+                # Echo only non-sensitive identity metadata, never signature values.
+                requested=request.headers.get('X-CL-Device','')
+                parsed=urlsplit(request.headers.get('Origin',''))
+                origin=(parsed.scheme+'://'+parsed.netloc) if parsed.scheme in ('http','https') and not parsed.username and not parsed.password else None
+                result['auth_diagnostic']={'requested_device_id':requested if re.fullmatch(r'[a-f0-9]{32}',requested) else None,
+                    'device_known':identity is not None,'device_revoked':bool(identity and identity.get('revoked')),
+                    'origin':origin,'https':request.is_secure,
+                    'headers':{name:bool(request.headers.get(name)) for name in ('X-CL-Device','X-CL-Timestamp','X-CL-Nonce','X-CL-Signature')}}
+            return jsonify(result),403
         return None
 
     @app.after_request
@@ -154,6 +180,7 @@ def attach_security(app, *, launcher=False, directory=None):
             elif operation=='mode': manager.set_mode(data.get('mode'))
             elif operation=='arm': manager.set_armed(data.get('armed') is True)
             elif operation=='revoke': manager.revoke(data.get('device_id'))
+            elif operation=='permissions': settings_allowed(); manager.change_permissions(data.get('device_id'), data.get('permissions'), data.get('posts'))
             elif operation=='role': settings_allowed(); manager.change_role(data.get('device_id'),data.get('role'))
             elif operation=='approve': manager.approve(data.get('request_id'),data.get('lifetime',43200),data.get('authorization_type','temporary'))
             elif operation in ('tls-setup', 'tls-start', 'tls-enroll'):
@@ -297,7 +324,7 @@ def attach_security(app, *, launcher=False, directory=None):
         try:
             device=manager.authorize(request.headers.get('X-CL-Device',''),request.headers.get('X-CL-Signature',''),request.method,
                 request.full_path.rstrip('?'),request.get_data(),request.headers.get('X-CL-Timestamp',''),request.headers.get('X-CL-Nonce',''),'read',critical=False)
-            return jsonify(ok=True,armed=manager.armed,role=device['role'])
+            return jsonify(ok=True,armed=manager.armed,role=device['role'],permissions=device_permissions(device),posts=device.get('posts', []))
         except SecurityError as error: return jsonify(ok=False,error=str(error)),403
 
     @app.route('/security/panel')

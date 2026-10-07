@@ -1908,7 +1908,7 @@ body{
 
 </style>
 
-<script src="/static/remote-auth.js"></script>
+<script src="/static/remote-auth.js?v=identity-diagnostics-1"></script>
 </head>
 <body><main class="shell"><header class="topbar showcue-header-v6">
 
@@ -1995,7 +1995,7 @@ body{
     </nav>
 
 
-    <div class="v6-secondary-actions">
+    <div class="v6-secondary-actions" hidden>
 
       {% if builder_local %}
       <button
@@ -2205,7 +2205,7 @@ Maximum 3 équipements par artiste.
 <div class="field" id="timecode-field"><div class="label">Timecode</div><div class="smpte-editor" id="form-smpte"></div><input type="hidden" id="form-timecode"></div><label class="field" id="section-field">Section<input id="form-section" list="manual-sections" maxlength="80"><datalist id="manual-sections"></datalist></label><label class="field" id="anchor-field">Position après<select id="form-anchor"><option value="">FIN DE CONDUITE</option></select></label><label class="field">Texte<textarea id="form-text" rows="3" maxlength="1000" required></textarea></label><div class="label">Destinataires <button type="button" class="quiet" id="destinations-all">TOUS</button></div><div class="posts" id="form-posts">{% for post in posts %}<label><input type="checkbox" value="{{ post }}"> {{ post }}</label>{% endfor %}</div><label class="field" id="status-field">État<select id="form-status"><option value="draft">À placer</option><option value="official">Dans la conduite</option></select></label><div class="error" id="form-error"></div><div class="actions"><button type="button" class="danger delete-action" id="editor-delete" hidden>SUPPRIMER LE CUE</button><button type="button" id="editor-cancel">ANNULER</button><button class="primary" value="default" id="save">ENREGISTRER</button></div></form></dialog>
 <dialog id="quick-editor" class="quick-dialog"><form method="dialog" id="quick-form"><h2>Correction rapide</h2><div class="field" id="quick-timecode-field"><div class="label">Timecode</div><div class="smpte-editor" id="quick-smpte"></div></div><label class="field">Texte<textarea id="quick-text" rows="4" maxlength="1000" required></textarea></label><div class="label">Destinataires</div><div class="quick-posts" id="quick-posts"></div><div class="error" id="quick-error"></div><div class="actions"><button type="button" class="danger delete-action" id="quick-delete">SUPPRIMER LE CUE</button><button type="button" id="quick-cancel">ANNULER</button><button class="primary" value="default">VALIDER</button></div></form></dialog>
 <div class="call-incoming" id="call-incoming" aria-live="assertive"></div>
-<dialog id="call-panel" class="call-panel"><h2>Appeler</h2><div class="call-targets">{% for post in posts %}<button type="button" data-call-target="{{ post }}">{{ {'FOH':'FOH','RETOURS':'RET','PLATEAU':'PLT','LUMIERE':'LUM'}[post] }}</button>{% endfor %}</div><div class="call-list" id="call-outgoing"></div><div class="error" id="call-error"></div><div class="actions"><button type="button" id="call-close">FERMER</button></div></dialog>
+<dialog id="call-panel" class="call-panel"><h2>Appeler ou envoyer un message</h2><label class="field">Message facultatif<textarea id="call-message" rows="2" maxlength="160" placeholder="Ex. Prêt pour le changement ?"></textarea></label><div class="call-targets">{% for post in posts %}<button type="button" data-call-target="{{ post }}">{{ {'FOH':'FOH','RETOURS':'RET','PLATEAU':'PLT','LUMIERE':'LUM'}[post] }}</button>{% endfor %}</div><div class="call-list" id="call-outgoing"></div><div class="error" id="call-error"></div><div class="actions"><button type="button" id="call-close">FERMER</button></div></dialog>
 <script>
 const $=id=>document.getElementById(id),postEl=$('post'),sessionEl=$('session'),editor=$('editor'),quickEditor=$('quick-editor'),recorderDialog=$('recorder'),callPanel=$('call-panel');let snapshot={},editing=null,quickEditing=null,classifying=false,captured=null,recordedDraft=null,mediaRecorder=null,mediaStream=null,recordChunks=[],editorFocusTimer=null;
 const savedPost=localStorage.getItem('cl-show-info-post');if([...postEl.options].some(o=>o.value===savedPost))postEl.value=savedPost;
@@ -2220,7 +2220,32 @@ function cueMeta(cue){
 
     const resolved=cue.resolved||{};
     const role=String(resolved.role||'').trim();
-    const artist=String(resolved.artist||resolved.resolved_artist||'').trim();
+    /*
+     * CL_SHOWCUE_ARTIST_RESTORE_V4_20261006
+     *
+     * Certaines résolutions multirôles exposent les artistes
+     * dans participants sans remplir resolved.artist.
+     */
+    const participantArtists=[
+        ...new Set(
+            (
+                resolved.participants ||
+                resolved.resolved_participants ||
+                []
+            )
+            .map(participant=>
+                String(participant?.artist||'').trim()
+            )
+            .filter(Boolean)
+        )
+    ];
+
+    const artist=String(
+        resolved.artist ||
+        resolved.resolved_artist ||
+        participantArtists.join(' / ') ||
+        ''
+    ).trim();
 
     let microphone=String(
         resolved.microphone||
@@ -2271,7 +2296,7 @@ function cueMeta(cue){
         identity,
         technical
     ].filter(Boolean).join('  |  ');
-}function renderLiveCue(prefix,cue){$(prefix).textContent=cue?cue.text:prefix==='current'?'Aucun cue atteint':'—';const time=$(prefix+'-time');if(time)time.textContent=cueMeta(cue)}
+}function renderLiveCue(prefix,cue){$(prefix).textContent=cue?cue.text:prefix==='current'?'Aucun cue atteint':'—';const time=$(prefix+'-time');if(time)time.textContent=prefix.startsWith('past')?(cue?.timecode||'—'):cueMeta(cue)}
 const destinationLabels={FOH:'FOH',RETOURS:'RET',PLATEAU:'PLT',LUMIERE:'LUM'};
 function actionButton(cue){const button=document.createElement('button');button.className='quiet edit-icon';button.textContent='✎';button.title='Modifier le cue';button.setAttribute('aria-label','Modifier '+cue.text);button.onclick=()=>openEditor(cue);return button}function deleteActionButton(cue){const button=document.createElement('button');button.className='quiet delete-icon';button.textContent='⌫';button.title='Supprimer le cue';button.setAttribute('aria-label','Supprimer '+cue.text);button.onclick=async event=>{event.stopPropagation();await deleteCue(cue)};return button}
 function destinations(cue){const group=document.createElement('div');group.className='destinations';Object.entries(destinationLabels).forEach(([post,label])=>{const button=document.createElement('button'),active=cue.posts.includes(post);button.className='destination'+(active?' active':'');button.textContent=label;button.title=(active?'Retirer ':'Ajouter ')+post;button.setAttribute('aria-pressed',active);button.onclick=async event=>{event.stopPropagation();const posts=active?cue.posts.filter(item=>item!==post):[...cue.posts,post];if(!posts.length){$('error').textContent='Un cue doit conserver au moins un destinataire.';return}button.disabled=true;try{await api('/show-info/cues/'+encodeURIComponent(cue.id),{method:'PUT',body:JSON.stringify(scoped({posts}))});await refresh()}catch(error){$('error').textContent=error.message}finally{button.disabled=false}};group.append(button)});return group}
@@ -2280,7 +2305,7 @@ function isTimecode(value){return /^\d{2}:\d{2}:\d{2}:\d{2}$/.test(String(value|
 function cueLine(cue,position){const row=document.createElement('div'),time=document.createElement('div'),text=document.createElement('div'),targets=destinations(cue),edit=actionButton(cue),actions=document.createElement('div');actions.className='cue-actions';actions.append(edit);if(cue.status==='official'&&cue.mode!=='library')actions.append(deleteActionButton(cue));row.className='cue-line';row.dataset.cueId=cue.id;if(cue.mode==='timed'&&cue.id===snapshot.conduite_current_id)row.classList.add('current-timed');time.className='line-time'+(isTimecode(position)?' true-time':'');time.textContent=position;text.className='line-text';text.textContent=cue.text;if(cue.mode==='library'){const meta=document.createElement('div');row.classList.add('library-line');meta.className='library-meta';meta.append(time,targets);row.append(text,actions,meta)}else row.append(time,text,targets,actions);return row}
 function manualSectionKey(section){return'cl-show-info-manual-'+snapshot.active_session_id+'-'+postEl.value+'-'+section}async function setManualAnchor(cues,anchorAfter){await Promise.all(cues.map(cue=>api('/show-info/cues/'+encodeURIComponent(cue.id),{method:'PUT',body:JSON.stringify(scoped({anchor_after:anchorAfter}))})));await refresh()}function manualBlock(section,cues,timed){const details=document.createElement('details'),summary=document.createElement('summary'),title=document.createElement('span'),marker=document.createElement('span'),lines=document.createElement('div'),nav=document.createElement('div'),up=document.createElement('button'),down=document.createElement('button'),previous=document.createElement('button'),next=document.createElement('button'),localCues=cues.filter(cue=>cue.posts.includes(postEl.value)),key=manualSectionKey(section),anchors=[...timed.map(cue=>cue.id),''],currentAnchor=(cues.find(cue=>cue.anchor_after)||{}).anchor_after||'',anchorIndex=Math.max(0,anchors.indexOf(currentAnchor));let index=Math.max(0,Math.min(Number(localStorage.getItem(key)||0),Math.max(0,localCues.length-1)));details.className='manual-block';details.open=true;details.draggable=true;details.dataset.manualSection=section;details.ondragstart=event=>{details.classList.add('dragging');event.dataTransfer.setData('text/plain',section)};details.ondragend=()=>details.classList.remove('dragging');title.textContent='☰  '+section+' · '+cues.length+' cue'+(cues.length>1?'s':'');marker.textContent='SANS LTC';summary.append(title,marker);lines.className='manual-lines';cues.forEach(cue=>{const row=cueLine(cue,String(cue.order));if(localCues[index]&&cue.id===localCues[index].id)row.classList.add('manual-current');lines.append(row)});nav.className='manual-section-nav';up.textContent='↑';up.title='Déplacer le bloc plus haut';up.setAttribute('aria-label',up.title);up.disabled=anchorIndex===0;up.onclick=()=>setManualAnchor(cues,anchors[anchorIndex-1]);down.textContent='↓';down.title='Déplacer le bloc plus bas';down.setAttribute('aria-label',down.title);down.disabled=anchorIndex>=anchors.length-1;down.onclick=()=>setManualAnchor(cues,anchors[anchorIndex+1]);previous.textContent='◀';previous.title='Cue manuel précédent';previous.setAttribute('aria-label',previous.title);next.textContent='▶';next.title='Cue manuel suivant';next.setAttribute('aria-label',next.title);previous.disabled=!localCues.length||index===0;next.disabled=!localCues.length||index>=localCues.length-1;previous.onclick=()=>{localStorage.setItem(key,--index);renderSequence()};next.onclick=()=>{localStorage.setItem(key,++index);renderSequence()};nav.append(up,down,previous,next);details.append(summary,lines,nav);return details}
 let lastConduiteActiveId=null;function followConduiteActive(){const id=snapshot.conduite_current_id;if(!id||id===lastConduiteActiveId||!$('view-conduite').classList.contains('active'))return;const selection=window.getSelection(),control=document.activeElement;if((selection&&!selection.isCollapsed)||(control&&control!==document.body&&/^(INPUT|TEXTAREA|SELECT|BUTTON|SUMMARY)$/.test(control.tagName)))return;const row=$('timed-sequence').querySelector('[data-cue-id="'+CSS.escape(id)+'"]');if(row){lastConduiteActiveId=id;row.scrollIntoView({behavior:'smooth',block:'center'})}}
-let sectionFilter='TOUT';function renderSectionFilters(sections){const box=$('section-filters'),names=['TOUT',...sections];if(sectionFilter!=='TOUT'&&!sections.includes(sectionFilter))sectionFilter='TOUT';box.innerHTML='';names.forEach(name=>{const button=document.createElement('button');button.className='section-filter'+(name===sectionFilter?' active':'');button.textContent=name;button.onclick=()=>{sectionFilter=name;renderSequence()};box.append(button)})}function manualDropTarget(element,anchorAfter,groups){element.ondragover=event=>{if(event.dataTransfer.types.includes('text/plain')){event.preventDefault();element.classList.add('manual-drop-target','drop-target')}};element.ondragleave=()=>element.classList.remove('manual-drop-target','drop-target');element.ondrop=async event=>{event.preventDefault();element.classList.remove('manual-drop-target','drop-target');const cues=groups.get(event.dataTransfer.getData('text/plain'));if(cues)try{await setManualAnchor(cues,anchorAfter)}catch(error){$('error').textContent=error.message}}}function renderSequence(){
+let sectionFilter='TOUT';function renderSectionFilters(sections){const box=$('section-filters'),names=['TOUT','PRÉPA','PRÉ-SHOW','SHOW','ENTRACTE'];if(!names.includes(sectionFilter))sectionFilter='TOUT';box.innerHTML='';names.forEach(name=>{const button=document.createElement('button');button.className='section-filter'+(name===sectionFilter?' active':'');button.textContent=name;button.onclick=()=>{sectionFilter=name;renderSequence()};box.append(button)})}function manualDropTarget(element,anchorAfter,groups){element.ondragover=event=>{if(event.dataTransfer.types.includes('text/plain')){event.preventDefault();element.classList.add('manual-drop-target','drop-target')}};element.ondragleave=()=>element.classList.remove('manual-drop-target','drop-target');element.ondrop=async event=>{event.preventDefault();element.classList.remove('manual-drop-target','drop-target');const cues=groups.get(event.dataTransfer.getData('text/plain'));if(cues)try{await setManualAnchor(cues,anchorAfter)}catch(error){$('error').textContent=error.message}}}function renderSequence(){
     /* CL_SHOWCUE_ORDERED_RENDER_V1 */
 
     const box=$('timed-sequence');
@@ -2438,7 +2463,7 @@ let sectionFilter='TOUT';function renderSectionFilters(sections){const box=$('se
 }
 function renderLibrary(){const box=$('library'),cues=((snapshot.conduite&&snapshot.conduite.library)||snapshot.library||[]).filter(cue=>cue.status==='official');box.innerHTML='';cues.forEach(cue=>box.append(cueLine(cue,'RÉSERVE')));if(!box.children.length)box.innerHTML='<div class="empty">Réserve vide</div>'}
 function renderDrafts(){const data=snapshot.conduite||{},drafts=['timed','manual','realtime','library'].flatMap(mode=>data[mode]||[]).filter(cue=>cue.status==='draft'),box=$('draft-list');box.innerHTML='';$('draft-count').textContent=drafts.length?'('+drafts.length+')':'';drafts.forEach(cue=>{const card=document.createElement('div'),row=cueLine(cue,cue.audio?'AUDIO':cue.mode==='timed'?cue.timecode:cue.mode==='realtime'?'🕒 '+cue.clock_time:'NOTE'),label=document.createElement('div'),actions=document.createElement('div'),timed=document.createElement('button'),manual=document.createElement('button'),library=document.createElement('button'),remove=document.createElement('button');card.className='capture-card';label.className='capture-label';label.textContent='À PLACER';row.querySelector('.line-text').append(label);actions.className='capture-actions';timed.textContent='PLACER AU TC';manual.textContent='PLACER SANS LTC';library.textContent='METTRE EN RÉSERVE';remove.textContent='SUPPRIMER';remove.className='danger';timed.onclick=()=>openEditor(cue,'timed',true);manual.onclick=()=>openEditor(cue,'manual',true);library.onclick=()=>classifyAsLibrary(cue);remove.onclick=()=>deleteCue(cue);actions.append(timed,manual,library,remove);card.append(row,actions);box.append(card)});if(!drafts.length)box.innerHTML='<div class="empty">Aucun élément à placer</div>'}
-function renderCalls(calls={}){const incoming=calls.incoming||[],outgoing=calls.outgoing||[],incomingBox=$('call-incoming'),outgoingBox=$('call-outgoing'),callButton=$('call-button'),short=post=>destinationLabels[post]||post;incomingBox.innerHTML='';outgoingBox.innerHTML='';incoming.forEach(item=>{const card=document.createElement('div'),title=document.createElement('div'),ack=document.createElement('button');card.className='incoming-card';title.className='incoming-title';title.textContent='APPEL '+short(item.source);ack.textContent='RÉPONDRE';ack.onclick=async()=>{ack.disabled=true;try{await api('/show-info/call/'+encodeURIComponent(item.id)+'/ack',{method:'POST',body:JSON.stringify({post:postEl.value})});await refresh()}catch(error){$('error').textContent=error.message;ack.disabled=false}};card.append(title,ack);incomingBox.append(card)});outgoing.forEach(item=>{const row=document.createElement('div'),label=document.createElement('span');row.className='call-item '+item.state;label.textContent=item.state==='acknowledged'?short(item.destination)+' OK':short(item.destination)+' — APPEL EN COURS';row.append(label);if(item.state==='calling'){const cancel=document.createElement('button');cancel.className='quiet';cancel.textContent='ANNULER';cancel.onclick=async()=>{try{await api('/show-info/call/'+encodeURIComponent(item.id)+'/cancel',{method:'POST',body:JSON.stringify({post:postEl.value})});await refresh()}catch(error){$('call-error').textContent=error.message}};row.append(cancel)}outgoingBox.append(row)});callButton.className='call-button';if(incoming.length){callButton.classList.add('incoming');callButton.textContent='APPEL '+short(incoming[0].source)}else{const acknowledged=outgoing.find(item=>item.state==='acknowledged'),calling=outgoing.find(item=>item.state==='calling');if(acknowledged){callButton.classList.add('acknowledged');callButton.textContent=short(acknowledged.destination)+' OK'}else if(calling){callButton.classList.add('calling');callButton.textContent='CALL '+short(calling.destination)}else callButton.textContent='CALL'}document.querySelectorAll('[data-call-target]').forEach(button=>button.disabled=button.dataset.callTarget===postEl.value)}
+function renderCalls(calls={}){const replyBox=$('call-replies');if(replyBox){replyBox.innerHTML='';(calls.outgoing||[]).filter(item=>item.state==='acknowledged').forEach(item=>{const card=document.createElement('div');card.className='call-reply-card';card.textContent=(destinationLabels[item.destination]||item.destination)+' · '+(item.reply||'Reçu');replyBox.append(card)})}const incoming=calls.incoming||[],outgoing=calls.outgoing||[],incomingBox=$('call-incoming'),outgoingBox=$('call-outgoing'),callButton=$('call-button'),short=post=>destinationLabels[post]||post;incomingBox.innerHTML='';outgoingBox.innerHTML='';incoming.forEach(item=>{const card=document.createElement('div'),title=document.createElement('div'),ack=document.createElement('button');card.className='incoming-card';title.className='incoming-title';title.textContent='APPEL '+short(item.source);ack.textContent='RÉPONDRE';ack.onclick=async()=>{ack.disabled=true;try{await api('/show-info/call/'+encodeURIComponent(item.id)+'/ack',{method:'POST',body:JSON.stringify({post:postEl.value})});await refresh()}catch(error){$('error').textContent=error.message;ack.disabled=false}};card.append(title);if(item.message){const text=document.createElement('p');text.className='call-message-text';text.textContent=item.message;card.append(text)}ack.textContent='REÇU';card.append(ack);['Prêt','Attends','Réponse…'].forEach(label=>{const reply=document.createElement('button');reply.textContent=label;reply.onclick=async()=>{const message=label==='Réponse…'?window.prompt('Répondre (160 caractères maximum) :'):label;if(message===null||!message.trim())return;reply.disabled=true;try{await api('/show-info/call/'+encodeURIComponent(item.id)+'/ack',{method:'POST',body:JSON.stringify({post:postEl.value,reply:message})});await refresh()}catch(error){$('error').textContent=error.message;reply.disabled=false}};card.append(reply)});incomingBox.append(card)});outgoing.forEach(item=>{const row=document.createElement('div'),label=document.createElement('span');row.className='call-item '+item.state;label.textContent=item.state==='acknowledged'?short(item.destination)+' · '+(item.reply||'Reçu'):short(item.destination)+' — APPEL EN COURS';row.append(label);if(item.state==='calling'){const cancel=document.createElement('button');cancel.className='quiet';cancel.textContent='ANNULER';cancel.onclick=async()=>{try{await api('/show-info/call/'+encodeURIComponent(item.id)+'/cancel',{method:'POST',body:JSON.stringify({post:postEl.value})});await refresh()}catch(error){$('call-error').textContent=error.message}};row.append(cancel)}outgoingBox.append(row)});callButton.className='call-button';if(incoming.length){callButton.classList.add('incoming');callButton.textContent='APPEL '+short(incoming[0].source)}else{const acknowledged=outgoing.find(item=>item.state==='acknowledged'),calling=outgoing.find(item=>item.state==='calling');if(acknowledged){callButton.classList.add('acknowledged');callButton.textContent=short(acknowledged.destination)+' OK'}else if(calling){callButton.classList.add('calling');callButton.textContent='CALL '+short(calling.destination)}else callButton.textContent='CALL'}document.querySelectorAll('[data-call-target]').forEach(button=>button.disabled=button.dataset.callTarget===postEl.value)}
 let distributionDocument=null;
 let distributionEditingIndex=null;
 
@@ -2770,7 +2795,7 @@ function readEquipmentSlots(){
 }
 
 function render(data){snapshot=data;renderSessions(data);const currentLtc=data.ltc_connected?data.ltc_timecode:'--:--:--:--';$('ltc').textContent=currentLtc;$('title').textContent=$('ableton-scene').textContent=data.title||'—';$('ableton-duration').textContent=formatSeconds(data.scene_duration_seconds);$('ableton-elapsed').textContent=formatSeconds(data.elapsed_seconds);$('ableton-remaining').textContent=formatSeconds(data.remaining_seconds);$('transport').textContent=data.is_playing?'PLAY':'STOP';$('transport').classList.toggle('play',data.is_playing);renderLiveCue('past-second',data.previous_second);renderLiveCue('past',data.previous);renderLiveCue('current',data.current);$('current-meta').textContent=cueMeta(data.current);$('live-edit').hidden=!data.current;$('live-edit').onclick=()=>data.current&&openQuickEditor(data.current);renderLiveCue('next',data.next);renderLiveCue('following',data.following);renderSequence();renderLibrary();renderDrafts();renderDistribution(data.distribution);renderCalls(data.calls)}
-async function api(url,options={}){const headers=options.body instanceof FormData?{}:{'Content-Type':'application/json'};const response=await fetch(url,{cache:'no-store',headers,...options}),data=await response.json();if(!response.ok||!data.ok)throw new Error(data.message||'Erreur serveur');return data}function interactionActive(){const selection=window.getSelection(),control=document.activeElement,pointer=document.querySelector('button:active,summary:active');return Boolean(editor.open||quickEditor.open||recorderDialog.open||pointer||(selection&&!selection.isCollapsed)||(control&&/^(INPUT|TEXTAREA|SELECT)$/.test(control.tagName)))}let refreshInFlight=false;async function refresh(){if(refreshInFlight)return;refreshInFlight=true;try{const data=await api('/show-info/status?post='+encodeURIComponent(postEl.value));if(interactionActive()){renderCalls(data.calls);return}render(data);$('error').textContent=''}catch(error){$('error').textContent=error.message}finally{refreshInFlight=false}}function checkedPosts(){return[...$('form-posts').querySelectorAll('input:checked')].map(input=>input.value)}
+async function api(url,options={}){const headers=options.body instanceof FormData?{}:{'Content-Type':'application/json'};const response=await fetch(url,{cache:'no-store',headers,...options});let data;try{data=await response.json()}catch(_){throw new Error('Erreur '+response.status+' — Réponse serveur non JSON')}if(!response.ok||!data.ok)throw new Error('Erreur '+response.status+' — '+(data.message||data.error||'Requête refusée sans explication'));return data}function interactionActive(){const selection=window.getSelection(),control=document.activeElement,pointer=document.querySelector('button:active,summary:active');return Boolean(editor.open||quickEditor.open||recorderDialog.open||pointer||(selection&&!selection.isCollapsed)||(control&&/^(INPUT|TEXTAREA|SELECT)$/.test(control.tagName)))}let refreshInFlight=false;async function refresh(){if(refreshInFlight)return;refreshInFlight=true;try{const data=await api('/show-info/status?post='+encodeURIComponent(postEl.value));if(interactionActive()){renderCalls(data.calls);return}render(data);$('error').textContent=''}catch(error){$('error').textContent=error.message}finally{refreshInFlight=false}}function checkedPosts(){return[...$('form-posts').querySelectorAll('input:checked')].map(input=>input.value)}
 async function deleteCue(cue,errorId='error',sessionId=snapshot.active_session_id){if(!cue||!window.confirm('Supprimer définitivement ce cue ?'))return false;try{await api('/show-info/cues/'+encodeURIComponent(cue.id)+'?session_id='+encodeURIComponent(sessionId),{method:'DELETE'});recordedDraft=null;await refresh();return true}catch(error){$(errorId).textContent=error.message;return false}}async function classifyAsLibrary(cue){try{await api('/show-info/cues/'+encodeURIComponent(cue.id),{method:'PUT',body:JSON.stringify(scoped({mode:'library',status:'official'}))});await refresh()}catch(error){$('error').textContent=error.message}}
 
 $('distribution-add').onclick=()=>openDistributionEditor();
@@ -2869,7 +2894,7 @@ $('distribution-delete').onclick=async()=>{
     }
 };
 
-$('call-button').onclick=()=>{$('call-error').textContent='';callPanel.showModal()};$('call-close').onclick=()=>callPanel.close();document.querySelectorAll('[data-call-target]').forEach(button=>button.onclick=async()=>{button.disabled=true;try{await api('/show-info/call',{method:'POST',body:JSON.stringify({source:postEl.value,destination:button.dataset.callTarget})});await refresh()}catch(error){$('call-error').textContent=error.message}finally{button.disabled=button.dataset.callTarget===postEl.value}});
+$('call-button').onclick=()=>{$('call-error').textContent='';callPanel.showModal()};$('call-close').onclick=()=>callPanel.close();document.querySelectorAll('[data-call-target]').forEach(button=>button.onclick=async()=>{button.disabled=true;try{await api('/show-info/call',{method:'POST',body:JSON.stringify({source:postEl.value,destination:button.dataset.callTarget,message:$('call-message').value.trim()})});$('call-message').value='';await refresh()}catch(error){$('call-error').textContent=error.message}finally{button.disabled=button.dataset.callTarget===postEl.value}});
 $('destinations-all').onclick=()=>$('form-posts').querySelectorAll('input').forEach(input=>input.checked=true);
 function prepareAnchorField(cue,mode){const select=$('form-anchor'),timed=((snapshot.conduite&&snapshot.conduite.timed)||[]).filter(item=>item.status==='official');$('anchor-field').hidden=mode!=='manual';select.innerHTML='<option value="">FIN DE CONDUITE</option>';timed.forEach(item=>{const option=document.createElement('option');option.value=item.id;option.textContent=item.timecode+' — '+item.text;select.append(option)});select.value=cue&&cue.mode==='manual'?(cue.anchor_after||''):''}
 function openEditor(cue=null,mode=null,classification=false){editing=cue;classifying=Boolean(classification);if(cue)captured=cue.timecode||null;const actualMode=mode||(cue?cue.mode:null),sections=[...new Set(((snapshot.conduite&&snapshot.conduite.manual)||[]).map(item=>item.section))];$('manual-sections').innerHTML='';sections.forEach(section=>{const option=document.createElement('option');option.value=section;$('manual-sections').append(option)});prepareAnchorField(cue,actualMode);$('editor-title').textContent=classifying?(actualMode==='timed'?'Placer au TC':'Placer sans LTC'):cue?'Modifier le cue':actualMode==='library'?'Nouveau texte de réserve':'Nouveau cue';$('timecode-field').hidden=actualMode!=='timed';$('section-field').hidden=actualMode!=='manual';$('status-field').hidden=!cue||classifying;$('editor-delete').hidden=!cue;formSmpte.set(actualMode==='timed'?(cue&&cue.mode==='timed'?cue.timecode:captured||'00:00:00:00'):'00:00:00:00');$('form-section').value=actualMode==='manual'?(cue&&cue.mode==='manual'?cue.section:sections[0]||'PARTIE PARLÉE'):'';$('form-text').value=cue?cue.text:'';$('form-status').value=classifying?'official':cue?cue.status:'draft';$('captured-label').textContent=cue&&cue.audio?'CAPTURE AUDIO · ENREGISTRÉE':!cue&&actualMode==='timed'?'LTC CAPTURÉ · '+captured:!cue&&actualMode==='manual'?'LTC absent : création manuelle':'';$('form-audio').hidden=!(cue&&cue.audio);$('form-audio').src=cue&&cue.audio?'/show-info/cues/'+encodeURIComponent(cue.id)+'/audio?session_id='+encodeURIComponent(snapshot.active_session_id):'';$('form-posts').querySelectorAll('input').forEach(input=>input.checked=cue?cue.posts.includes(input.value):true);editor.dataset.mode=actualMode;editor.dataset.sessionId=snapshot.active_session_id;$('form-error').textContent='';editor.showModal();clearTimeout(editorFocusTimer);editorFocusTimer=setTimeout(()=>$('form-text').focus(),0)}
@@ -2879,7 +2904,7 @@ async function beginRecording(context){const selected=$('audio-input').value;loc
 async function captureAudio(){try{const context=await api('/show-info/capture',{method:'POST',body:'{}'});captured=context.timecode;recorderDialog.dataset.context=JSON.stringify(scoped(context));$('record-context').textContent=context.mode==='timed'?'LTC FIGÉ · '+context.timecode:'SANS LTC · CUE MANUEL';$('record-error').textContent='';$('record-state').textContent='Préparation des entrées système…';$('record-start').disabled=true;$('audio-input').disabled=false;recorderDialog.showModal();await prepareInputs()}catch(error){await stopStream();$('record-error').textContent=error.message;if(!recorderDialog.open)recorderDialog.showModal()}}$('capture-audio').onclick=$('draft-capture-audio').onclick=captureAudio;$('record-start').onclick=async()=>{try{await beginRecording(JSON.parse(recorderDialog.dataset.context))}catch(error){await stopStream();$('record-error').textContent=error.name==='NotFoundError'?'La source sélectionnée a disparu. Choisissez une autre entrée.':error.message;$('audio-input').disabled=false;$('record-start').disabled=false;await listInputs()}};$('record-stop').onclick=()=>{if(mediaRecorder&&mediaRecorder.state==='recording')mediaRecorder.stop()};$('record-cancel').onclick=async()=>{if(mediaRecorder&&mediaRecorder.state==='recording'){mediaRecorder.onstop=null;mediaRecorder.stop()}await stopStream();$('audio-input').disabled=false;recorderDialog.close()};$('audio-input').onchange=()=>localStorage.setItem('cl-showcue-audio-input',$('audio-input').value);
 async function cancelEditor(){clearTimeout(editorFocusTimer);editorFocusTimer=null;const disposable=recordedDraft&&editing&&recordedDraft.id===editing.id;if(disposable){try{await api('/show-info/cues/'+encodeURIComponent(editing.id)+'?session_id='+encodeURIComponent(editor.dataset.sessionId),{method:'DELETE'});recordedDraft=null}catch(error){$('form-error').textContent=error.message;return}}editor.close();editing=null;classifying=false;captured=null;await refresh()}$('editor-cancel').onclick=cancelEditor;$('editor-delete').onclick=async()=>{if(await deleteCue(editing,'form-error',editor.dataset.sessionId)){editor.close();editing=null;classifying=false;captured=null;await refresh()}};
 function renderQuickPosts(cue){const box=$('quick-posts');box.innerHTML='';Object.entries(destinationLabels).forEach(([post,label])=>{const button=document.createElement('button');button.type='button';button.className='quick-post'+(cue.posts.includes(post)?' active':'');button.dataset.post=post;button.textContent=label;button.setAttribute('aria-pressed',cue.posts.includes(post));button.onclick=()=>{const active=button.classList.contains('active'),count=box.querySelectorAll('.quick-post.active').length;if(active&&count===1){$('quick-error').textContent='Un cue doit conserver au moins un destinataire.';return}$('quick-error').textContent='';button.classList.toggle('active');button.setAttribute('aria-pressed',button.classList.contains('active'))};box.append(button)})}function quickCheckedPosts(){return[...$('quick-posts').querySelectorAll('.quick-post.active')].map(button=>button.dataset.post)}function openQuickEditor(cue){quickEditing=cue;quickEditor.dataset.sessionId=snapshot.active_session_id;$('quick-text').value=cue.text;$('quick-timecode-field').hidden=cue.mode!=='timed';quickSmpte.set(cue.timecode||'00:00:00:00');renderQuickPosts(cue);$('quick-error').textContent='';quickEditor.showModal()}$('quick-cancel').onclick=()=>{quickEditor.close();quickEditing=null;refresh()};$('quick-delete').onclick=async()=>{if(await deleteCue(quickEditing,'quick-error',quickEditor.dataset.sessionId)){quickEditor.close();quickEditing=null;await refresh()}};$('quick-form').addEventListener('submit',async event=>{event.preventDefault();if(!quickEditing)return;const payload={},text=$('quick-text').value,timecode=quickSmpte.get(),posts=quickCheckedPosts();if(text!==quickEditing.text)payload.text=text;if(quickEditing.mode==='timed'&&timecode!==quickEditing.timecode)payload.timecode=timecode;if(JSON.stringify(posts)!==JSON.stringify(quickEditing.posts))payload.posts=posts;if(!Object.keys(payload).length){quickEditor.close();quickEditing=null;await refresh();return}try{await api('/show-info/cues/'+encodeURIComponent(quickEditing.id),{method:'PUT',body:JSON.stringify(scoped(payload,quickEditor.dataset.sessionId))});quickEditor.close();quickEditing=null;await refresh()}catch(error){$('quick-error').textContent=error.message}});
-$('cue-form').addEventListener('submit',async event=>{event.preventDefault();const mode=editor.dataset.mode,payload={session_id:editor.dataset.sessionId,mode,text:$('form-text').value,posts:checkedPosts(),status:editing?(classifying?'official':$('form-status').value):'draft'};if(mode==='timed')payload.timecode=$('form-timecode').value;if(mode==='realtime')payload.clock_time=$('form-clock-time').value;if(typeof collectFullCueBuilder==='function')payload.builder=collectFullCueBuilder();if(mode==='manual'){payload.section=$('form-section').value;payload.anchor_after=$('form-anchor').value;if(classifying&&(!editing||editing.mode!=='manual')){const sameSection=((snapshot.conduite&&snapshot.conduite.manual)||[]).filter(cue=>cue.section===payload.section);payload.order=Math.max(0,...sameSection.map(cue=>Number(cue.order)||0))+1}}try{const url=editing?'/show-info/cues/'+encodeURIComponent(editing.id):'/show-info/cues',method=editing?'PUT':'POST';await api(url,{method,body:JSON.stringify(payload)});recordedDraft=null;editor.close();editing=null;classifying=false;captured=null;await refresh()}catch(error){$('form-error').textContent=error.message}});
+$('cue-form').addEventListener('submit',async event=>{event.preventDefault();const mode=editor.dataset.mode,payload={session_id:editor.dataset.sessionId,mode,text:$('form-text').value,posts:checkedPosts(),status:editing?(classifying?'official':$('form-status').value):'draft'};if(mode==='timed')payload.timecode=$('form-timecode').value;if(mode==='realtime')payload.clock_time=$('form-clock-time').value;if(typeof collectFullCueBuilder==='function'){payload.builder=collectFullCueBuilder();delete payload.builder.notes_by_post;}if(mode==='manual'){payload.section=$('form-section').value;payload.anchor_after=$('form-anchor').value;if(classifying&&(!editing||editing.mode!=='manual')){const sameSection=((snapshot.conduite&&snapshot.conduite.manual)||[]).filter(cue=>cue.section===payload.section);payload.order=Math.max(0,...sameSection.map(cue=>Number(cue.order)||0))+1}}try{const url=editing?'/show-info/cues/'+encodeURIComponent(editing.id):'/show-info/cues',method=editing?'PUT':'POST';await api(url,{method,body:JSON.stringify(payload)});recordedDraft=null;editor.close();editing=null;classifying=false;captured=null;await refresh()}catch(error){$('form-error').textContent=error.message}});
 sessionEl.onchange=async()=>{const target=sessionEl.value;sessionEl.disabled=true;try{await api('/show-info/sessions/'+encodeURIComponent(target)+'/activate',{method:'POST',body:'{}'});lastConduiteActiveId=null;sessionEl.blur();await refresh()}catch(error){$('error').textContent=error.message}finally{sessionEl.disabled=false}};
 $('session-new').onclick=async()=>{const name=window.prompt('Nom de la nouvelle session :');if(name===null)return;try{await api('/show-info/sessions',{method:'POST',body:JSON.stringify({name})});lastConduiteActiveId=null;sessionEl.blur();await refresh()}catch(error){$('error').textContent=error.message}};
 $('session-rename').onclick=async()=>{const current=(snapshot.sessions||[]).find(item=>item.id===snapshot.active_session_id),name=window.prompt('Nouveau nom de la session :',current?current.name:'');if(name===null)return;try{await api('/show-info/sessions/'+encodeURIComponent(snapshot.active_session_id),{method:'PUT',body:JSON.stringify({name})});await refresh()}catch(error){$('error').textContent=error.message}};
@@ -3576,12 +3601,18 @@ let selectedConduiteCueId = null;
 ---------------------------------------------------------- */
 
 function conduiteCueSection(cue){
-    return String(
-        cue.section ||
-        (cue.builder && cue.builder.section) ||
-        ''
-    ).trim();
+    const normalize = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase().replace(/[^A-Z]/g, '');
+    const phase = normalize(cue?.builder?.phase || cue?.phase);
+    const section = normalize(cue?.section || cue?.builder?.section);
+    const classify = value => {
+        if (['PREPA','PREPARATION','TECHNIQUE','REPETITION'].includes(value)) return 'PRÉPA';
+        if (['PRESHOW','PRESPECTACLE','NOPUBLIC'].includes(value)) return 'PRÉ-SHOW';
+        if (['ENTRACTE','INTERMEDE'].includes(value)) return 'ENTRACTE';
+        return null;
+    };
+    return classify(phase) || (phase ? 'SHOW' : classify(section)) || 'SHOW';
 }
+
 
 function conduiteBuilderNumber(cue){
     const raw = cue && cue.builder ? cue.builder.number : '';
@@ -4259,22 +4290,18 @@ $('capture-tc').onclick = captureTcOnSelectedConduiteCue;
             );
         };
 
-        const timed = ordered
-            .filter(cue => cue.mode === 'timed')
-            .slice()
-            .sort((a,b)=>
-                tcUnits(a.timecode) - tcUnits(b.timecode)
-            );
-
+        // The opening phases use Builder/manual order; clock time remains the
+        // ordering key for the show. Untimed actions retain their show slots.
+        const opening = cue => ['PRÉPA','PRÉ-SHOW'].includes(conduiteCueSection(cue));
+        const show = ordered.filter(cue => !opening(cue));
+        const timed = show.filter(cue => cue.mode === 'timed').slice()
+            .sort((a,b) => tcUnits(a.timecode) - tcUnits(b.timecode));
         let timedIndex = 0;
-
-        return ordered.map(cue=>{
-            if(cue.mode !== 'timed'){
-                return cue;
-            }
-
-            return timed[timedIndex++] || cue;
-        });
+        return [
+            ...ordered.filter(cue => conduiteCueSection(cue) === 'PRÉPA'),
+            ...ordered.filter(cue => conduiteCueSection(cue) === 'PRÉ-SHOW'),
+            ...show.map(cue => cue.mode === 'timed' ? timed[timedIndex++] || cue : cue)
+        ];
     };
 
 
@@ -4722,7 +4749,7 @@ $('capture-tc').onclick = captureTcOnSelectedConduiteCue;
         kicker.textContent=
             allDone
                 ? 'PRÉPARATION TERMINÉE'
-                : 'À FAIRE AVANT LE PROCHAIN TC';
+                : 'À FAIRE';
 
         const progress=document.createElement('div');
         progress.className='live-checklist-progress';
@@ -6947,8 +6974,8 @@ $('capture-tc').onclick = captureTcOnSelectedConduiteCue;
 </script>
 
 
-<link rel="stylesheet" href="/static/showcue-stage.css?v=mobile-conduite-1">
-<script src="/static/showcue-stage.js?v=mobile-conduite-1"></script>
+<link rel="stylesheet" href="/static/showcue-stage.css?v=phase-calls-7">
+<script src="/static/showcue-stage.js?v=showcue-permissions-notes-1"></script>
 
 <!-- CL_SHOWCUE_DICTATION_V1 -->
 <style id="cl-showcue-dictation-style">
@@ -8755,7 +8782,19 @@ function techSelect(values,saved,className,emptyLabel){
     );
   }
 
-  select.value=saved||'';
+  /*
+   * Priorité :
+   * 1. valeur déjà sauvegardée sur le cue
+   * 2. valeur unique définie dans Préparation
+   * 3. aucune sélection automatique si plusieurs choix
+   */
+  select.value=
+    saved ||
+    (values.length===1 ? values[0] : '');
+
+  if(!saved && values.length===1){
+    select.classList.add('full-cue-native-default');
+  }
 
   return select;
 }
@@ -10509,4 +10548,1570 @@ window.syncFullCueRoleSummary = syncFullCueRoleSummary;
 })();
 </script>
 
+
+
+<!-- CL_SHOWCUE_EDITOR_USABILITY_20261006 -->
+<style id="cl-showcue-editor-usability-20261006">
+
+/* ---------------------------------------------------------
+   Dictée retirée de l'interface
+   --------------------------------------------------------- */
+.cl-dictation-bar,
+.cl-dictation-button,
+.cl-dictation-status,
+.cl-dictation-preview {
+    display: none !important;
+}
+
+/* ---------------------------------------------------------
+   Timecode live dans l'éditeur
+   --------------------------------------------------------- */
+#cl-editor-live-tc {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    margin-left: 10px;
+    padding: 5px 9px;
+    border: 1px solid #51483d;
+    border-radius: 7px;
+    background: #0e0c0a;
+    color: #d8d0c5;
+    vertical-align: middle;
+}
+
+#cl-editor-live-tc .cl-editor-live-tc-label {
+    color: #9f968b;
+    font-size: .62rem;
+    font-weight: 900;
+    letter-spacing: .08em;
+}
+
+#cl-editor-live-tc .cl-editor-live-tc-value {
+    min-width: 88px;
+    color: #efc46f;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: .78rem;
+    font-weight: 900;
+    letter-spacing: .03em;
+}
+
+/* Le vrai SELECT Section garde le style existant */
+#full-cue-builder-section {
+    width: 100%;
+}
+
+/* Valeurs héritées du rôle : discrètes, mais visibles */
+.full-cue-default-filled {
+    border-color: #806637 !important;
+}
+
+</style>
+
+<script id="cl-showcue-editor-usability-script-20261006">
+(() => {
+    'use strict';
+
+    const PATCH = 'CL_SHOWCUE_EDITOR_USABILITY_20261006';
+
+    const clean = value => String(value ?? '').trim();
+
+    const roleKey = value => {
+        const key = clean(value).toLocaleLowerCase('fr');
+        return key === 'preshow punk' ? 'punk' : key;
+    };
+
+    /* =====================================================
+       1. SECTION = vrai menu déroulant
+       ===================================================== */
+
+    function sectionValues(current='') {
+        const values = new Map();
+
+        const add = value => {
+            value = clean(value);
+            if (!value) return;
+            const key = value.toLocaleLowerCase('fr');
+            if (!values.has(key)) values.set(key, value);
+        };
+
+        try {
+            if (typeof sharedShowCueSections !== 'undefined') {
+                sharedShowCueSections.forEach(add);
+            }
+        } catch (_) {}
+
+        try {
+            (snapshot?.sections || []).forEach(add);
+        } catch (_) {}
+
+        try {
+            const conduite = snapshot?.conduite || {};
+            ['timed','manual','realtime','library'].forEach(mode => {
+                (conduite[mode] || []).forEach(cue => {
+                    add(cue?.builder?.section);
+                    add(cue?.section);
+                });
+            });
+        } catch (_) {}
+
+        [
+            'SHOW',
+            'INTERMÈDE',
+            'PRÉPARATION',
+            'MUSIQUE',
+            'LIGHT',
+            'MICROS',
+            'IEM',
+            'ARTISTES',
+            'COSTUMES',
+            'TECHNIQUE'
+        ].forEach(add);
+
+        add(current);
+
+        return [...values.values()];
+    }
+
+    function ensureSectionSelect(current='') {
+        let control = document.getElementById('full-cue-builder-section');
+        if (!control) return null;
+
+        current = clean(current || control.value);
+
+        if (control.tagName !== 'SELECT') {
+            const select = document.createElement('select');
+
+            for (const attr of control.attributes) {
+                if (attr.name === 'list' || attr.name === 'placeholder') continue;
+                select.setAttribute(attr.name, attr.value);
+            }
+
+            select.id = 'full-cue-builder-section';
+            control.replaceWith(select);
+            control = select;
+        }
+
+        const selected = current || clean(control.value);
+
+        control.replaceChildren();
+
+        for (const value of sectionValues(selected)) {
+            control.add(new Option(value, value));
+        }
+
+        if (selected) {
+            if (![...control.options].some(o => o.value === selected)) {
+                control.add(new Option(selected, selected));
+            }
+            control.value = selected;
+        }
+
+        return control;
+    }
+
+    ensureSectionSelect();
+
+    if (typeof window.populateFullCueClassification === 'function') {
+        const originalPopulateClassification =
+            window.populateFullCueClassification;
+
+        window.populateFullCueClassification = function(cue) {
+            let current = '';
+
+            try {
+                const builder =
+                    typeof builderOf === 'function'
+                        ? builderOf(cue)
+                        : (cue?.builder || {});
+
+                current = clean(
+                    builder?.section ||
+                    cue?.section ||
+                    ''
+                );
+            } catch (_) {}
+
+            ensureSectionSelect(current);
+            const result =
+                originalPopulateClassification.apply(this, arguments);
+
+            ensureSectionSelect(
+                document.getElementById(
+                    'full-cue-builder-section'
+                )?.value || current
+            );
+
+            return result;
+        };
+    }
+
+
+    /* =====================================================
+       2. Valeurs par défaut MICRO / IEM / EQUIPEMENT
+       ===================================================== */
+
+    function distributionRows() {
+        const raw = window.snapshot?.distribution;
+
+        if (Array.isArray(raw)) return raw;
+
+        if (Array.isArray(raw?.assignments))
+            return raw.assignments;
+
+        if (Array.isArray(raw?.rows))
+            return raw.rows;
+
+        if (raw && typeof raw === 'object') {
+            return Object.values(raw).filter(
+                value =>
+                    value &&
+                    typeof value === 'object' &&
+                    !Array.isArray(value)
+            );
+        }
+
+        return [];
+    }
+
+    function activeDistributionForRole(role) {
+        const matches = distributionRows().filter(row =>
+            roleKey(row?.role) === roleKey(role) &&
+            row?.active !== false
+        );
+
+        /*
+         * Si plusieurs lignes sont actives pour le même rôle,
+         * on ne devine rien.
+         */
+        return matches.length === 1 ? matches[0] : null;
+    }
+
+    function valuesByType(distribution, type) {
+        const result = [];
+
+        const add = value => {
+            value = clean(value);
+            if (
+                value &&
+                !result.some(
+                    item =>
+                        item.toLocaleLowerCase('fr') ===
+                        value.toLocaleLowerCase('fr')
+                )
+            ) {
+                result.push(value);
+            }
+        };
+
+        const slots =
+            distribution?.equipment_slots ||
+            distribution?.resolved_equipment_slots ||
+            [];
+
+        slots.forEach(slot => {
+            if (
+                clean(slot?.type).toLocaleUpperCase('fr') ===
+                type.toLocaleUpperCase('fr')
+            ) {
+                add(slot?.value);
+            }
+        });
+
+        /*
+         * Compatibilité avec les anciennes structures.
+         */
+        if (type === 'MICRO') {
+            add(distribution?.microphone);
+            add(distribution?.resolved_microphone);
+        }
+
+        if (type === 'IEM') {
+            add(distribution?.iem);
+            add(distribution?.resolved_iem);
+        }
+
+        if (type === 'ÉQUIPEMENT') {
+            add(distribution?.equipment);
+            add(distribution?.resolved_equipment);
+        }
+
+        return result;
+    }
+
+    function setDefault(control, value) {
+        if (!control) return;
+
+        value = clean(value);
+
+        /*
+         * Une valeur déjà renseignée appartient au cue :
+         * surtout ne pas l'écraser.
+         */
+        if (clean(control.value)) return;
+
+        if (!value) return;
+
+        if (
+            control.tagName === 'SELECT' &&
+            ![...control.options].some(
+                option => option.value === value
+            )
+        ) {
+            control.add(new Option(value, value));
+        }
+
+        control.value = value;
+        control.dataset.roleDefault = value;
+        control.classList.add('full-cue-default-filled');
+    }
+
+    function prefillRoleCard(card) {
+        if (!card) return;
+
+        const enabled =
+            card.querySelector('.full-cue-role-enabled');
+
+        if (enabled && !enabled.checked) return;
+
+        const role = clean(card.dataset.role);
+        if (!role) return;
+
+        const dist = activeDistributionForRole(role);
+        if (!dist) return;
+
+        const mappings = [
+            ['.full-cue-micro', 'MICRO'],
+            ['.full-cue-iem', 'IEM'],
+            ['.full-cue-equipment', 'ÉQUIPEMENT']
+        ];
+
+        for (const [selector, type] of mappings) {
+            const control = card.querySelector(selector);
+            if (!control || clean(control.value)) continue;
+
+            const values = valuesByType(dist, type);
+
+            /*
+             * Préremplissage automatique uniquement
+             * lorsqu'il n'existe qu'une valeur non ambiguë.
+             */
+            if (values.length === 1) {
+                setDefault(control, values[0]);
+            }
+        }
+    }
+
+    function prefillAllRoles() {
+        document.querySelectorAll(
+            '#form-role-assignments .full-cue-role-card'
+        ).forEach(prefillRoleCard);
+    }
+
+    /*
+     * Après ajout ou activation d'un rôle, les cartes sont
+     * reconstruites par le code existant. On intervient juste
+     * après sans modifier sa logique.
+     */
+    const roleBox =
+        document.getElementById('form-role-assignments');
+
+    if (roleBox) {
+        const observer = new MutationObserver(() => {
+            queueMicrotask(prefillAllRoles);
+        });
+
+        observer.observe(roleBox, {
+            childList: true,
+            subtree: true
+        });
+
+        roleBox.addEventListener('change', event => {
+            const card =
+                event.target.closest('.full-cue-role-card');
+
+            if (card) {
+                setTimeout(
+                    () => prefillRoleCard(card),
+                    0
+                );
+            }
+        });
+
+        prefillAllRoles();
+    }
+
+
+    /* =====================================================
+       3. Retirer réellement les contrôles de dictée du DOM
+       ===================================================== */
+
+    function removeDictationUi(root=document) {
+        root.querySelectorAll?.(
+            '.cl-dictation-bar'
+        ).forEach(node => node.remove());
+    }
+
+    removeDictationUi();
+
+    const dictationObserver =
+        new MutationObserver(() => removeDictationUi());
+
+    dictationObserver.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+
+
+    /* =====================================================
+       4. LTC LIVE à côté de CAPTURER TC
+       ===================================================== */
+
+    const FPS = 25;
+    const TC_RE = /^\d{2}:\d{2}:\d{2}:\d{2}$/;
+
+    let liveBaseFrames = null;
+    let liveSyncAt = 0;
+    let livePlaying = false;
+
+    function tcToFrames(value) {
+        const p = value.split(':').map(Number);
+        return (
+            ((p[0] * 60 + p[1]) * 60 + p[2]) * FPS
+            + p[3]
+        );
+    }
+
+    function framesToTc(frames) {
+        const day = 24 * 60 * 60 * FPS;
+
+        let value =
+            ((Math.floor(frames) % day) + day) % day;
+
+        const ff = value % FPS;
+        value = Math.floor(value / FPS);
+
+        const ss = value % 60;
+        value = Math.floor(value / 60);
+
+        const mm = value % 60;
+        const hh = Math.floor(value / 60) % 24;
+
+        return [hh,mm,ss,ff]
+            .map(part =>
+                String(part).padStart(2,'0')
+            )
+            .join(':');
+    }
+
+    function ensureLiveTcBadge() {
+        const label =
+            document.getElementById('captured-label');
+
+        if (!label || !editor?.open) return null;
+
+        let badge =
+            document.getElementById('cl-editor-live-tc');
+
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.id = 'cl-editor-live-tc';
+
+            const caption =
+                document.createElement('span');
+
+            caption.className =
+                'cl-editor-live-tc-label';
+
+            caption.textContent = 'TC LIVE';
+
+            const value =
+                document.createElement('span');
+
+            value.className =
+                'cl-editor-live-tc-value';
+
+            value.textContent = '--:--:--:--';
+
+            badge.append(caption,value);
+            label.append(' ',badge);
+        }
+
+        return badge.querySelector(
+            '.cl-editor-live-tc-value'
+        );
+    }
+
+    function drawLiveTc() {
+        const target = ensureLiveTcBadge();
+
+        if (target) {
+            if (
+                liveBaseFrames !== null &&
+                livePlaying &&
+                !document.hidden
+            ) {
+                const elapsed =
+                    performance.now() - liveSyncAt;
+
+                target.textContent =
+                    framesToTc(
+                        liveBaseFrames +
+                        Math.floor(
+                            elapsed * FPS / 1000
+                        )
+                    );
+            }
+        }
+
+        requestAnimationFrame(drawLiveTc);
+    }
+
+    async function pollEditorLtc() {
+        if (!editor?.open) {
+            liveBaseFrames = null;
+            livePlaying = false;
+            return;
+        }
+
+        try {
+            const response = await fetch(
+                '/show-info/status?post=' +
+                encodeURIComponent(postEl.value),
+                {cache:'no-store'}
+            );
+
+            const data = await response.json();
+
+            const value =
+                clean(data?.ltc_timecode);
+
+            const valid =
+                data?.ltc_connected === true &&
+                TC_RE.test(value);
+
+            const target = ensureLiveTcBadge();
+
+            if (!valid) {
+                liveBaseFrames = null;
+                livePlaying = false;
+
+                if (target)
+                    target.textContent =
+                        '--:--:--:--';
+
+                return;
+            }
+
+            liveBaseFrames = tcToFrames(value);
+            liveSyncAt = performance.now();
+            livePlaying =
+                data?.is_playing === true;
+
+            if (target)
+                target.textContent = value;
+
+        } catch (_) {
+            const target = ensureLiveTcBadge();
+
+            if (target)
+                target.textContent =
+                    '--:--:--:--';
+
+            liveBaseFrames = null;
+            livePlaying = false;
+        }
+    }
+
+    requestAnimationFrame(drawLiveTc);
+
+    setInterval(pollEditorLtc, 400);
+
+    /*
+     * Premier passage immédiatement après ouverture.
+     */
+    document.addEventListener('click', event => {
+        if (
+            event.target.closest(
+                '.edit-icon, #add-cue, #draft-add-cue'
+            )
+        ) {
+            setTimeout(() => {
+                ensureSectionSelect();
+                prefillAllRoles();
+                pollEditorLtc();
+            }, 50);
+        }
+    });
+
+    console.info(PATCH + ' chargé');
+})();
+</script>
+
+
+<!-- CL_SHOWCUE_EDITOR_ROLE_UI_V2_20261006 -->
+<style id="cl-showcue-editor-role-ui-v2">
+
+/* ==========================================================
+   SECTION : rendre évident qu'il s'agit d'un menu déroulant
+   ========================================================== */
+
+#full-cue-builder-section {
+    background:
+        linear-gradient(
+            180deg,
+            #312b24 0%,
+            #211d19 100%
+        ) !important;
+
+    border: 1px solid #8a7044 !important;
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.07),
+        inset 0 -2px 5px rgba(0,0,0,.26),
+        0 1px 5px rgba(0,0,0,.28) !important;
+
+    color: #f5f1e9 !important;
+    font-weight: 850 !important;
+    cursor: pointer;
+}
+
+#full-cue-builder-section:hover {
+    border-color: #c79b50 !important;
+}
+
+
+/* ==========================================================
+   ROLE + ARTISTE
+   ========================================================== */
+
+.full-cue-role-card .cl-role-artist-large {
+    display: inline-flex;
+    align-items: center;
+
+    margin-left: 12px;
+    margin-right: auto;
+
+    font-size: 1.35rem;
+    line-height: 1;
+    font-weight: 950;
+
+    letter-spacing: .025em;
+    color: #f5f1e9;
+
+    white-space: nowrap;
+}
+
+.full-cue-role-card .cl-role-artist-large.is-empty {
+    color: #81786f;
+    font-size: .82rem;
+    font-weight: 750;
+}
+
+
+/* Le haut de la carte doit vraiment lire :
+   [ MENEUSE ▼ ]   JUSTINE            [ RETIRER ]
+*/
+.full-cue-role-card > :first-child {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 7px !important;
+}
+
+.full-cue-role-card > :first-child > select:first-of-type {
+    flex: 0 0 auto !important;
+}
+
+
+/* ==========================================================
+   MATERIEL HERITE DE LA PREPARATION
+   ========================================================== */
+
+.full-cue-role-card select.cl-preparation-default {
+    border-color: #9d7c43 !important;
+    background-color: #2b241a !important;
+}
+
+.full-cue-role-card select.cl-preparation-default:not(:focus) {
+    box-shadow:
+        inset 0 0 0 1px rgba(199,155,80,.10);
+}
+
+
+/* ==========================================================
+   BOUTONS BAS DE FENETRE
+   ========================================================== */
+
+#editor .actions {
+    display: flex !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    gap: 9px !important;
+}
+
+#editor #editor-delete {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+}
+
+</style>
+
+<script id="cl-showcue-editor-role-ui-v2-script">
+(() => {
+    'use strict';
+
+    const PATCH =
+        'CL_SHOWCUE_EDITOR_ROLE_UI_V2_20261006';
+
+    const clean = value =>
+        String(value ?? '').trim();
+
+    const norm = value =>
+        clean(value)
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g,'')
+            .toLocaleUpperCase('fr');
+
+    const roleKey = value => {
+        const valueNorm =
+            clean(value).toLocaleLowerCase('fr');
+
+        return valueNorm === 'preshow punk'
+            ? 'punk'
+            : valueNorm;
+    };
+
+
+    /* ======================================================
+       DISTRIBUTION / PREPARATION
+
+       IMPORTANT :
+       snapshot est déclaré "let snapshot={}" par ShowCue.
+       Ce n'est PAS window.snapshot.
+       ====================================================== */
+
+    function getSnapshot() {
+        try {
+            return typeof snapshot !== 'undefined'
+                ? snapshot
+                : {};
+        } catch (_) {
+            return {};
+        }
+    }
+
+    function collectDistributionRows() {
+        const root =
+            getSnapshot()?.distribution;
+
+        const rows = [];
+        const seen = new Set();
+
+        const walk = node => {
+            if (!node || typeof node !== 'object')
+                return;
+
+            if (seen.has(node))
+                return;
+
+            seen.add(node);
+
+            if (
+                !Array.isArray(node) &&
+                clean(node.role) &&
+                (
+                    Array.isArray(node.equipment_slots) ||
+                    Array.isArray(node.resolved_equipment_slots) ||
+                    node.artist !== undefined ||
+                    node.active !== undefined
+                )
+            ) {
+                rows.push(node);
+            }
+
+            if (Array.isArray(node)) {
+                node.forEach(walk);
+            } else {
+                Object.values(node).forEach(walk);
+            }
+        };
+
+        walk(root);
+
+        return rows;
+    }
+
+    function roleRows(role) {
+        return collectDistributionRows().filter(
+            row =>
+                roleKey(row.role) === roleKey(role)
+        );
+    }
+
+    function activeRoleRow(role) {
+        const all = roleRows(role);
+
+        const active =
+            all.filter(row =>
+                row.active === true ||
+                row.active === 1 ||
+                row.active === 'true'
+            );
+
+        if (active.length === 1)
+            return active[0];
+
+        /*
+         * Certaines structures ne publient qu'une seule ligne
+         * pour le rôle sans propriété active explicite.
+         */
+        if (
+            active.length === 0 &&
+            all.length === 1
+        ) {
+            return all[0];
+        }
+
+        return null;
+    }
+
+
+    /* ======================================================
+       EXTRACTION DES EQUIPEMENTS
+       ====================================================== */
+
+    function unique(values) {
+        const result = [];
+
+        values.forEach(value => {
+            value = clean(value);
+
+            if (
+                value &&
+                !result.some(
+                    existing =>
+                        norm(existing) === norm(value)
+                )
+            ) {
+                result.push(value);
+            }
+        });
+
+        return result;
+    }
+
+    function slotTypeMatches(type, wanted) {
+        const current = norm(type);
+
+        if (wanted === 'MICRO')
+            return (
+                current === 'MICRO' ||
+                current.includes('MICRO')
+            );
+
+        if (wanted === 'IEM')
+            return (
+                current === 'IEM' ||
+                current.includes('IEM') ||
+                current.includes('EAR')
+            );
+
+        if (wanted === 'EQUIPEMENT')
+            return (
+                current === 'EQUIPEMENT' ||
+                (
+                    !current.includes('MICRO') &&
+                    !current.includes('IEM') &&
+                    !current.includes('EAR')
+                )
+            );
+
+        return false;
+    }
+
+    function equipmentValues(row, wanted) {
+        if (!row)
+            return [];
+
+        const slots = [
+            ...(row.equipment_slots || []),
+            ...(row.resolved_equipment_slots || [])
+        ];
+
+        const result = [];
+
+        slots.forEach(slot => {
+            if (
+                slotTypeMatches(
+                    slot?.type,
+                    wanted
+                )
+            ) {
+                result.push(slot?.value);
+            }
+        });
+
+        /*
+         * Compatibilité avec d'éventuelles anciennes
+         * structures de Préparation.
+         */
+        if (wanted === 'MICRO') {
+            result.push(
+                row.microphone,
+                row.resolved_microphone,
+                row.micro
+            );
+        }
+
+        if (wanted === 'IEM') {
+            result.push(
+                row.iem,
+                row.resolved_iem,
+                row.ear,
+                row.ear_iem
+            );
+        }
+
+        if (wanted === 'EQUIPEMENT') {
+            result.push(
+                row.equipment,
+                row.resolved_equipment
+            );
+        }
+
+        return unique(result);
+    }
+
+
+    /* ======================================================
+       ARTISTE EN GROS A COTE DU ROLE
+       ====================================================== */
+
+    function artistForRole(role) {
+        const row = activeRoleRow(role);
+
+        return clean(
+            row?.artist ||
+            row?.resolved_artist ||
+            row?.name
+        );
+    }
+
+    function enhanceArtist(card) {
+        if (!card)
+            return;
+
+        const role =
+            clean(card.dataset.role);
+
+        if (!role)
+            return;
+
+        const head =
+            card.firstElementChild;
+
+        if (!head)
+            return;
+
+        const roleSelect =
+            head.querySelector('select');
+
+        if (!roleSelect)
+            return;
+
+        const artist =
+            artistForRole(role);
+
+        let label =
+            head.querySelector(
+                '.cl-role-artist-large'
+            );
+
+        if (!label) {
+            label =
+                document.createElement('span');
+
+            label.className =
+                'cl-role-artist-large';
+
+            roleSelect.insertAdjacentElement(
+                'afterend',
+                label
+            );
+        }
+
+        label.textContent =
+            artist || 'AUCUN ARTISTE ACTIF';
+
+        label.classList.toggle(
+            'is-empty',
+            !artist
+        );
+
+        /*
+         * Si l'ancien petit nom de l'artiste existe encore
+         * dans le header, on le masque afin de ne pas afficher
+         * JUSTINE deux fois.
+         */
+        if (artist) {
+            [...head.children].forEach(child => {
+                if (
+                    child === label ||
+                    child === roleSelect ||
+                    child.tagName === 'BUTTON'
+                ) {
+                    return;
+                }
+
+                if (
+                    clean(child.textContent) === artist
+                ) {
+                    child.style.display = 'none';
+                }
+            });
+
+            [...head.childNodes].forEach(node => {
+                if (
+                    node.nodeType === Node.TEXT_NODE &&
+                    clean(node.textContent) === artist
+                ) {
+                    node.textContent = '';
+                }
+            });
+        }
+    }
+
+
+    /* ======================================================
+       MENUS MICRO / IEM / EQUIPEMENT
+
+       - toutes les valeurs de Préparation sont proposées
+       - valeur unique => auto-sélection
+       - valeur déjà enregistrée => jamais écrasée
+       ====================================================== */
+
+    function syncSelectFromPreparation(
+        select,
+        values
+    ) {
+        if (!select)
+            return;
+
+        values = unique(values);
+
+        const previous =
+            clean(select.value);
+
+        /*
+         * Conserver les options système existantes
+         * ("PAS DE MICRO", etc.).
+         * Ajouter seulement ce qui vient de Préparation.
+         */
+        values.forEach(value => {
+            const exists =
+                [...select.options].some(
+                    option =>
+                        norm(option.value) ===
+                        norm(value)
+                );
+
+            if (!exists) {
+                select.add(
+                    new Option(
+                        value,
+                        value
+                    )
+                );
+            }
+        });
+
+        /*
+         * Une valeur déjà enregistrée sur le cue est
+         * toujours prioritaire.
+         */
+        if (previous) {
+            if (
+                ![...select.options].some(
+                    option =>
+                        option.value === previous
+                )
+            ) {
+                select.add(
+                    new Option(
+                        previous,
+                        previous
+                    )
+                );
+            }
+
+            select.value = previous;
+            return;
+        }
+
+        /*
+         * Une seule possibilité = choix évident.
+         */
+        if (values.length === 1) {
+            select.value = values[0];
+
+            select.classList.add(
+                'cl-preparation-default'
+            );
+
+            /*
+             * Le code de sauvegarde lit directement
+             * la valeur du select, aucun changement du
+             * modèle de données n'est nécessaire.
+             */
+            select.dispatchEvent(
+                new Event(
+                    'change',
+                    {bubbles:true}
+                )
+            );
+        }
+    }
+
+    function enhanceEquipment(card) {
+        if (!card)
+            return;
+
+        const enabled =
+            card.querySelector(
+                '.full-cue-role-enabled'
+            );
+
+        if (
+            enabled &&
+            !enabled.checked
+        ) {
+            return;
+        }
+
+        const role =
+            clean(card.dataset.role);
+
+        if (!role)
+            return;
+
+        const row =
+            activeRoleRow(role);
+
+        if (!row)
+            return;
+
+        syncSelectFromPreparation(
+            card.querySelector(
+                '.full-cue-micro'
+            ),
+            equipmentValues(
+                row,
+                'MICRO'
+            )
+        );
+
+        syncSelectFromPreparation(
+            card.querySelector(
+                '.full-cue-iem'
+            ),
+            equipmentValues(
+                row,
+                'IEM'
+            )
+        );
+
+        syncSelectFromPreparation(
+            card.querySelector(
+                '.full-cue-equipment'
+            ),
+            equipmentValues(
+                row,
+                'EQUIPEMENT'
+            )
+        );
+    }
+
+
+    /* ======================================================
+       CARTE COMPLETE
+       ====================================================== */
+
+    function enhanceCard(card) {
+        /*
+         * CL_SHOWCUE_ARTIST_RESTORE_V4_20261006
+         *
+         * V2 est désormais neutralisé :
+         * - le nom artiste vient du rendu natif
+         * - le matériel vient de techSelect() natif
+         *
+         * Cela évite notamment que enhanceArtist()
+         * masque .full-cue-role-artist.
+         */
+    }
+
+    function enhanceAllCards() {
+        document.querySelectorAll(
+            '#form-role-assignments ' +
+            '.full-cue-role-card'
+        ).forEach(enhanceCard);
+    }
+
+
+    /* ======================================================
+       OBSERVER LES AJOUTS DE ROLES
+       ====================================================== */
+
+    const roleBox =
+        document.getElementById(
+            'form-role-assignments'
+        );
+
+    if (roleBox) {
+        let queued = false;
+
+        const schedule = () => {
+            if (queued)
+                return;
+
+            queued = true;
+
+            requestAnimationFrame(() => {
+                queued = false;
+                enhanceAllCards();
+            });
+        };
+
+        const observer =
+            new MutationObserver(schedule);
+
+        observer.observe(
+            roleBox,
+            {
+                childList: true,
+                subtree: true
+            }
+        );
+
+        roleBox.addEventListener(
+            'change',
+            () => setTimeout(
+                enhanceAllCards,
+                0
+            )
+        );
+    }
+
+
+    /* ======================================================
+       A L'OUVERTURE DE LA FENETRE
+       ====================================================== */
+
+    document.addEventListener(
+        'click',
+        event => {
+            if (
+                event.target.closest(
+                    '.edit-icon,' +
+                    '#add-cue,' +
+                    '#draft-add-cue,' +
+                    '#full-cue-add-role'
+                )
+            ) {
+                setTimeout(
+                    enhanceAllCards,
+                    30
+                );
+
+                setTimeout(
+                    enhanceAllCards,
+                    120
+                );
+            }
+        }
+    );
+
+    /*
+     * La fenêtre peut déjà être ouverte au chargement
+     * du patch.
+     */
+    enhanceAllCards();
+
+    console.info(
+        PATCH + ' chargé'
+    );
+})();
+</script>
+
+
+<!-- CL_SHOWCUE_ROLE_NATIVE_FIX_V3_20261006 -->
+<style id="cl-showcue-role-native-fix-v3">
+
+/*
+ * Le nom natif de l'artiste est la source de vérité.
+ * Masquer le faux libellé ajouté par V2.
+ */
+#form-role-assignments .cl-role-artist-large {
+    display: none !important;
+}
+
+/*
+ * Présentation :
+ *
+ * [ PUNK ▼ ]   JADE NAOMI                 [ RETIRER ]
+ */
+#form-role-assignments .full-cue-role-head {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 8px !important;
+}
+
+#form-role-assignments .full-cue-role-name-select {
+    flex: 0 0 auto !important;
+}
+
+#form-role-assignments .full-cue-role-artist {
+    display: inline-flex !important;
+    align-items: center !important;
+
+    margin-left: 12px !important;
+    margin-right: auto !important;
+
+    color: #f4efe6 !important;
+
+    font-size: 1.35rem !important;
+    line-height: 1 !important;
+    font-weight: 950 !important;
+    letter-spacing: .025em !important;
+
+    white-space: nowrap !important;
+}
+
+/*
+ * Les valeurs héritées automatiquement de Préparation
+ * restent légèrement signalées visuellement.
+ */
+#form-role-assignments select.full-cue-native-default {
+    border-color: #9d7c43 !important;
+    background-color: #2b241a !important;
+}
+
+/*
+ * SECTION : renforcer encore légèrement l'aspect SELECT.
+ */
+#full-cue-builder-section {
+    background:
+        linear-gradient(
+            180deg,
+            #342d25 0%,
+            #211d18 100%
+        ) !important;
+
+    border-color: #a48249 !important;
+
+    box-shadow:
+        inset 0 1px 0 rgba(255,255,255,.08),
+        inset 0 -3px 7px rgba(0,0,0,.32),
+        0 1px 4px rgba(0,0,0,.25) !important;
+
+    cursor: pointer !important;
+}
+
+/*
+ * Footer : les trois actions restent groupées.
+ */
+#editor .actions {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-end !important;
+    gap: 9px !important;
+}
+
+#editor #editor-delete {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+}
+
+</style>
+
+
+<!-- CL_SHOWCUE_ARTIST_RESTORE_V4_20261006 -->
+<style id="cl-showcue-artist-restore-v4">
+
+/* Le faux artiste créé par V2 reste définitivement caché. */
+#form-role-assignments .cl-role-artist-large {
+    display:none !important;
+}
+
+/* La source native redevient la seule visible. */
+#form-role-assignments .full-cue-role-artist {
+    display:inline-flex !important;
+    align-items:center !important;
+
+    margin-left:12px !important;
+    margin-right:auto !important;
+
+    color:#f4efe6 !important;
+
+    font-size:1.35rem !important;
+    line-height:1 !important;
+    font-weight:950 !important;
+    letter-spacing:.025em !important;
+
+    white-space:nowrap !important;
+}
+
+</style>
+
+
+<!-- CL_SHOWCUE_REMOTE_LOCAL_ACTION_GUARD_V1_20261006 -->
+{% if not builder_local %}
+<style id="cl-showcue-remote-local-action-guard-style">
+    /*
+     * Les actions strictement locales ne doivent pas apparaître
+     * depuis un téléphone / navigateur distant.
+     */
+    .cl-local-only-hidden-remote {
+        display:none !important;
+    }
+</style>
+
+<script id="cl-showcue-remote-local-action-guard">
+(() => {
+    'use strict';
+
+    const PATCH = 'CL_SHOWCUE_REMOTE_LOCAL_ACTION_GUARD_V1_20261006';
+
+    /*
+     * Actions d'export actuellement réservées au Cue Editor local.
+     *
+     * On utilise à la fois le texte et l'URL :
+     * - le texte permet de couvrir les boutons générés dynamiquement ;
+     * - l'URL protège aussi une action dont le libellé changerait.
+     */
+    const LOCAL_EXPORT_TEXT = /(?:^|\s)(?:EXPORT(?:ER)?\s*)?(?:XLSX?|CSV)(?:\s|$)/i;
+
+    function normalizedText(element) {
+        return String(
+            element?.innerText ||
+            element?.textContent ||
+            element?.getAttribute?.('aria-label') ||
+            element?.getAttribute?.('title') ||
+            ''
+        ).replace(/\s+/g, ' ').trim();
+    }
+
+    function targetUrl(element) {
+        return String(
+            element?.getAttribute?.('href') ||
+            element?.dataset?.href ||
+            element?.dataset?.url ||
+            ''
+        );
+    }
+
+    function isLocalExport(element) {
+        if (!element) return false;
+
+        const text = normalizedText(element);
+        const url = targetUrl(element);
+
+        if (LOCAL_EXPORT_TEXT.test(text)) {
+            return true;
+        }
+
+        return (
+            /(?:export|xlsx?|csv)/i.test(url) &&
+            /(?:show|cue|builder|editor)/i.test(url)
+        );
+    }
+
+    function hideLocalOnlyActions(root = document) {
+        root
+            .querySelectorAll('a, button, [role="button"]')
+            .forEach(element => {
+                if (!isLocalExport(element)) return;
+
+                element.classList.add('cl-local-only-hidden-remote');
+                element.hidden = true;
+                element.setAttribute('aria-hidden', 'true');
+                element.tabIndex = -1;
+            });
+    }
+
+    /*
+     * Deuxième garde-fou :
+     * même si un bouton est créé après notre scan ou si une règle CSS
+     * le rend de nouveau visible, aucun clic ne peut quitter ShowCue
+     * vers le Cue Editor local.
+     */
+    document.addEventListener(
+        'click',
+        event => {
+            const control = event.target.closest(
+                'a, button, [role="button"]'
+            );
+
+            if (!control || !isLocalExport(control)) return;
+
+            event.preventDefault();
+            event.stopImmediatePropagation();
+
+            window.alert(
+                'Cette fonction d’export est disponible uniquement sur le Mac local.'
+            );
+        },
+        true
+    );
+
+    /*
+     * Certains contrôles ShowCue sont créés après chargement/render.
+     * On rescanne automatiquement les nouveaux éléments.
+     */
+    const observer = new MutationObserver(mutations => {
+        for (const mutation of mutations) {
+            for (const node of mutation.addedNodes) {
+                if (!(node instanceof Element)) continue;
+
+                if (
+                    node.matches?.('a, button, [role="button"]') &&
+                    isLocalExport(node)
+                ) {
+                    node.classList.add(
+                        'cl-local-only-hidden-remote'
+                    );
+                    node.hidden = true;
+                    node.setAttribute('aria-hidden', 'true');
+                    node.tabIndex = -1;
+                }
+
+                hideLocalOnlyActions(node);
+            }
+        }
+    });
+
+    function start() {
+        hideLocalOnlyActions();
+
+        observer.observe(document.documentElement, {
+            childList: true,
+            subtree: true
+        });
+
+        console.info(PATCH + ' chargé');
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener(
+            'DOMContentLoaded',
+            start,
+            {once:true}
+        );
+    } else {
+        start();
+    }
+})();
+</script>
+{% endif %}
+<link rel="stylesheet" href="/static/showcue-mobile-editor.css?v=1">
+<script src="/static/showcue-mobile-editor.js?v=1"></script>
 </body></html>

@@ -626,6 +626,21 @@ class ShowCueRouteTests(unittest.TestCase):
         self.assertEqual(outgoing[0]["state"], "acknowledged")
         self.assertEqual(self.path.read_bytes(), before)
 
+    def test_call_message_reply_validation_and_no_cue_write(self):
+        before = self.path.read_bytes()
+        result = self.client.post("/show-info/call", json={"source":"FOH", "destination":"RETOURS", "message":"Prêt ?"})
+        call = result.get_json()["call"]
+        self.assertEqual(call["message"], "Prêt ?")
+        url = f"/show-info/call/{call['id']}/ack"
+        self.assertEqual(self.client.post(url, json={"post":"PLATEAU", "reply":"Prêt"}).status_code, 403)
+        self.assertEqual(self.client.post(url, json={"post":"RETOURS", "reply":"x"*161}).status_code, 400)
+        result = self.client.post(url, json={"post":"RETOURS", "reply":"Prêt"})
+        self.assertEqual(result.get_json()["call"]["reply"], "Prêt")
+        outgoing = self.client.get("/show-info/status?post=FOH").get_json()["calls"]["outgoing"]
+        self.assertEqual(outgoing[0]["reply"], "Prêt")
+        self.assertEqual(self.client.post("/show-info/call", json={"source":"FOH", "destination":"RETOURS", "message":{}}).status_code, 400)
+        self.assertEqual(self.path.read_bytes(), before)
+
     def test_call_validates_posts_self_call_and_ack_identity(self):
         self.assertEqual(self.client.post("/show-info/call", json={"source": "FOH", "destination": "FOH"}).status_code, 400)
         self.assertEqual(self.client.post("/show-info/call", json={"source": "INCONNU", "destination": "RETOURS"}).status_code, 400)

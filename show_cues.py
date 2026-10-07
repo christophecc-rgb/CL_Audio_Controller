@@ -311,6 +311,14 @@ def normalize_new_section(value, existing=()):
     return section
 
 
+def normalize_notes_by_post(value):
+    if not isinstance(value, dict) or any(post not in SHOW_POSTS for post in value):
+        raise ValueError('notes_by_post invalide')
+    if any(not isinstance(note, str) or len(note) > 10000 for note in value.values()):
+        raise ValueError('Notes : texte de 10000 caractères maximum')
+    return dict(value)
+
+
 def _normalize_cue(raw, index, used_ids):
     if not isinstance(raw, dict):
         raise ValueError(f"cue #{index + 1} invalide")
@@ -347,6 +355,9 @@ def _normalize_cue(raw, index, used_ids):
                    "resolved_iem", "resolved_equipment")
         cue["builder"] = {key: str(builder.get(key) or "").strip()
                           for key in allowed if str(builder.get(key) or "").strip()}
+
+        if 'notes_by_post' in builder:
+            cue['builder']['notes_by_post'] = normalize_notes_by_post(builder['notes_by_post'])
 
         # CL_SHOWCUE_ROLE_ASSIGNMENTS_STORAGE_V1
         role_assignments = builder.get("role_assignments")
@@ -509,6 +520,10 @@ def update_show_cue(document, cue_id, values):
                     "anchor_after", "audio", "builder", "conduite_order"):
             if key in values:
                 updated[key] = values[key]
+        # General edits cannot replace per-post notes (dedicated, atomic route).
+        if 'builder' in values and isinstance(updated.get('builder'), dict):
+            updated['builder'] = dict(updated['builder'])
+            updated['builder']['notes_by_post'] = dict(current.get('builder', {}).get('notes_by_post', {}))
         used_ids = {cue["id"] for position, cue in enumerate(cues) if position != index}
         if str(updated.get("mode") or "") == "manual" and "section" in values:
             updated["section"] = normalize_new_section(values["section"], [

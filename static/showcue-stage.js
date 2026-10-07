@@ -35,6 +35,7 @@
   document.querySelector('.shell').prepend(nav);
   const utilities = node('details', 'stage-utilities');
   utilities.append(node('summary', '', 'Connexion et horloge'), network, clock);
+  utilities.style.setProperty('display', 'none', 'important');
   nav.append(utilities);
   header.append(title);
 
@@ -63,6 +64,7 @@
 
   const sessionField = document.getElementById('session').parentElement;
   const secondary = nav.querySelector('.v6-secondary-actions');
+  if (secondary) secondary.style.setProperty('display', 'none', 'important');
   const utilitySummary = utilities.querySelector('summary');
   utilitySummary.textContent = 'Connexion';
 
@@ -102,13 +104,23 @@
   header.append(desktopLogo);
 
   const desktopSignals = node('div', 'stage-desktop-signals');
+  const playbackIndicator = document.getElementById('transport');
+  const incomingCalls = document.getElementById('call-incoming');
+  const callReplies = node('div', 'stage-call-replies');
+  callReplies.id = 'call-replies';
 
   function arrangeDesktopSignals() {
     if (mobile.matches) {
+      transport.prepend(playbackIndicator);
+      if (incomingCalls) document.body.append(incomingCalls);
+      transport.after(callReplies);
       header.append(clocks, transport);
       desktopSignals.remove();
     } else {
-      desktopSignals.append(clocks, transport);
+      desktopSignals.append(clocks, playbackIndicator);
+      nav.append(transport);
+      if (incomingCalls) nav.append(incomingCalls);
+      nav.append(callReplies);
       header.append(desktopSignals);
     }
   }
@@ -137,7 +149,7 @@
   if (checklist) {
     lane.append(checklist);
   }
-  side.append(live.querySelector('.live-ahead'));
+  lane.append(live.querySelector('.live-ahead'));
   const orderPanel = node('article', 'panel stage-order');
   const orderHead = node('div', 'stage-order-head');
   const seeAll = node('button', 'quiet', 'Voir tout ›');
@@ -182,33 +194,35 @@
   let savingNotes = false;
   async function editCueNotes() {
     if (savingNotes) return;
-    const cue = snapshot.current;
-    const sessionId = snapshot.active_session_id;
-    if (!cue) return;
-
-    const value = window.prompt(
-      'Notes du cue : ' + cue.text,
-      cue.builder?.notes || ''
-    );
-    if (value === null) return;
-
-    savingNotes = true;
-    notes.setAttribute('aria-busy', 'true');
-    try {
-      await api('/show-info/cues/' + encodeURIComponent(cue.id), {
-        method: 'PUT',
-        body: JSON.stringify({
-          session_id: sessionId,
-          builder: {...(cue.builder || {}), notes: value}
-        })
-      });
-      await refresh();
-    } catch (error) {
-      window.alert('Notes non enregistrées : ' + error.message);
-    } finally {
-      savingNotes = false;
-      notes.removeAttribute('aria-busy');
+    const cue=snapshot.current,sessionId=snapshot.active_session_id,post=postEl.value;
+    if(!cue)return;
+    const local=['127.0.0.1','localhost','[::1]'].includes(location.hostname);
+    const rights=window.CLRemotePermissions||{};
+    let dialog=document.getElementById('stage-notes-editor');
+    if(!dialog){
+      dialog=document.createElement('dialog');dialog.id='stage-notes-editor';dialog.className='stage-notes-editor';
+      dialog.innerHTML='<form class="stage-notes-editor-form"><div class="stage-notes-editor-title"></div><label>Note à modifier <select class="stage-note-scope"></select></label><textarea class="stage-notes-editor-textarea" rows="10" maxlength="10000"></textarea><div class="stage-notes-editor-error" role="alert"></div><div class="stage-notes-editor-actions"><button type="button" class="quiet">Annuler</button><button type="submit" class="primary">Enregistrer</button></div></form>';
+      document.body.append(dialog);
     }
+    const form=dialog.querySelector('form'),scope=dialog.querySelector('select'),textarea=dialog.querySelector('textarea'),error=dialog.querySelector('[role="alert"]'),save=form.querySelector('[type="submit"]');
+    dialog.querySelector('.stage-notes-editor-title').textContent=cue.text||'Notes du cue';
+    scope.replaceChildren(new Option('NOTES '+post,post));
+    if(local||rights.edit_cues)scope.add(new Option('NOTE GÉNÉRALE','GENERAL'));
+    const canWrite=()=>local||(scope.value==='GENERAL'?rights.edit_cues:rights.edit_notes&&(rights.posts||[]).includes(post));
+    const load=()=>{textarea.value=scope.value==='GENERAL'?(cue.builder?.notes||''):(cue.builder?.notes_by_post?.[post]||'');save.disabled=!canWrite();error.textContent=canWrite()?'':'Permission requise pour modifier cette note.';};
+    scope.onchange=load;load();
+    textarea.onkeydown=event=>{if(event.key==='Enter'&&(event.metaKey||event.ctrlKey)){event.preventDefault();form.requestSubmit();}};
+    form.querySelector('[type="button"]').onclick=()=>dialog.close();
+    form.onsubmit=async event=>{
+      event.preventDefault();if(savingNotes||!canWrite())return;
+      savingNotes=true;save.disabled=true;error.textContent='';
+      try{
+        await api('/show-info/cues/'+encodeURIComponent(cue.id)+'/notes/'+encodeURIComponent(scope.value),{method:'PUT',body:JSON.stringify({session_id:sessionId,text:textarea.value})});
+        dialog.close();await refresh();
+      }catch(exc){error.textContent=exc.message;}
+      finally{savingNotes=false;save.disabled=!canWrite();}
+    };
+    dialog.showModal();requestAnimationFrame(()=>textarea.focus());
   }
 
   notes.onclick = editCueNotes;
@@ -228,6 +242,16 @@
 
   details.append(role, notes);
   current.querySelector('.current-copy').append(details);
+  const remaining = node('div', 'stage-current-remaining');
+  remaining.setAttribute('aria-label', 'Temps restant de la scène Ableton');
+  const remainingSource = document.getElementById('ableton-remaining');
+  const updateRemaining = () => {
+    remaining.textContent = remainingSource?.textContent || '—';
+    remaining.title = 'Temps restant de la scène Ableton';
+  };
+  current.querySelector('.cue-kicker').append(remaining);
+  if (remainingSource) new MutationObserver(updateRemaining).observe(remainingSource, {childList:true, subtree:true, characterData:true});
+  updateRemaining();
   const numberFor = (cue, cues) => cue?.builder?.number || (cue && cues.findIndex(c => c.id === cue.id) >= 0 ? cues.findIndex(c => c.id === cue.id) + 1 : '—');
   function updateStage(data) {
     const cues = (data.conduite?.timed || []).filter(c => c.status === 'official');
@@ -561,10 +585,77 @@
         }
       }
 
-      role.replaceChildren(
-        node('small', '', 'Rôle / matériel'),
-        node('span', 'stage-current-assignment', lines.join('\n') || '—')
+      /* CL_SHOWCUE_CURRENT_CARD_HIERARCHY_V1_20261006 */
+
+      const stageRoleLines =
+        lines
+          .map(value => String(value || '').trim())
+          .filter(Boolean);
+
+      const stagePostLine =
+        stageRoleLines.find(value =>
+          /^POSTE\s*:/i.test(value)
+        ) || '';
+
+      const stagePost =
+        stagePostLine
+          .replace(/^POSTE\s*:\s*/i, '')
+          .trim();
+
+      const stageAssignmentLines =
+        stageRoleLines.filter(value =>
+          !/^POSTE\s*:/i.test(value)
+        );
+
+      const stageRoleName =
+        String(roleName || '').trim();
+
+      /*
+       * Le rôle est affiché comme information principale.
+       * On l'enlève du bloc matériel s'il était déjà présent.
+       */
+      const stageMaterialLines =
+        stageAssignmentLines.filter(value =>
+          !stageRoleName ||
+          value.toLocaleUpperCase('fr') !==
+            stageRoleName.toLocaleUpperCase('fr')
+        );
+
+      role.replaceChildren();
+
+      role.append(
+        node('small', '', 'Rôle / matériel')
       );
+
+      if(stageRoleName){
+        role.append(
+          node(
+            'strong',
+            'stage-current-role-name',
+            stageRoleName
+          )
+        );
+      }
+
+      if(stageMaterialLines.length){
+        role.append(
+          node(
+            'span',
+            'stage-current-material',
+            stageMaterialLines.join(' · ')
+          )
+        );
+      }
+
+      if(stagePost){
+        role.append(
+          node(
+            'span',
+            'stage-current-post-badge',
+            stagePost
+          )
+        );
+      }
 
       /*
        * CASTING :
@@ -576,9 +667,10 @@
     }
 
     notes.replaceChildren(
-      node('small', '', 'Notes'),
-      node('span', '', cue?.builder?.notes || 'Aucune note pour ce cue')
+      node('small', '', 'NOTES '+postEl.value),
+      node('span', '', cue?.builder?.notes_by_post?.[postEl.value] || 'Aucune note '+postEl.value)
     );
+    if(cue?.builder?.notes)notes.append(node('small','','NOTE GÉNÉRALE'),node('span','',cue.builder.notes));
 
     details.hidden =
       !cue ||
@@ -1123,4 +1215,3 @@
     }
   });
 })();
-

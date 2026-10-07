@@ -13,6 +13,16 @@ import time
 PERMISSIONS = {'reader': {'read'}, 'operator': {'read','show'}, 'admin': {'read','show','admin'}}
 
 
+SHOWCUE_POSTS = ('FOH', 'RETOURS', 'PLATEAU', 'LUMIERE')
+
+def device_permissions(device):
+    """Legacy GO follows its role; new editing rights always require a grant."""
+    grants = device.get('permissions', {})
+    return {'go': grants.get('go', device.get('role') in ('operator', 'admin')) is True,
+            'edit_cues': grants.get('edit_cues') is True,
+            'edit_notes': grants.get('edit_notes') is True}
+
+
 def private_directory(path):
     # mkdir(parents=True) gives intermediate dirs 0755, which would invalidate
     # the existing target-config permission contract on a fresh installation.
@@ -322,6 +332,18 @@ class RemoteSecurity:
                 raise SecurityError('Appareil ou rôle inconnu')
             self.devices[device_id]['role']=role; self.save(); self.audit('change-role','accepted',device=self.devices[device_id])
 
+    def change_permissions(self, device_id, permissions, posts):
+        if not isinstance(permissions, dict) or set(permissions) != {'go', 'edit_cues', 'edit_notes'} or any(type(value) is not bool for value in permissions.values()):
+            raise SecurityError('Permissions invalides')
+        if not isinstance(posts, list) or any(post not in SHOWCUE_POSTS for post in posts):
+            raise SecurityError('Postes invalides')
+        with self.lock:
+            self.load(); self.refresh_password()
+            if device_id not in self.devices:
+                raise SecurityError('Appareil inconnu')
+            self.devices[device_id].update(permissions=dict(permissions), posts=list(dict.fromkeys(posts)))
+            self.save(); self.audit('change-permissions', 'accepted', device=self.devices[device_id])
+
     def authorize(self,device_id,signature,method,path,body,timestamp,nonce,permission,critical=True):
         with self.lock:
             self.load(); self.refresh_password(); device=self.devices.get(device_id); now=self.clock()
@@ -329,7 +351,11 @@ class RemoteSecurity:
                 raise SecurityError('Appareil inconnu ou révoqué')
             if not self._authorization_current(device,now):
                 raise SecurityError('Prise de poste expirée')
-            if permission not in PERMISSIONS[device['role']]:
+            if permission in ('edit_cues', 'edit_notes', 'go'):
+                if not device_permissions(device)[permission]:
+                    label = {'go': 'GO', 'edit_cues': 'Modifier les cues', 'edit_notes': 'Modifier les notes'}[permission]
+                    raise SecurityError('Permission « ' + label + ' » requise')
+            elif permission not in PERMISSIONS[device['role']]:
                 raise SecurityError('Permission insuffisante')
             if critical and not self.armed:
                 raise SecurityError('Télécommandes désarmées')
@@ -373,6 +399,8 @@ class RemoteSecurity:
             devices=[]
             for item in self.devices.values():
                 public={k:v for k,v in item.items() if k not in ('key','password_revision')}
+                public['permissions']=device_permissions(item)
+                public['posts']=item.get('posts', [])
                 public['authorization_type']=item.get('authorization_type','temporary')
                 public['active']=not item['revoked'] and bool(item.get('key')) and self._authorization_current(item,now)
                 public['connected']=public['active'] and item['id'] in self.runtime_seen and now-self.runtime_seen[item['id']]<10

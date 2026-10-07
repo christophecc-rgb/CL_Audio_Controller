@@ -1,0 +1,13 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert/strict');
+const source=fs.readFileSync('templates/show_info.html','utf8');
+const phase=source.slice(source.indexOf('function conduiteCueSection(cue){'),source.indexOf('function conduiteBuilderNumber'));
+const begin=source.indexOf('    conduiteOrderedCues = function(){');
+const end=source.indexOf('\n    };',begin)+7;
+const cue=(id,mode,section,timecode,order)=>({id,mode,section,timecode,conduite_order:order,status:'official'});
+const rows=[cue('show-late','timed','SHOW','02:00:00:00',1),cue('preshow-a','timed','PRESHOW','18:03:00:00',2),cue('preshow-b','timed','PRESHOW','18:00:00:00',3),cue('prep','manual','PRÉPARATION',null,4),cue('action','manual','PARTIE PARLÉE',null,5),cue('show-early','timed','SHOW','01:00:00:00',6),cue('interval','timed','ENTRACTE','01:30:00:00',7)];
+const context={snapshot:{conduite:{timed:rows.filter(x=>x.mode==='timed'),manual:rows.filter(x=>x.mode==='manual')}},conduiteOrderedCues:null};vm.createContext(context);
+vm.runInContext(phase+`function persistentConduiteNumber(cue){return Number.isFinite(cue.conduite_order)?cue.conduite_order:null;}\n`+source.slice(begin,end),context);
+assert.equal(vm.runInContext('conduiteOrderedCues().map(x=>x.id).join(",")',context),'prep,preshow-a,preshow-b,show-early,action,interval,show-late');
+assert.equal(vm.runInContext('conduiteCueSection({section:"PARTIE PARLÉE"})',context),'SHOW');
+assert.equal(vm.runInContext('conduiteCueSection({builder:{phase:"PRÉ-SHOW"}})',context),'PRÉ-SHOW');
+console.log('PASS: opening phases first in saved order, show chronological, untimed action retains slot, spoken cues in Show.');

@@ -145,10 +145,21 @@
       row.append(text('p','Connexion actuelle : '+(item.connected?'connecté':'hors ligne')+' · Rôle : '+item.role));
       const meta=text('p','Dernière activité : '+activity);meta.className='device-meta';row.append(meta);
       row.style.borderLeft=permanent?'4px solid #8fc9ff':'4px solid #d9b85f';
-      const revoke=text('button','Révoquer');revoke.dataset.feedbackKey=item.id+':revoke';revoke.onclick=()=>act('revoke',{device_id:item.id},revoke);row.append(revoke);
+      const revoke=text('button','Révoquer');revoke.dataset.feedbackKey=item.id+':revoke';revoke.onclick=()=>act('revoke',{device_id:item.id},revoke);revoke.className='danger';
       const roles=document.createElement('select');['reader','operator','admin'].forEach(role=>{const option=text('option',role);option.value=role;roles.append(option);});roles.value=item.role;
       roles.setAttribute('aria-label','Rôle de '+item.name);roles.dataset.feedbackKey=item.id+':role';
-      roles.onchange=()=>act('role',{device_id:item.id,role:roles.value},roles);row.append(roles);el('devices').append(row);
+      roles.onchange=()=>act('role',{device_id:item.id,role:roles.value},roles);const actions=document.createElement('div');actions.className='device-actions';const roleLabel=document.createElement('label');roleLabel.append(text('span','Rôle global'),roles);actions.append(roleLabel,revoke);row.append(actions);el('devices').append(row);
+      const grants=document.createElement('fieldset');grants.className='device-grants';
+      grants.append(text('legend','Permissions ShowCue / GO'));
+      const checks={};
+      for(const [key,label] of [['go','GO'],['edit_cues','Modifier les cues'],['edit_notes','Modifier les notes']]){
+        const line=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.checked=item.permissions?.[key]===true;checks[key]=input;line.append(input,text('span',' '+label));line.style.display='flex';line.style.alignItems='center';line.style.minHeight='36px';grants.append(line);
+      }
+      const postChecks={};grants.append(text('p','Postes autorisés pour les notes'));const postGroup=document.createElement('div');postGroup.className='device-posts';
+      for(const post of ['FOH','RETOURS','PLATEAU','LUMIERE']){
+        const line=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.checked=(item.posts||[]).includes(post);postChecks[post]=input;line.append(input,text('span',' '+post));line.style.display='flex';line.style.alignItems='center';line.style.minHeight='36px';postGroup.append(line);
+      }
+      grants.append(postGroup);const apply=text('button','Enregistrer les droits');apply.className='device-save';apply.onclick=()=>act('permissions',{device_id:item.id,permissions:Object.fromEntries(Object.entries(checks).map(([key,input])=>[key,input.checked])),posts:Object.keys(postChecks).filter(post=>postChecks[post].checked)},apply);grants.append(apply);row.append(grants);
       for(const control of [revoke,roles]){const saved=feedbacks.get(control.dataset.feedbackKey);if(saved)feedback(control,saved.message,saved.error);}
     });
     }

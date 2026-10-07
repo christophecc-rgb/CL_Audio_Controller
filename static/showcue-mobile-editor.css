@@ -1,0 +1,92 @@
+/* Desktop layout and controls keep their existing presentation. */
+.cl-editor-body { display: contents; }
+.cl-editor-delete:empty { display: none; }
+dialog:is(#editor, #quick-editor, #stage-notes-editor).cl-mobile-editor[open] {
+  position: fixed !important;
+  top: var(--cl-editor-top, 0px) !important;
+  left: var(--cl-editor-left, 0px) !important;
+  right: auto !important;
+  bottom: auto !important;
+  margin: 0 !important;
+  width: var(--cl-editor-width, 100vw) !important;
+  max-width: none !important;
+  height: var(--cl-editor-height, 100dvh) !important;
+  max-height: var(--cl-editor-height, 100dvh) !important;
+  padding: 10px 12px !important;
+  border-radius: 0 !important;
+  overflow: hidden !important;
+  background: #151820 !important;
+  color: #f2f4f8 !important;
+}
+dialog:is(#editor, #quick-editor, #stage-notes-editor).cl-mobile-editor form {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+dialog:is(#editor, #quick-editor, #stage-notes-editor).cl-mobile-editor form > h2,
+dialog:is(#editor, #quick-editor, #stage-notes-editor).cl-mobile-editor form > .stage-notes-editor-title {
+  flex: 0 0 auto;
+  font-size: 18px !important;
+  margin: 0 0 8px !important;
+}
+dialog:is(#editor, #quick-editor, #stage-notes-editor).cl-mobile-editor .cl-editor-body {
+  display: block !important;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 2px 12px;
+  scroll-padding-block: 12px;
+}
+dialog:is(#editor, #quick-editor, #stage-notes-editor).cl-mobile-editor .cl-editor-body .full-cue-block,
+dialog:is(#editor, #quick-editor, #stage-notes-editor).cl-mobile-editor .cl-editor-body .full-cue-role-list {
+  max-height: none !important;
+  overflow: visible !important;
+}
+dialog:is(#editor, #quick-editor, #stage-notes-editor).cl-mobile-editor input,
+dialog:is(#editor, #quick-editor, #stage-notes-editor).cl-mobile-editor textarea,
+dialog:is(#editor, #quick-editor, #stage-notes-editor).cl-mobile-editor select {
+  font-size: 16px !important;
+}
+dialog:is(#editor, #quick-editor, #stage-notes-editor).cl-mobile-editor textarea {
+  width: 100%;
+  min-height: 100px !important;
+  max-height: none !important;
+  white-space: pre-wrap;
+}
+dialog:is(#editor, #quick-editor, #stage-notes-editor).cl-mobile-editor button { min-height: 44px !important; }
+dialog:is(#editor, #quick-editor, #stage-notes-editor).cl-mobile-editor form > .actions,
+dialog:is(#editor, #quick-editor, #stage-notes-editor).cl-mobile-editor form > .stage-notes-editor-actions {
+  position: static !important;
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  flex: 0 0 auto;
+  gap: 8px !important;
+  margin: 0 !important;
+  padding: 8px 0 max(0px, env(safe-area-inset-bottom)) !important;
+  background: #151820 !important;
+  border-top: 1px solid #414655;
+  backdrop-filter: none !important;
+}
+dialog:is(#editor, #quick-editor, #stage-notes-editor).cl-mobile-editor .cl-editor-delete {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid #71424b;
+}
+dialog:is(#editor, #quick-editor, #stage-notes-editor).cl-mobile-editor .cl-editor-delete button { width: 100%; }
+
+dialog:is(#editor, #quick-editor, #stage-notes-editor).cl-mobile-editor form > .error,
+dialog:is(#editor, #quick-editor, #stage-notes-editor).cl-mobile-editor form > .stage-notes-editor-error {
+  flex: 0 0 auto;
+  margin: 4px 0;
+  max-height: 64px;
+  overflow-wrap: anywhere;
+}
+dialog:is(#editor, #quick-editor, #stage-notes-editor).cl-mobile-editor form > .error:empty,
+dialog:is(#editor, #quick-editor, #stage-notes-editor).cl-mobile-editor form > .stage-notes-editor-error:empty { display: none; }
