@@ -1,6 +1,6 @@
 # Third-party software notices
 
-This document inventories the third-party software used to build or run CL Audio Controller 2.0.0. It is an operational summary, not legal advice. Before distributing a binary, the exact license texts shipped by the resolved packages should be collected with the release and checked against the final bundle.
+This document inventories the third-party software used by CL Audio Controller. The dependency versions below are historical observations, not a release version declaration. Before distributing a binary, the exact license texts shipped by the resolved packages should be collected with the release and checked against the final bundle.
 
 ## Runtime and bundled dependencies
 

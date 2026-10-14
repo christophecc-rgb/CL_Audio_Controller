@@ -30,6 +30,7 @@ Source CoreMIDI :
 Gestionnaire IAC CL MIDI Return Test
   ↓
 Show Control
+```
 
 ## Validation
 
@@ -47,7 +48,10 @@ Correctif source préparé dans app.py : handler SIGTERM ciblé, sortie via Syst
 
 ## Snapshot
 
-Voir docs/validated-local-midi-2026-09-30/ pour Git, CoreMIDI, processus, status, sauvegardes, hashes, patch Bonjour et tests.
+Les dumps Git, CoreMIDI, processus, statut et hashes de cette capture ont été
+retirés du dépôt courant lors du nettoyage FULL du 14 octobre. Ils restent
+consultables dans l'historique Git antérieur à `cleanup/current-full`.
+Ce document conserve les résultats de terrain ; il ne décrit pas l'état actuel du Mac.
 
 ## Tests plus larges
 

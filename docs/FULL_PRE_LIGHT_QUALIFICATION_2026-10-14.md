@@ -1,5 +1,9 @@
 # Qualification du socle FULL avant Light — 14 octobre 2026
 
+Ce rapport décrit l'intervention sur `consolidation/full-pre-light`, avant son
+adoption locale par main. Pour le nettoyage suivant et l'état courant, consulter
+[CURRENT_FULL_MAINTENANCE.md](CURRENT_FULL_MAINTENANCE.md).
+
 ## Périmètre et historique
 
 Branche locale : `consolidation/full-pre-light`, créée depuis

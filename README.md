@@ -2,7 +2,7 @@
 
 CL Audio Show Control est une application macOS de pilotage d'Ableton Live. Elle réunit une interface native, une télécommande Web accessible sur le réseau local, des échanges OSC avec AbletonOSC, un suivi de l'arrangement et un pont Max for Live pour le crossfader.
 
-La version de référence est **2.2.0** (build 6), identifiée par le bundle macOS `com.claudio.controller`.
+La version déclarée par `CL Audio Controller.spec` est **2.2.0** (build 6), identifiée par le bundle macOS `com.claudio.controller`. Les évolutions FULL postérieures restent non publiées ; les écarts de version des scripts et composants sont détaillés dans [l'état de maintenance](docs/CURRENT_FULL_MAINTENANCE.md).
 
 ## État du projet
 
@@ -23,7 +23,7 @@ La reproductibilité fonctionnelle est documentée et validée. Une identité bi
 - `CL Audio Controller.spec` : configuration PyInstaller de l'application macOS.
 - `Diagnostics/`, `Guides/` et `INSTALLER_AbletonOSC/` : outils et documentation d'exploitation.
 
-Les dossiers locaux `build/` et `dist/` contiennent des artefacts de référence. Ils sont exclus du suivi Git et restent uniquement disponibles comme éléments de comparaison locale.
+Les dossiers locaux `build/`, `dist/` et `Releases/` contiennent des sorties générées exclues du suivi Git. Leur présence n'est pas nécessaire au fonctionnement depuis les sources.
 
 ## Prérequis
 
@@ -80,7 +80,6 @@ Les périphériques prêts à installer sont fournis dans :
 M4L/Install/
 ├── XFADER OSC BRIDGE v8.amxd
 ├── Paradis Latin AutoScene.amxd
-├── Paradis Latin AutoScene - Live 10.amxd
 ├── LTC Display v2.0 Remote Config.amxd
 ├── ParadisLatin_AutoScene.js
 ├── paradis_latin_logo.jpg
@@ -88,9 +87,9 @@ M4L/Install/
 ```
 
 Le X-Fader doit écouter en UDP sur le port 9001 et être placé sur la piste Master.
-La variante AutoScene à charger dépend de la version du Live Set : utiliser la
-version standard pour les versions actuelles de Live et la variante `Live 10`
-pour les projets qui l'exigent. Le LTC Remote Config écoute sur le port 63123.
+Le dépôt fournit uniquement la variante AutoScene standard pour les versions
+actuelles de Live. La variante spécifique Live 10 n'est plus présente ; ne pas
+présenter sa compatibilité comme validée. Le LTC Remote Config écoute sur le port 63123.
 Les fichiers auxiliaires doivent rester dans le même dossier que les `.amxd`.
 
 Les sources éditables sont organisées dans `M4L/Devices/`. Chaque périphérique
@@ -145,7 +144,7 @@ La configuration de référence est `CL Audio Controller.spec`. Elle doit être 
 .venv/bin/python -m PyInstaller "CL Audio Controller.spec"
 ```
 
-Pour le premier build de validation, ne pas écraser les dossiers `build/` et `dist/` de référence. Utiliser une copie de validation ou des chemins de sortie distincts. Comparer ensuite le nouveau bundle à `dist/CL Audio Controller.app` et réaliser les tests fonctionnels décrits dans `BUILD_ENVIRONMENT.md`.
+Utiliser des chemins de sortie distincts pour chaque qualification et ne pas écraser une distribution conservée. Réaliser les contrôles décrits dans `BUILD_ENVIRONMENT.md` ; aucun bundle local historique n'est requis pour reconstruire les sources.
 
 ### Distribution installable
 

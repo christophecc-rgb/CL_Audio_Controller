@@ -9,13 +9,11 @@ transportable sur un autre Mac.
   Master et à utiliser avec le port UDP 9001.
 - `Paradis Latin AutoScene.amxd` : périphérique AutoScene pour les versions
   actuelles d'Ableton Live.
-  sur Live 10, conservée sous un nom explicite pour l'installation.
-  Max 8 / Ableton Live 10.
 - `LTC Display v2.0 Remote Config.amxd` : affichage et émission du LTC. Le port
   attendu par défaut est 63123 ; en mode distant, renseigner l'adresse du Mac
   exécutant CL Audio Controller.
-- `ParadisLatin_AutoScene.js` et `paradis_latin_logo.jpg` : dépendances des
-  deux variantes AutoScene. Elles doivent rester dans le même dossier que les
+- `ParadisLatin_AutoScene.js` et `paradis_latin_logo.jpg` : dépendances
+  d'AutoScene. Elles doivent rester dans le même dossier que les
   `.amxd`.
 - `cache.js` : dépendance JavaScript conservée avec le périphérique LTC.
 
@@ -23,7 +21,7 @@ transportable sur un autre Mac.
 
 1. Ouvrir la bibliothèque utilisateur dans Ableton Live.
 2. Copier les périphériques dans un dossier Max for Live de la bibliothèque.
-3. Charger uniquement la variante AutoScene correspondant au Live Set.
+3. Charger la variante AutoScene standard fournie. La variante Live 10 n'est plus distribuée par ce dépôt.
 4. Placer le X-Fader sur la piste Master lorsque la télécommande A/B est utilisée.
 5. Enregistrer une copie de test du Live Set après configuration.
 

@@ -1,6 +1,6 @@
 # CL Cue Editor — fiabilisation des shows
 
-Date : 4 octobre 2026. Rapport initial lu : CL_Cue_Editor_sessions_2026-10-04.md.
+Date : 4 octobre 2026. Ce rapport remplace l'audit initial des sessions, conservé dans l'historique Git.
 
 ## Corrections
 

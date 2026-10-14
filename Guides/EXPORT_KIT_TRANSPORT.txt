@@ -4,17 +4,20 @@ Le script :
 
     scripts/export_transport_kit.command
 
-sélectionne automatiquement le fichier CL_Production_Suite le plus récent
-présent dans le dossier local Releases.
+reconstruit les composants de la suite depuis les sources et assemble un kit
+dans un dossier temporaire. Il requiert l'environnement de build macOS et
+les dépôts voisins AbletonOSC et CL_Arrangement_Builder_Live.
 
 Il crée sur le Bureau :
 
-    CL_Suite_Transport_AAAA-MM-JJ_HHMMSS.zip
-    CL_Suite_Transport_AAAA-MM-JJ_HHMMSS_SHA256.txt
+    CL_Suite_Transport_AAAA-MM-JJ_HHMMSS_ARCH.zip
+    et le fichier de contrôle SHA-256 associé.
 
-La copie est comparée à la source par SHA-256 avant d'être présentée comme
-valide. Le script n'effectue aucune reconstruction, aucun commit et aucun
-envoi vers GitHub.
+Les bundles et ressources assemblés sont vérifiés, puis l'archive est extraite
+pour contrôler le kit final. Le script ne fait ni commit ni push. Il effectue
+des compilations et signatures locales : ne pas le lancer pendant un spectacle.
+La version par défaut de ce chemin est encore 2.2.1, alors que le .spec de
+Show Control déclare 2.2.0/build 6 ; voir docs/CURRENT_FULL_MAINTENANCE.md.
 
 Un raccourci portant le nom :
 

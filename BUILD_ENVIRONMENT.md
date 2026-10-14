@@ -1,14 +1,18 @@
 # Environnement de build — CL Audio Controller
 
-## Application de référence
+## Application actuelle et référence historique
 
 - Nom : CL Audio Controller
-- Version : 2.1.0
-- Numéro de build : 5
+- Version déclarée par le `.spec` actuel : 2.2.0
+- Numéro de build déclaré : 6
 - Identifiant macOS : `com.claudio.controller`
 - Point d'entrée : `launcher_control.py`
 - Configuration : `CL Audio Controller.spec`
-- Bundle de référence : `dist/CL Audio Controller.app`
+
+Les relevés d'outils ci-dessous proviennent de l'ancienne référence 2.1.0/build 5.
+Ils décrivent un environnement observé, pas la qualification de la version FULL
+actuelle. Aucun bundle historique dans `dist/` n'est nécessaire au build.
+Voir [l'état de maintenance](docs/CURRENT_FULL_MAINTENANCE.md).
 
 ## Python
 

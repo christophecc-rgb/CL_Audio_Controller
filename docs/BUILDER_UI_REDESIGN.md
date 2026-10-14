@@ -41,7 +41,9 @@ Jeu synthétique isolé de 134 cues, serveur temporaire sans connexion au moteur
 | Cues complets visibles | 4 | 19 | 16 |
 | Débordement horizontal | — | aucun | aucun |
 
-Captures dans `docs/builder-ui/` : before-1512.png, after-1512.png, after-1280.png, batch-1512.png, sessions.png, remote-1512.png. Les captures sont prises dans le navigateur ; leur résolution bitmap peut différer des dimensions CSS selon l’échelle du navigateur.
+Les captures et le dump de mesures de cette comparaison ont été retirés du
+dépôt courant le 14 octobre ; ils restent dans l'historique Git. Le tableau
+ci-dessus conserve les mesures de la qualification, sans constituer un test visuel actuel.
 
 Essai UI effectué : sélectionner huit cues, appliquer SHOW puis PRESHOW, vérifier les TC, déplacer un groupe en fin de document, enregistrer et recharger. Les huit identifiants et TC restent dans le même ordre relatif. La sélection reste active après une sauvegarde. Lecture seule vérifiée : sauvegarde et sélection désactivées, Détails et consultation des sessions disponibles. Aucune erreur JavaScript observée sur l’écran final.
 
