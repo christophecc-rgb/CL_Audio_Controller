@@ -88,3 +88,9 @@ node_modules/
 /tools/cl_midi_network/CLMIDINetworkDashboard
 /tools/cl_midi_network/CLMIDINetworkDashboard.arm64
 /tools/cl_midi_network/CLMIDINetworkDashboard.x86_64
+
+# Sorties locales de qualification et sauvegardes temporaires
+/releases/
+*.pid
+*.bak_release_version
+*.backup-[0-9]*
