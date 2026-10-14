@@ -231,6 +231,7 @@ ditto "$CONTROLLER_ROOT/03 — MIDI & Réseau/CL MIDI Analyzer.app" "$COMPONENTS
 ditto "$CONTROLLER_ROOT/03 — MIDI & Réseau/CL MIDI Performance Monitor.app" "$COMPONENTS_ROOT/Applications/CL MIDI Performance Monitor.app"
 ditto "$BUILDER_APP" "$COMPONENTS_ROOT/Applications/CL Arrangement Builder.app"
 
+
 ditto "$CONTROLLER_ROOT/04 — Ableton & Max for Live/AbletonOSC CL/AbletonOSC" "$COMPONENTS_ROOT/Ableton Live 11-12/Remote Scripts/AbletonOSC"
 ditto "$BUILDER_DIR/RemoteScript" "$COMPONENTS_ROOT/Ableton Live 11-12/Remote Scripts/CL_Arrangement_Builder_Live"
 
@@ -250,9 +251,14 @@ for file in "CL_Absolute_MTC.amxd" "CL_Absolute_MTC.maxpat"; do
 done
 
 ditto   "$PROJECT_DIR/tools/ableton_mtc_bridge/max_for_live/CL_Absolute_MTC.amxd"   "$COMPONENTS_ROOT/Ableton Live 11-12/Max for Live/CL Absolute MTC/CL Absolute MTC.amxd"
+ditto   "$PROJECT_DIR/M4L/Install/CL Absolute MTC/CL Absolute MTC Offset Paradis Latin V2 Precision.amxd"   "$COMPONENTS_ROOT/Ableton Live 11-12/Max for Live/CL Absolute MTC/CL Absolute MTC Offset Paradis Latin V2 Precision.amxd"
 
 ditto   "$PROJECT_DIR/tools/ableton_mtc_bridge/max_for_live/CL_Absolute_MTC.maxpat"   "$COMPONENTS_ROOT/Ableton Live 11-12/Max for Live/CL Absolute MTC/CL Absolute MTC.maxpat"
 ditto "$CONTROLLER_ROOT/03 — MIDI & Réseau/CL MIDI Network Tools" "$COMPONENTS_ROOT/Outils_reseau_MIDI"
+
+# Vérifier le catalogue FULL et les dépendances avant tout export.
+"$CL_PYTHON" "$PROJECT_DIR/scripts/verify_full_kit.py" "$COMPONENTS_ROOT" \
+  --layout components --report "$INSTALLER_RESOURCES/FULL_KIT_APPLICATIONS.json"
 
 # Les caches trouvés dans d'anciens livrables Builder ne sont jamais requis à
 # l'exécution. Ils sont retirés uniquement de la copie temporaire distribuée.

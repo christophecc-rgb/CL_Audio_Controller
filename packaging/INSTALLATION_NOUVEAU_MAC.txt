@@ -37,6 +37,21 @@ INSTALLATION AUTOMATIQUE RECOMMANDÉE
 
 RÔLES RTP-MIDI
 
+APPLICATIONS DE PRODUCTION — INSTALLATEUR NATIF
+
+Le kit complet embarque CL Audio Export et CL Arrangement Builder dans
+Installer la Suite CL.app/Contents/Resources/Composants/Applications/.
+Le rôle Serveur sélectionne Audio Export et son moteur Show Control local.
+Le rôle Ableton sélectionne Arrangement Builder et installe aussi son Remote
+Script CL_Arrangement_Builder_Live dans la bibliothèque utilisateur de Live.
+Sur un seul Mac, le mode Personnalisé permet de sélectionner les deux ; leurs
+dépendances sont ajoutées par le catalogue des rôles.
+Les deux applications sont installées dans ~/Applications/Prod Ableton/.
+Une mise à jour conserve les copies remplacées dans la Corbeille datée de
+l'installateur ; les réglages et shows utilisateur restent conservés.
+
+RÔLES RTP-MIDI HISTORIQUES DU MOTEUR SHELL
+
 - Mac Télécommande — RTP émetteur-récepteur : installe Show Control, la
   découverte automatique Bonjour et les retours MIDI des consoles. La liaison
   réseau démarre automatiquement à l'ouverture de session.

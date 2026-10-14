@@ -22,7 +22,7 @@ live_choice="Ableton Live 12"
 live_family="12"
 
 selected="$(/usr/bin/osascript \
-  -e 'set picked to choose from list {"CL Show Control", "CL Arrangement Builder", "Paradis Latin AutoScene", "CL MIDI Console Monitor"} with title "Installer la Suite CL" with prompt "Sélectionnez les composants à installer :" default items {"CL Show Control", "CL Arrangement Builder", "Paradis Latin AutoScene", "CL MIDI Console Monitor"} with multiple selections allowed' \
+  -e 'set picked to choose from list {"CL Show Control", "CL Audio Export", "CL Arrangement Builder", "Paradis Latin AutoScene", "CL MIDI Console Monitor"} with title "Installer la Suite CL" with prompt "Sélectionnez les composants à installer :" default items {"CL Show Control", "CL Audio Export", "CL Arrangement Builder", "Paradis Latin AutoScene", "CL MIDI Console Monitor"} with multiple selections allowed' \
   -e 'if picked is false then return ""' \
   -e 'set AppleScript'\''s text item delimiters to "|"' \
   -e 'return picked as text'
@@ -31,7 +31,8 @@ selected="$(/usr/bin/osascript \
 [[ -n "$selected" ]] || exit 0
 
 components=""
-[[ "$selected" == *"CL Show Control"* ]] && components="${components:+$components,}controller"
+[[ "$selected" == *"CL Audio Export"* ]] && components="${components:+$components,}show-audio-builder"
+[[ "$selected" == *"CL Show Control"* || "$selected" == *"CL Audio Export"* ]] && components="${components:+$components,}controller"
 [[ "$selected" == *"CL Arrangement Builder"* ]] && components="${components:+$components,}builder"
 [[ "$selected" == *"Paradis Latin AutoScene"* ]] && components="${components:+$components,}autoscene"
 [[ "$selected" == *"CL MIDI Console Monitor"* ]] && components="${components:+$components,}midi-console"

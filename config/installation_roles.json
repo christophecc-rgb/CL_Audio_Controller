@@ -271,6 +271,47 @@
         "5050/TCP loopback"
       ],
       "permissions": []
+    },
+    "audio_export": {
+      "source": "Applications/CL Audio Export.app",
+      "target": "Applications/Prod Ableton/CL Audio Export.app",
+      "owner": "interactive",
+      "dependencies": [
+        "CL Show Control local",
+        "Ableton Live 11/12"
+      ],
+      "required_components": [
+        "show_control"
+      ],
+      "legacy_targets": [
+        "Applications/CL Show Audio Builder.app",
+        "Applications/CL Audio Export.app"
+      ],
+      "permissions": []
+    },
+    "arrangement_builder": {
+      "source": "Applications/CL Arrangement Builder.app",
+      "target": "Applications/Prod Ableton/CL Arrangement Builder.app",
+      "owner": "interactive",
+      "dependencies": [
+        "Ableton Live 11/12"
+      ],
+      "required_components": [
+        "arrangement_builder_script"
+      ],
+      "legacy_targets": [
+        "Applications/Arrangement Builder Live.app",
+        "Applications/CL Arrangement Builder.app"
+      ],
+      "permissions": []
+    },
+    "arrangement_builder_script": {
+      "source": "Ableton Live 11-12/Remote Scripts/CL_Arrangement_Builder_Live",
+      "target": "@LIVE/Remote Scripts/CL_Arrangement_Builder_Live",
+      "dependencies": [
+        "Ableton Live 11/12"
+      ],
+      "permissions": []
     }
   },
   "roles": {
@@ -280,6 +321,7 @@
         "show_control",
         "showcue",
         "cue_editor",
+        "audio_export",
         "network_manager",
         "network_tools"
       ],
@@ -314,6 +356,7 @@
         "show_control",
         "showcue",
         "cue_editor",
+        "audio_export",
         "network_manager",
         "network_tools"
       ],
@@ -321,6 +364,8 @@
         "ableton_osc",
         "absolute_mtc",
         "analyzer",
+        "arrangement_builder",
+        "arrangement_builder_script",
         "control_client",
         "live_devices",
         "mtc_bridge",
@@ -341,7 +386,9 @@
       "components": [
         "ableton_osc",
         "live_devices",
-        "absolute_mtc"
+        "absolute_mtc",
+        "arrangement_builder",
+        "arrangement_builder_script"
       ],
       "services": [],
       "permissions": [
@@ -368,10 +415,13 @@
       "visible_tools": [
         "ableton_osc",
         "live_devices",
-        "absolute_mtc"
+        "absolute_mtc",
+        "arrangement_builder",
+        "arrangement_builder_script"
       ],
       "forbidden_components": [
         "analyzer",
+        "audio_export",
         "control_client",
         "cue_editor",
         "mtc_bridge",
@@ -419,6 +469,9 @@
         "ableton_osc",
         "absolute_mtc",
         "analyzer",
+        "arrangement_builder",
+        "arrangement_builder_script",
+        "audio_export",
         "control_client",
         "cue_editor",
         "live_devices",
@@ -466,6 +519,9 @@
         "ableton_osc",
         "absolute_mtc",
         "analyzer",
+        "arrangement_builder",
+        "arrangement_builder_script",
+        "audio_export",
         "cue_editor",
         "live_devices",
         "mtc_bridge",
@@ -514,6 +570,9 @@
       "forbidden_components": [
         "absolute_mtc",
         "analyzer",
+        "arrangement_builder",
+        "arrangement_builder_script",
+        "audio_export",
         "control_client",
         "cue_editor",
         "live_devices",
@@ -572,6 +631,9 @@
       "forbidden_components": [
         "ableton_osc",
         "absolute_mtc",
+        "arrangement_builder",
+        "arrangement_builder_script",
+        "audio_export",
         "control_client",
         "cue_editor",
         "live_devices",
@@ -601,6 +663,9 @@
         "ableton_osc",
         "absolute_mtc",
         "analyzer",
+        "arrangement_builder",
+        "arrangement_builder_script",
+        "audio_export",
         "control_client",
         "cue_editor",
         "live_devices",
@@ -660,5 +725,20 @@
         "20810/UDP loopback"
       ]
     }
+  },
+  "full_kit_applications": {
+    "CL Show Control.app": "01 — Applications principales/CL Show Control.app",
+    "CL ShowCue.app": "01 — Applications principales/CL ShowCue.app",
+    "CL Cue Editor.app": "01 — Applications principales/CL Cue Editor.app",
+    "CL Audio Export.app": "02 — Production/CL Audio Export.app",
+    "CL Arrangement Builder.app": "02 — Production/CL Arrangement Builder.app",
+    "CL Ableton Remote.app": "02 — Production/CL Ableton Remote.app",
+    "CL MIDI Network Manager.app": "03 — MIDI & Réseau/CL MIDI Network Manager.app",
+    "CL MIDI RTP Agent.app": "03 — MIDI & Réseau/CL MIDI RTP Agent.app",
+    "CL MIDI & RTP Diagnostic.app": "03 — MIDI & Réseau/CL MIDI & RTP Diagnostic.app",
+    "CL MIDI Analyzer.app": "03 — MIDI & Réseau/CL MIDI Analyzer.app",
+    "CL MIDI Performance Monitor.app": "03 — MIDI & Réseau/CL MIDI Performance Monitor.app",
+    "CL MTC Bridge.app": null,
+    "CL Sync Meter.app": null
   }
 }

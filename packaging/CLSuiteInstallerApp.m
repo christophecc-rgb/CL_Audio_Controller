@@ -1,5 +1,9 @@
 #import <Cocoa/Cocoa.h>
 
+static NSArray<NSString *> *CLRoleNames(void) {
+    return @[@"show_server", @"ableton_reader", @"mtc_logic", @"control_station", @"show_backup", @"diagnostics", @"custom"];
+}
+
 static void CLInstallApplicationMenu(void) {
     NSMenu *mainMenu = [[NSMenu alloc] initWithTitle:@""];
     NSMenuItem *applicationItem = [[NSMenuItem alloc] initWithTitle:@"" action:nil keyEquivalent:@""];
@@ -36,6 +40,7 @@ static void CLInstallApplicationMenu(void) {
 @property NSTextField *statusLabel;
 @property BOOL uninstaller;
 @property NSURL *resources;
+@property NSDictionary *roleCatalog;
 @end
 
 @implementation CLSuiteAppDelegate
@@ -47,6 +52,8 @@ static void CLInstallApplicationMenu(void) {
         _cards = [NSMutableDictionary dictionary];
         _componentGroups = [NSMutableDictionary dictionary];
         _resources = NSBundle.mainBundle.resourceURL;
+        NSData *catalogData = [NSData dataWithContentsOfURL:[_resources URLByAppendingPathComponent:@"installation_roles.json"]];
+        if (catalogData) _roleCatalog = [NSJSONSerialization JSONObjectWithData:catalogData options:0 error:nil];
         _uninstaller = [NSBundle.mainBundle.bundleIdentifier containsString:@"uninstaller"];
     }
     return self;
@@ -105,6 +112,11 @@ static void CLInstallApplicationMenu(void) {
 }
 
 - (void)applicationDidFinishLaunching:(NSNotification *)notification {
+    if (![self.roleCatalog[@"roles"] isKindOfClass:NSDictionary.class]) {
+        [self showAlert:@"Kit incomplet" message:@"Le catalogue des rôles est absent ou invalide." style:NSAlertStyleCritical];
+        [NSApp terminate:nil];
+        return;
+    }
     [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
     CLInstallApplicationMenu();
     NSRect visibleFrame = NSScreen.mainScreen.visibleFrame;
@@ -184,6 +196,8 @@ static void CLInstallApplicationMenu(void) {
         @[@"show_control", @"CL Show Control — moteur", @"Démarre le serveur local et le panneau de contrôle.", @"Controller.png"],
         @[@"showcue", @"CL ShowCue — conduite", @"Affiche les cues du show. Moteur local requis.", @"ShowCue.png"],
         @[@"cue_editor", @"CL Cue Editor — édition", @"Prépare les cues et sauvegarde les shows. Moteur local requis.", @"CueEditor.png"],
+        @[@"audio_export", @"CL Audio Export", @"Exporte les WAV/MP3 du show. Moteur local requis.", @"AudioExport.png"],
+        @[@"arrangement_builder", @"CL Arrangement Builder", @"Construit l’arrangement dans Live ; son Remote Script est installé avec l’application.", @"Builder.png"],
         @[@"control_client", @"Accès à un serveur distant", @"Ouvre le serveur HTTPS dans votre navigateur.", @"ShowCue.png"],
         @[@"ableton_osc", @"AbletonOSC", @"Extension Live 11/12 pour les commandes OSC.", @"Controller.png"],
         @[@"live_devices", @"Devices Live LTC / X-Fader", @"Devices de timecode et de fondu pour Ableton.", @"Controller.png"],
@@ -199,8 +213,8 @@ static void CLInstallApplicationMenu(void) {
         @[@"rtp_agent", @"Option agent RTP", @"Connexion MIDI réseau automatique en arrière-plan.", @"MIDIConsole.png"]
     ];
     NSArray *groups = @[
-        @[@"Show et conduite", @[@"show_control", @"showcue", @"cue_editor", @"control_client"]],
-        @[@"Ableton et synchronisation", @[@"ableton_osc", @"live_devices", @"absolute_mtc", @"mtc_bridge", @"sync_meter", @"show_backup"]],
+        @[@"Show et conduite", @[@"show_control", @"showcue", @"cue_editor", @"audio_export", @"control_client"]],
+        @[@"Ableton et synchronisation", @[@"ableton_osc", @"arrangement_builder", @"live_devices", @"absolute_mtc", @"mtc_bridge", @"sync_meter", @"show_backup"]],
         @[@"MIDI et réseau", @[@"network_manager", @"network_tools", @"analyzer", @"performance_monitor", @"rtp_diagnostic", @"rtp_agent"]]
     ];
     for (NSArray *group in groups) {
@@ -325,12 +339,10 @@ static void CLInstallApplicationMenu(void) {
 - (void)roleChanged:(id)sender {
     (void)sender;
     NSInteger role = self.roleSelector.selectedSegment;
-    NSArray *roles = @[@[@"show_control", @"showcue", @"cue_editor", @"network_manager", @"network_tools"],
-        @[@"ableton_osc", @"live_devices", @"absolute_mtc"], @[@"mtc_bridge", @"sync_meter"],
-        @[@"control_client"], @[@"show_backup", @"ableton_osc"],
-        @[@"network_manager", @"network_tools", @"analyzer", @"performance_monitor", @"rtp_diagnostic"], @[]];
+    NSArray *roleNames = CLRoleNames();
+    NSArray *components = self.roleCatalog[@"roles"][roleNames[role]][@"components"];
     [self.checks enumerateKeysAndObjectsUsingBlock:^(NSString *key, NSButton *check, BOOL *stop) {
-        BOOL selected = role < 6 && [roles[role] containsObject:key];
+        BOOL selected = role < 6 && [components containsObject:key];
         check.state = selected ? NSControlStateValueOn : NSControlStateValueOff;
         check.enabled = role == 6 || (role == 1 && ([key isEqualToString:@"rtp_agent"] || [key isEqualToString:@"mtc_bridge"]));
         self.cards[key].hidden = !(selected || check.enabled);
@@ -348,8 +360,8 @@ static void CLInstallApplicationMenu(void) {
         section.hidden = !visible;
     }
     NSArray *descriptions = @[
-        @"Sur ce Mac : moteur CL, conduite ShowCue, éditeur de cues et outils réseau.",
-        @"Sur le Mac qui lit Ableton : extensions Live. MTC Bridge et agent RTP sont optionnels.",
+        @"Sur ce Mac : moteur CL, ShowCue, Cue Editor, Audio Export et outils réseau.",
+        @"Sur le Mac qui lit Ableton : extensions Live et Arrangement Builder. MTC Bridge et agent RTP sont optionnels.",
         @"Pour recevoir et vérifier le timecode dans Logic ou un autre lecteur MTC.",
         @"Pour accéder à un autre Mac : adresse HTTPS du serveur demandée à l’installation.",
         @"Pour le poste de secours : intégration CL Show Backup externe requise.",
@@ -372,6 +384,14 @@ static void CLInstallApplicationMenu(void) {
     if (self.roleSelector.selectedSegment == 6 && !self.uninstaller &&
         (self.checks[@"showcue"].state == NSControlStateValueOn || self.checks[@"cue_editor"].state == NSControlStateValueOn)) {
         self.checks[@"show_control"].state = NSControlStateValueOn;
+    }
+    if (self.roleSelector.selectedSegment == 6 && !self.uninstaller) {
+        for (NSString *key in self.checks) {
+            if (self.checks[key].state != NSControlStateValueOn) continue;
+            for (NSString *dependency in self.roleCatalog[@"components"][key][@"required_components"]) {
+                self.checks[dependency].state = NSControlStateValueOn;
+            }
+        }
     }
 }
 
@@ -437,7 +457,7 @@ static void CLInstallApplicationMenu(void) {
     task.arguments = @[engine];
     NSMutableDictionary *environment = [NSProcessInfo.processInfo.environment mutableCopy];
     environment[@"CL_SUITE_NONINTERACTIVE"] = @"1";
-    NSArray *roleNames = @[@"show_server", @"ableton_reader", @"mtc_logic", @"control_station", @"show_backup", @"diagnostics", @"custom"];
+    NSArray *roleNames = CLRoleNames();
     NSInteger role = self.roleSelector.selectedSegment;
     environment[@"CL_SUITE_ROLE"] = roleNames[role];
     if (role == 6) environment[@"CL_SUITE_ROLE_COMPONENTS"] = [selected componentsJoinedByString:@","];

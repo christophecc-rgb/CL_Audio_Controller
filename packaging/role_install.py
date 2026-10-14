@@ -57,6 +57,11 @@ def manifest(role, features=(), custom=()):
             raise ValueError('Option interdite pour ce rôle : ' + feature)
         for field in ('components', 'services', 'network_transports', 'ports'):
             result[field] = list(dict.fromkeys(result[field] + option[field]))
+    # Resolve application/runtime dependencies from the shared catalog.
+    for name in result['components']:
+        for dependency in catalog['components'][name].get('required_components', []):
+            if dependency not in result['components']:
+                result['components'].append(dependency)
     for _, item in local_component_items({name: catalog['components'][name] for name in result['components']}):
         service = item.get('service')
         if service and service not in result['services']:
@@ -104,6 +109,10 @@ class RoleInstaller:
             target = self.target(item)
             if target.exists() or target.is_symlink():
                 found.append({'kind':'component','component':name,'path':str(target),'required':name in role_manifest['components']})
+            for legacy in item.get('legacy_targets', []):
+                alias = self.home / legacy
+                if alias.exists() or alias.is_symlink():
+                    found.append({'kind':'legacy_app','component':name,'path':str(alias),'required':False})
             for pattern in (target.name + '.sauvegarde_*', target.stem + '.backup-*.app'):
                 for backup in target.parent.glob(pattern):
                     found.append({'kind':'old_backup','path':str(backup),'required':False})

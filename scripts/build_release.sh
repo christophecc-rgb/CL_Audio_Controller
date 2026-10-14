@@ -287,6 +287,7 @@ ditto "$M4L_SOURCE" "$KIT_ROOT/Max for Live à installer"
 ditto "$MIDI_DEVICE_SOURCE" "$KIT_ROOT/Max for Live à installer/CL MIDI Console Monitor"
 mkdir -p "$KIT_ROOT/Max for Live à installer/CL Absolute MTC"
 ditto "$MTC_M4L_SOURCE/CL_Absolute_MTC.amxd" "$KIT_ROOT/Max for Live à installer/CL Absolute MTC/CL Absolute MTC.amxd"
+ditto "$PROJECT_ROOT/M4L/Install/CL Absolute MTC/CL Absolute MTC Offset Paradis Latin V2 Precision.amxd" "$KIT_ROOT/Max for Live à installer/CL Absolute MTC/CL Absolute MTC Offset Paradis Latin V2 Precision.amxd"
 ditto "$MTC_M4L_SOURCE/CL_Absolute_MTC.maxpat" "$KIT_ROOT/Max for Live à installer/CL Absolute MTC/CL Absolute MTC.maxpat"
 
 "$MIDI_TOOLS_SOURCE/build.sh" "$BUILD_ROOT/midi-tools"
@@ -530,6 +531,9 @@ done
 
 echo
 echo "========== NETTOYAGE XATTR FINAL =========="
+
+"$CL_PYTHON" "$PROJECT_ROOT/scripts/verify_full_kit.py" "$KIT_ROOT" \
+  --layout release --report "$KIT_ROOT/FULL_KIT_APPLICATIONS.json"
 
 while IFS= read -r -d '' app; do
   /usr/bin/xattr -cr "$app"
