@@ -2684,7 +2684,10 @@ body.show-mode .app{max-width:1440px;overflow-y:auto}body.show-mode .desktop-gri
 
   <div class="server-access-grid">
     <div class="server-access-panel">
-      <div class="server-access-label">REMOTE</div>
+      <div class="server-access-label">ADRESSE IPHONE / REMOTE</div>
+      <div id="sharedProtocol" class="state-detail"></div>
+      <div id="sharedCertificate" class="state-detail"></div>
+      <img id="sharedQR" alt="QR iPhone / Remote" width="140" height="140" hidden style="background:white;padding:8px;border-radius:8px">
       <div class="server-access-row">
         <div
           id="remoteAddress"
@@ -2697,14 +2700,15 @@ body.show-mode .app{max-width:1440px;overflow-y:auto}body.show-mode .desktop-gri
         </button>
         <button
           type="button"
-          onclick="runAction('/local-page','Ouverture locale')">
+          onclick="openSharedRemote()">
           Ouvrir
         </button>
       </div>
     </div>
 
     <div class="server-access-panel">
-      <div class="server-access-label">SHOWCUE — CONDUITE</div>
+      <div class="server-access-label">SHOWCUE / CONDUITE</div>
+      <img id="showcueQR" alt="QR ShowCue / conduite" width="100" height="100" hidden style="background:white;padding:8px;border-radius:8px">
       <div class="server-access-row">
         <div
           id="showqAddress"
@@ -3207,9 +3211,7 @@ function render(s){
   else if(s.web){card.className='card system error';title.textContent='SERVEUR NON VALIDÉ';detail.textContent=s.identity_message||'Instance inconnue ou incompatible sur le port 5050';}
   else{card.className='card system error';title.textContent='SYSTÈME ARRÊTÉ';detail.textContent='Démarrez le serveur avant le spectacle';}
   const now=new Date();el('stateTime').textContent=now.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
-  el('remoteAddress').textContent=bonjourShareURL(s.lan_url||'—');
-const showqBase=String(bonjourShareURL(s.lan_url||'')).replace(/\/+$/,'');
-el('showqAddress').textContent=showqBase ? showqBase+'/show-info' : '—';
+  renderSharedAddresses(s);
 el('localAddress').textContent=String(s.local_url||'').replace(/^https?:\/\//,'');
   updateShowCurrent(s);
   setTech('techWeb',s.web);setTech('techOsc',s.osc);setTech('techReturn',s.ret);
@@ -3407,22 +3409,34 @@ async function testAbletonConnection(){
   catch(e){el('actionStatus').textContent='! '+e;}
 }
 function confirmStop(){if(confirm('Arrêter le serveur de télécommande ?\n\nLes appareils connectés perdront immédiatement l’accès.'))runAction('/stop','Arrêt du serveur');}
-async function copyAddress(){if(!latestState)return;try{await navigator.clipboard.writeText(latestState.lan_url);el('actionStatus').textContent='✓ Adresse copiée';}catch(e){el('actionStatus').textContent='Adresse : '+latestState.lan_url;}}
-function currentShowQAddress(){
-  if(!latestState||!latestState.lan_url)return '';
-  return String(latestState.lan_url).replace(/\/+$/,'')+'/show-info';
+function isShareableURL(value){
+  try{const url=new URL(value);return ['http:','https:'].includes(url.protocol)&&url.hostname.toLowerCase().endsWith('.local')&&!url.username&&!url.password;}catch(_){return false;}
 }
-async function copyShowQAddress(){
-  const value=currentShowQAddress();
-  if(!value)return;
-  try{
-    await navigator.clipboard.writeText(value);
-    el('actionStatus').textContent='✓ Adresse ShowQ copiée';
-  }catch(e){
-    el('actionStatus').textContent='ShowQ : '+value;
+function renderSharedAddresses(s){
+  const shared=s.shared_addresses||{};
+  const candidate=Object.hasOwn(shared,'remote_url')?shared.remote_url:bonjourShareURL(s.lan_url||'');
+  const remote=isShareableURL(candidate)?candidate:'';
+  el('remoteAddress').textContent=remote||'—';
+  el('showqAddress').textContent=remote?(shared.showcue_url||remote.replace(/\/+$/,'')+'/show-info'):'—';
+  el('sharedProtocol').textContent=shared.tls_active||remote.startsWith('https://')?'🔒 HTTPS actif':remote?'HTTP':'Adresse indisponible';
+  el('sharedCertificate').textContent=shared.warning|| (shared.local_certificate?'Certificat local : installer la confiance CL sur l’iPhone (Maintenance locale).':remote.startsWith('https://')?'Certificat fourni manuellement : vérifier sa confiance sur l’iPhone.':'');
+  for(const [id,value] of [['sharedQR',remote],['showcueQR',remote?el('showqAddress').textContent:'']]){
+    const qr=el(id);qr.hidden=!value;
+    const qrSource=value?'/shared-qr?url='+encodeURIComponent(value):'';
+    if(qr.getAttribute('src')!==qrSource){if(value)qr.setAttribute('src',qrSource);else qr.removeAttribute('src');}
   }
 }
-function openShowQ(){runAction('/open-showq','Ouverture de ShowQ');}
+function currentRemoteAddress(){return el('remoteAddress').textContent==='—'?'':el('remoteAddress').textContent;}
+function currentShowQAddress(){return el('showqAddress').textContent==='—'?'':el('showqAddress').textContent;}
+async function copySharedAddress(value){
+  if(!value)return;
+  try{await navigator.clipboard.writeText(value);el('actionStatus').textContent='✓ Adresse copiée';}
+  catch(e){el('actionStatus').textContent='Adresse : '+value;}
+}
+async function copyAddress(){await copySharedAddress(currentRemoteAddress());}
+async function copyShowQAddress(){await copySharedAddress(currentShowQAddress());}
+function openSharedRemote(){const value=currentRemoteAddress();if(value)window.open(value,'_blank','noopener');}
+function openShowQ(){const value=currentShowQAddress();if(value)window.open(value,'_blank','noopener');}
 async function copyLtcValue(value,label){
   if(!value)return;
   try{await navigator.clipboard.writeText(value);el('ltcDestinationLabel').textContent='✓ '+label+' : '+value;}
@@ -3552,6 +3566,26 @@ def index():
         html = html.replace('Démarrage · <span id="startupBackup">Backup : vérification…</span> · <span id="startupReturns">Simulateurs : vérification…</span> · ', '<span id="startupBackup" hidden></span><span id="startupReturns" hidden></span>')
     return render_template_string(html)
 
+@app.route("/shared-qr")
+def shared_qr():
+    """Local, ordinary navigation QR; never an authentication/enrollment QR."""
+    from urllib.parse import urlsplit
+    from security_http import qr_svg
+    value = request.args.get('url', '')
+    try:
+        parsed = urlsplit(value)
+        if (len(value) > 512 or parsed.scheme not in ('http', 'https') or
+                not (parsed.hostname or '').lower().endswith('.local') or
+                parsed.username or parsed.password or parsed.path not in ('/', '/show-info') or
+                parsed.query or parsed.fragment):
+            raise ValueError()
+        _ = parsed.port
+    except ValueError:
+        return 'Adresse partageable invalide', 400
+    return app.response_class(qr_svg(value), mimetype='image/svg+xml',
+                              headers={'Cache-Control': 'no-store'})
+
+
 @app.route("/logo")
 def logo():
     if LOGO.exists():
@@ -3613,6 +3647,7 @@ def state():
         ret=osc_return_ready,
         local_url=cl_server.get("url", REMOTE_ROOT_URL),
         lan_url=cl_server.get("url") if cl_server["remote"] else REMOTE_ROOT_LAN_URL(),
+        shared_addresses=remote_state.get("shared_addresses", {}),
         events=events[-5:],
         set_ready=remote_state.get("set_ready"),
         set_generation=remote_state.get("set_generation"),

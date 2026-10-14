@@ -58,6 +58,7 @@ from backup_scene_follow import BackupSceneFollow
 from scene_backup_udp import SceneBackupUDP
 from runtime_identity import runtime_identity
 from security_http import attach_security, start_remote_tls, local_request
+from remote_tls import shared_addresses
 from midi_endpoint_names import SHOW_IAC, RETURN_RTP, DIRECT_RTP, endpoint_matches
 from ltc_receiver import LTCReceiver, LTC_BIND_HOST, LTC_PORT
 from show_cues import (
@@ -5934,6 +5935,7 @@ def status():
         if acquired:
             lock.release()
 
+    data["shared_addresses"] = shared_addresses(app.extensions.get("cl_remote_tls"))
     data["arrangement_markers"] = data.get("arrangement_markers", [])
     data["arrangement_markers_source"] = data.get("arrangement_markers_source", "CACHE")
     return jsonify(data)

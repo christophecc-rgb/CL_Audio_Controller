@@ -3,7 +3,7 @@ const fs=require('fs'),path=require('path'),vm=require('vm'),assert=require('ass
 const source=fs.readFileSync(process.env.CONSOLE_PANEL_SOURCE||path.resolve(__dirname,'../../launcher_control.py'),'utf8');
 const section=(a,b)=>source.slice(source.indexOf(a),source.indexOf(b,source.indexOf(a)));
 const nodes=new Map();
-const el=id=>{if(!nodes.has(id))nodes.set(id,{value:'',textContent:'',className:'',children:[]});return nodes.get(id)};
+const el=id=>{if(!nodes.has(id))nodes.set(id,{value:'',textContent:'',className:'',children:[],getAttribute(k){return this[k]},setAttribute(k,v){this[k]=v},removeAttribute(k){delete this[k]}});return nodes.get(id)};
 const local={mode:'local',host:'127.0.0.1',send_port:11000,reply_port:11001};
 const remote={mode:'remote',host:'192.168.1.53',send_port:11000,reply_port:11001};
 let active='local',posts=[];
@@ -15,6 +15,7 @@ const context=vm.createContext({el,console,URL,setTimeout:fn=>fn(),
  fetch:async(url,opts)=>{const p=JSON.parse(opts.body);posts.push(p);if(!p.cl_server){active=p.mode;assert.equal(p.host,active==='remote'?'192.168.1.53':'127.0.0.1')}return {ok:true,json:async()=>({message:'OK'})}}});
 vm.runInContext(`let latestState,networkDrafts={},networkVisibleMode,networkFormDirty=false,networkFormInitialized=false,clServerDirty=false,clServerInitialized=false;\n`+
  section('// ABLETON_DISCOVERY_BEGIN','// ABLETON_DISCOVERY_END')+
+ section('function isShareableURL(value)','async function copyLtcValue')+
  section('function render(s){','async function refresh()')+
  section('function copyNetworkDraft(','async function testAbletonConnection()')+
  section('async function saveCLServer(){','function renderCLServer(s)')+

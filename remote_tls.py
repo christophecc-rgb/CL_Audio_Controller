@@ -75,6 +75,34 @@ def network_identity():
             'suggested_url': 'https://' + (hostname or (interfaces[0]['address'] if interfaces else '')) + ':8443' if hostname or interfaces else ''}
 
 
+def shared_addresses(tls):
+    """Public display metadata from the running listener, without a blocking probe."""
+    if tls is None:
+        return {}
+    if hasattr(tls, 'refresh_network'):
+        tls.refresh_network()
+    with tls.lock:
+        active = tls.server is not None
+        settings = dict(tls.settings)
+        hostname = tls.identity.get('bonjour_name', '')
+        if active:
+            base = settings.get('server_url', '').rstrip('/')
+            # Configuration belongs to this running listener, not a pending UI setting.
+            try:
+                server_address(base, tls.server.server_port)
+            except SecurityError:
+                return {}
+            host, _ = server_address(base)
+            if host.endswith('.local') and hostname and host.lower() != hostname.lower():
+                return {'remote_url': '', 'showcue_url': '', 'tls_active': True,
+                        'warning': 'Nom Bonjour modifié : reconfigurer le certificat HTTPS dans Maintenance locale.'}
+        else:
+            base = 'http://' + hostname + ':5050' if hostname else ''
+        return {'remote_url': base + '/' if base else '',
+                'showcue_url': base + '/show-info' if base else '',
+                'tls_active': active, 'local_certificate': active and bool(settings.get('managed'))}
+
+
 def read_settings(directory):
     path = Path(directory) / 'remote-tls.json'
     data = json.loads(path.read_text()) if path.exists() else {}
@@ -150,6 +178,25 @@ class RemoteTLS:
         self.enrollment_token = ''
         self.enrollment_expires = 0
         self.identity = network_identity()
+        self.network_updated = time.monotonic()
+        self.network_refreshing = False
+
+    def refresh_network(self):
+        """Refresh OS identity asynchronously so /status remains non-blocking."""
+        with self.lock:
+            if self.network_refreshing or time.monotonic() - self.network_updated < 3:
+                return
+            self.network_refreshing = True
+        def refresh():
+            try:
+                identity = network_identity()
+                with self.lock:
+                    self.identity = identity
+            finally:
+                with self.lock:
+                    self.network_updated = time.monotonic()
+                    self.network_refreshing = False
+        threading.Thread(target=refresh, name='CL share network', daemon=True).start()
 
     def start(self, settings):
         """Only invoked by persisted explicit configuration or an unlocked local admin."""
