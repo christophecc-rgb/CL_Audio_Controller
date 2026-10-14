@@ -29,6 +29,7 @@ from show_audio_playback_sources import group_playback_leaf_tracks
 
 from show_audio_ableton_offline import (
     OFFLINE_SUCCESS,
+    ExportCancelled, _check_export_cancel, _run_export_process,
     execute_offline_wav,
 )
 
@@ -333,6 +334,7 @@ def encode_mp3(
     output_path: Path,
     *,
     bitrate_kbps: int,
+    cancel_event=None,
 ) -> dict:
     """Encode un master WAV en MP3 puis publie atomiquement."""
 
@@ -380,8 +382,8 @@ def encode_mp3(
             str(partial),
         ]
 
-        completed = subprocess.run(
-            command,
+        completed = _run_export_process(
+            command, cancel_event=cancel_event,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
@@ -394,6 +396,7 @@ def encode_mp3(
                 + completed.stderr.strip()
             )
 
+        _check_export_cancel(cancel_event)
         validation = _validate_mp3(
             partial
         )
@@ -419,6 +422,7 @@ def encode_mp3(
 def _copy_wav_atomic(
     source: Path,
     target: Path,
+    *, cancel_event=None,
 ) -> dict:
     source = Path(source).resolve()
     target = Path(target).resolve()
@@ -459,6 +463,7 @@ def _copy_wav_atomic(
                 ),
             }
 
+        _check_export_cancel(cancel_event)
         os.replace(
             partial,
             target,
@@ -481,6 +486,7 @@ def execute_batch_item(
     tempo: float,
     automation: Callable[[str], Any] | None = None,
     timeout: float = 300.0,
+    cancel_event=None,
 ) -> dict:
     """Exécute un item dont la zone Arrangement est déjà résolue."""
 
@@ -571,6 +577,7 @@ def execute_batch_item(
     playback_restore = {}
 
     try:
+        _check_export_cancel(cancel_event)
         result["status"] = "rendering"
 
         requested_states = _automatic_playback_states(item)
@@ -599,12 +606,13 @@ def execute_batch_item(
             tempo=float(tempo),
             automation=automation,
             timeout=float(timeout),
+            **({"cancel_event": cancel_event} if cancel_event is not None else {}),
         )
 
         result["render"] = render
 
         if render.get("status") != OFFLINE_SUCCESS:
-            result["status"] = "failed"
+            result["status"] = "cancelled" if render.get("status") == "cancelled" else "failed"
             result["fallback"] = render.get(
                 "fallback",
                 "realtime",
@@ -623,6 +631,7 @@ def execute_batch_item(
         result["status"] = "encoding"
 
         for specification in outputs:
+            _check_export_cancel(cancel_event)
             fmt = str(
                 specification.get("format")
                 or ""
@@ -652,12 +661,14 @@ def execute_batch_item(
                             "bitrate_kbps"
                         ]
                     ),
+                    **({"cancel_event": cancel_event} if cancel_event is not None else {}),
                 )
 
             elif fmt == "wav":
                 encoded = _copy_wav_atomic(
                     master_path,
                     final_path,
+                    **({"cancel_event": cancel_event} if cancel_event is not None else {}),
                 )
 
             else:
@@ -675,6 +686,11 @@ def execute_batch_item(
             time.monotonic() - started
         )
 
+        return result
+
+    except ExportCancelled as exc:
+        result["status"] = "cancelled"
+        result["error"] = str(exc)
         return result
 
     except Exception as exc:

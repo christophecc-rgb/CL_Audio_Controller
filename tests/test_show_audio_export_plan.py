@@ -316,3 +316,31 @@ def test_scene_export_skips_technical_scene_without_audio():
     }
 
     assert build_scene_export_items({}, snapshot) == []
+
+
+def test_export_plan_inserts_medley_in_display_order_and_numbers_outputs():
+    plan = build_export_plan(config(), snapshot())
+    items = plan["items"]
+
+    assert [
+        (item["type"], item.get("scene_number"))
+        for item in items
+    ] == [
+        ("scene", 10),
+        ("medley_full", None),
+        ("medley_part", 40),
+        ("medley_part", 41),
+        ("medley_part", 42),
+        ("medley_part", 43),
+    ]
+
+    assert [item["export_number"] for item in items] == [
+        10, 40, 41, 42, 43, 44
+    ]
+
+    assert items[1]["filename_stem"].startswith("040 - MEDLEY 040-043")
+    assert items[2]["filename_stem"].startswith("041 - GIGI")
+    assert items[5]["filename_stem"].startswith("044 - DANCING QUEEN")
+
+    assert items[2]["scene_number"] == 40
+    assert items[5]["scene_number"] == 43

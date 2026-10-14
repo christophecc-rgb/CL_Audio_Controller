@@ -16,20 +16,28 @@ class PassiveFeedbackTests(unittest.TestCase):
         names = {'receive_playing_slot_event', 'record_ableton_midi_output',
                  'record_go_midi_expectations',
                  'expected_console_scene_for_index',
-                 'build_device_state', 'console_visual_state'}
-        functions = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in names]
+                 'build_device_state', 'console_visual_state',
+                 'update_manual_scene_state_locked', 'manual_scene_console_consumer'}
+        functions = [n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name in names
+                     or isinstance(n, ast.ClassDef) and n.name == 'ConsoleGoConsumer']
         state = {'set_generation': 1, 'set_ready': True, 'scenes': {0: 'Intro', 1: 'Falling'},
                  'playing_scene': 0, 'play_mode': 'session'}
         transport = Mock(resolved_host='192.168.1.138')
         def profile(name):
             return types.SimpleNamespace(id=name, legacy_key=name, to_dict=lambda: {'id': name})
-        scope = dict(Any=Any, Optional=Optional, Dict=Dict, state=state, lock=threading.RLock(),
+        from app_mode import capabilities_for
+        from scene_timing import SceneTimingAPI
+        scope = dict(APP_CAPABILITIES=capabilities_for(), Any=Any, Optional=Optional, Dict=Dict, state=state, lock=threading.RLock(),
                      time=types.SimpleNamespace(time=lambda: 100),
                      _playing_listener_generation=1, _playing_listener_token='token',
                      _playing_listener_tracks={0: 0}, ableton_transport=transport,
                      parse_scene_duration_seconds=lambda name: None,
                      send_midi_monitor_scene_context=Mock(), schedule_selected_scene_duration_refresh=Mock(),
                      resolve_device_profile=profile, MIDI_RETURN_VISUAL_TIMEOUT_SECONDS=5)
+        from ableton_runtime import AbletonRuntime, RuntimeBindings
+        scope['ableton_runtime'] = AbletonRuntime(RuntimeBindings(scope))
+        scope['scene_timing'] = SceneTimingAPI(scope['parse_scene_duration_seconds'], Mock(),
+            scope['schedule_selected_scene_duration_refresh'], Mock())
         exec(compile(ast.Module(body=functions, type_ignores=[]), '<passive feedback>', 'exec'), scope)
         scope['receive_playing_slot_event']((0, 'token', 1), '192.168.1.138')
         self.assertEqual(state['playing_scene_name'], 'Falling')

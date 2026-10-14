@@ -190,6 +190,8 @@ static void CLInstallApplicationMenu(void) {
         @[@"absolute_mtc", @"CL Absolute MTC", @"Device Live de synchronisation temporelle.", @"MIDIConsole.png"],
         @[@"mtc_bridge", @"MTC Bridge", @"Application de synchro ouverte explicitement.", @"MIDIConsole.png"],
         @[@"sync_meter", @"Sync Meter", @"Diagnostic de synchro MTC.", @"Diagnostic.png"],
+        @[@"arrangement_builder", @"CL Arrangement Builder", @"Construction des arrangements Ableton Live.", @"Builder.png"],
+        @[@"audio_export", @"CL Audio Export", @"Export audio depuis Ableton Live.", @"AudioExport.png"],
         @[@"show_backup", @"CL Show Backup — externe", @"Intégration externe à valider avant installation.", @"Controller.png"],
         @[@"network_manager", @"Network Manager", @"Vérifie les connexions MIDI et réseau.", @"MIDIConsole.png"],
         @[@"network_tools", @"Helpers et simulateurs", @"Tests et simulation des connexions MIDI.", @"MIDIConsole.png"],
@@ -200,7 +202,7 @@ static void CLInstallApplicationMenu(void) {
     ];
     NSArray *groups = @[
         @[@"Show et conduite", @[@"show_control", @"showcue", @"cue_editor", @"control_client"]],
-        @[@"Ableton et synchronisation", @[@"ableton_osc", @"live_devices", @"absolute_mtc", @"mtc_bridge", @"sync_meter", @"show_backup"]],
+        @[@"Ableton et synchronisation", @[@"ableton_osc", @"live_devices", @"absolute_mtc", @"mtc_bridge", @"sync_meter", @"arrangement_builder", @"audio_export", @"show_backup"]],
         @[@"MIDI et réseau", @[@"network_manager", @"network_tools", @"analyzer", @"performance_monitor", @"rtp_diagnostic", @"rtp_agent"]]
     ];
     for (NSArray *group in groups) {
@@ -406,6 +408,10 @@ static void CLInstallApplicationMenu(void) {
 - (void)actionPressed:(id)sender {
     NSMutableArray<NSString *> *selected = [NSMutableArray array];
     for (NSString *key in self.checks) if (self.checks[key].state == NSControlStateValueOn) [selected addObject:key];
+    if ([selected containsObject:@"arrangement_builder"] &&
+        ![selected containsObject:@"arrangement_builder_script"]) {
+        [selected addObject:@"arrangement_builder_script"];
+    }
     [selected sortUsingSelector:@selector(compare:)];
     if (!selected.count) {
         [self showAlert:@"Aucun composant sélectionné" message:@"Sélectionnez au moins un élément." style:NSAlertStyleWarning];

@@ -268,7 +268,7 @@ def test_packaged_ui_gates_qr_and_explains_physical_trust_steps():
     root = Path(__file__).resolve().parents[1]
     html = (root / 'static/security-panel.html').read_text()
     js = (root / 'static/security-panel.js').read_text()
-    assert 'Première configuration iPhone' in html and 'prepare-https' in html
+    assert 'Ajouter ou configurer un iPhone' in html and 'prepare-https' in html
     assert 'confiance totale' in html and 'clés privées restent sur le Mac' in html
     assert 'disabled data-qr="operator"' in html
     assert '!https.ready||!https.phone_verified' in js

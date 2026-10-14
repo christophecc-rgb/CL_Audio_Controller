@@ -281,3 +281,26 @@ def test_batch_default_automation_is_resolved_by_offline_engine(monkeypatch, tmp
     assert seen[0]['zone']['expected_duration_seconds'] == 32
     assert result['status'] == 'failed'
     assert result['error'] == 'configure_export_jxa: délai dépassé'
+
+
+
+def test_cancel_render_restores_playback_without_encoding(monkeypatch, tmp_path):
+    import threading
+    import show_audio_batch_export as batch
+    event = threading.Event()
+    events = []
+    monkeypatch.setattr(batch, "_automatic_playback_states", lambda item: {2:False})
+    monkeypatch.setattr(batch, "_track_state_snapshot", lambda indexes: {2:True})
+    monkeypatch.setattr(batch, "_set_track_mutes", lambda values: events.append(dict(values)))
+    def render(**kwargs):
+        assert kwargs["cancel_event"] is event
+        event.set()
+        return {"status":"cancelled", "error":"Export audio annulé"}
+    monkeypatch.setattr(batch, "execute_offline_wav", render)
+    monkeypatch.setattr(batch, "encode_mp3", lambda *a, **kw: pytest.fail("encoded after cancellation"))
+    result = batch.execute_batch_item({"id":"test", "zone":{"start_beats":0,"duration_beats":2},
+        "settings":{}, "outputs":[{"format":"mp3","filename":"test.mp3","bitrate_kbps":320}]},
+        output_directory=tmp_path, tempo=120, cancel_event=event)
+    assert result["status"] == "cancelled"
+    assert events == [{2:False}, {2:True}]
+    assert not (tmp_path / "test.mp3").exists()

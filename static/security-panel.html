@@ -1,40 +1,734 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Télécommandes CL</title><style>*{box-sizing:border-box}body{font:15px/1.45 system-ui;background:#111720;color:#e8eef7;margin:0;padding:16px;max-width:1600px;margin-inline:auto}h1{font-size:26px;margin:0}h2{font-size:18px;margin:0 0 10px}h3{font-size:16px}p{margin:8px 0;color:#bac7d8}header{margin-bottom:10px}.eyebrow{color:#88bfff;font-weight:600;font-size:13px}.statusbar{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px}.statusbar>div{background:#1d2939;border:1px solid #35465e;border-radius:10px;padding:10px 14px}.statusbar small{display:block;color:#a5b5c9}.statusbar strong{display:block;margin-top:3px}main{display:grid;grid-template-columns:minmax(340px,.85fr) minmax(480px,1.4fr);gap:12px;align-items:start}.card,details{background:#1a2331;border:1px solid #35445a;border-radius:12px;padding:12px;margin:0 0 10px}article article{background:#141d29}button,input,select{font:inherit;min-height:42px;border:1px solid #53657f;border-radius:7px;padding:8px 11px;margin:4px 3px 4px 0}button{background:#283b53;color:#f0f6ff;cursor:pointer}button:hover{background:#354f70}button:disabled{opacity:.45;cursor:not-allowed}button:focus-visible,summary:focus-visible,a:focus-visible{outline:3px solid #8fc9ff;outline-offset:3px}input,select{background:#101925;color:#eee;max-width:100%}label{display:block;color:#c6d1df}label input{width:100%}summary{cursor:pointer;font-weight:600;min-height:30px}details[open]>summary{margin-bottom:12px}a{color:#8fc9ff;overflow-wrap:anywhere}.danger{background:#8c293c;color:white}.steps{padding-left:24px}#onboarding{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}#onboarding .steps{grid-column:1/-1}#onboarding article{margin:0}#onboarding label input{width:auto}#showcue-qr svg,#qr svg,#trust-qr svg,#check-qr svg{width:200px;max-width:100%;height:auto;background:white;margin:8px 0}pre{white-space:pre-wrap;overflow-wrap:anywhere}#devices{max-height:360px;overflow:auto;padding-right:4px}#devices article{padding:12px;margin:0 0 8px;border:1px solid #41526b;border-radius:8px}#devices h3{margin:0 0 4px}#devices p{margin:5px 0}article>h3{margin:12px 0 6px}.device-meta{font-size:14px}.feedback:empty{display:none}.feedback{color:#a7e7cb;margin:4px 0 8px;font-size:14px}.feedback.error{color:#ffb4bf}#result{color:#ffb4bf}.service{margin:3px 0 0}#setup-details{margin-top:4px}.wide{grid-column:1/-1}[hidden]{display:none!important}@media(min-width:1100px){#administration button{font-size:14px}#administration p{font-size:14px}}@media(max-width:900px){body{padding:16px}main{grid-template-columns:1fr}.statusbar{grid-template-columns:repeat(2,1fr)}#onboarding{grid-template-columns:1fr}#devices{max-height:none}.wide{grid-column:auto}}@media(max-width:480px){body{padding:12px}.statusbar{gap:6px}.statusbar>div{padding:8px}button{width:100%;margin:4px 0}h1{font-size:23px}}
-/* Device cards: compact checkboxes, complete rights visible without nested scroll. */
-#devices { max-height: none; overflow: visible; padding-right: 0; }
-#devices .device-grants { min-width: 0; margin: 14px 0 0; padding: 12px; border: 1px solid #35465e; border-radius: 8px; }
-#devices .device-grants legend { padding: 0 6px; font-size: 14px; font-weight: 600; }
-#devices .device-grants label { gap: 10px; cursor: pointer; }
-#devices .device-grants input[type="checkbox"] { width: 20px; height: 20px; min-height: 20px; flex: 0 0 20px; padding: 0; margin: 0; border-radius: 4px; accent-color: #438fe0; }
-#devices .device-grants label span { min-width: 0; overflow-wrap: anywhere; }
-#devices .device-posts { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 4px 14px; }
-#devices .device-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-#devices .device-actions label { display: flex; align-items: center; gap: 8px; }
-#devices .device-save { margin-top: 12px; }
-</style></head><body><header><div class="eyebrow">CL SHOW CONTROL</div><h1 id="page-title">Télécommandes CL</h1><p class="service" id="service-context">Télécommandes · Serveur 5050</p><div class="statusbar" aria-label="État du système"><div><small>Connexion sécurisée</small><strong id="top-https">Vérification…</strong></div><div><small>Mode</small><strong id="top-mode">—</strong></div><div><small>Administration</small><strong id="top-admin">—</strong></div><div><small>Télécommandes</small><strong id="state">○ Désarmées</strong></div></div></header><main><div><article class="card" id="administration"><h2>Administration</h2><p id="admin-state" role="status">VERROUILLÉ</p>
-<label>Mot de passe administrateur <input id="password" type="password" autocomplete="current-password"></label>
-<button data-op="setup">Créer le mot de passe admin</button>
-<button data-op="unlock" data-duration="five_minutes">Déverrouiller 5 min</button>
-<button data-op="unlock" data-duration="session">Déverrouiller pour cette session</button>
-<button data-op="unlock" data-duration="development">Développement persistant sur ce Mac</button>
-<p>Cette option conserve le mode configuration après redémarrage et partage l’accès entre les fenêtres locales de ce Mac. Verrouiller maintenant ou passer en mode spectacle la désactive.</p>
-<button data-op="lock">Verrouiller maintenant</button>
-<p>Le déverrouillage pour cette session prend fin à l’arrêt de CL Show Control. Il n’arme aucune télécommande.</p></article>
-</div><div><article class="card" id="controls"><h2>Accès rapides et spectacle</h2><button id="open-showcue">Ouvrir ShowCue sur iPhone</button>
-<section id="showcue-access" hidden aria-label="Accès direct à ShowCue"><button id="close-showcue">Fermer l’affichage</button><div id="showcue-qr"></div><a id="showcue-link" target="_blank" rel="noopener noreferrer"></a><button id="copy-showcue">Copier l’adresse</button><p>Scanner avec Safari sur l’iPhone. Cet accès ouvre ShowCue et réutilise l’autorisation existante. Il ne crée aucune association et n’accorde aucun droit. Si des commandes nécessitent une autorisation, associer l’iPhone via Première configuration iPhone et approuver sa demande sur le Mac.</p></section><button data-mode="show">Mode spectacle</button><button data-arm="true">Armer les télécommandes</button><button data-arm="false" class="danger">Désarmer toutes les télécommandes</button></article>
-<article class="card"><h2>Appareils autorisés <span id="device-count"></span></h2><p>Autorisation, connexion actuelle et test iPhone sont indépendants.</p><div id="devices"></div><h3>Demandes à approuver</h3><div id="pending"></div></article></div><div class="wide"><details id="setup-details"><summary>Première configuration iPhone <span id="setup-status"></span></summary><button id="first-setup">Ouvrir la configuration iPhone</button><section id="onboarding">
-<ol class="steps" aria-label="Progression iPhone"><li id="step-https">1. Connexion sécurisée à préparer</li><li id="step-phone">2. iPhone à vérifier</li><li id="step-device">3. Télécommande à autoriser</li></ol>
-<article><h2>1 — Préparer la connexion sécurisée</h2><p>Déverrouiller l’administration, puis autoriser le mode configuration. Le nom de ce Mac est proposé automatiquement.</p>
-<button data-mode="development">Autoriser le mode configuration</button>
-<button id="prepare-https">Préparer la connexion sécurisée</button><p id="connection-state" role="status"></p></article>
-<article><h2>2 — Vérifier l’iPhone</h2><p>Connecter l’iPhone au même réseau. Scanner le QR de test avec Safari, puis confirmer sur l’iPhone. Cette page suit automatiquement la confirmation.</p>
-<a id="phone-check" hidden>Ouvrir le test sur l’iPhone</a><div id="check-qr"></div><p id="phone-state" role="status"></p>
-<details><summary>Première utilisation : installer la confiance sur l’iPhone</summary>
-<p>Scanner ce QR pour télécharger le certificat public. Les clés privées restent sur le Mac.</p><button id="enroll-phone">Afficher le QR du certificat public (15 minutes)</button><div id="trust-qr"></div><a id="ca-download" hidden>Télécharger le profil public (AirDrop possible)</a><p id="ca-fingerprint"></p>
-<p>Dans Réglages → Général → VPN et gestion de l’appareil, installer « Confiance CL Show Control ». Comparer l’empreinte affichée aux détails du certificat. Puis Réglages → Général → Informations → Réglages des certificats : activer la confiance totale pour cette CA.</p><a href="https://support.apple.com/fr-fr/102390" target="_blank" rel="noreferrer">Aide Apple</a></details></article>
-<article><h2>3 — Ajouter la télécommande</h2><button disabled data-qr="operator">Ajouter cet iPhone comme télécommande</button><button disabled data-qr="reader">Ajouter une télécommande en lecture</button>
-<div id="qr"></div><p id="expiry"></p><p>Scanner le QR, saisir le nom sur l’iPhone, puis approuver la demande ici. L’autorisation permanente conserve l’appareil après redémarrage ; l’armement reste manuel.</p>
-<p id="device-state" role="status"></p></article>
-</section></details><details><summary>Réseau et certificats</summary><p id="network-choice"></p><label>Choisir une interface <select id="server-choice"><option value="">Choisir une interface</option></select></label><label>Adresse HTTPS du serveur <input id="url" type="url" placeholder="https://serveur.local:8443"></label><p id="https-state"></p>
-<button id="start-https">Démarrer / recharger HTTPS</button><button disabled data-qr="admin">QR admin temporaire</button><button data-op="password">Changer le mot de passe</button><button data-op="revoke" class="danger">Révoquer toutes</button>
-<details><summary>Certificat fourni manuellement</summary><label>Certificat <input id="certificate" placeholder="/chemin/certificat.pem"></label><label>Clé privée <input id="private-key" placeholder="/chemin/cle.pem"></label><label>Port HTTPS <input id="tls-port" type="number" value="8443"></label><button id="configure-tls">Enregistrer la configuration avancée</button></details>
-<details><summary>Scene Backup — Ethernet dédié</summary><label>Show <input id="backup-show" value="OP2026"></label><label>Interface dédiée <input id="backup-interface" placeholder="en7 (lo0 pour test local)"></label><label>IP locale dédiée <input id="backup-source" placeholder="192.168.50.1"></label><label>IP secours dédiée <input id="backup-peer" placeholder="192.168.50.2"></label><label>Session partagée avec RX <input id="backup-session"></label><label>Secret partagé avec RX <input id="backup-secret" type="password" autocomplete="off"></label><button id="new-backup-secret">Préparer nouveau secret / session</button><button id="configure-backup">Activer HMAC sur UDP 12042</button><button id="disable-backup">Désactiver le tunnel</button><p>Configurer le même show, la même session et le même secret sur RX avant activation. La configuration TX est volatile et doit être remise après redémarrage. Le secret n’est jamais affiché dans les états ou journaux.</p></details><details><summary>Diagnostic réseau</summary><pre id="diagnostics"></pre></details></details></div></main><p id="result" role="status"></p><script src="/static/security-panel.js?v=device-layout-2"></script></body></html>
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Télécommandes CL</title><style>
+*{box-sizing:border-box}
+:root{
+  --bg:#101720;
+  --panel:#182332;
+  --panel2:#121c28;
+  --line:#35465e;
+  --line2:#435875;
+  --text:#edf4fc;
+  --muted:#aebed1;
+  --blue:#83bfff;
+  --green:#85ddb8;
+  --red:#ffb4bf;
+}
+body{
+  font:15px/1.45 system-ui,-apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  margin:0 auto;
+  padding:28px;
+  max-width:1180px;
+}
+header{margin-bottom:18px}
+.eyebrow{
+  color:var(--blue);
+  font-weight:700;
+  font-size:12px;
+  letter-spacing:.04em;
+}
+h1{font-size:28px;line-height:1.15;margin:3px 0 5px}
+h2{font-size:19px;margin:0 0 5px}
+h3{font-size:15px;margin:14px 0 6px}
+p{margin:7px 0;color:var(--muted)}
+.service{margin:0;color:#91a4bb}
+
+.statusbar{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:15px;
+}
+.statusbar>div{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  background:#172231;
+  border:1px solid var(--line);
+  border-radius:999px;
+  padding:7px 11px;
+  min-width:0;
+}
+.statusbar small{
+  color:#91a4bb;
+  font-size:12px;
+}
+.statusbar strong{
+  display:block;
+  font-size:13px;
+  margin:0;
+}
+
+main{
+  display:block;
+  width:100%;
+}
+.card,details{
+  background:var(--panel);
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:16px;
+  margin:0 0 12px;
+}
+.card.primary{
+  border-color:#4a6b91;
+  box-shadow:0 8px 28px rgba(0,0,0,.12);
+}
+.card-head{
+  display:flex;
+  justify-content:space-between;
+  gap:14px;
+  align-items:flex-start;
+  margin-bottom:12px;
+}
+.card-head p{margin:2px 0 0}
+
+.actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  align-items:center;
+}
+button,input,select{
+  font:inherit;
+  min-height:40px;
+  border:1px solid #536982;
+  border-radius:8px;
+  padding:8px 12px;
+}
+button{
+  background:#293d55;
+  color:#f1f7ff;
+  cursor:pointer;
+  font-weight:600;
+}
+button:hover{background:#35516f}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,summary:focus-visible,a:focus-visible{
+  outline:3px solid #8fc9ff;
+  outline-offset:3px
+}
+input,select{
+  background:#0f1925;
+  color:#eee;
+  max-width:100%;
+}
+label{display:block;color:#c9d4e2}
+label input{width:100%}
+a{color:#8fc9ff;overflow-wrap:anywhere}
+.danger{background:#8f2e43;border-color:#b2475e;color:white}
+.danger:hover{background:#a63b52}
+
+.control-state{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  align-items:center;
+}
+#controls .actions{margin-top:10px}
+#controls .feedback{margin:8px 0 0}
+
+#devices{
+  max-height:none;
+  overflow:visible;
+  padding:0;
+}
+#devices article{
+  background:var(--panel2);
+  padding:14px;
+  margin:0 0 9px;
+  border:1px solid #40536c;
+  border-radius:10px;
+}
+#devices h3{margin:0 0 5px}
+#devices p{margin:4px 0}
+.device-meta{font-size:14px}
+#devices .device-grants{
+  min-width:0;
+  margin:12px 0 0;
+  padding:0;
+  border:0;
+}
+#devices .device-grants legend{
+  padding:0;
+  font-size:14px;
+  font-weight:650;
+}
+#devices .device-grants label{
+  gap:9px;
+  cursor:pointer;
+}
+#devices .device-grants input[type="checkbox"]{
+  width:19px;
+  height:19px;
+  min-height:19px;
+  flex:0 0 19px;
+  padding:0;
+  margin:0;
+  border-radius:4px;
+  accent-color:#438fe0;
+}
+#devices .device-posts{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:4px 14px;
+}
+#devices .device-actions{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:10px;
+}
+#devices .device-actions label{
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+#devices .device-save{margin-top:10px}
+
+summary{
+  cursor:pointer;
+  font-weight:700;
+  min-height:30px;
+  font-size:16px;
+}
+details[open]>summary{margin-bottom:14px}
+details.advanced{
+  background:#151f2c;
+}
+details.advanced>summary{
+  color:#d4dfec;
+}
+.admin-grid{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:16px;
+}
+.admin-grid>div{
+  min-width:0;
+}
+.admin-note{
+  font-size:13px;
+  color:#93a6bc;
+}
+
+#onboarding{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:12px;
+}
+#onboarding .steps{grid-column:1/-1}
+#onboarding article{
+  margin:0;
+  background:var(--panel2);
+  padding:13px;
+  border-radius:10px;
+}
+#onboarding label input{width:auto}
+.steps{padding-left:24px}
+
+#showcue-qr svg,#qr svg,#trust-qr svg,#check-qr svg{
+  width:200px;
+  max-width:100%;
+  height:auto;
+  background:white;
+  margin:8px 0;
+}
+pre{white-space:pre-wrap;overflow-wrap:anywhere}
+.feedback:empty{display:none}
+.feedback{
+  color:var(--green);
+  margin:4px 0 8px;
+  font-size:13px;
+}
+.feedback.error{color:var(--red)}
+#result{color:var(--red)}
+#setup-details{margin-top:0}
+[hidden]{display:none!important}
+
+@media(max-width:800px){
+  body{padding:16px}
+  .admin-grid{grid-template-columns:1fr}
+  #onboarding{grid-template-columns:1fr}
+  .statusbar{gap:6px}
+}
+@media(max-width:520px){
+  body{padding:12px}
+  h1{font-size:24px}
+  .statusbar>div{width:100%;justify-content:space-between}
+  .actions{display:block}
+  .actions button{width:100%;margin:3px 0}
+  #devices .device-posts{grid-template-columns:1fr}
+}
+
+/* Appareils autorisés : résumé compact, droits repliables. */
+#devices article{
+  padding:12px 14px;
+}
+
+#devices article > h3{
+  margin:0 0 3px;
+  font-size:16px;
+}
+
+#devices article > p{
+  margin:2px 0;
+  line-height:1.35;
+}
+
+#devices .device-actions{
+  margin-top:8px;
+}
+
+#devices .device-rights{
+  margin:10px 0 0;
+  padding:0;
+  background:transparent;
+  border:0;
+  border-top:1px solid #304157;
+  border-radius:0;
+}
+
+#devices .device-rights > summary{
+  min-height:0;
+  padding:10px 2px 2px;
+  font-size:14px;
+  font-weight:650;
+  color:#a9c7e8;
+}
+
+#devices .device-rights[open] > summary{
+  margin-bottom:8px;
+}
+
+#devices .device-grants{
+  margin:0;
+  padding:10px 12px 12px;
+  background:#101a26;
+  border:1px solid #304157;
+  border-radius:9px;
+}
+
+#devices .device-grants > p{
+  margin:8px 0 5px;
+}
+
+#devices .device-save{
+  margin-top:10px;
+}
+
+/* Armement : un seul contrôle visible, l'état réel pilote son action. */
+#controls .legacy-arm-control{
+  display:none!important;
+}
+
+#arm-toggle{
+  min-width:230px;
+  background:#2c69a4;
+  border-color:#4c87bd;
+}
+
+#arm-toggle:hover{
+  background:#397bb8;
+}
+
+#arm-toggle.is-armed{
+  background:#7d3341;
+  border-color:#a84a5c;
+}
+
+#arm-toggle.is-armed:hover{
+  background:#944052;
+}
+
+/* Security panel compact pass */
+
+/* Appareil compact quand les droits sont repliés */
+#devices article{
+  padding:8px 11px;
+}
+
+#devices article > h3{
+  margin:0 0 2px;
+  font-size:15px;
+  line-height:1.2;
+}
+
+#devices article > p{
+  margin:1px 0;
+  line-height:1.25;
+  font-size:13px;
+}
+
+#devices .device-actions{
+  margin-top:5px;
+  gap:6px;
+}
+
+#devices .device-actions select{
+  min-height:31px;
+  padding:3px 7px;
+}
+
+#devices .device-actions button{
+  min-height:32px;
+  padding:4px 9px;
+}
+
+#devices .device-rights{
+  margin-top:5px;
+}
+
+#devices .device-rights > summary{
+  padding:6px 1px 0;
+  font-size:13px;
+  min-height:0;
+  line-height:1.2;
+}
+
+#devices .device-rights[open] > summary{
+  margin-bottom:7px;
+}
+
+#devices + h3{
+  margin-top:7px;
+  margin-bottom:2px;
+}
+
+#pending:empty{
+  min-height:0;
+  margin:0;
+}
+
+/* QR télécommande plus compact */
+#showcue-access:not([hidden]){
+  display:grid;
+  grid-template-columns:150px minmax(0,1fr);
+  gap:7px 14px;
+  align-items:start;
+  margin-top:10px;
+  padding:11px;
+  background:#111c29;
+  border:1px solid #35475e;
+  border-radius:10px;
+}
+
+#showcue-qr{
+  grid-column:1;
+  grid-row:1 / span 4;
+}
+
+#showcue-qr svg{
+  width:140px;
+  height:140px;
+  margin:0;
+}
+
+#close-showcue,
+#copy-showcue{
+  justify-self:start;
+  min-height:32px;
+  padding:4px 9px;
+}
+
+#showcue-link{
+  font-size:13px;
+}
+
+#showcue-access > p{
+  margin:0;
+  font-size:13px;
+  line-height:1.3;
+}
+
+/* Panneaux fermés plus fins */
+main > details:not([open]){
+  padding-top:10px;
+  padding-bottom:10px;
+}
+
+main > details:not([open]) > summary{
+  min-height:18px;
+  line-height:1.2;
+}
+
+@media(max-width:650px){
+  #showcue-access:not([hidden]){
+    grid-template-columns:1fr;
+  }
+
+  #showcue-qr,
+  #close-showcue,
+  #showcue-link,
+  #copy-showcue,
+  #showcue-access > p{
+    grid-column:1;
+    grid-row:auto;
+  }
+}
+
+/* CL_SECURITY_STATE_UI */
+
+/* Etat actif de déverrouillage local */
+#administration [data-op="unlock"].admin-mode-active{
+  background:#916628;
+  border-color:#c99a4b;
+  color:#fff;
+  font-weight:750;
+  box-shadow:
+    0 0 0 1px rgba(201,154,75,.18),
+    0 0 12px rgba(145,102,40,.18);
+}
+
+#administration [data-op="unlock"].admin-mode-active:disabled{
+  opacity:1;
+  cursor:default;
+}
+
+/* Etat verrouillé : indicateur, plus une fausse action */
+#administration [data-op="lock"].admin-locked-state{
+  opacity:.72;
+  cursor:default;
+}
+
+/* Les retours d'action sont compacts et temporaires */
+.feedback{
+  display:inline-block;
+  margin:0 0 0 8px;
+  vertical-align:middle;
+}
+
+#administration .feedback,
+#controls .feedback{
+  max-width:100%;
+}
+
+
+/* CL_ADMIN_STATE_COLORS */
+
+#admin-state.is-locked{
+  color:#ff7f91;
+  font-weight:800;
+  letter-spacing:.02em;
+}
+
+#admin-state.is-unlocked{
+  color:#67dfa9;
+  font-weight:800;
+  letter-spacing:.02em;
+}
+
+/* En spectacle : état fort mais le bouton reste utilisable pour en sortir */
+#controls [data-mode].show-mode-active{
+  background:#9e3145;
+  border-color:#d45a70;
+  color:#fff;
+  font-weight:800;
+  opacity:1;
+  cursor:pointer;
+}
+
+#controls [data-mode].show-mode-active:hover{
+  filter:brightness(1.08);
+}
+
+</style></head><body>
+<header>
+  <div class="eyebrow">CL SHOW CONTROL</div>
+  <h1 id="page-title">Télécommandes CL</h1>
+  <p class="service" id="service-context">Télécommandes · Serveur 5050</p>
+
+  <div class="statusbar" aria-label="État du système">
+    <div><small>HTTPS</small><strong id="top-https">Vérification…</strong></div>
+    <div><small>Mode</small><strong id="top-mode">—</strong></div>
+    <div><small>Administration</small><strong id="top-admin">—</strong></div>
+    <div><small>Télécommandes</small><strong id="state">○ Désarmées</strong></div>
+  </div>
+</header>
+
+<main>
+
+  <article class="card primary" id="controls">
+    <div class="card-head">
+      <div>
+        <h2>Télécommandes</h2>
+        <p>Contrôle général des appareils distants autorisés.</p>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button id="arm-toggle" type="button">Armer les télécommandes</button>
+      <button data-arm="true" class="legacy-arm-control">Armer les télécommandes</button>
+      <button data-arm="false" class="danger legacy-arm-control">Désarmer les télécommandes</button>
+      <button data-mode="show">Mode spectacle</button>
+      <button id="open-showcue">Ouvrir la télécommande sur iPhone</button>
+    </div>
+
+    <section id="showcue-access" hidden aria-label="Accès à la télécommande iPhone">
+      <button id="close-showcue">Fermer l’affichage</button>
+      <div id="showcue-qr"></div>
+      <a id="showcue-link" target="_blank" rel="noopener noreferrer"></a>
+      <button id="copy-showcue">Copier l’adresse</button>
+      <p>Scanner avec Safari sur l’iPhone pour ouvrir la télécommande. Cet accès réutilise une autorisation existante et n’accorde aucun nouveau droit.</p>
+    </section>
+  </article>
+
+  <article class="card">
+    <div class="card-head">
+      <div>
+        <h2>Appareils autorisés <span id="device-count"></span></h2>
+        <p>Les appareils autorisés restent indépendants de l’armement général.</p>
+      </div>
+      <div class="actions">
+        <button id="first-setup">+ Ajouter une télécommande</button>
+      </div>
+    </div>
+
+    <div id="devices"></div>
+
+    <h3 id="pending-heading" hidden>Demandes à approuver</h3>
+    <div id="pending"></div>
+  </article>
+
+  <details id="setup-details">
+    <summary>Ajouter ou configurer un iPhone <span id="setup-status"></span></summary>
+
+    <section id="onboarding">
+      <ol class="steps" aria-label="Progression iPhone">
+        <li id="step-https">Connexion sécurisée à préparer</li>
+        <li id="step-phone">iPhone à vérifier</li>
+        <li id="step-device">Télécommande à autoriser</li>
+      </ol>
+
+      <article>
+        <h2>1 — Connexion sécurisée</h2>
+        <p>Déverrouiller l’administration, puis préparer HTTPS pour ce Mac.</p>
+        <button data-mode="development">Autoriser le mode configuration</button>
+        <button id="prepare-https">Préparer la connexion sécurisée</button>
+        <p id="connection-state" role="status"></p>
+      </article>
+
+      <article>
+        <h2>2 — Vérifier l’iPhone</h2>
+        <p>Connecter l’iPhone au même réseau, puis scanner le QR de test avec Safari.</p>
+        <a id="phone-check" hidden>Ouvrir le test sur l’iPhone</a>
+        <div id="check-qr"></div>
+        <p id="phone-state" role="status"></p>
+
+        <details>
+          <summary>Première utilisation : confiance HTTPS</summary>
+          <p>Scanner ce QR pour télécharger le certificat public. Les clés privées restent sur le Mac.</p>
+          <button id="enroll-phone">Afficher le QR du certificat public (15 minutes)</button>
+          <div id="trust-qr"></div>
+          <a id="ca-download" hidden>Télécharger le profil public (AirDrop possible)</a>
+          <p id="ca-fingerprint"></p>
+          <p>Dans Réglages → Général → VPN et gestion de l’appareil, installer « Confiance CL Show Control », puis activer la confiance totale du certificat.</p>
+          <a href="https://support.apple.com/fr-fr/102390" target="_blank" rel="noreferrer">Aide Apple</a>
+        </details>
+      </article>
+
+      <article>
+        <h2>3 — Autoriser la télécommande</h2>
+        <button disabled data-qr="operator">Ajouter cet iPhone comme télécommande</button>
+        <button disabled data-qr="reader">Ajouter une télécommande en lecture</button>
+        <div id="qr"></div>
+        <p id="expiry"></p>
+        <p>Scanner le QR, saisir le nom sur l’iPhone, puis approuver la demande ici. L’autorisation permanente conserve l’appareil après redémarrage ; l’armement reste manuel.</p>
+        <p id="device-state" role="status"></p>
+      </article>
+    </section>
+  </details>
+
+  <details class="advanced">
+    <summary>Administration et sécurité avancées</summary>
+
+    <div class="admin-grid">
+      <div>
+        <article class="card" id="administration">
+          <h2>Administration locale</h2>
+          <p id="admin-state" role="status">VERROUILLÉ</p>
+
+          <label>
+            Mot de passe administrateur
+            <input id="password" type="password" autocomplete="current-password">
+          </label>
+
+          <div class="actions">
+            <button data-op="setup">Créer le mot de passe admin</button>
+
+            <button data-op="unlock" data-duration="session">Déverrouiller pour cette session</button>
+            <button data-op="unlock" data-duration="development">Maintenance déverrouillée en permanence</button>
+            <button data-op="lock">Verrouiller maintenant</button>
+          </div>
+
+          <p class="admin-note">
+            Le déverrouillage permanent conserve le mode maintenance après redémarrage sur ce Mac.
+            Le déverrouillage de session prend fin à l’arrêt de CL Show Control.
+            Aucun de ces réglages n’arme les télécommandes.
+          </p>
+        </article>
+      </div>
+
+      <div>
+        <details>
+          <summary>Réseau et certificats</summary>
+
+          <p id="network-choice"></p>
+
+          <label>
+            Choisir une interface
+            <select id="server-choice">
+              <option value="">Choisir une interface</option>
+            </select>
+          </label>
+
+          <label>
+            Adresse HTTPS du serveur
+            <input id="url" type="url" placeholder="https://serveur.local:8443">
+          </label>
+
+          <p id="https-state"></p>
+
+          <div class="actions">
+            <button id="start-https">Démarrer / recharger HTTPS</button>
+            <button disabled data-qr="admin">QR admin temporaire</button>
+            <button data-op="password">Changer le mot de passe</button>
+            <button data-op="revoke" class="danger">Révoquer toutes</button>
+          </div>
+
+          <details>
+            <summary>Certificat fourni manuellement</summary>
+            <label>Certificat <input id="certificate" placeholder="/chemin/certificat.pem"></label>
+            <label>Clé privée <input id="private-key" placeholder="/chemin/cle.pem"></label>
+            <label>Port HTTPS <input id="tls-port" type="number" value="8443"></label>
+            <button id="configure-tls">Enregistrer la configuration avancée</button>
+          </details>
+
+          <details>
+            <summary>Scene Backup — Ethernet dédié</summary>
+            <label>Show <input id="backup-show" value="OP2026"></label>
+            <label>Interface dédiée <input id="backup-interface" placeholder="en7 (lo0 pour test local)"></label>
+            <label>IP locale dédiée <input id="backup-source" placeholder="192.168.50.1"></label>
+            <label>IP secours dédiée <input id="backup-peer" placeholder="192.168.50.2"></label>
+            <label>Session partagée avec RX <input id="backup-session"></label>
+            <label>Secret partagé avec RX <input id="backup-secret" type="password" autocomplete="off"></label>
+            <button id="new-backup-secret">Préparer nouveau secret / session</button>
+            <button id="configure-backup">Activer HMAC sur UDP 12042</button>
+            <button id="disable-backup">Désactiver le tunnel</button>
+            <p>Configurer le même show, la même session et le même secret sur RX avant activation. La configuration TX est volatile et doit être remise après redémarrage.</p>
+          </details>
+
+          <details>
+            <summary>Diagnostic réseau</summary>
+            <pre id="diagnostics"></pre>
+          </details>
+        </details>
+      </div>
+    </div>
+  </details>
+
+</main>
+
+<p id="result" role="status"></p>
+<script src="/static/security-panel.js?v=device-layout-2"></script></body></html>

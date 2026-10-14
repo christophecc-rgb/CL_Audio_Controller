@@ -1,3 +1,12 @@
+import sys
+from pathlib import Path
+
+# PyInstaller peut exécuter ce .spec avec un cwd différent du dépôt.
+_spec_dir = Path(SPECPATH).resolve()
+if str(_spec_dir) not in sys.path:
+    sys.path.insert(0, str(_spec_dir))
+
+from release_version import bundle_version, bundle_build
 # -*- mode: python ; coding: utf-8 -*-
 
 a = Analysis(
@@ -76,8 +85,8 @@ app = BUNDLE(
     bundle_identifier='com.claudio.controller',
     info_plist={
         'CFBundleDisplayName': 'CL Show Control',
-        'CFBundleShortVersionString': '2.2.0',
-        'CFBundleVersion': '6',
+        'CFBundleShortVersionString': bundle_version(),
+        'CFBundleVersion': bundle_build(),
         'LSMinimumSystemVersion': '11.0', 'NSHighResolutionCapable': True,
     },
 )

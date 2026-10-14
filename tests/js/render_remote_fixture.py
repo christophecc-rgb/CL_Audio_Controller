@@ -7,7 +7,9 @@ class R:
  def get_data(self,as_text=False):return self.t if as_text else self.t.encode()
  def set_data(self,t):self.t=t
 class Q:path='/'
-n={'AUTONOMOUS_MODE':False,'request':Q(),'CL_AUDIO_REMOTE_SUBTITLES':{'/':'Session','/ab':'A/B','/arrangement':'Arrangement'}}
+sys.path.insert(0, str(r))
+from app_mode import AppMode, capabilities_for
+n={'APP_CAPABILITIES': capabilities_for(AppMode.FULL), 'AppMode': AppMode, 'AUTONOMOUS_MODE':False,'request':Q(),'CL_AUDIO_REMOTE_SUBTITLES':{'/':'Session','/ab':'A/B','/arrangement':'Arrangement'}}
 exec(compile(ast.Module(body=[f],type_ignores=[]),'decoration','exec'),n)
 results={}
 for route,file in [('/','index'),('/ab','ab'),('/arrangement','arrangement')]:

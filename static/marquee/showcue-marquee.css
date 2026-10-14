@@ -1,0 +1,67 @@
+/* ShowQ Art déco — essai visuel réversible.
+ * Retirer le lien vers cette feuille pour retrouver l'habillage précédent.
+ * ON dépend exclusivement du badge ON AIR existant et d'une cue courante.
+ */
+html body.stage-ui #view-live :is(.live-current, .ahead-card) {
+  position:relative;
+  isolation:isolate;
+}
+html body.stage-ui #view-live .live-current,
+html body.stage-ui #view-live .live-current.stage-has-current {
+  border-color:transparent !important;
+  box-shadow:none !important;
+  animation:none !important;
+}
+html body.stage-ui #view-live .ahead-card {
+  border-color:transparent !important;
+}
+html body.stage-ui #view-live :is(.live-current, .ahead-card)::after {
+  content:"" !important;
+  display:block !important;
+  position:absolute !important;
+  inset:-4px !important;
+  width:auto !important;
+  height:auto !important;
+  min-width:0 !important;
+  margin:0 !important;
+  padding:0 !important;
+  border:16px solid transparent !important;
+  border-image: url("marquee_off.png") 110 100 / 16px / 0 stretch !important;
+  border-radius:0 !important;
+  background:none !important;
+  box-shadow:none !important;
+  pointer-events:none !important;
+  z-index:2 !important;
+  opacity:1 !important;
+  animation:none !important;
+  filter:none !important;
+}
+html body.stage-ui #view-live .live-current.stage-has-current:has(#live-on-air.active)::after {
+  border-image-source:url("marquee_on.png") !important;
+  filter:drop-shadow(0 0 4px #ffb74d66) !important;
+}
+@media(max-width:760px) {
+  html body.stage-ui #view-live :is(.live-current, .ahead-card)::after {
+    border-image-width:12px !important;
+    border-width:12px !important;
+  }
+}
+
+/* Accents rouges accordés au cadre ; titres dorés conservés. */
+html body.stage-ui #view-live .cue-kicker .label {
+  color:#ef665a !important;
+}
+html body.stage-ui #view-live .stage-number {
+  color:#ff8172 !important;
+  background:linear-gradient(120deg,#691b2077,#301315) !important;
+  border-color:#a73b36 !important;
+}
+html body.stage-ui #view-live #live-on-air {
+  color:#ff8172 !important;
+  background:#421719 !important;
+  border-color:#ce5147 !important;
+}
+html body.stage-ui #view-live #live-on-air::before {
+  background:#ff8172 !important;
+  box-shadow:0 0 6px #ef665a55 !important;
+}

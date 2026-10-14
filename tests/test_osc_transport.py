@@ -202,7 +202,7 @@ class OSCTransportTests(unittest.TestCase):
     def test_abletonosc_client_is_not_constructed_in_business_code(self):
         source = (Path(__file__).resolve().parents[1] / "app.py").read_text(encoding="utf-8")
         direct_clients = [line for line in source.splitlines() if "SimpleUDPClient(" in line]
-        self.assertEqual(direct_clients, ["m4l_client = udp_client.SimpleUDPClient(M4L_IP, M4L_PORT)"])
+        self.assertEqual(direct_clients, ["m4l_client = udp_client.SimpleUDPClient(M4L_IP, M4L_PORT) if APP_CAPABILITIES.console_enabled else None"])
 
 
 if __name__ == "__main__":

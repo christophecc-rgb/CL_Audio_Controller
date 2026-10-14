@@ -271,6 +271,26 @@
         "5050/TCP loopback"
       ],
       "permissions": []
+    },
+    "arrangement_builder": {
+      "source": "Applications/CL Arrangement Builder.app",
+      "target": "Applications/Prod Ableton/CL Arrangement Builder.app",
+      "owner": "interactive",
+      "permissions": []
+    },
+    "arrangement_builder_script": {
+      "source": "Ableton Live 11-12/Remote Scripts/CL_Arrangement_Builder_Live",
+      "target": "@LIVE/Remote Scripts/CL_Arrangement_Builder_Live",
+      "dependencies": [
+        "Ableton Live 11/12"
+      ],
+      "permissions": []
+    },
+    "audio_export": {
+      "source": "Applications/CL Audio Export.app",
+      "target": "Applications/Prod Ableton/CL Audio Export.app",
+      "owner": "interactive",
+      "permissions": []
     }
   },
   "roles": {
@@ -341,7 +361,10 @@
       "components": [
         "ableton_osc",
         "live_devices",
-        "absolute_mtc"
+        "absolute_mtc",
+        "arrangement_builder",
+        "arrangement_builder_script",
+        "audio_export"
       ],
       "services": [],
       "permissions": [

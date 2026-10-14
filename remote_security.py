@@ -63,7 +63,6 @@ class RemoteSecurity:
         self.nonces = {}
         self.failures = []
         self.password_record = None
-        self.local_development_seen = False
         self.loaded = False
         self.runtime_seen = {}
 
@@ -118,15 +117,10 @@ class RemoteSecurity:
             active = False
         if active:
             self.mode = 'development'
-        elif self.local_development_seen:
-            self.mode = 'show'
-            self.admin_sessions.clear()
-        self.local_development_seen = active
         return active
 
     def disable_local_development(self):
         (self.directory/'local-development.json').unlink(missing_ok=True)
-        self.local_development_seen = False
 
     def enable_local_development(self):
         private_directory(self.directory)
@@ -135,7 +129,6 @@ class RemoteSecurity:
         with os.fdopen(fd, 'w') as file:
             json.dump({'enabled': True, 'password_revision': self.password_revision}, file)
         os.replace(temporary, self.directory/'local-development.json')
-        self.local_development_seen = True
         self.mode = 'development'
 
     def save(self):

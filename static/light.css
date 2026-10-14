@@ -1,0 +1,511 @@
+:root{color-scheme:dark;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#090c12;color:#f7f8fa}*{box-sizing:border-box}body{margin:0}main{max-width:1440px;margin:auto;padding:clamp(20px,4vw,56px);min-height:100dvh;display:flex;flex-direction:column;gap:24px}header{display:flex;justify-content:space-between;align-items:center;gap:20px}h1{font-size:18px;letter-spacing:.08em;margin:0}h1 span{color:#bac4d3;font-weight:400}#state{border:1px solid #5f7088;border-radius:999px;padding:14px 22px;font-size:20px;font-weight:700;white-space:nowrap}#state[data-state=playing]{background:#143b2b;color:#a0ffbd;border-color:#64dc91}#state[data-state=ready]{color:#a0ffbd}#state[data-state=error]{background:#4b1c22;color:#ffd4d4;border-color:#ff8383}.scenes{display:grid;grid-template-columns:1fr 1fr;gap:24px}.scene{border:1px solid #435269;border-radius:20px;padding:28px;background:#151c28;min-height:235px}.prepared{border-color:#edb854;background:#292216}h2{margin:0 0 26px;color:#c3ccd9;font-size:15px;letter-spacing:.1em}.prepared h2{color:#ffcf79}.scene-content{display:flex;align-items:flex-start;gap:24px}.current-content{display:block}.number{font-size:clamp(40px,5vw,70px);font-weight:700;line-height:1;color:#c3ccd9}.prepared .number{color:#ffcf79}.scene p{margin:0;font-size:clamp(24px,3vw,42px);line-height:1.15;font-weight:650;overflow-wrap:anywhere}.current #current-name{font-size:clamp(34px,4.4vw,64px);font-weight:750;letter-spacing:-.02em;line-height:1.05}button{font:inherit;cursor:pointer;border-radius:14px;border:1px solid #66758b;background:#202a3b;color:#fff;font-size:20px;font-weight:700;min-height:76px;padding:20px}button:focus-visible{outline:4px solid white;outline-offset:5px}button:hover:not(:disabled){filter:brightness(1.14)}button:disabled{opacity:.4;cursor:default}.go{background:linear-gradient(180deg,#2fa85a 0%,#1f7f43 100%);border:1px solid #63d98b;border-radius:28px;min-height:190px;font-size:92px;letter-spacing:.03em;display:flex;align-items:center;justify-content:center;position:relative;box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 10px 28px rgba(0,0,0,.28)}.go span{position:absolute;bottom:22px;font-size:13px;letter-spacing:.15em;font-weight:500}nav{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px}.stop{background:#332026;border-color:#d66c76}.stop span{display:block;font-size:11px;margin-top:6px;color:#d9b8bd}#message{min-height:24px;margin:0;color:#ffcf79;text-align:center;font-size:17px}footer{margin-top:auto;display:flex;justify-content:space-between;color:#aeb9ca;font-size:13px}@media(max-width:680px){main{gap:16px}header{align-items:flex-start;flex-direction:column;gap:12px}#state{font-size:16px;padding:10px 16px}.scenes{grid-template-columns:1fr;gap:12px}.scene{min-height:140px;padding:20px}h2{margin-bottom:18px;font-size:12px}.scene p{font-size:26px}.number{font-size:42px}.go{min-height:145px;font-size:72px}nav{gap:8px}nav button{font-size:12px;padding:12px 5px;min-height:65px}footer{font-size:11px;gap:12px;flex-wrap:wrap}}@media(prefers-reduced-motion:no-preference){button{transition:background .15s,filter .15s,transform .08s}.go:active:not(:disabled){transform:translateY(1px)}}
+
+.timing{margin-top:24px;font-variant-numeric:tabular-nums;font-size:20px;color:#c3ccd9;display:flex;gap:8px;flex-wrap:wrap}.timing strong{margin-left:auto;font-size:18px;color:#ffcf79}
+
+/* Lecture active — halo doux autour de la scène réellement en cours */
+.scene.current{
+  position:relative;
+  transition:border-color .18s ease, box-shadow .18s ease, background .18s ease;
+}
+
+.scene.current.is-playing{
+  border-color:#68a9ff;
+  background:#162131;
+  box-shadow:
+    0 0 0 1px rgba(104,169,255,.20),
+    0 0 22px rgba(76,145,255,.24),
+    inset 0 0 18px rgba(70,130,220,.06);
+}
+
+@media (prefers-reduced-motion:no-preference){
+  .scene.current.is-playing{
+    animation:light-current-playing 1.65s ease-in-out infinite;
+  }
+
+  @keyframes light-current-playing{
+    0%,100%{
+      border-color:#5d8fcf;
+      box-shadow:
+        0 0 0 1px rgba(104,169,255,.12),
+        0 0 12px rgba(76,145,255,.15),
+        inset 0 0 12px rgba(70,130,220,.04);
+    }
+
+    50%{
+      border-color:#83baff;
+      box-shadow:
+        0 0 0 2px rgba(131,186,255,.25),
+        0 0 30px rgba(76,145,255,.32),
+        inset 0 0 24px rgba(70,130,220,.08);
+    }
+  }
+}
+
+/* Titre de la scène active en or pendant la lecture */
+.scene.current #current-name{
+  transition:color .18s ease, text-shadow .18s ease;
+}
+
+.scene.current.is-playing #current-name{
+  color:#ffcf79;
+  text-shadow:0 0 18px rgba(255,207,121,.16);
+}
+
+
+/* CL_LIGHT_REMOTE_TOGGLE */
+
+.header-status{
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:10px;
+  flex-wrap:wrap;
+}
+
+.remote-toggle{
+  min-height:34px;
+  padding:7px 11px;
+  border-radius:9px;
+  border:1px solid rgba(255,255,255,.16);
+  background:rgba(255,255,255,.055);
+  color:rgba(255,255,255,.72);
+  font:inherit;
+  font-size:.72rem;
+  font-weight:750;
+  letter-spacing:.06em;
+  cursor:pointer;
+}
+
+.remote-toggle.is-enabled{
+  background:rgba(58,157,103,.18);
+  border-color:rgba(91,219,149,.62);
+  color:#72e4aa;
+  box-shadow:0 0 14px rgba(72,202,136,.12);
+}
+
+.remote-toggle:disabled{
+  opacity:.5;
+  cursor:default;
+}
+
+@media (max-width:700px){
+  .header-status{
+    width:100%;
+    justify-content:space-between;
+  }
+}
+
+/* =========================================================
+   CL LIGHT — POLISH 1
+   ========================================================= */
+
+/* Halo de lecture plus visible sans changer les proportions */
+.scene.current.is-playing{
+  border-color:rgba(110,175,255,.95) !important;
+  box-shadow:
+    0 0 0 1px rgba(110,175,255,.20),
+    0 0 18px rgba(70,140,255,.28),
+    0 0 34px rgba(70,140,255,.18),
+    inset 0 0 18px rgba(70,140,255,.05) !important;
+}
+
+@media (prefers-reduced-motion:no-preference){
+  .scene.current.is-playing{
+    animation:cl-light-halo 1.6s ease-in-out infinite;
+  }
+
+  @keyframes cl-light-halo{
+    0%,100%{
+      box-shadow:
+        0 0 0 1px rgba(110,175,255,.16),
+        0 0 14px rgba(70,140,255,.20),
+        0 0 26px rgba(70,140,255,.12),
+        inset 0 0 14px rgba(70,140,255,.04);
+    }
+    50%{
+      box-shadow:
+        0 0 0 2px rgba(130,195,255,.26),
+        0 0 24px rgba(70,140,255,.34),
+        0 0 42px rgba(70,140,255,.22),
+        inset 0 0 22px rgba(70,140,255,.07);
+    }
+  }
+}
+
+/* Titre courant plus net en lecture */
+.scene.current.is-playing #current-name{
+  color:#ffd88a !important;
+  text-shadow:
+    0 1px 2px rgba(0,0,0,.72),
+    0 0 12px rgba(255,216,138,.18);
+}
+
+/* Header : remote plus discret et mieux aligné */
+.header-status{
+  gap:8px;
+}
+
+.remote-toggle{
+  min-height:30px;
+  padding:5px 9px;
+  border-radius:7px;
+  font-size:.68rem;
+  letter-spacing:.045em;
+}
+
+.remote-toggle span{
+  margin-left:4px;
+}
+
+/* Transport secondaire plus compact */
+nav[aria-label="Commandes"]{
+  gap:8px;
+}
+
+nav[aria-label="Commandes"] button{
+  min-height:48px;
+  padding:10px 12px;
+  font-size:.86rem;
+  border-radius:8px;
+}
+
+nav[aria-label="Commandes"] .stop{
+  min-width:0;
+}
+
+/* iPhone : encore plus serré */
+@media (max-width:700px){
+  nav[aria-label="Commandes"]{
+    gap:6px;
+  }
+
+  nav[aria-label="Commandes"] button{
+    min-height:44px;
+    padding:8px 6px;
+    font-size:.76rem;
+  }
+
+  .remote-toggle{
+    min-height:28px;
+    padding:4px 7px;
+    font-size:.62rem;
+  }
+}
+
+
+/* =========================================================
+   CL LIGHT — HALO LECTURE VISIBLE
+   ========================================================= */
+
+.scene.current.is-playing{
+  border-color:#73b5ff !important;
+
+  filter:
+    drop-shadow(0 0 7px rgba(70,145,255,.65))
+    drop-shadow(0 0 18px rgba(70,145,255,.38));
+
+  animation:cl-light-real-halo 1.45s ease-in-out infinite !important;
+}
+
+@keyframes cl-light-real-halo{
+  0%,100%{
+    filter:
+      drop-shadow(0 0 5px rgba(70,145,255,.48))
+      drop-shadow(0 0 13px rgba(70,145,255,.24));
+  }
+
+  50%{
+    filter:
+      drop-shadow(0 0 10px rgba(105,180,255,.90))
+      drop-shadow(0 0 28px rgba(70,145,255,.58));
+  }
+}
+
+.scene.current.is-playing #current-name{
+  color:#ffd27d !important;
+
+  text-shadow:
+    0 0 5px rgba(255,210,125,.22),
+    0 0 14px rgba(255,190,80,.20) !important;
+}
+
+
+
+/* CL_LIGHT_LAYOUT_POLISH */
+
+/* Petit numéro directement dans le titre des deux cartes */
+.scene h2{
+  display:flex;
+  align-items:baseline;
+  gap:10px;
+}
+
+.scene-small-number{
+  font-size:.72em;
+  font-weight:800;
+  opacity:.72;
+  letter-spacing:.04em;
+  font-variant-numeric:tabular-nums;
+}
+
+/* Le titre de scène garde exactement sa place visuelle */
+.scene.prepared .scene-content{
+  display:block;
+}
+
+/* Ancien gros numéro : neutralisé par la nouvelle structure */
+.scene.prepared .number{
+  display:none;
+}
+
+/* Temps de la scène courante légèrement plus discret */
+.scene.current .timing{
+  font-size:.90em;
+}
+
+.scene.current .timing strong{
+  font-size:.96em;
+}
+
+/* La scène préparée peut être un peu plus compacte */
+.scene.prepared{
+  min-height:0;
+  align-self:start;
+}
+
+.scene.prepared .scene-content{
+  min-height:auto;
+}
+
+.scene.prepared .timing{
+  margin-top:16px;
+}
+
+/* GO légèrement moins haut */
+.go{
+  min-height:135px !important;
+}
+
+/* PREV / NEXT / STOP plus confortables et plus présents */
+nav[aria-label="Commandes"] button{
+  min-height:64px !important;
+  padding-top:14px !important;
+  padding-bottom:14px !important;
+}
+
+/* Téléphone */
+@media (max-width:700px){
+  .scene-small-number{
+    font-size:.68em;
+  }
+
+  .scene.current .timing{
+    font-size:.86em;
+  }
+
+  .scene.prepared .timing{
+    margin-top:12px;
+  }
+
+  .go{
+    min-height:108px !important;
+  }
+
+  nav[aria-label="Commandes"] button{
+    min-height:58px !important;
+    padding-top:12px !important;
+    padding-bottom:12px !important;
+  }
+}
+
+
+/* =========================================================
+   CL LIGHT — CARTE PRÉPARÉE PLUS COMPACTE
+   ========================================================= */
+
+.scene.prepared{
+  min-height:210px !important;
+  padding-top:28px !important;
+  padding-bottom:24px !important;
+}
+
+.scene.prepared .scene-content{
+  min-height:auto !important;
+}
+
+.scene.prepared .timing{
+  margin-top:14px !important;
+}
+
+@media (max-width:700px){
+  .scene.prepared{
+    min-height:150px !important;
+    padding-top:18px !important;
+    padding-bottom:16px !important;
+  }
+
+  .scene.prepared .timing{
+    margin-top:10px !important;
+  }
+}
+
+
+
+/* =========================================================
+   CL_LIGHT_TRANSPORT_PAUSE
+   ========================================================= */
+
+.transport-stack{
+  display:flex !important;
+  flex-direction:column;
+  gap:9px !important;
+}
+
+.transport-row{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:9px;
+}
+
+.transport-stack .transport-row button{
+  width:100%;
+  min-height:64px !important;
+  padding:13px 16px !important;
+}
+
+.pause{
+  border-color:rgba(93,126,166,.70) !important;
+  background:
+    linear-gradient(
+      180deg,
+      rgba(38,58,82,.96),
+      rgba(23,38,57,.98)
+    ) !important;
+  color:#d8e8ff !important;
+}
+
+.pause > span:last-child{
+  opacity:.58;
+  margin-left:7px;
+  font-size:.78em;
+}
+
+.stop{
+  border-color:rgba(139,72,76,.80) !important;
+}
+
+
+/* Flash bref lorsqu'une nouvelle scène est préparée */
+
+.scene.prepared.selection-flash{
+  animation:cl-light-prepared-flash .62s ease-out !important;
+}
+
+@keyframes cl-light-prepared-flash{
+  0%{
+    border-color:rgba(255,203,104,.98);
+
+    filter:
+      drop-shadow(0 0 12px rgba(255,190,70,.90))
+      drop-shadow(0 0 28px rgba(255,170,50,.52));
+
+    transform:scale(1.004);
+  }
+
+  45%{
+    border-color:rgba(255,210,122,.90);
+
+    filter:
+      drop-shadow(0 0 8px rgba(255,190,70,.60))
+      drop-shadow(0 0 20px rgba(255,170,50,.32));
+
+    transform:scale(1.002);
+  }
+
+  100%{
+    filter:none;
+    transform:scale(1);
+  }
+}
+
+
+/* Identité produit */
+
+.app-identity{
+  display:flex !important;
+  justify-content:center !important;
+  align-items:center;
+  gap:7px !important;
+
+  margin-top:auto;
+  padding-top:12px;
+
+  color:rgba(142,169,174,.58) !important;
+
+  font-size:10px !important;
+  font-weight:750;
+  letter-spacing:.12em;
+}
+
+
+/* Mobile */
+
+@media (max-width:700px){
+
+  .transport-stack{
+    gap:7px !important;
+  }
+
+  .transport-row{
+    gap:7px;
+  }
+
+  .transport-stack .transport-row button{
+    min-height:56px !important;
+    padding:10px 7px !important;
+  }
+
+  .pause > span:last-child,
+  .stop > span{
+    font-size:.72em;
+  }
+
+  .app-identity{
+    display:flex !important;
+    padding-top:6px;
+    font-size:9px !important;
+  }
+}
+
+
+/* =========================================================
+   CL LIGHT — IPHONE FIXED VIEWPORT
+   Pas de scroll / bounce vertical de la télécommande
+   ========================================================= */
+
+@media (max-width:700px){
+
+  html,
+  body{
+    width:100%;
+    height:100%;
+    margin:0;
+    overflow:hidden;
+    overscroll-behavior:none;
+  }
+
+  body{
+    position:fixed;
+    inset:0;
+  }
+
+  .light-app,
+  main{
+    width:100%;
+    height:100svh;
+    min-height:0 !important;
+    max-height:100svh;
+    overflow:hidden;
+  }
+}
+

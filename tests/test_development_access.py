@@ -31,7 +31,10 @@ class DevelopmentAccessTests(unittest.TestCase):
             self.launcher.admin('', local=True)
             action()
             with self.assertRaises(SecurityError): self.launcher.admin('', local=True)
-            self.assertEqual(self.launcher.mode, 'show')
+            self.assertEqual(self.backend.mode, 'show')
+            self.assertEqual(self.launcher.admin_status('')['mode'], 'locked')
+            # Shared maintenance grants admin access, not synchronization of mode.
+            self.assertEqual(self.launcher.mode, 'development')
     def test_password_change_revokes_persistent_access(self):
         self.backend.unlock('development-test-password', duration='development')
         self.launcher.admin('', local=True)

@@ -1602,7 +1602,7 @@ def test_full_medley_preparation_through_batch_outputs(monkeypatch, tmp_path):
     assert len(items) == 1
     item = items[0]
     assert item["type"] == "medley_full"
-    assert item["source_item"]["filename_stem"] == "MEDLEY 040-043 - SING SING"
+    assert item["source_item"]["filename_stem"] == "040 - MEDLEY 040-043 - SING SING"
     assert item["zone"]["scene_numbers"] == [40, 41, 42, 43]
     assert (item["zone"]["start_beats"], item["zone"]["end_beats"]) == (10, 18)
     assert item["zone"]["expected_duration_seconds"] == 4
@@ -1682,3 +1682,49 @@ def test_prepare_incomplete_medley_reports_error_without_starting(monkeypatch):
     assert app.export_workflow_state == "ERROR"
     assert "Medley incomplet" in errors[0][1]
     assert app.prepared_export_job is None
+
+
+
+def test_cancel_button_signals_worker_and_waits_for_cleanup(monkeypatch, tmp_path):
+    import pytest
+    import threading
+    import show_audio_builder_desktop as desktop
+    app = workflow_fixture()
+    app.set_export_workflow_state("EXPORTING")
+    event = threading.Event()
+    app._export_cancel_event = event
+    app.event_generate = lambda *args: None
+    app.request_cancel_export_ui()
+    assert event.is_set()
+    assert app.export_workflow_state == "EXPORTING"
+    assert app.cancel_export_button.options["state"] == "disabled"
+    assert app.launch_export_button.options["state"] == "disabled"
+    monkeypatch.setattr(desktop.messagebox, "showerror", lambda *a: pytest.fail("cancel shown as error"))
+    monkeypatch.setattr(desktop.messagebox, "showinfo", lambda *a: pytest.fail("cancel shown as success"))
+    app._get_scene_export_results().put(("result", {"status": "cancelled"}, str(tmp_path)))
+    app._poll_single_scene_export()
+    assert app.export_workflow_state == "IDLE"
+    assert "annulé" in app.info_var.get()
+
+
+def test_cancel_stops_before_next_batch_item(monkeypatch, tmp_path):
+    import threading
+    import show_audio_builder_desktop as desktop
+    app = workflow_fixture()
+    event = threading.Event()
+    app._export_cancel_event = event
+    class Builder:
+        def __init__(self, **kwargs): pass
+        def status(self):
+            return {"set_ready": True, "set_generation": 42, "current_set_name": "SHOW"}
+    monkeypatch.setattr(desktop, "ShowAudioSnapshotBuilder", Builder)
+    calls = []
+    def execute(item, **kwargs):
+        assert kwargs["cancel_event"] is event
+        calls.append(item)
+        event.set()
+        return {"status": "completed", "outputs": []}
+    monkeypatch.setattr(desktop, "execute_batch_item", execute)
+    app._run_single_scene_export([{"id":"first"},{"id":"second"}], tmp_path, 42, "SHOW", 120)
+    assert calls == [{"id":"first"}]
+    assert app._get_scene_export_results().get_nowait()[1]["status"] == "cancelled"

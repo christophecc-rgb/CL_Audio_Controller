@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CL Show Control Light</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='light.css') }}">
+  <script src="{{ url_for('static', filename='light.js') }}" defer></script>
+</head>
+<body>
+<main>
+  <header>
+    <h1>CL SHOW CONTROL <span>LIGHT</span></h1>
+    <div class="header-status">
+      <div id="state" role="status" aria-live="polite" data-state="unavailable">ABLETON INDISPONIBLE</div>
+      <button id="remote-toggle" class="remote-toggle" type="button" aria-pressed="false">
+        TÉLÉCOMMANDE <span id="remote-state">OFF</span>
+      </button>
+    </div>
+  </header>
+  <section class="scenes" aria-label="Scènes">
+    <article class="scene current"><h2>SCÈNE EN COURS <span id="current-number" class="scene-small-number">—</span></h2><div class="scene-content current-content"><p id="current-name">Aucune scène en cours</p></div><div class="timing" id="current-timing" aria-label="Temps de la scène en cours"><span id="current-position">—</span> / <span id="current-duration">—</span><strong>RESTE <span id="current-remaining">—</span></strong></div></article>
+    <article class="scene prepared"><h2>SCÈNE PRÉPARÉE / SUIVANTE <span id="prepared-number" class="scene-small-number">—</span></h2><div class="scene-content"><p id="prepared-name">En attente d’Ableton</p></div><div class="timing">DURÉE <span id="prepared-duration">—</span></div></article>
+  </section>
+  <button id="go" data-action="go" class="go" disabled>GO <span>ENTRÉE</span></button>
+  <nav class="transport-stack" aria-label="Commandes">
+    <div class="transport-row">
+      <button data-action="prev" disabled>← PRÉCÉDENT</button>
+      <button data-action="next" disabled>SUIVANT →</button>
+    </div>
+
+    <div class="transport-row">
+      <button data-action="stop" class="stop" disabled>STOP <span>ÉCHAP</span></button>
+      <button data-action="pause" id="pause" class="pause" disabled>
+        <span id="pause-label">PAUSE</span>
+        <span>ESPACE</span>
+      </button>
+    </div>
+  </nav>
+
+  <p id="message" role="status" aria-live="polite"></p>
+
+  <footer class="app-identity">
+    <span>CL AUDIO</span>
+    <span>·</span>
+    <span>2026</span>
+  </footer>
+</main>
+</body>
+</html>

@@ -63,6 +63,42 @@ def attach_security(app, *, launcher=False, directory=None):
     @app.before_request
     def secure_boundary():
         path=request.path
+
+        light_runtime = app.extensions.get('cl_common_light_runtime') if not launcher else None
+
+        if light_runtime is not None and path == '/light/remote':
+            if not local_request():
+                return jsonify(
+                    ok=False,
+                    error='Activation de la télécommande réservée au Mac local',
+                    remote_enabled=bool(getattr(light_runtime, 'remote_enabled', False)),
+                ), 403
+            return None
+
+        if light_runtime is not None and path == '/action' and not local_request():
+            if not bool(getattr(light_runtime, 'remote_enabled', False)):
+                return jsonify(
+                    ok=False,
+                    error='Télécommande Light désactivée',
+                    security_required=False,
+                    remote_enabled=False,
+                ), 403
+
+            data=request.get_json(silent=True) or {}
+            if not isinstance(data,dict):
+                return jsonify(error='Objet JSON requis'),400
+
+            g.cl_device={
+                'id':'light-lan',
+                'role':'light-remote',
+                'operator':'',
+            }
+            g.cl_command=str(data.get('action') or 'action')[:120]
+            g.cl_scene=data.get('scene') if isinstance(
+                data.get('scene'),
+                (str,int,float,type(None))
+            ) else None
+            return None
         if path.startswith(('/security/','/remote/')) and request.content_length and request.content_length > 16384:
             return jsonify(error='Requête de sécurité trop grande'),413
         if path.startswith('/security/') or path.startswith('/remote/'):

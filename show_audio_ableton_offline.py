@@ -7,10 +7,13 @@ callable afin de rester testable sans GUI et sans toucher au transport Live.
 from __future__ import annotations
 
 import json
+import ctypes
+import sys
 from contextlib import nullcontext
 import os
 import re
 import shutil
+import signal
 import subprocess
 import threading
 import time
@@ -31,6 +34,96 @@ OFFLINE_SUCCESS = "success"
 
 class OfflineExportError(RuntimeError):
     pass
+
+
+class ExportCancelled(OfflineExportError):
+    pass
+
+
+def _check_export_cancel(cancel_event) -> None:
+    if cancel_event is not None and cancel_event.is_set():
+        raise ExportCancelled("Export audio annulé")
+
+
+def _run_export_process(command, *, cancel_event=None, **kwargs):
+    if cancel_event is None:
+        return subprocess.run(command, **kwargs)
+    _check_export_cancel(cancel_event)
+    timeout = kwargs.pop("timeout", None)
+    check = kwargs.pop("check", False)
+    if kwargs.pop("capture_output", False):
+        kwargs["stdout"] = kwargs["stderr"] = subprocess.PIPE
+    deadline = None if timeout is None else time.monotonic() + timeout
+    with subprocess.Popen(command, start_new_session=True, **kwargs) as process:
+        def stop():
+            try:
+                os.killpg(process.pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+            try:
+                process.communicate(timeout=1)
+            except subprocess.TimeoutExpired:
+                try:
+                    os.killpg(process.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                process.communicate()
+            # Un descendant peut avoir fermé ses pipes tout en ignorant TERM.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        try:
+            while True:
+                _check_export_cancel(cancel_event)
+                if deadline is not None and time.monotonic() >= deadline:
+                    raise subprocess.TimeoutExpired(command, timeout)
+                try:
+                    stdout, stderr = process.communicate(timeout=0.1)
+                    break
+                except subprocess.TimeoutExpired:
+                    continue
+        except BaseException:
+            stop()
+            raise
+        _check_export_cancel(cancel_event)
+        result = subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+        if check:
+            result.check_returncode()
+        return result
+
+
+def _cancel_live_export() -> None:
+    # Échap est limité aux fenêtres d'export ; aucun transport ni Set n'est fermé.
+    script = r'''const se = Application("/System/Library/CoreServices/System Events.app");
+const matches = se.applicationProcesses.whose({name:"Live"})();
+function savePanel(element) {
+  try { return String(element.attributes.byName("AXIdentifier").value()) === "save-panel"; }
+  catch (_) { return false; }
+}
+function exporting(live) {
+  const windows = live.windows();
+  for (let i=0;i<windows.length;i++) {
+    const w=windows[i];
+    const name=String(w.name());
+    if (name === "Exporter Audio/Vidéo" || name === "Export Audio/Video" ||
+        /^(Exportation Audio|Exporting Audio|Rendering Audio)/.test(name) || savePanel(w)) return true;
+    // Le Save Panel peut être une feuille du dialogue plutôt qu'une fenêtre.
+    const sheets=w.sheets();
+    for(let j=0;j<sheets.length;j++) if(savePanel(sheets[j])) return true;
+  }
+  return false;
+}
+if (matches.length === 1) {
+  const live=matches[0];
+  for(let attempt=0;attempt<3 && exporting(live);attempt++) {
+    live.frontmost=true; se.keyCode(53); delay(0.2);
+  }
+  if(exporting(live)) throw new Error("Annulation Live non confirmée");
+}
+'''
+    subprocess.run(["/usr/bin/osascript", "-l", "JavaScript", "-e", script],
+                   capture_output=True, text=True, check=True, timeout=10)
 
 
 def _positive_float(value: Any, name: str) -> float:
@@ -242,6 +335,71 @@ def _offline_live_loop_request(payload: dict) -> dict:
         )
 
     return result
+
+
+
+def _parse_native_loop_start_bbt(value: Any) -> tuple[int, int, int]:
+    # Live ajoute un quatrième champ (ticks), absent des contrôles Export.
+    match = re.fullmatch(r"(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?", str(value).strip())
+    if not match:
+        raise OfflineExportError(f"BBT natif Live invalide : {value!r}")
+    bars, beats, sixteenths = (int(match.group(i)) for i in (1, 2, 3))
+    if bars < 1 or beats < 1 or not 1 <= sixteenths <= 4:
+        raise OfflineExportError(f"BBT natif Live invalide : {value!r}")
+    return bars, beats, sixteenths
+
+
+def _publish_bridge_command(temporary: Path, command: Path) -> None:
+    if sys.platform == "darwin":
+        # macOS peut refuser les liens physiques dans Documents (TCC).
+        # RENAME_EXCL publie le fichier complet et refuse une cible existante.
+        rename = ctypes.CDLL(None, use_errno=True).renamex_np
+        rename.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint]
+        rename.restype = ctypes.c_int
+        if rename(os.fsencode(temporary), os.fsencode(command), 0x00000004):
+            error = ctypes.get_errno()
+            raise OSError(error, os.strerror(error), str(command))
+    else:
+        os.link(temporary, command)
+
+
+def _get_live_loop_start_bbt(*, timeout: float = 5.0) -> tuple[int, int, int]:
+    bridge = Path.home() / "Documents/CL_Arrangement_Builder_Bridge"
+    command_path = bridge / "command.json"
+    request_id = "offline-bbt-" + uuid.uuid4().hex
+    temporary = bridge / (request_id + ".tmp")
+    deadline = time.monotonic() + timeout
+    try:
+        temporary.write_text(json.dumps({
+            "command": "get_loop_start_bbt", "request_id": request_id,
+        }), encoding="utf-8")
+        # Publication atomique sans écraser une commande d'un autre client.
+        while True:
+            try:
+                _publish_bridge_command(temporary, command_path)
+                break
+            except FileExistsError:
+                if time.monotonic() >= deadline:
+                    raise OfflineExportError("bridge Live occupé : délai BBT dépassé")
+                time.sleep(0.05)
+        while time.monotonic() < deadline:
+            try:
+                status = json.loads((bridge / "status.json").read_text(encoding="utf-8"))
+            except (FileNotFoundError, json.JSONDecodeError):
+                status = {}
+            result = status.get("loop_start_bbt_result") or {}
+            if result.get("request_id") == request_id:
+                if result.get("status") != "ok":
+                    raise OfflineExportError("BBT natif Live : " + str(result.get("error") or "échec"))
+                bbt = _parse_native_loop_start_bbt(result.get("bbt"))
+                print("[OFFLINE_BBT] native_loop_start " + json.dumps(result), flush=True)
+                return bbt
+            time.sleep(0.05)
+        raise OfflineExportError("BBT natif Live : délai de réponse dépassé")
+    except OSError as exc:
+        raise OfflineExportError(f"bridge BBT Live inaccessible : {exc}") from exc
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def _restore_live_loop_state(state: dict[str, Any]) -> None:
@@ -547,36 +705,226 @@ function recoverBBT(error) {{
   throw new Error("Limite recuperations AX BBT atteinte (3): " + String(error));
 }}
 function setAXNumericByActions(identifier, wanted) {{
+  if (typeof nativeBBTWorker === "string") {{
+    const target = Number(wanted);
+    if (bbtIdentifiers.indexOf(identifier) === -1 || !Number.isSafeInteger(target)) {{
+      throw new Error("Cible BBT invalide: " + identifier);
+    }}
+    const task = $.NSTask.alloc.init;
+    const output = $.NSPipe.pipe;
+    const errors = $.NSPipe.pipe;
+    task.launchPath = $(nativeBBTWorker);
+    task.arguments = $(["--bbt", String(live.unixId()), identifier, String(target)]);
+    task.standardOutput = output;
+    task.standardError = errors;
+    task.launch;
+    task.waitUntilExit;
+    const result = ObjC.unwrap($.NSString.alloc.initWithDataEncoding(
+      output.fileHandleForReading.readDataToEndOfFile, $.NSUTF8StringEncoding));
+    const trace = ObjC.unwrap($.NSString.alloc.initWithDataEncoding(
+      errors.fileHandleForReading.readDataToEndOfFile, $.NSUTF8StringEncoding));
+    if (trace) console.log(trace.trim());
+    if (Number(task.terminationStatus) !== 0 || result.indexOf("BBT_OK=" + target + "\\n") === -1) {{
+      throw new Error("Reglage AX BBT interrompu: " + identifier + " " + result.trim());
+    }}
+    // Vérification indépendante côté JXA, après invalidation du cache.
+    clearBBTControlCache();
+    const actual = numericAXValue(identifier);
+    if (actual !== target) {{
+      throw new Error("Reglage AX BBT interrompu: " + identifier + " reason=native_verification_failed actual=" + actual);
+    }}
+    completedBBT[identifier] = actual;
+    return;
+  }}
   if (bbtIdentifiers.indexOf(identifier) === -1) {{
     throw new Error("Controle BBT inconnu: " + identifier);
   }}
+
   const target = Number(wanted);
-  if (!Number.isFinite(target)) {{
-    throw new Error("Cible BBT invalide: " + identifier + " valeur=" + String(wanted));
+  if (!Number.isFinite(target) || !Number.isInteger(target)) {{
+    throw new Error(
+      "Cible BBT invalide: " +
+      identifier +
+      " valeur=" +
+      String(wanted)
+    );
   }}
-  const maxSteps = 256;
+
+  const maxActionBudget = 10000;
+  const actionMargin = 16;
+
+  let initial = null;
   let steps = 0;
+  let actionBudget = null;
+  let direction = "none";
+  const recentValues = [];
+
+  function logBBTResult(reason, current) {{
+    const message =
+      "bbt_numeric " +
+      JSON.stringify({{
+        identifier: identifier,
+        initial: initial,
+        target: target,
+        last: current,
+        actions: steps,
+        direction: direction,
+        budget: actionBudget,
+        reason: reason
+      }});
+
+    // Les tests comportementaux extraient ce helper sans le logger global.
+    // En export Live réel, timing() est disponible et conserve le diagnostic.
+    if (typeof timing === "function") {{
+      timing(message);
+    }}
+  }}
+
+  function failBBT(reason, current, detail) {{
+    logBBTResult(reason, current);
+
+    throw new Error(
+      "Reglage AX BBT interrompu: " +
+      identifier +
+      " reason=" + reason +
+      " initial=" + String(initial) +
+      " target=" + String(target) +
+      " last=" + String(current) +
+      " actions=" + String(steps) +
+      " direction=" + direction +
+      (detail ? " " + detail : "")
+    );
+  }}
+
   while (true) {{
     try {{
       // Nouvelle lecture apres toute erreur, avant de choisir UNE action.
       const current = numericAXValue(identifier);
+
+      if (!Number.isFinite(current) || !Number.isInteger(current)) {{
+        failBBT("invalid_current", current, "");
+      }}
+
+      if (initial === null) {{
+        initial = current;
+
+        const distance = Math.abs(target - initial);
+
+        direction =
+          initial < target ? "increment" :
+          initial > target ? "decrement" :
+          "none";
+
+        actionBudget = Math.min(
+          maxActionBudget,
+          distance + actionMargin
+        );
+
+        recentValues.push(initial);
+
+        logBBTResult("start", current);
+
+        if (distance > maxActionBudget) {{
+          failBBT(
+            "budget_exhausted",
+            current,
+            "required=" + String(distance) +
+            " max_budget=" + String(maxActionBudget)
+          );
+        }}
+      }}
+
       if (current === target) {{
         completedBBT[identifier] = current;
+        logBBTResult("target_reached", current);
         return;
       }}
-      if (steps >= maxSteps) throw new Error("Limite actions AX BBT atteinte: " + identifier);
-      const actionName = current < target ? "AXIncrement" : "AXDecrement";
+
+      if (
+        (direction === "increment" && current > target) ||
+        (direction === "decrement" && current < target)
+      ) {{
+        failBBT("overshoot", current, "before_action");
+      }}
+
+      if (steps >= actionBudget) {{
+        failBBT("budget_exhausted", current, "");
+      }}
+
+      const actionName =
+        direction === "increment"
+          ? "AXIncrement"
+          : "AXDecrement";
+
       steps += 1;
+
       performAXAction(identifier, actionName);
-      const next = numericAXValue(identifier);
+
+      let next = numericAXValue(identifier);
+      // Une action AX peut être appliquée après son retour. Relire sans
+      // réémettre l'action : 5 attentes de 50 ms maximum.
+      for (let poll = 0; next === current && poll < 5; poll++) {{
+        if (typeof delay !== "function") break;
+        delay(0.05);
+        next = numericAXValue(identifier);
+      }}
+
+      if (!Number.isFinite(next) || !Number.isInteger(next)) {{
+        failBBT("invalid_current", next, "after_action=" + actionName);
+      }}
+
       if (next === current) {{
-        throw new Error("Action AX BBT sans effet: " + identifier + " action=" + actionName);
+        failBBT(
+          "no_effect",
+          next,
+          "Action AX BBT sans effet action=" + actionName
+        );
+      }}
+
+      if (
+        recentValues.length >= 2 &&
+        next === recentValues[recentValues.length - 2]
+      ) {{
+        failBBT(
+          "oscillation",
+          next,
+          "action=" + actionName
+        );
+      }}
+
+      if (
+        (direction === "increment" && next > target) ||
+        (direction === "decrement" && next < target)
+      ) {{
+        failBBT(
+          "overshoot",
+          next,
+          "action=" + actionName
+        );
+      }}
+
+      if (
+        (direction === "increment" && next < current) ||
+        (direction === "decrement" && next > current)
+      ) {{
+        failBBT(
+          "wrong_direction",
+          next,
+          "action=" + actionName
+        );
+      }}
+
+      recentValues.push(next);
+
+      if (recentValues.length > 4) {{
+        recentValues.shift();
       }}
     }} catch (error) {{
       recoverBBT(error);
     }}
   }}
 }}
+
 
 function setBBT(prefix, values) {{
   if (!values || values.length !== 3) {{
@@ -893,22 +1241,68 @@ function openExportDialog() {{
   live.frontmost = true;
   delay(0.20);
 
-  // Sélectionner boucle (Maj+Cmd+L), distinct de Cmd+L qui modifie la boucle.
-  // Export reprend la sélection temporelle, pas les seuls marqueurs de boucle.
-  timing("select_loop:start");
-  se.keystroke("l", {{using:["command down", "shift down"]}});
-  timing("select_loop:sent");
+  function clickMenuCommand(menuNames, commandNames) {{
+    let opened = false;
+    let selected = false;
+    function normalized(value) {{
+      const name = String(value).trim();
+      if (name.endsWith("...")) return name.slice(0, -3).trim();
+      if (name.endsWith("…")) return name.slice(0, -1).trim();
+      return name;
+    }}
+    try {{
+      const bars = live.menuBars();
+      if (!bars.length) return false;
+      const headings = bars[0].menuBarItems();
+      for (let i=0;i<headings.length;i++) {{
+        const heading = headings[i];
+        if (menuNames.indexOf(String(heading.name())) === -1) continue;
+        heading.click();
+        opened = true;
+        delay(0.05);
+        const menus = heading.menus();
+        if (!menus.length) return false;
+        const items = menus[0].menuItems();
+        for (let j=0;j<items.length;j++) {{
+          const item = items[j];
+          const name = normalized(item.name());
+          if (commandNames.indexOf(name) === -1) continue;
+          if (!item.enabled()) throw new Error("Commande menu Live desactivee: " + name);
+          item.click();
+          selected = true;
+          timing("menu_command:clicked name=" + name);
+          return true;
+        }}
+        return false;
+      }}
+      return false;
+    }} catch (error) {{
+      if (String(error).indexOf("Commande menu Live desactivee:") !== -1) throw error;
+      timing("menu_command:unavailable " + String(error));
+      return false;
+    }} finally {{
+      // Fermer un menu sans commande avant d'envoyer un éventuel raccourci.
+      if (opened && !selected) se.keyCode(53);
+    }}
+  }}
 
-  // Ableton applique la sélection temporelle de façon asynchrone.
-  // Laisser Live stabiliser la sélection avant d'ouvrir Export Audio.
-  delay(0.35);
+  timing("select_loop:start");
+  const selectedLoop = clickMenuCommand(
+    ["Edit", "Edition", "Édition"],
+    ["Select Loop", "Select Loop Brace Contents", "Sélectionner la boucle"]
+  );
+  if (!selectedLoop) {{
+    timing("select_loop:menu_not_used_fallback_shortcut");
+    se.keystroke("l", {{using:["command down", "shift down"]}});
+  }}
+  delay(0.50);
   timing("select_loop:settled");
 
-  // Ouvrir Export Audio après stabilisation de la sélection temporelle.
-  se.keystroke(
-    "r",
-    {{using:["command down", "shift down"]}}
-  );
+  timing("export_dialog:menu_open_start");
+  if (!clickMenuCommand(["File", "Fichier"], ["Export Audio/Video", "Exporter Audio/Vidéo"])) {{
+    timing("export_dialog:menu_unavailable_fallback_shortcut");
+    se.keystroke("r", {{using:["command down", "shift down"]}});
+  }}
 }}
 
 // Live peut parfois afficher la fenêtre Export alors que son arbre AX
@@ -990,12 +1384,17 @@ function assertBBT(prefix, values) {{
 }}
 
 function configureExportBBT() {{
-  // Le START est prepare et confirme en beats absolus via AbletonOSC.
-  // Ne pas le comparer a un BBT recalcule en 4/4 :
-  // les changements de signature du Set rendent cette conversion invalide.
-  timing("configure_bbt:start_verified_by_live_loop");
+  timing("configure_bbt:start_start");
+  setBBT(
+    "Base.RenderStartBox.RenderStart",
+    spec.start
+  );
+  assertBBT(
+    "Base.RenderStartBox.RenderStart",
+    spec.start
+  );
+  timing("configure_bbt:done_start");
 
-  // Seule la duree reste corrigee par actions AX bornees.
   timing("configure_bbt:start_length");
   setBBT(
     "Base.RenderLengthBox.RenderLength",
@@ -1009,6 +1408,10 @@ timing("configure_bbt:start");
 try {{
   configureExportBBT();
 }} catch (firstBBTError) {{
+  // Un arrêt numérique est définitif : rouvrir perdrait toute progression.
+  if (String(firstBBTError).indexOf("Reglage AX BBT interrompu:") !== -1) {{
+    throw firstBBTError;
+  }}
   // Export Audio peut exceptionnellement conserver un dialogue ou une
   // sélection périmée. Le reconstruire une fois avant d'abandonner.
   timing("configure_bbt:retry_start");
@@ -1066,6 +1469,54 @@ timing("export_configured:return");
 JSON.stringify({{state: "export_configured", pid: live.unixId()}});'''
 
 
+_NATIVE_BBT_ALGORITHM_SWIFT = r"""
+struct BBTAdjustmentError: Error { let reason: String }
+func adjustBBT(target: Int, read: () -> Int?, action: (Bool) -> Void,
+               pause: () -> Void, expired: () -> Bool,
+               log: (Int, Int, Int, Int, String) -> Void) throws {
+    guard let initial = read() else { throw BBTAdjustmentError(reason: "invalid_current") }
+    let distance = abs(target - initial)
+    let budget = min(10000, distance + 16)
+    var current = initial
+    var actions = 0
+    var previous: Int? = nil
+    func report(_ reason: String) { log(initial, current, actions, budget, reason) }
+    func stop(_ reason: String) throws -> Never {
+        report(reason)
+        throw BBTAdjustmentError(reason: reason)
+    }
+    report("start")
+    if distance > 10000 { try stop("budget_exhausted") }
+    while current != target {
+        if actions >= budget { try stop("budget_exhausted") }
+        if expired() { try stop("deadline_exceeded") }
+        let before = current
+        actions += 1
+        action(target > initial)
+        guard var next = read() else { try stop("invalid_current") }
+        for _ in 0..<25 {
+            if next != before { break }
+            if expired() { try stop("deadline_exceeded") }
+            pause()
+            guard let observed = read() else { try stop("invalid_current") }
+            next = observed
+        }
+        current = next
+        if next == before { try stop("no_effect") }
+        if next == previous { try stop("oscillation") }
+        if (target > initial && next > target) || (target < initial && next < target) {
+            try stop("overshoot")
+        }
+        if (target > initial && next < before) || (target < initial && next > before) {
+            try stop("wrong_direction")
+        }
+        previous = before
+    }
+    report("target_reached")
+}
+"""
+
+
 _NATIVE_SAVE_AX_SWIFT = r"""
 import Foundation
 import AppKit
@@ -1102,7 +1553,8 @@ func fail(_ stage: String) -> Never {
     exit(1)
 }
 guard AXIsProcessTrusted() else { fail("ACCESSIBILITY_NOT_TRUSTED") }
-guard CommandLine.arguments.count == 3,
+guard (CommandLine.arguments.count == 3 ||
+       (CommandLine.arguments.count == 5 && CommandLine.arguments[1] == "--bbt")),
       let pid = Int32(CommandLine.arguments[2]), pid > 0,
       let live = NSRunningApplication(processIdentifier: pid),
       live.bundleIdentifier == "com.ableton.live", !live.isTerminated else {
@@ -1119,6 +1571,41 @@ func panel(_ windows: [AXUIElement]) -> AXUIElement? {
         if let result = find(window, "save-panel") { return result }
     }
     return nil
+}
+if CommandLine.arguments[1] == "--bbt" {
+    let identifier = CommandLine.arguments[3]
+    let allowed = ["Base.RenderStartBox.RenderStart", "Base.RenderLengthBox.RenderLength"]
+        .flatMap { prefix in ["Bars", "Beats", "Subdivisions"].map { prefix + "." + $0 } }
+    guard allowed.contains(identifier), let target = Int(CommandLine.arguments[4]),
+          target >= 0, target <= 1000000000 else { fail("BBT_TARGET_INVALID") }
+    guard let initialWindows = windows(), panel(initialWindows) == nil,
+          let dialog = initialWindows.first(where: { find($0, "Base.FinalButtonsBox.ExportButton") != nil }),
+          let control = find(dialog, identifier) else { fail("BBT_CONTROL_ABSENT") }
+    let deadline = ProcessInfo.processInfo.systemUptime + 60
+    var actionError: AXError = .success
+    do {
+        try adjustBBT(target: target, read: {
+            guard actionError == .success || actionError.rawValue == -25204,
+                  let raw = attr(control, kAXValueAttribute) else { return nil }
+            guard let value = (raw as? NSNumber)?.doubleValue ?? Double(String(describing: raw)) else { return nil }
+            guard value.isFinite, value.rounded() == value, value >= 0, value <= 1000000000 else { return nil }
+            return Int(value)
+        }, action: { increment in
+            actionError = AXUIElementPerformAction(control, (increment ? kAXIncrementAction : kAXDecrementAction) as CFString)
+        }, pause: { usleep(10000) }, expired: {
+            live.isTerminated || ProcessInfo.processInfo.systemUptime >= deadline
+        }, log: { initial, last, actions, budget, reason in
+            let record: [String: Any] = ["identifier": identifier, "initial": initial,
+                "target": target, "last": last, "actions": actions, "budget": budget,
+                "direction": initial < target ? "increment" : (initial > target ? "decrement" : "none"),
+                "reason": reason]
+            if let data = try? JSONSerialization.data(withJSONObject: record, options: [.sortedKeys]),
+               let json = String(data: data, encoding: .utf8) { timing("bbt_numeric " + json) }
+        })
+    } catch let error as BBTAdjustmentError { fail("BBT reason=" + error.reason) }
+      catch { fail("BBT_UNKNOWN") }
+    print("BBT_OK=\(target)")
+    exit(0)
 }
 timing("export_lookup:start")
 guard let initial = windows() else { fail("WINDOWS_UNREADABLE") }
@@ -1197,7 +1684,7 @@ fail(stage)
 """
 
 
-def run_macos_automation(script: str, *, timeout: float = 300.0) -> str:
+def run_macos_automation(script: str, *, timeout: float = 300.0, cancel_event=None) -> str:
     """JXA configure, puis un unique processus natif possède Export et Save.
 
     Cache de modules Swift conservé ; source et exécutable restent temporaires.
@@ -1217,7 +1704,7 @@ def run_macos_automation(script: str, *, timeout: float = 300.0) -> str:
     def run_timed(command, **kwargs):
         timing(f"{stage}:start")
         try:
-            result = subprocess.run(command, **kwargs)
+            result = _run_export_process(command, cancel_event=cancel_event, **kwargs)
         except (OSError, subprocess.SubprocessError) as exc:
             relay(exc)
             timing(f"{stage}:failed")
@@ -1246,7 +1733,7 @@ def run_macos_automation(script: str, *, timeout: float = 300.0) -> str:
         with tempfile.TemporaryDirectory(prefix="cl_show_audio_ax_") as directory:
             source = Path(directory) / "save.swift"
             binary = Path(directory) / "save"
-            source.write_text(_NATIVE_SAVE_AX_SWIFT, encoding="utf-8")
+            source.write_text(_NATIVE_BBT_ALGORITHM_SWIFT + _NATIVE_SAVE_AX_SWIFT, encoding="utf-8")
             timing("swift_module_cache:load_start")
             # Le dossier temporaire macOS est propre à l'utilisateur. Conserver
             # les modules évite leur reconstruction (~25 s mesurées), sans
@@ -1260,9 +1747,10 @@ def run_macos_automation(script: str, *, timeout: float = 300.0) -> str:
                 check=True, capture_output=True, text=True, timeout=remaining(60),
             )
             stage = "configure_export_jxa"
+            script = "const nativeBBTWorker = " + json.dumps(str(binary)) + ";\n" + script
             configured = run_timed(
                 ["/usr/bin/osascript", "-l", "JavaScript", "-e", script],
-                check=True, capture_output=True, text=True, timeout=remaining(90),
+                check=True, capture_output=True, text=True, timeout=remaining(float(timeout)),
             )
             try:
                 ready = json.loads(configured.stdout)
@@ -1325,14 +1813,28 @@ def validate_wav_file(
 def execute_offline_wav(
     *, zone: dict, settings: dict, output_path: Path, tempo: float,
     automation: Callable[[str], Any] | None = None, timeout: float = 300.0,
+    cancel_event=None,
 ) -> dict:
     """Execute un rendu Ableton offline puis publie atomiquement le WAV valide."""
     render_candidate: Path | None = None
     partial_path: Path | None = None
 
     try:
+        _check_export_cancel(cancel_event)
         parameters = wav_export_parameters(settings)
         start = beats_to_bbt(zone["start_beats"])
+        # Limitation connue :
+        # duration_beats est une longueur absolue en beats, mais le projet ne
+        # dispose pas ici de la timeline des changements de signature.
+        # Conserver la conversion historique en 4/4 plutôt que d'inventer
+        # une conversion BBT incorrecte à travers plusieurs signatures.
+        print(
+            "[OFFLINE_BBT] length_signature_limitation "
+            "beats_per_bar=4 "
+            "reason=no_signature_timeline "
+            f"duration_beats={zone['duration_beats']}",
+            flush=True,
+        )
         length = beats_to_length_bbt(zone["duration_beats"])
 
         expected_seconds = zone.get("expected_duration_seconds")
@@ -1352,15 +1854,6 @@ def execute_offline_wav(
             f"{target.stem}.__clrender_{render_token}{target.suffix or '.wav'}"
         )
         requested_render_path = target.with_name(render_name)
-
-        command = build_ableton_export_script(
-            start_bbt=start,
-            length_bbt=length,
-            output_path=requested_render_path,
-            sample_rate=parameters["sample_rate"],
-            bit_depth=parameters["bit_depth"],
-            normalize=parameters["normalize"],
-        )
 
         started = time.monotonic()
 
@@ -1388,15 +1881,35 @@ def execute_offline_wav(
                 automation_error = None
                 try:
                     if automation is None:
+                        _check_export_cancel(cancel_event)
                         timing("prepare_live_loop:start")
                         previous_loop_state = _prepare_live_export_loop(
                             start_bbt=start, length_bbt=length,
                         )
                         timing("prepare_live_loop:done")
+                        start = _get_live_loop_start_bbt()
+                        command = build_ableton_export_script(
+                            start_bbt=start,
+                            length_bbt=length,
+                            output_path=requested_render_path,
+                            sample_rate=parameters["sample_rate"],
+                            bit_depth=parameters["bit_depth"],
+                            normalize=parameters["normalize"],
+                        )
                         timing("macos_automation:start")
-                        run_macos_automation(command, timeout=float(timeout))
+                        _check_export_cancel(cancel_event)
+                        run_macos_automation(command, timeout=float(timeout),
+                                             **({"cancel_event": cancel_event} if cancel_event is not None else {}))
                         timing("macos_automation:done")
                     else:
+                        command = build_ableton_export_script(
+                            start_bbt=start,
+                            length_bbt=length,
+                            output_path=requested_render_path,
+                            sample_rate=parameters["sample_rate"],
+                            bit_depth=parameters["bit_depth"],
+                            normalize=parameters["normalize"],
+                        )
                         automation(command)
                 except subprocess.SubprocessError as exc:
                     # Compatibilité des automations injectées après lancement du rendu.
@@ -1449,6 +1962,7 @@ def execute_offline_wav(
                     return matches[0] if matches else None
 
                 while time.monotonic() < deadline:
+                    _check_export_cancel(cancel_event)
                     if (
                         automation_error_deadline is not None
                         and time.monotonic() >= automation_error_deadline
@@ -1511,6 +2025,10 @@ def execute_offline_wav(
                     expected_sample_rate=parameters["sample_rate"],
                 )
                 timing("wav_validation:done")
+            except ExportCancelled:
+                if automation is None and previous_loop_state is not None:
+                    _cancel_live_export()
+                raise
             finally:
                 if previous_loop_state is not None:
                     timing("restore_live_loop:start")
@@ -1526,6 +2044,7 @@ def execute_offline_wav(
             partial_path.unlink()
 
         # Copie vers le filesystem final puis rename atomique.
+        _check_export_cancel(cancel_event)
         timing("master_copy:start")
         shutil.copy2(render_candidate, partial_path)
         timing("master_copy:done")
@@ -1537,6 +2056,7 @@ def execute_offline_wav(
             expected_sample_rate=parameters["sample_rate"],
         )
 
+        _check_export_cancel(cancel_event)
         os.replace(partial_path, target)
         partial_path = None
         timing("master_publish:done")
@@ -1559,6 +2079,11 @@ def execute_offline_wav(
             "file": result_file,
             "render_source": str(render_candidate),
         }
+
+    except ExportCancelled as exc:
+        if partial_path is not None:
+            partial_path.unlink(missing_ok=True)
+        return {"status": "cancelled", "error": str(exc), "fallback": None}
 
     except OfflineExportError as exc:
         if partial_path is not None:

@@ -79,3 +79,6 @@ node_modules/
 
 # Copies de travail datées (les sources et fonctionnalités restent visibles)
 *.bak-[0-9]*
+
+# Sauvegardes temporaires du stamping de version
+*.bak_release_version

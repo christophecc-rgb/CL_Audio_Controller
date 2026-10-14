@@ -10,6 +10,13 @@ Toutes les évolutions notables de CL Audio Controller seront documentées dans 
   ce qui élimine les conflits d'affectation lors des mouvements continus de la
   télécommande A/B.
 
+## [2.3.0] — 2026-10-09 (candidat)
+
+- Security Panel : Configuration distincte de l’administration locale, transitions spectacle protégées.
+- Moteur Ableton/GO/timing commun à FULL et Light, interface Light dédiée et remote sécurisé.
+- Kits FULL et Light versionnés 2.3.0 ; runtime historique exclu du bundle Light.
+- Validation des artefacts requise avant publication.
+
 ## [2.2.0] — 2026-07-25
 
 ### Télécommandes

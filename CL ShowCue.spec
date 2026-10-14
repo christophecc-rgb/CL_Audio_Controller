@@ -1,3 +1,13 @@
+import sys
+from pathlib import Path
+
+# PyInstaller peut exécuter ce .spec avec un cwd différent du dépôt.
+# On force donc le dossier contenant le .spec dans sys.path.
+_spec_dir = Path(SPECPATH).resolve()
+if str(_spec_dir) not in sys.path:
+    sys.path.insert(0, str(_spec_dir))
+
+from release_version import bundle_version, bundle_build
 # -*- mode: python ; coding: utf-8 -*-
 
 a = Analysis(
@@ -52,8 +62,8 @@ app = BUNDLE(
     bundle_identifier='com.claudio.showcue',
     info_plist={
         'CFBundleDisplayName': 'CL ShowCue',
-        'CFBundleShortVersionString': '1.0.0',
-        'CFBundleVersion': '1',
+        'CFBundleShortVersionString': bundle_version(),
+        'CFBundleVersion': bundle_build(),
         'LSMinimumSystemVersion': '11.0', 'NSHighResolutionCapable': True,
     },
 )

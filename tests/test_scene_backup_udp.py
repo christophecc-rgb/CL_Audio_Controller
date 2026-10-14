@@ -133,9 +133,16 @@ def test_actual_go_handoff_does_not_wait_for_backup_network():
     sock = Socket(gate=gate)
     obj = backup(sock)
     source = Path(__file__).resolve().parents[1] / 'app.py'
-    node = next(n for n in ast.parse(source.read_text()).body
-                if isinstance(n, ast.FunctionDef) and n.name == 'execute_go_transaction')
-    scope = dict(time=time, threading=threading, scene_transaction_lock=threading.RLock(),
+    nodes = [n for n in ast.parse(source.read_text()).body
+             if (isinstance(n, ast.FunctionDef) and n.name == 'execute_go_transaction')
+             or (isinstance(n, ast.ClassDef) and n.name in {'FullGoConsumer', 'ProfileGoConsumer', 'TimingGoConsumer', 'ConsoleGoConsumer', 'BackupGoConsumer'})
+             or (isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == 'GO_CONSUMERS' for t in n.targets))]
+    from app_mode import AppMode, capabilities_for
+    from go_core import GoContext, LocalGoConsumer, execute_go_core
+    from scene_timing import SceneTimingAPI
+    scope = dict(capabilities_for=capabilities_for, AppMode=AppMode, APP_CAPABILITIES=capabilities_for(),
+                 GoContext=GoContext, LocalGoConsumer=LocalGoConsumer, execute_go_core=execute_go_core,
+                 time=time, threading=threading, scene_transaction_lock=threading.RLock(),
                  lock=threading.RLock(), completed_go_requests={},
                  state={'set_generation': 1, 'set_ready': True, 'scenes': {0: 'Test'}},
                  clamp_scene_number=lambda n: n - 1, generation_is_current=lambda n: True,
@@ -145,7 +152,9 @@ def test_actual_go_handoff_does_not_wait_for_backup_network():
                  send_midi_monitor_scene_context=Mock(), record_go_midi_expectations=Mock(),
                  scene_backup_udp=obj, copy_to_backup=Mock(), parse_scene_duration_seconds=lambda n: 10,
                  schedule_selected_scene_duration_refresh=Mock())
-    exec(compile(ast.fix_missing_locations(ast.Module(body=[ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0), node],
+    scope['scene_timing'] = SceneTimingAPI(scope['parse_scene_duration_seconds'], Mock(),
+        scope['schedule_selected_scene_duration_refresh'], Mock())
+    exec(compile(ast.fix_missing_locations(ast.Module(body=[ast.ImportFrom(module='__future__', names=[ast.alias(name='annotations')], level=0), *nodes],
                             type_ignores=[])), '<GO integration>', 'exec'), scope)
     try:
         started = time.monotonic()

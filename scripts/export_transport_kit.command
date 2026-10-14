@@ -28,9 +28,11 @@ ABLETONOSC_DIR="$GITHUB_DIR/AbletonOSC"
 RELEASES_DIR="$PROJECT_DIR/Releases"
 DESKTOP_DIR="${CL_SUITE_EXPORT_DIR:-$HOME/Desktop}"
 ICLOUD_DRIVE_DIR="$HOME/Library/Mobile Documents/com~apple~CloudDocs"
-VERSION="${CL_AUDIO_VERSION:-2.2.1}"
+VERSION="${CL_AUDIO_VERSION:-$("$CL_PYTHON" "$PROJECT_DIR/release_version.py")}"
+export CL_AUDIO_VERSION="$VERSION"
+export CL_BUILD_NUMBER="${CL_BUILD_NUMBER:-$("$CL_PYTHON" "$PROJECT_DIR/release_version.py" --build)}"
 TIMESTAMP="$(date '+%Y-%m-%d_%H%M%S')"
-SUITE_NAME="CL_Suite_Transport_${TIMESTAMP}_${CL_BUILD_ARCH}"
+SUITE_NAME="CL_Kit_${VERSION}_${TIMESTAMP}_${CL_BUILD_ARCH}"
 BUILD_ROOT="$(mktemp -d "/private/tmp/${SUITE_NAME}_XXXXXX")"
 SUITE_ROOT="$BUILD_ROOT/$SUITE_NAME"
 DEST_ZIP="$DESKTOP_DIR/${SUITE_NAME}.zip"
@@ -260,6 +262,7 @@ find "$COMPONENTS_ROOT" -type f \( -name '*.pyc' -o -name '.DS_Store' -o -name '
 # moment de la signature initiale d'une application (par exemple les .pyc du
 # RemoteScript d'Arrangement Builder). Re-signer les applications distribuées
 # après le nettoyage afin que leur sceau corresponde exactement au contenu final.
+"$CL_PYTHON" "$PROJECT_DIR/scripts/stamp_release_bundles.py" "$COMPONENTS_ROOT/Applications" --version "$VERSION" --build "$CL_BUILD_NUMBER" --manifest "$INSTALLER_RESOURCES/RELEASE_MANIFEST.json"
 echo "Re-signature des applications après nettoyage…"
 while IFS= read -r -d '' app_path; do
   xattr -cr "$app_path"
@@ -338,6 +341,7 @@ for app_kind in installer uninstaller; do
 <key>CFBundleName</key><string>$display_name</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>$VERSION</string>
+<key>CFBundleVersion</key><string>$CL_BUILD_NUMBER</string>
 <key>LSMinimumSystemVersion</key><string>10.15</string>
 <key>NSHighResolutionCapable</key><true/>
 </dict></plist>
@@ -435,7 +439,7 @@ rm -rf "$ROUNDTRIP_ROOT"
 mkdir -p "$ROUNDTRIP_ROOT"
 ditto -x -k "$BUILD_ROOT/final-kit.zip" "$ROUNDTRIP_ROOT"
 
-ROUNDTRIP_SUITE="$(find "$ROUNDTRIP_ROOT" -maxdepth 1 -type d -name 'CL_Suite_Transport_*' -print -quit)"
+ROUNDTRIP_SUITE="$(find "$ROUNDTRIP_ROOT" -maxdepth 1 -type d -name "$SUITE_NAME" -print -quit)"
 [[ -n "$ROUNDTRIP_SUITE" ]] || fail "suite ré-extraite introuvable"
 
 ROUNDTRIP_INSTALLER="$ROUNDTRIP_SUITE/Installer la Suite CL.app"

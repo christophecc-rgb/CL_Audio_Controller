@@ -368,33 +368,92 @@ assert.throws(() => numericAXValue(bbtIdentifiers[0]), /illisible/);
 ''')
 
 
-def test_bbt_actions_are_strictly_bounded(tmp_path):
+def test_bbt_actions_use_dynamic_bounded_budget(tmp_path):
     run_ax_simulation(tmp_path, r"""
-let values = Object.fromEntries(bbtIdentifiers.map(id => [id, 0]));
+const id = bbtIdentifiers[3];
+let value = 0;
 let actions = 0;
 
-numericAXValue = id => values[id];
+numericAXValue = () => value;
 
-performAXAction = (id, action) => {
+performAXAction = (_id, action) => {
   actions++;
-  values[id] += action === "AXIncrement" ? 1 : -1;
+  value += action === "AXIncrement" ? 1 : -1;
 };
 
 exportDialogControlsReady = () => true;
 exportDialogIsOpen = () => true;
 waitExportDialogReady = () => true;
 
-setAXNumericByActions(bbtIdentifiers[3], 16);
-assert.strictEqual(actions, 16);
+function reset(start) {
+  value = start;
+  actions = 0;
+  delete completedBBT[id];
+}
 
+for (const [start, target, expectedActions] of [
+  [0, 256, 256],
+  [0, 257, 257],
+  [0, 1000, 1000],
+  [1000, 238, 762],
+  [42, 42, 0],
+  [0, 8, 8],
+  [8, 0, 8]
+]) {
+  reset(start);
+
+  setAXNumericByActions(id, target);
+
+  assert.strictEqual(value, target);
+  assert.strictEqual(actions, expectedActions);
+  assert.strictEqual(completedBBT[id], target);
+}
+
+reset(0);
+performAXAction = () => {
+  actions++;
+};
 assert.throws(
-  () => setAXNumericByActions(bbtIdentifiers[3], 300),
-  /Limite|limite|maxSteps|actions AX|atteindre/
+  () => setAXNumericByActions(id, 2),
+  /reason=no_effect.*sans effet/
 );
+
+reset(0);
+performAXAction = () => {
+  actions++;
+  value += 2;
+};
+assert.throws(
+  () => setAXNumericByActions(id, 1),
+  /reason=overshoot/
+);
+
+reset(0);
+let flip = false;
+performAXAction = () => {
+  actions++;
+  flip = !flip;
+  value = flip ? 1 : 0;
+};
+assert.throws(
+  () => setAXNumericByActions(id, 3),
+  /reason=oscillation/
+);
+
+reset(0);
+performAXAction = (_id, action) => {
+  actions++;
+  value += action === "AXIncrement" ? 1 : -1;
+};
+assert.throws(
+  () => setAXNumericByActions(id, 10001),
+  /reason=budget_exhausted/
+);
+assert.strictEqual(actions, 0);
 """)
 
 
-def test_export_start_is_verified_and_never_adjusted_by_ax(tmp_path):
+def test_export_start_is_set_and_verified_by_ax(tmp_path):
     script = build_ableton_export_script(
         start_bbt=(4848, 3, 2),
         length_bbt=(16, 0, 0),
@@ -409,18 +468,18 @@ def test_export_start_is_verified_and_never_adjusted_by_ax(tmp_path):
         script.index('choose("Base.RenderedTrack"')
     ]
 
-    assert "start_verified_by_live_loop" in block
+    assert "configure_bbt:done_start" in block
 
     assert (
         'assertBBT(\n'
         '    "Base.RenderStartBox.RenderStart",'
-        not in block
+        in block
     )
 
     assert (
         'setBBT(\n'
         '    "Base.RenderStartBox.RenderStart",'
-        not in block
+        in block
     )
 
     assert (
@@ -463,7 +522,16 @@ def test_default_automation_receives_render_timeout(monkeypatch, tmp_path):
     def restore(state):
         restored.append(state)
 
+    def native_bbt():
+        assert prepared
+        return (4133, 1, 1)
+
+    monkeypatch.setattr(offline, "_get_live_loop_start_bbt", native_bbt)
+
     def blocked(script, *, timeout):
+        spec = json.loads(script.split("const spec = ", 1)[1].split(";", 1)[0])
+        assert spec["start"] == [4133, 1, 1]
+        assert spec["length"] == [16, 0, 0]
         calls.append(timeout)
         raise OfflineExportError(
             "configure_export_jxa: délai dépassé"
@@ -674,6 +742,7 @@ def test_restore_after_render_validation(monkeypatch, tmp_path, outcome):
     monkeypatch.setattr(offline, "_LIVE_EXPORT_LOCK", lock)
     monkeypatch.setattr(offline.time, "monotonic", lambda: clock[0])
     monkeypatch.setattr(offline, "_prepare_live_export_loop", lambda **kw: previous)
+    monkeypatch.setattr(offline, "_get_live_loop_start_bbt", lambda: (2, 1, 1))
 
     def launch(script, **kw):
         assert lock.held
@@ -785,3 +854,575 @@ def test_ambiguous_render_fails_immediately_without_replacing_master(monkeypatch
     assert result["status"] == offline.OFFLINE_FAILED
     assert "ambigu" in result["error"]
     assert target.read_bytes() == b"master precedent"
+
+
+@pytest.mark.parametrize("value,expected", [
+    ("4133.01.01.053", (4133, 1, 1)),
+    ("42.07.04.000", (42, 7, 4)),
+    ("1.1.1", (1, 1, 1)),
+])
+def test_native_bbt_parser(value, expected):
+    import show_audio_ableton_offline as offline
+    assert offline._parse_native_loop_start_bbt(value) == expected
+
+
+@pytest.mark.parametrize("value", [None, "", "1.2", "0.1.1.000", "1.0.1.000", "1.1.5.000", "1.1.1.bad"])
+def test_native_bbt_parser_rejects_invalid(value):
+    import show_audio_ableton_offline as offline
+    with pytest.raises(OfflineExportError):
+        offline._parse_native_loop_start_bbt(value)
+
+
+@pytest.mark.parametrize("outcome", ["ok", "error", "stale", "busy", "invalid"])
+def test_native_bbt_bridge_correlates_response(monkeypatch, tmp_path, outcome):
+    import show_audio_ableton_offline as offline
+    monkeypatch.setattr(offline.Path, "home", lambda: tmp_path)
+    bridge = tmp_path / "Documents/CL_Arrangement_Builder_Bridge"
+    bridge.mkdir(parents=True)
+    command = bridge / "command.json"
+    status = bridge / "status.json"
+    status.write_text(json.dumps({"loop_start_bbt_result": {
+        "request_id": "old", "status": "ok", "bbt": "1.1.1.000",
+    }}))
+    if outcome == "busy":
+        command.write_text('{"command":"other"}')
+    clock = [0.0]
+    monkeypatch.setattr(offline.time, "monotonic", lambda: clock[0])
+    def sleep(seconds):
+        clock[0] += seconds
+        if command.exists() and outcome not in ("busy", "stale"):
+            request = json.loads(command.read_text())
+            assert request["command"] == "get_loop_start_bbt"
+            status.write_text(json.dumps({"loop_start_bbt_result": {
+                "request_id": request["request_id"],
+                "status": "error" if outcome == "error" else "ok",
+                "error": "getter unavailable",
+                "bbt": "bad" if outcome == "invalid" else "4133.01.01.053",
+                "loop_start_beats": 16528.21875,
+            }}))
+            command.unlink()
+    monkeypatch.setattr(offline.time, "sleep", sleep)
+    if outcome == "ok":
+        assert offline._get_live_loop_start_bbt(timeout=0.2) == (4133, 1, 1)
+    else:
+        with pytest.raises(OfflineExportError):
+            offline._get_live_loop_start_bbt(timeout=0.2)
+    assert not list(bridge.glob("*.tmp"))
+    if outcome == "busy":
+        assert json.loads(command.read_text()) == {"command": "other"}
+
+
+def test_native_bbt_failure_restores_loop_without_opening_export(monkeypatch, tmp_path):
+    import show_audio_ableton_offline as offline
+    previous = {"loop_start": 10, "loop_length": 4, "loop": False}
+    restored = []
+    monkeypatch.setattr(offline, "_prepare_live_export_loop", lambda **kw: previous)
+    def fail():
+        raise OfflineExportError("BBT natif indisponible")
+    monkeypatch.setattr(offline, "_get_live_loop_start_bbt", fail)
+    monkeypatch.setattr(offline, "_restore_live_loop_state", restored.append)
+    monkeypatch.setattr(offline, "run_macos_automation", lambda *a, **kw: pytest.fail("export lancé"))
+    result = offline.execute_offline_wav(
+        zone={"start_beats": 4, "duration_beats": 2}, settings=settings(),
+        output_path=tmp_path / "final.wav", tempo=120,
+    )
+    assert result["status"] == OFFLINE_FAILED
+    assert restored == [previous]
+
+
+@pytest.mark.parametrize("mismatch", [False, True])
+def test_render_start_is_verified_before_length(tmp_path, mismatch):
+    import shutil
+    import subprocess
+    script = build_ableton_export_script(
+        start_bbt=(4133, 1, 1), length_bbt=(16, 0, 0),
+        output_path=tmp_path / "test.wav", sample_rate=48000,
+        bit_depth=24, normalize=False,
+    )
+    helpers = script[script.index("function assertBBT"):script.index('timing("configure_bbt:start");')]
+    harness = r"""
+const assert = require('assert');
+const spec = {start:[4133,1,1], length:[16,0,0]};
+const events = [];
+function timing() {}
+function setBBT(prefix, values) { events.push([prefix, values]); }
+function numericAXValue(id) {
+  assert.strictEqual(events.length, 1);
+  assert.ok(id.startsWith('Base.RenderStartBox.RenderStart.'));
+  if (mismatch) return 999;
+  return spec.start[['Bars','Beats','Subdivisions'].indexOf(id.split('.').pop())];
+}
+if (mismatch) {
+  assert.throws(configureExportBBT, /START BBT inattendu/);
+  assert.strictEqual(events.length, 1);
+} else {
+  configureExportBBT();
+  assert.deepStrictEqual(events, [
+    ['Base.RenderStartBox.RenderStart', spec.start],
+    ['Base.RenderLengthBox.RenderLength', spec.length],
+  ]);
+}
+"""
+    result = subprocess.run(
+        [shutil.which("node"), "-e", "const mismatch = " + json.dumps(mismatch) + ";" + helpers + harness],
+        capture_output=True, text=True, timeout=10,
+    )
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("busy", [False, True])
+def test_bridge_publication_is_atomic_without_hardlinks_on_macos(monkeypatch, tmp_path, busy):
+    import sys
+    import show_audio_ableton_offline as offline
+    if sys.platform != "darwin":
+        pytest.skip("publication native macOS")
+    temporary = tmp_path / "request.tmp"
+    command = tmp_path / "command.json"
+    payload = '{"command":"get_loop_start_bbt","request_id":"test"}'
+    temporary.write_text(payload)
+    def forbidden_link(*args):
+        raise PermissionError("Operation not permitted")
+    monkeypatch.setattr(offline.os, "link", forbidden_link)
+    if busy:
+        command.write_text("existing request")
+        with pytest.raises(FileExistsError):
+            offline._publish_bridge_command(temporary, command)
+        assert command.read_text() == "existing request"
+        assert temporary.read_text() == payload
+    else:
+        offline._publish_bridge_command(temporary, command)
+        assert command.read_text() == payload
+        assert not temporary.exists()
+
+
+@pytest.mark.parametrize("start,target,expected_actions,expected_budget", [
+    (0, 256, 256, 272),
+    (0, 257, 257, 273),
+    (0, 1000, 1000, 1016),
+    (1000, 238, 762, 778),
+    (42, 42, 0, 16),
+    (0, 10000, 10000, 10000),
+])
+def test_numeric_budget_and_success_logs(tmp_path, start, target, expected_actions, expected_budget):
+    run_ax_simulation(tmp_path, f"const start = {start}, target = {target}, expectedActions = {expected_actions}, expectedBudget = {expected_budget};" + r"""
+const id = bbtIdentifiers[3];
+let value = start, actions = 0;
+const logs = [];
+function timing(message) { logs.push(JSON.parse(message.slice('bbt_numeric '.length))); }
+numericAXValue = () => value;
+performAXAction = (_id, action) => { actions++; value += action === 'AXIncrement' ? 1 : -1; };
+setAXNumericByActions(id, target);
+assert.strictEqual(value, target);
+assert.strictEqual(actions, expectedActions);
+assert.strictEqual(logs.length, 2);
+for (const log of logs) {
+  assert.strictEqual(log.identifier, id);
+  assert.strictEqual(log.initial, start);
+  assert.strictEqual(log.target, target);
+  assert.strictEqual(log.budget, expectedBudget);
+}
+assert.strictEqual(logs[0].last, start);
+assert.strictEqual(logs[0].actions, 0);
+assert.strictEqual(logs[0].reason, 'start');
+assert.strictEqual(logs[1].last, target);
+assert.strictEqual(logs[1].actions, expectedActions);
+assert.strictEqual(logs[1].reason, 'target_reached');
+""")
+
+
+@pytest.mark.parametrize("scenario,reason,last,actions", [
+    ("no_effect", "no_effect", 0, 1),
+    ("wrong_direction", "wrong_direction", -1, 1),
+    ("overshoot", "overshoot", 4, 1),
+    ("oscillation", "oscillation", 0, 2),
+    ("maximum", "budget_exhausted", 0, 0),
+    ("invalid", "invalid_current", 0.5, 1),
+])
+def test_numeric_failure_stops_and_logs(tmp_path, scenario, reason, last, actions):
+    run_ax_simulation(tmp_path,
+        "const scenario = " + json.dumps(scenario) + "; const expectedReason = " + json.dumps(reason) +
+        f"; const expectedLast = {last}, expectedActions = {actions};" + r"""
+const id = bbtIdentifiers[3];
+let value = 0, actions = 0;
+const target = scenario === 'maximum' ? 10001 : 3;
+const logs = [];
+function timing(message) { logs.push(JSON.parse(message.slice('bbt_numeric '.length))); }
+numericAXValue = () => value;
+performAXAction = () => {
+  actions++;
+  if (scenario === 'wrong_direction') value--;
+  if (scenario === 'overshoot') value = 4;
+  if (scenario === 'oscillation') value = actions % 2;
+  if (scenario === 'invalid') value = 0.5;
+};
+assert.throws(() => setAXNumericByActions(id, target), new RegExp('reason=' + expectedReason));
+assert.strictEqual(actions, expectedActions);
+assert.strictEqual(completedBBT[id], undefined);
+assert.strictEqual(logs.length, 2);
+assert.strictEqual(logs[0].reason, 'start');
+const log = logs[1];
+assert.strictEqual(log.identifier, id);
+assert.strictEqual(log.initial, 0);
+assert.strictEqual(log.target, target);
+assert.strictEqual(log.last, expectedLast);
+assert.strictEqual(log.actions, expectedActions);
+assert.strictEqual(log.reason, expectedReason);
+assert.strictEqual(log.budget, Math.min(10000, target + 16));
+""")
+
+
+@pytest.mark.parametrize("settles", [True, False])
+def test_bbt_waits_for_effect_without_repeating_action(tmp_path, settles):
+    run_ax_simulation(tmp_path, "const settles = " + json.dumps(settles) + r""";
+const id = bbtIdentifiers[3];
+let value = 0, actions = 0, waits = 0;
+numericAXValue = () => value;
+performAXAction = () => { actions++; };
+function delay(seconds) {
+  assert.strictEqual(seconds, 0.05);
+  waits++;
+  if (settles && waits === 3) value = 1;
+}
+if (settles) {
+  setAXNumericByActions(id, 1);
+  assert.strictEqual(waits, 3);
+  assert.strictEqual(completedBBT[id], 1);
+} else {
+  assert.throws(() => setAXNumericByActions(id, 1), /reason=no_effect/);
+  assert.strictEqual(waits, 5);
+}
+assert.strictEqual(actions, 1);
+""")
+
+
+def test_numeric_failure_does_not_reopen_dialog(tmp_path):
+    import shutil
+    import subprocess
+    script = build_ableton_export_script(
+        start_bbt=(315, 3, 3), length_bbt=(69, 3, 3),
+        output_path=tmp_path / "test.wav", sample_rate=48000,
+        bit_depth=24, normalize=False,
+    )
+    block = script[script.index('try {\n  configureExportBBT();'):script.index('timing("configure_bbt:done");')]
+    harness = r"""
+const assert = require('assert');
+function configureExportBBT() { throw new Error('Reglage AX BBT interrompu: reason=no_effect'); }
+function timing() { assert.fail('retry numérique inattendu'); }
+assert.throws(() => { BLOCK }, /reason=no_effect/);
+""".replace('BLOCK', block)
+    result = subprocess.run([shutil.which("node"), "-e", harness], capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, result.stderr
+
+
+def test_jxa_has_global_budget_for_large_start_delta(monkeypatch, tmp_path):
+    import subprocess
+    import show_audio_ableton_offline as offline
+    calls = []
+    def run(command, **kwargs):
+        calls.append(kwargs["timeout"])
+        if len(calls) == 1:
+            return subprocess.CompletedProcess(command, 0, "", "")
+        raise subprocess.TimeoutExpired(command, kwargs["timeout"])
+    monkeypatch.setattr(offline.subprocess, "run", run)
+    monkeypatch.setattr(offline.time, "monotonic", lambda: 0.0)
+    script = build_ableton_export_script(
+        start_bbt=(315, 3, 3), length_bbt=(69, 3, 3), output_path=tmp_path / "test.wav",
+        sample_rate=48000, bit_depth=24, normalize=False,
+    )
+    with pytest.raises(OfflineExportError, match="configure_export_jxa"):
+        offline.run_macos_automation(script, timeout=300)
+    assert calls == [60, 300]
+
+
+@pytest.fixture(scope="module")
+def native_bbt_fixture(tmp_path_factory):
+    import shutil
+    import subprocess
+    from pathlib import Path
+    import show_audio_ableton_offline as offline
+    swift = shutil.which("swiftc")
+    if not swift:
+        pytest.skip("Swift requis pour les tests du helper natif")
+    directory = tmp_path_factory.mktemp("native_bbt")
+    source = directory / "main.swift"
+    source.write_text("import Foundation\n" + offline._NATIVE_BBT_ALGORITHM_SWIFT + r"""
+let scenario = CommandLine.arguments[1]
+var value = Int(CommandLine.arguments[2])!
+let target = Int(CommandLine.arguments[3])!
+var actions = 0, waits = 0
+var invalid = false
+var records: [[String: Any]] = []
+var failure = ""
+do {
+    try adjustBBT(target: target, read: { invalid ? nil : value }, action: { up in
+        actions += 1
+        switch scenario {
+        case "no_effect", "delayed": break
+        case "wrong_direction": value += up ? -1 : 1
+        case "overshoot": value = target + 1
+        case "oscillation": value = actions % 2
+        case "invalid": invalid = true
+        default: value += up ? 1 : -1
+        }
+    }, pause: {
+        waits += 1
+        if scenario == "delayed" && waits == 3 { value = target }
+    }, expired: { scenario == "deadline" }, log: { initial, last, count, budget, reason in
+        records.append(["initial": initial, "target": target, "last": last,
+                        "actions": count, "budget": budget, "reason": reason])
+    })
+} catch let error as BBTAdjustmentError { failure = error.reason }
+let result: [String: Any] = ["value": value, "actions": actions, "waits": waits, "failure": failure, "logs": records]
+print(String(data: try! JSONSerialization.data(withJSONObject: result), encoding: .utf8)!)
+""")
+    binary = directory / "native-bbt"
+    compiled = subprocess.run([swift, "-module-cache-path", str(directory / "cache"), str(source), "-o", str(binary)],
+                              capture_output=True, text=True, timeout=120)
+    assert compiled.returncode == 0, compiled.stderr
+    return binary
+
+
+@pytest.mark.parametrize("start,target,count", [(0,256,256), (0,257,257), (0,1000,1000),
+    (1000,238,762), (42,42,0), (4281,603,3678), (0,10000,10000)])
+def test_native_bbt_large_moves_and_logs(native_bbt_fixture, start, target, count):
+    import subprocess
+    result = subprocess.run([str(native_bbt_fixture), "normal", str(start), str(target)], capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, result.stderr
+    data = json.loads(result.stdout)
+    assert (data["value"], data["actions"], data["failure"]) == (target, count, "")
+    assert [log["reason"] for log in data["logs"]] == ["start", "target_reached"]
+    assert data["logs"][-1] == {"initial": start, "target": target, "last": target,
+        "actions": count, "budget": min(10000, abs(target-start)+16), "reason": "target_reached"}
+
+
+@pytest.mark.parametrize("scenario,target,reason,count", [
+    ("no_effect",3,"no_effect",1), ("wrong_direction",3,"wrong_direction",1),
+    ("overshoot",3,"overshoot",1), ("oscillation",3,"oscillation",2),
+    ("normal",10001,"budget_exhausted",0), ("invalid",3,"invalid_current",1),
+    ("deadline",3,"deadline_exceeded",0), ("delayed",3,"",1),
+])
+def test_native_bbt_safety(native_bbt_fixture, scenario, target, reason, count):
+    import subprocess
+    result = subprocess.run([str(native_bbt_fixture), scenario, "0", str(target)], capture_output=True, text=True, timeout=10)
+    assert result.returncode == 0, result.stderr
+    data = json.loads(result.stdout)
+    assert data["failure"] == reason
+    assert data["actions"] == count
+    assert data["logs"][-1]["reason"] == (reason or "target_reached")
+    if scenario == "delayed":
+        assert data["waits"] == 3
+    if scenario == "no_effect":
+        assert data["waits"] == 25
+
+
+@pytest.mark.parametrize("outcome", ["ok", "failure", "verification"])
+def test_jxa_native_worker_contract(tmp_path, outcome):
+    import shutil
+    import subprocess
+    import sys
+    if sys.platform != "darwin":
+        pytest.skip("ObjC JXA requis")
+    worker = tmp_path / "worker"
+    worker.write_text("#!/bin/sh\nprintf 'BBT_OK=1\\n'\nexit " + ("1" if outcome == "failure" else "0") + "\n")
+    worker.chmod(0o700)
+    script = build_ableton_export_script(start_bbt=(1,1,1),length_bbt=(1,0,0),
+        output_path=tmp_path / "out.wav",sample_rate=48000,bit_depth=24,normalize=False)
+    helper = script[script.index("function setAXNumericByActions"):script.index("\n\nfunction setBBT")]
+    prefix = 'ObjC.import("Foundation"); const nativeBBTWorker = ' + json.dumps(str(worker)) + r""";
+const live = {unixId:()=>123};
+const bbtIdentifiers = ['test'];
+const completedBBT = {};
+let cleared = 0;
+function clearBBTControlCache(){cleared++;}
+""" + "function numericAXValue(){return " + ("2" if outcome == "verification" else "1") + ";}"
+    assertion = r"""
+let failed = false;
+try { setAXNumericByActions('test', 1); } catch(e) { failed = true; }
+if (failed !== EXPECTED) throw new Error('unexpected worker result');
+if (!failed && (completedBBT.test !== 1 || cleared !== 1)) throw new Error('verification missing');
+""".replace("EXPECTED", "false" if outcome == "ok" else "true")
+    result = subprocess.run(['/usr/bin/osascript', '-l', 'JavaScript', '-e', prefix+helper+assertion],
+                            capture_output=True,text=True,timeout=10)
+    assert result.returncode == 0, result.stderr
+
+
+
+def test_cancel_stops_running_export_process(tmp_path):
+    import sys
+    import threading
+    import time
+    import show_audio_ableton_offline as offline
+    event = threading.Event()
+    started = tmp_path / "started"
+    command = [sys.executable, "-c",
+               "from pathlib import Path; import time; Path(" + repr(str(started)) + ").touch(); time.sleep(30)"]
+    def cancel_when_running():
+        deadline = time.monotonic() + 5
+        while not started.exists() and time.monotonic() < deadline:
+            time.sleep(.01)
+        event.set()
+    thread = threading.Thread(target=cancel_when_running)
+    thread.start()
+    before = time.monotonic()
+    try:
+        with pytest.raises(offline.ExportCancelled):
+            offline._run_export_process(command, cancel_event=event, capture_output=True, text=True, timeout=30)
+    finally:
+        event.set()
+        thread.join(timeout=6)
+    assert started.exists()
+    assert time.monotonic() - before < 5
+
+
+def test_cancel_before_launch_never_starts_process(monkeypatch):
+    import threading
+    import show_audio_ableton_offline as offline
+    event = threading.Event()
+    event.set()
+    monkeypatch.setattr(offline.subprocess, "Popen", lambda *a, **kw: pytest.fail("process launched"))
+    with pytest.raises(offline.ExportCancelled):
+        offline._run_export_process(["unused"], cancel_event=event)
+
+
+@pytest.mark.parametrize("phase", ["configure", "render_wait"])
+def test_cancel_export_closes_dialog_then_restores_loop(monkeypatch, tmp_path, phase):
+    import threading
+    import show_audio_ableton_offline as offline
+    event = threading.Event()
+    previous = {"loop_start": 10, "loop_length": 4, "loop": False}
+    events = []
+    monkeypatch.setattr(offline, "_prepare_live_export_loop", lambda **kw: previous)
+    monkeypatch.setattr(offline, "_get_live_loop_start_bbt", lambda: (315, 3, 3))
+    def automation(*args, **kwargs):
+        assert kwargs["cancel_event"] is event
+        events.append("automation")
+        event.set()
+        if phase == "configure":
+            raise offline.ExportCancelled("Export audio annulé")
+    monkeypatch.setattr(offline, "run_macos_automation", automation)
+    monkeypatch.setattr(offline, "_cancel_live_export", lambda: events.append("close_dialog"))
+    monkeypatch.setattr(offline, "_restore_live_loop_state", lambda state: events.append(("restore", state)))
+    target = tmp_path / "final.wav"
+    target.write_bytes(b"existing audio")
+    result = offline.execute_offline_wav(zone={"start_beats": 1258.5, "duration_beats": 2},
+        settings=settings(), output_path=target, tempo=120, cancel_event=event)
+    assert result["status"] == "cancelled"
+    assert events == ["automation", "close_dialog", ("restore", previous)]
+    assert target.read_bytes() == b"existing audio"
+
+
+
+def test_cancel_stops_descendant_even_if_it_ignores_term(tmp_path):
+    import sys
+    import threading
+    import time
+    import show_audio_ableton_offline as offline
+    heartbeat = tmp_path / "heartbeat"
+    child = "import signal,time; from pathlib import Path; signal.signal(signal.SIGTERM,signal.SIG_IGN); p=Path(" + repr(str(heartbeat)) + ");\nwhile True: p.write_text(str(time.monotonic())); time.sleep(.02)"
+    parent = "import subprocess,sys,time; subprocess.Popen([sys.executable,'-c'," + repr(child) + "],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL); time.sleep(30)"
+    event = threading.Event()
+    def cancel():
+        deadline = time.monotonic() + 5
+        while not heartbeat.exists() and time.monotonic() < deadline:
+            time.sleep(.01)
+        event.set()
+    thread = threading.Thread(target=cancel)
+    thread.start()
+    try:
+        with pytest.raises(offline.ExportCancelled):
+            offline._run_export_process([sys.executable,"-c",parent], cancel_event=event, capture_output=True,text=True,timeout=10)
+    finally:
+        event.set()
+        thread.join(timeout=6)
+    assert heartbeat.exists()
+    time.sleep(.1)
+    last = heartbeat.read_text()
+    time.sleep(.15)
+    assert heartbeat.read_text() == last
+
+
+@pytest.mark.parametrize("scenario,expected_presses,failed", [
+    ("none",0,False), ("export",1,False), ("save",2,False),
+    ("render",1,False), ("unrelated",0,False), ("refuses",3,True),
+])
+def test_cancel_live_is_scoped_and_confirmed(monkeypatch, scenario, expected_presses, failed):
+    import shutil
+    import subprocess
+    import show_audio_ableton_offline as offline
+    calls = []
+    monkeypatch.setattr(offline.subprocess, "run", lambda command, **kw: calls.append(command))
+    offline._cancel_live_export()
+    script = calls[0][-1]
+    # Use a real JS runtime with only the Live window surface simulated.
+    harness = "const scenario = " + json.dumps(scenario) + r""";
+let presses=0;
+let stages = scenario==='save' ? ['save','export'] :
+             ['export','render','refuses','unrelated'].includes(scenario) ? [scenario] : [];
+function windowFor(stage) { return {
+  name:()=>stage==='export'||stage==='refuses' ? 'Exporter Audio/Vidéo' : stage==='render' ? 'Exportation Audio...' : 'SHOW CASSIS',
+  attributes:{byName:()=>({value:()=>stage==='save' ? 'save-panel' : ''})},
+  sheets:()=>[]
+}; }
+const process = {windows:()=>[windowFor(stages[0]||'main')]};
+function Application(){return {applicationProcesses:{whose:()=>()=>[process]},
+  keyCode:(key)=>{if(key!==53) throw Error('unexpected key'); presses++; if(scenario!=='refuses') stages.shift();}};}
+function delay(){}
+let failure=false;
+try { SCRIPT } catch(e) { failure=true; }
+if(presses!==EXPECTED || failure!==FAILED) throw Error('cancel scope or confirmation incorrect');
+""".replace('SCRIPT', script).replace('EXPECTED',str(expected_presses)).replace('FAILED',json.dumps(failed))
+    # Capture before monkeypatching the subprocess module shared by the test.
+    # Popen avoids the mocked run used to capture the production script.
+    process = subprocess.Popen([shutil.which("node"),"-e",harness],stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+    stdout,stderr=process.communicate(timeout=10)
+    assert process.returncode==0,stderr
+
+
+@pytest.mark.parametrize("language", ["fr", "en"])
+@pytest.mark.parametrize("scenario", ["ready", "missing", "disabled", "unavailable"])
+def test_export_open_uses_localized_menu_before_shortcut(tmp_path, language, scenario):
+    import shutil
+    import subprocess
+    script = build_ableton_export_script(start_bbt=(603,3,3),length_bbt=(110,1,0),
+        output_path=tmp_path / "test.wav",sample_rate=48000,bit_depth=24,normalize=False)
+    opener = script[script.index("function openExportDialog()"):script.index("// Live peut parfois")]
+    harness = 'const language = ' + json.dumps(language) + '; const scenario = ' + json.dumps(scenario) + r""";
+const assert=require('assert');
+const events=[];
+const fileName=language==='fr' ? 'Fichier' : 'File';
+const editName=language==='fr' ? 'Edition' : 'Edit';
+function heading(name,command,kind){return {
+ name:()=>name,
+ click:()=>events.push('heading:'+kind),
+ menus:()=>[{menuItems:()=>scenario==='missing' && kind==='export' ? [] : [{
+   name:()=>command, enabled:()=>scenario!=='disabled'||kind!=='export',
+   click:()=>events.push('command:'+kind)
+ }]}]
+};}
+const live={frontmost:false,menuBars:()=>{
+ if(scenario==='unavailable') throw Error('AX unavailable');
+ return [{menuBarItems:()=>[
+ heading(editName,language==='fr' ? 'Sélectionner la boucle' : 'Select Loop','loop'),
+ heading(fileName,language==='fr' ? 'Exporter Audio/Vidéo...' : 'Export Audio/Video…','export')
+ ]}];
+}};
+const se={keyCode:()=>events.push('close_menu'),keystroke:key=>events.push('shortcut:'+key)};
+function delay(){}
+function timing(){}
+OPENER
+if(scenario==='disabled') {
+ assert.throws(openExportDialog,/Commande menu Live desactivee/);
+ assert(!events.includes('shortcut:r'));
+} else {
+ openExportDialog();
+ if(scenario==='ready') {
+   assert.deepStrictEqual(events,['heading:loop','command:loop','heading:export','command:export']);
+ } else if(scenario==='missing') {
+   assert.deepStrictEqual(events,['heading:loop','command:loop','heading:export','close_menu','shortcut:r']);
+ } else {
+   assert.deepStrictEqual(events,['shortcut:l','shortcut:r']);
+ }
+}
+""".replace('OPENER',opener)
+    result = subprocess.run([shutil.which('node'),'-e',harness],capture_output=True,text=True,timeout=10)
+    assert result.returncode==0,result.stderr

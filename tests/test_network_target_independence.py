@@ -75,7 +75,9 @@ class NetworkIndependenceTests(unittest.TestCase):
         discovery = mock.Mock(return_value={'ip': '192.168.1.54', 'host': 'Record-Blue.local'})
         for host in ['192.168.1.53', 'iMac-de-Sono-2.local']:
             target = targets.validate_target({'mode': 'remote', 'host': host})
-            scope = {'load_target': lambda: target, 'OSCTransport': osc_transport.OSCTransport,
+            from app_mode import AppMode, capabilities_for
+            scope = {'APP_CAPABILITIES': capabilities_for(AppMode.FULL), 'AppMode': AppMode,
+                     'load_target': lambda: target, 'OSCTransport': osc_transport.OSCTransport,
                      'discover_ableton_remote': discovery, 'dataclass_replace': replace}
             with mock.patch.object(osc_transport, 'resolve_ipv4_host', return_value='192.168.1.53') as resolve, mock.patch.object(osc_transport.udp_client, 'SimpleUDPClient') as client:
                 exec(startup, scope)

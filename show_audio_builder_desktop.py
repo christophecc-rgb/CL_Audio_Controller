@@ -43,6 +43,7 @@ from show_audio_arrangement_resolver import (
     resolve_medley_zone,
 )
 from show_audio_batch_export import execute_batch_item
+from show_audio_ableton_offline import _check_export_cancel, ExportCancelled
 from show_audio_export_plan import build_export_plan
 from show_audio_export_settings import normalize_export_settings
 from show_audio_snapshot import ShowAudioSnapshotBuilder
@@ -1178,8 +1179,11 @@ class ShowAudioBuilderDesktop(tk.Tk):
             batch_items = item if isinstance(item, list) else [item]
             completed_outputs = []
             for batch_item in batch_items:
+                cancel_event = self.__dict__.get("_export_cancel_event")
+                _check_export_cancel(cancel_event)
                 result = execute_batch_item(
                     batch_item, output_directory=output_directory, tempo=tempo,
+                    **({"cancel_event": cancel_event} if cancel_event is not None else {}),
                 )
                 if result.get("status") != "completed":
                     break
@@ -1192,6 +1196,10 @@ class ShowAudioBuilderDesktop(tk.Tk):
                 ("result", result, str(output_directory))
             )
 
+        except ExportCancelled as exc:
+            self._get_scene_export_results().put(
+                ("result", {"status": "cancelled", "error": str(exc)}, str(output_directory))
+            )
         except Exception as exc:
             traceback.print_exc()
             self._get_scene_export_results().put(
@@ -1237,6 +1245,10 @@ class ShowAudioBuilderDesktop(tk.Tk):
             return
 
         result = payload or {}
+        if result.get("status") == "cancelled":
+            self.set_export_workflow_state("IDLE")
+            self.info_var.set("Export audio annulé · préparer à nouveau pour relancer.")
+            return
 
         if result.get("status") != "completed":
             error = (
@@ -1366,6 +1378,7 @@ class ShowAudioBuilderDesktop(tk.Tk):
             f"Export audio en cours · {title}"
         )
 
+        self._export_cancel_event = threading.Event()
         self._scene_export_deadline = time.monotonic() + 330.0 * len(batch_items)
         self._scene_export_timed_out = False
         threading.Thread(
@@ -1523,6 +1536,11 @@ class ShowAudioBuilderDesktop(tk.Tk):
 
     def request_cancel_export_ui(self):
         if self.export_workflow_state == "EXPORTING":
+            cancel_event = self.__dict__.get("_export_cancel_event")
+            if cancel_event is not None:
+                cancel_event.set()
+            self.cancel_export_button.configure(state="disabled")
+            self.info_var.set("Annulation en cours · arrêt et restauration de Live…")
             self.event_generate("<<ExportCancelRequested>>")
 
     def prepare_export_ui(self) -> None:

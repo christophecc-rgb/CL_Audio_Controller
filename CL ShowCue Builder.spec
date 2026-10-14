@@ -1,3 +1,12 @@
+import sys
+from pathlib import Path
+
+# PyInstaller peut exécuter le .spec hors du dossier du dépôt.
+_spec_dir = Path(SPECPATH).resolve()
+if str(_spec_dir) not in sys.path:
+    sys.path.insert(0, str(_spec_dir))
+
+from release_version import bundle_version, bundle_build
 # -*- mode: python ; coding: utf-8 -*-
 
 a = Analysis(
@@ -20,6 +29,6 @@ app = BUNDLE(
     coll, name='CL Cue Editor.app', icon='assets/app_icons/CL_Cue_Editor.icns',
     bundle_identifier='com.claudio.showcue.builder',
     info_plist={'CFBundleDisplayName': 'CL Cue Editor',
-                'CFBundleShortVersionString': '1.0.0',
-                'CFBundleVersion': '1', 'LSMinimumSystemVersion': '11.0', 'NSHighResolutionCapable': True},
+                'CFBundleShortVersionString': bundle_version(),
+                'CFBundleVersion': bundle_build(), 'LSMinimumSystemVersion': '11.0', 'NSHighResolutionCapable': True},
 )

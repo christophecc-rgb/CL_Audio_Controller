@@ -12,6 +12,13 @@
 # - AbletonOSC reçoit sur 11000
 # - ce script reçoit les réponses sur 11001
 
+from runtime_startup import require_full_runtime, run_light_entry, host_capabilities
+
+if __name__ == "__main__" and run_light_entry("backend"):
+    raise SystemExit(0)
+
+require_full_runtime()
+
 import json
 import hmac
 import ipaddress
@@ -29,6 +36,11 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Optional, Tuple
 from pathlib import Path
 AUTONOMOUS_MODE = (Path(__file__).resolve().parent / "autonomous-mode.json").exists()
+
+from app_mode import AppMode, capabilities_for, local_light_state
+from go_core import GoContext, LocalGoConsumer, execute_go_core
+
+APP_CAPABILITIES = host_capabilities()
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
 from show_audio_print_engine import PrintEngineError, capture_clean
@@ -81,7 +93,9 @@ SERVER_INSTANCE_ID = str(uuid.uuid4())
 LAUNCH_ID = os.environ.get("CL_AUDIO_LAUNCH_ID")
 EXPECTED_BUILD_ID = os.environ.get("CL_AUDIO_EXPECTED_BUILD_ID")
 SHUTDOWN_TOKEN = os.environ.get("CL_AUDIO_SHUTDOWN_TOKEN")
-DEVICE_CONFIGURATION_RESULT = load_device_configuration_result()
+from device_profiles import DeviceConfiguration, DeviceConfigurationLoadResult
+DEVICE_CONFIGURATION_RESULT = (load_device_configuration_result() if APP_CAPABILITIES.console_enabled
+    else DeviceConfigurationLoadResult(DeviceConfiguration(), "light-disabled"))
 DEVICE_CONFIGURATION = DEVICE_CONFIGURATION_RESULT.configuration
 
 
@@ -179,7 +193,7 @@ def require_active_show_session(values, registry):
 # Max for Live Crossfader Bridge
 M4L_IP = "127.0.0.1"
 M4L_PORT = 9001
-m4l_client = udp_client.SimpleUDPClient(M4L_IP, M4L_PORT)
+m4l_client = udp_client.SimpleUDPClient(M4L_IP, M4L_PORT) if APP_CAPABILITIES.console_enabled else None
 
 # Contexte de scène destiné au moniteur MIDI Max for Live. La destination
 # suit la cible Ableton active afin de fonctionner aussi en mode distant.
@@ -272,7 +286,7 @@ atexit.register(stop_midi_expected_bonjour_publisher)
 MIDI_CONSOLE_STATE_PATH = Path("/private/tmp/CL_MIDI_Console_State.json")
 MIDI_CONSOLE_TITLE_OVERRIDES: Dict[str, Tuple[float, str]] = {}
 CONSOLE_FILES_ROOT = DEFAULT_CONFIG_PATH.parent / "Console Files"
-CONSOLE_LIBRARY_STORE = ConsoleLibraryStore(CONSOLE_FILES_ROOT)
+CONSOLE_LIBRARY_STORE = ConsoleLibraryStore(CONSOLE_FILES_ROOT) if APP_CAPABILITIES.console_enabled else None
 CONSOLE_TITLE_PREFERENCES_PATH = DEFAULT_CONFIG_PATH.with_name("console-title-preferences.json")
 CONSOLE_TITLE_OFFSET_MIN = -5
 CONSOLE_TITLE_OFFSET_MAX = 5
@@ -382,7 +396,8 @@ GENERATION_DEBUG = os.environ.get("CL_AUDIO_GENERATION_DEBUG", "0").strip().lowe
 
 app = Flask(__name__)
 remote_security = attach_security(app)
-ableton_target = load_target()
+from ableton_targets import AbletonTarget
+ableton_target = load_target() if APP_CAPABILITIES.mode is AppMode.FULL else AbletonTarget()
 
 # La cible enregistrée est autoritaire. OSCTransport résout son nom éventuel ;
 # une découverte RTP/Bonjour ne doit jamais sélectionner une autre machine.
@@ -390,19 +405,22 @@ ableton_transport = OSCTransport(
     host=ableton_target.host,
     send_port=ableton_target.send_port,
     reply_port=ableton_target.reply_port,
+    **({"collect_metrics": False} if APP_CAPABILITIES.mode is AppMode.LOCAL_LIGHT else {}),
 )
 # Optional copy only: PRIMARY retains its transport and confirmation path.
 BACKUP_PREFERENCES_PATH = DEFAULT_CONFIG_PATH.with_name("backup-destination.json")
-backup_destination = load_backup_destination(BACKUP_PREFERENCES_PATH)
-hot_backup = HotBackup()
-ableton_transport.foreign_reply_handler = hot_backup.receive
+backup_destination = load_backup_destination(BACKUP_PREFERENCES_PATH) if APP_CAPABILITIES.hot_backup_enabled else None
+hot_backup = HotBackup() if APP_CAPABILITIES.hot_backup_enabled else None
+if hot_backup is not None:
+    ableton_transport.foreign_reply_handler = hot_backup.receive
 hot_backup_generation = None
 
 # Lightweight scene-event backup broadcaster.
 # Disabled by default until explicitly configured.
-scene_backup_udp = SceneBackupUDP()
-atexit.register(scene_backup_udp.close)
-app.extensions["cl_scene_backup"] = scene_backup_udp
+scene_backup_udp = SceneBackupUDP() if APP_CAPABILITIES.hot_backup_enabled else None
+if scene_backup_udp is not None:
+    atexit.register(scene_backup_udp.close)
+    app.extensions["cl_scene_backup"] = scene_backup_udp
 app.extensions["cl_osc_status"] = ableton_transport.diagnostics
 
 # Donne momentanément la priorité au test de connexion demandé par
@@ -564,6 +582,8 @@ CL_AUDIO_REMOTE_CSS = """
 
 def decorate_remote_page_html(response):
     """Installe le shell V2 commun autour des trois modules de la télécommande."""
+    if APP_CAPABILITIES.mode is not AppMode.FULL:
+        return response
     if request.path not in CL_AUDIO_REMOTE_SUBTITLES:
         return response
 
@@ -1229,7 +1249,7 @@ state: Dict[str, Any] = {
     "expected_activated_at": None,
     "console_title_mode": load_console_title_mode(),
     "console_title_offsets": load_console_title_offsets(),
-    "console_scene_libraries": load_console_scene_libraries(),
+    "console_scene_libraries": load_console_scene_libraries() if APP_CAPABILITIES.console_enabled else {},
     "is_paused": False,
     "play_mode": "stopped",
     "playing_scene": -1,
@@ -1426,7 +1446,7 @@ _NOT_RECEIVED = object()
 _playing_listener_generation: Optional[int] = None
 _playing_listener_token: Optional[str] = None
 _playing_listener_tracks: Dict[int, Optional[int]] = {}
-backup_scene_follow = BackupSceneFollow()
+backup_scene_follow = BackupSceneFollow() if APP_CAPABILITIES.hot_backup_enabled else None
 _playing_listener_install_lock = threading.Lock()
 _playing_listener_shutdown = False
 
@@ -1880,6 +1900,8 @@ def generation_log(event: str, **details: Any) -> None:
 
 
 def stop_backup_scene_follow_locked():
+    if backup_scene_follow is None:
+        return
     token = backup_scene_follow.token
     scenes = tuple(backup_scene_follow.values)
     backup_scene_follow.reset()
@@ -1904,6 +1926,8 @@ def start_backup_scene_follow():
 
 
 def receive_backup_transport_event(args, source_host=None):
+    if backup_scene_follow is None:
+        return
     if len(args) != 2:
         return
     token, playing = args
@@ -1916,6 +1940,8 @@ def receive_backup_transport_event(args, source_host=None):
 
 
 def receive_backup_scene_trigger(args, source_host=None):
+    if backup_scene_follow is None:
+        return
     if len(args) != 3:
         return
     scene, token, triggered = args
@@ -1955,47 +1981,11 @@ atexit.register(stop_playing_scene_listeners)
 
 
 def ensure_playing_scene_listeners() -> None:
-    """One read of track count per Set; no recurring track/clip scan.
+    return ableton_runtime.ensure_playing_scene_listeners()
 
-    AbletonOSC echoes extra start_listen parameters BEFORE the property value.
-    The opaque token therefore identifies the actual subscription on the wire,
-    including across server restarts, rather than tagging arrivals retroactively.
-    """
-    global _playing_listener_generation, _playing_listener_token
-    if not _playing_listener_install_lock.acquire(blocking=False):
-        return
-    try:
-        with lock:
-            generation = int(state.get("set_generation", 0))
-            if (_playing_listener_shutdown or not state.get("set_ready")
-                    or _playing_listener_generation == generation):
-                return
-        response = query("/live/song/get/num_tracks", expected_generation=generation,
-                         apply_response=False)
-        if not response:
-            return  # Retry only at the next normal identity/transport refresh.
-        try:
-            count = int(response[0])
-        except (ValueError, TypeError):
-            return
-        if count < 0:
-            return
-        with lock:
-            if (_playing_listener_shutdown or generation != int(state.get("set_generation", 0))
-                    or not state.get("set_ready")):
-                return
-            stop_playing_scene_listeners_locked()
-            _playing_listener_generation = generation
-            _playing_listener_token = f"{SERVER_INSTANCE_ID}:{generation}:{uuid.uuid4()}"
-            for track in range(count):
-                _playing_listener_tracks[track] = None
-                if ableton_transport.send("/live/track/start_listen/playing_slot_index",
-                                          track, _playing_listener_token) is False:
-                    stop_playing_scene_listeners_locked()
-                    return
 
-    finally:
-        _playing_listener_install_lock.release()
+def update_manual_scene_state_locked(generation, slot, name, initial):
+    return ableton_runtime.update_manual_scene_state_locked(generation, slot, name, initial)
 
 
 def receive_playing_slot_event(args, source_host=None) -> None:
@@ -2034,28 +2024,14 @@ def receive_playing_slot_event(args, source_host=None) -> None:
         if slot == state.get("playing_scene") and state.get("play_mode") == "session":
             return  # Multiple tracks of the same scene must not restart the countdown.
         name = state["scenes"][slot]
-        duration = parse_scene_duration_seconds(name)
-        now = time.time()
-        state.update(
-            playing_scene=slot, playing_scene_name=name, current_scene=slot,
-            last_fired_scene=slot, last_fired_scene_name=name, has_show_started=True,
-            play_mode="session", is_playing=True, is_paused=False,
-            scene_duration_seconds=duration, scene_duration_is_clip=False,
-            # Initial listener values cannot tell us when playback began.
-            remaining_seconds=None if initial else duration,
-            playback_deadline=(now + duration) if duration is not None and not initial else None,
-            expected_scene_signature=(generation, "session", slot), expected_activated_at=now,
-            sync_source="Ableton événement", arrangement_marker="—",
-        )
+        now = update_manual_scene_state_locked(generation, slot, name, initial)
 
         # Une scène lancée directement dans Live devient aussi la nouvelle
         # intention MIDI attendue. Ceci met uniquement à jour l'état interne :
         # aucune commande Live ni aucun Program Change n'est émis ici.
-        record_go_midi_expectations(
-            slot,
-            now,
-            source="ableton_playing_scene_event",
-        )
+        console_consumer = manual_scene_console_consumer()
+        if console_consumer is not None:
+            console_consumer.manual_expectations_locked(generation, slot, now)
 
         # Une scène lancée directement dans Ableton doit recaler le
         # pointeur LOCAL de la télécommande sur la scène suivante,
@@ -2073,19 +2049,17 @@ def receive_playing_slot_event(args, source_host=None) -> None:
                 next_name or f"Scène {selection_to_advance + 1}"
             )
             state["selected_scene_duration_seconds"] = (
-                parse_scene_duration_seconds(next_name)
+                scene_timing.declared_duration(next_name)
             )
             state["selected_scene_duration_index"] = selection_to_advance
             state["selected_scene_duration_is_clip"] = False
 
         # Existing context publication only; no Program Change interpretation/emission.
-        send_midi_monitor_scene_context(generation, slot, name)
+        if console_consumer is not None:
+            console_consumer.manual_context_locked(generation, slot, name)
 
     if selection_to_advance is not None:
-        schedule_selected_scene_duration_refresh(
-            selection_to_advance,
-            generation,
-        )
+        scene_timing.prepare_duration(selection_to_advance, generation)
 
 
 def reset_live_set_state_locked(set_id: Optional[str], reason: str) -> int:
@@ -2098,44 +2072,8 @@ def reset_live_set_state_locked(set_id: Optional[str], reason: str) -> int:
     previous_set_id = state.get("current_set_id")
     generation = previous_generation + 1
     identity = set_id or f"pending:{generation}"
-    state.update({
-        "current_set_id": identity,
-        "current_set_name": "",
-        "set_generation": generation,
-        "current_scene": None,
-        "next_scene": None,
-        "has_show_started": False,
-        "selected_scene": 0,
-        "selected_scene_name": "—",
-        "selected_scene_duration_seconds": None,
-        "selected_scene_duration_index": None,
-        "selected_scene_duration_is_clip": False,
-        "scenes": {},
-        "console_scene_map": {"cl5": {}, "ql1": {}},
-        "ableton_midi_output": {"cl5": None, "ql1": None},
-        "device_states": {},
-        "play_mode": "stopped",
-        "playing_scene": -1,
-        "playing_scene_name": "—",
-        "last_fired_scene": -1,
-        "last_fired_scene_name": "—",
-        "is_playing": False,
-        "is_paused": False,
-        "scene_duration_seconds": None,
-        "scene_duration_is_clip": False,
-        "remaining_seconds": None,
-        "playback_deadline": None,
-        "arrangement_time": 0.0,
-        "last_arrangement_time": 0.0,
-        "arrangement_time_label": "00:00",
-        "arrangement_marker": "—",
-        "arrangement_markers": [],
-        "message": f"Nouveau Live Set détecté ({reason})",
-        "sync_source": "Ableton",
-        "bootstrap_running": False,
-        "bootstrap_generation": None,
-        "pending_request": None,
-    })
+    state.update(ableton_runtime.invalidated_session_state(identity, generation, reason))
+    state.update({'console_scene_map': {'cl5': {}, 'ql1': {}}, 'ableton_midi_output': {'cl5': None, 'ql1': None}, 'device_states': {}, 'arrangement_time': 0.0, 'arrangement_time_label': '00:00', 'arrangement_marker': '—', 'arrangement_markers': []})
     set_set_ready_locked(False, reason, "reset_live_set_state_locked")
     ableton_transport.cancel_pending()
     completed_go_requests.clear()
@@ -3269,113 +3207,8 @@ def _first_text_value(response: Optional[Tuple[Any, ...]]) -> str:
     return ""
 
 
-def refresh_live_set_identity(expected_generation: Optional[int] = None) -> Optional[int]:
-    """Vérifie l'identité du Set pendant le rafraîchissement normal.
-
-    /live/startup donne la réinitialisation immédiate. Cette comparaison permanente
-    de file_path constitue la seconde source de détection si l'événement est perdu.
-    """
-    if expected_generation is None:
-        with lock:
-            expected_generation = int(state.get("set_generation", 0))
-
-    # Le bootstrap confirme lui-même file_path au début et à la fin de sa
-    # transaction. Le cycle normal ne doit pas intercaler une seconde série de
-    # lectures pendant cette courte fenêtre.
-    with lock:
-        transaction = _bootstrap_transaction
-        if (
-            transaction is not None
-            and transaction.generation == int(expected_generation)
-            and not transaction.completed
-            and not transaction.cancelled
-        ):
-            return int(expected_generation)
-
-    file_path_response = query(
-        "/live/song/get/file_path",
-        timeout=OSC_TIMEOUT,
-        expected_generation=expected_generation,
-        allow_during_bootstrap=True,
-        apply_response=False,
-    )
-    file_path_available = file_path_response is not None
-    file_path = _first_text_value(file_path_response)
-    if not generation_is_current(expected_generation):
-        return None
-
-    set_name_response = query(
-        "/live/song/get/name",
-        timeout=OSC_TIMEOUT,
-        expected_generation=expected_generation,
-        allow_during_bootstrap=True,
-        apply_response=False,
-    )
-    set_name_available = set_name_response is not None
-    set_name = _first_text_value(set_name_response)
-    if not generation_is_current(expected_generation):
-        return None
-
-    confirmation_response = query(
-        "/live/song/get/file_path",
-        timeout=OSC_TIMEOUT,
-        expected_generation=expected_generation,
-        allow_during_bootstrap=True,
-        apply_response=False,
-    )
-    if confirmation_response is None or not generation_is_current(expected_generation):
-        return None
-    confirmed_file_path = _first_text_value(confirmation_response)
-    if confirmed_file_path != file_path:
-        generation_log(
-            "identity_confirmation_mismatch",
-            first=file_path,
-            second=confirmed_file_path,
-            generation=expected_generation,
-        )
-        return None
-
-    with lock:
-        current_id = state.get("current_set_id")
-        if current_id is None:
-            generation = reset_live_set_state_locked(file_path or None, "initial identity")
-            if not file_path:
-                state["current_set_id"] = f"unsaved:{generation}"
-            state["current_set_name"] = set_name
-            return generation
-
-        pending = str(current_id).startswith("pending:")
-        observed_id = file_path or (f"unsaved:{expected_generation}" if pending else str(current_id))
-
-        if pending:
-            state["current_set_id"] = observed_id
-            state["current_set_name"] = set_name
-            return int(state["set_generation"])
-
-        current_is_temporary = str(current_id).startswith("unsaved:")
-        identity_changed = (
-            file_path_available
-            and (
-                (bool(file_path) and file_path != current_id)
-                or (not file_path and not current_is_temporary)
-            )
-        )
-        if identity_changed:
-            generation_log(
-                "file_path_changed",
-                previous_set_id=current_id,
-                observed_set_id=file_path or "<unsaved>",
-                generation=expected_generation,
-            )
-            generation = reset_live_set_state_locked(file_path or None, "file_path")
-            if not file_path:
-                state["current_set_id"] = f"unsaved:{generation}"
-            state["current_set_name"] = set_name
-            return generation
-
-        if set_name_available:
-            state["current_set_name"] = set_name
-        return int(state["set_generation"])
+def refresh_live_set_identity(expected_generation: Optional[int]=None) -> Optional[int]:
+    return ableton_runtime.refresh_live_set_identity(expected_generation)
 
 
 def _bootstrap_target_identity() -> Tuple[str, int, int]:
@@ -3493,93 +3326,8 @@ def abort_bootstrap(generation: int, reason: str) -> None:
     )
 
 
-def apply_live_set_bootstrap_locked(
-    generation: int,
-    file_path: str,
-    set_name: str,
-    selected_scene: int,
-    scene_names: Tuple[Any, ...],
-) -> bool:
-    """Remplace en une écriture l'intégralité des données propres au nouveau Set."""
-    global _bootstrap_generation
-
-    if int(state.get("set_generation", 0)) != int(generation):
-        write_bootstrap_diagnostic("bootstrap-apply-rejected",
-            reason="generation_mismatch",
-            transactionGeneration=generation,
-            stateGeneration=state.get("set_generation"))
-        return False
-    if state.get("set_ready", False):
-        write_bootstrap_diagnostic("bootstrap-apply-rejected",
-            reason="set_already_ready",
-            generation=generation)
-        return False
-
-    set_id = file_path or f"unsaved:{generation}"
-    current_id = str(state.get("current_set_id") or "")
-    temporary_same_generation = current_id == f"unsaved:{generation}"
-    if (
-        current_id
-        and not current_id.startswith("pending:")
-        and not temporary_same_generation
-        and current_id != set_id
-    ):
-        write_bootstrap_diagnostic(
-            "bootstrap-apply-rejected",
-            reason="set_identity_mismatch",
-            generation=generation,
-            currentSetId=current_id,
-            transactionSetId=set_id,
-        )
-        return False
-
-    new_scenes = {
-        index: str(name)
-        for index, name in enumerate(scene_names)
-        if name is not None
-    }
-    selected_name = new_scenes.get(int(selected_scene), "—") or "—"
-    state.update({
-        "current_set_id": set_id,
-        "current_set_name": set_name,
-        "selected_scene": int(selected_scene),
-        "next_scene": int(selected_scene),
-        "selected_scene_name": selected_name,
-        "selected_scene_duration_seconds": parse_scene_duration_seconds(selected_name),
-        "selected_scene_duration_index": int(selected_scene),
-        "selected_scene_duration_is_clip": False,
-        "scenes": new_scenes,
-        "current_scene": None,
-        "playing_scene": -1,
-        "playing_scene_name": "—",
-        "last_fired_scene": -1,
-        "last_fired_scene_name": "—",
-        "has_show_started": False,
-        "message": "Live Set prêt",
-        "sync_source": "Ableton",
-    })
-    set_connected_locked(True, "bootstrap complet", "apply_live_set_bootstrap_locked")
-    set_set_ready_locked(True, "bootstrap complet et cohérent", "apply_live_set_bootstrap_locked")
-    set_bootstrap_step_locked("Live Set prêt", "bootstrap complet et cohérent")
-    state["bootstrap_running"] = False
-    state["bootstrap_generation"] = None
-    state["pending_request"] = None
-    state["last_successful_bootstrap"] = {
-        "generation": int(generation),
-        "completed_at": time.time(),
-        "current_set_id": set_id,
-        "scene_count": len(new_scenes),
-        "selected_scene": int(selected_scene),
-    }
-    _bootstrap_generation = None
-    generation_log(
-        "bootstrap_complete",
-        generation=generation,
-        current_set_id=set_id,
-        selected_scene=selected_scene,
-        scene_count=len(new_scenes),
-    )
-    return True
+def apply_live_set_bootstrap_locked(generation: int, file_path: str, set_name: str, selected_scene: int, scene_names: Tuple[Any, ...]) -> bool:
+    return ableton_runtime.apply_live_set_bootstrap_locked(generation, file_path, set_name, selected_scene, scene_names)
 
 
 def refresh_console_scene_map(generation: int, attempt: int = 1) -> None:
@@ -3717,126 +3465,7 @@ def schedule_console_scene_map_refresh(generation: int, attempt: int = 1) -> Non
 
 
 def bootstrap_live_set(generation: int) -> None:
-    """Accumule un instantané privé jusqu'à complétion ou échéance globale."""
-    global _bootstrap_generation, _bootstrap_transaction
-
-    with lock:
-        transaction = _bootstrap_transaction
-        if transaction is None or transaction.generation != int(generation):
-            transaction = _new_bootstrap_transaction(generation)
-            _bootstrap_transaction = transaction
-
-    try:
-        # Laisse arriver les datagrammes émis avant l'invalidation. Sans identifiant
-        # de requête dans AbletonOSC, ils ne sont corrélables qu'une fois drainés.
-        with lock:
-            set_bootstrap_step_locked("purge des réponses OSC antérieures", "début du bootstrap transactionnel")
-        write_bootstrap_diagnostic("bootstrap-started", setGeneration=generation)
-        time.sleep(OSC_BOOTSTRAP_DRAIN_SECONDS)
-
-        request_fields = (
-            ("file_path", "/live/song/get/file_path", 0.10, "attente de Song.file_path"),
-            ("song_name", "/live/song/get/name", 0.08, "attente de Song.name"),
-            ("selected_scene", "/live/view/get/selected_scene", 0.10, "attente de la scène sélectionnée"),
-            ("scene_names", "/live/song/get/scenes/name", 0.20, "attente des noms de scènes"),
-        )
-
-        while not transaction.completed and not transaction.cancelled:
-            if not generation_is_current(generation):
-                _bootstrap_cancel(transaction, "génération modifiée pendant le bootstrap")
-                return
-            if transaction.target_identity != _bootstrap_target_identity():
-                _bootstrap_cancel(transaction, "cible OSC modifiée pendant le bootstrap")
-                return
-            if time.monotonic() >= transaction.deadline:
-                _bootstrap_cancel(transaction, "timeout global du bootstrap", event="timeout")
-                return
-
-            progress = False
-            for field_name, address, technical_timeout, step in request_fields:
-                if transaction.received(field_name):
-                    continue
-                with lock:
-                    set_bootstrap_step_locked(step, f"transaction #{generation}")
-                if _bootstrap_query_field(transaction, field_name, address, technical_timeout):
-                    progress = True
-                if not generation_is_current(generation):
-                    _bootstrap_cancel(transaction, "génération modifiée pendant une lecture")
-                    return
-                if time.monotonic() >= transaction.deadline:
-                    break
-
-            if transaction.ready_to_confirm() and not transaction.received("confirmed_file_path"):
-                with lock:
-                    set_bootstrap_step_locked("confirmation de Song.file_path", "validation finale de l'identité")
-                if _bootstrap_query_field(
-                    transaction,
-                    "confirmed_file_path",
-                    "/live/song/get/file_path",
-                    0.10,
-                ):
-                    progress = True
-                    if transaction.confirmed_file_path != transaction.file_path:
-                        _bootstrap_cancel(transaction, "Song.file_path a changé pendant le bootstrap")
-                        return
-                    write_bootstrap_diagnostic(
-                        "bootstrap-file-path-confirmed",
-                        setGeneration=generation,
-                        filePath=transaction.file_path,
-                    )
-
-            if transaction.complete():
-                if not generation_is_current(generation):
-                    _bootstrap_cancel(transaction, "génération modifiée avant publication")
-                    return
-                with lock:
-                    applied = apply_live_set_bootstrap_locked(
-                        generation,
-                        str(transaction.confirmed_file_path),
-                        str(transaction.song_name),
-                        int(transaction.selected_scene),
-                        tuple(transaction.scene_names),
-                    )
-                if not applied:
-                    _bootstrap_cancel(transaction, "instantané cohérent refusé avant publication")
-                    return
-                transaction.completed = True
-                schedule_console_scene_map_refresh(generation)
-                elapsed_ms = int((time.monotonic() - transaction.started_at) * 1000)
-                write_bootstrap_diagnostic(
-                    "bootstrap-transaction-completed",
-                    setGeneration=generation,
-                    filePath=transaction.confirmed_file_path,
-                    selectedScene=transaction.selected_scene,
-                    sceneCount=len(transaction.scene_names),
-                    attempts=dict(transaction.attempts),
-                    elapsedMs=elapsed_ms,
-                )
-                return
-
-            write_bootstrap_diagnostic(
-                "bootstrap-transaction-waiting",
-                setGeneration=generation,
-                missing=transaction.missing(),
-                attempts=dict(transaction.attempts),
-                remainingMs=max(0, int((transaction.deadline - time.monotonic()) * 1000)),
-            )
-            if not progress:
-                time.sleep(min(
-                    BOOTSTRAP_RETRY_PAUSE_SECONDS,
-                    max(0.0, transaction.deadline - time.monotonic()),
-                ))
-    except Exception as exc:
-        _bootstrap_cancel(transaction, f"exception {type(exc).__name__}: {exc}")
-    finally:
-        with lock:
-            if _bootstrap_transaction is transaction and (transaction.completed or transaction.cancelled):
-                _bootstrap_transaction = None
-            if _bootstrap_generation == generation and not state.get("set_ready", False):
-                _bootstrap_generation = None
-                state["bootstrap_running"] = False
-                state["bootstrap_generation"] = None
-                state["pending_request"] = None
+    return ableton_runtime.bootstrap_live_set(generation)
 
 
 def start_live_set_bootstrap(generation: int) -> None:
@@ -3869,132 +3498,7 @@ def start_live_set_bootstrap(generation: int) -> None:
 
 
 def refresh_names_and_transport() -> bool:
-    """
-    Refresh léger. Ne scanne pas toutes les pistes.
-    """
-    try:
-        initial_generation = None
-        recovery_generation = None
-        wait_for_initial_bootstrap = False
-        with lock:
-            generation = int(state.get("set_generation", 0))
-            transaction = _bootstrap_transaction
-            bootstrap_active = (
-                _bootstrap_generation is not None
-                or (
-                    transaction is not None
-                    and not transaction.completed
-                    and not transaction.cancelled
-                )
-            )
-            if bootstrap_active and not state.get("set_ready", False):
-                wait_for_initial_bootstrap = True
-            elif state.get("current_set_id") is None:
-                initial_generation = reset_live_set_state_locked(None, "initial bootstrap")
-            elif not state.get("set_ready", False):
-                # Une erreur réseau peut annuler la transaction tout en laissant
-                # l'identité temporaire pending:<génération>. La reprise doit
-                # alors repasser directement par le bootstrap transactionnel :
-                # les prélectures courtes d'identité ne doivent pas devenir une
-                # condition de récupération.
-                recovery_generation = generation
-
-        # Le premier instantané est confié directement à la transaction.
-        # Il ne dépend donc ni d'un /live/startup spontané, ni des trois
-        # prélectures historiques aux timeouts adaptés au seul mode local.
-        if initial_generation is not None:
-            start_live_set_bootstrap(initial_generation)
-            return False
-
-        if recovery_generation is not None:
-            start_live_set_bootstrap(recovery_generation)
-            return False
-
-        # Une transaction initiale déjà active reste l'unique propriétaire
-        # des lectures d'identité jusqu'à sa complétion ou son annulation.
-        if wait_for_initial_bootstrap:
-            return False
-
-        verified_generation = refresh_live_set_identity(generation)
-        if verified_generation is None:
-            return False
-        if verified_generation != generation:
-            start_live_set_bootstrap(verified_generation)
-            return False
-        generation = verified_generation
-
-        with lock:
-            ready = bool(state.get("set_ready", False))
-        if not ready:
-            start_live_set_bootstrap(generation)
-            return False
-
-        res = query("/live/view/get/selected_scene", expected_generation=generation)
-        if res:
-            selected = int(res[0])
-            with lock:
-                if int(state.get("set_generation", 0)) != generation:
-                    return
-
-                # La sélection Live n'est autoritaire qu'avant le début du show.
-                # Pendant le show, selected_scene / next_scene restent locaux.
-                sync_live_selection = not bool(state.get("has_show_started"))
-                if sync_live_selection:
-                    selection_changed = int(state.get("selected_scene", -1)) != selected
-                    state["selected_scene"] = selected
-                    state["next_scene"] = selected
-                    if selection_changed:
-                        selected_name = str(state.get("scenes", {}).get(selected, "") or "")
-                        state["selected_scene_duration_seconds"] = parse_scene_duration_seconds(selected_name)
-                        state["selected_scene_duration_index"] = selected
-                        state["selected_scene_duration_is_clip"] = False
-                    should_refresh_selected_duration = (
-                        selection_changed
-                        or int(state.get("selected_scene_duration_index", -1)) != selected
-                        or not bool(state.get("selected_scene_duration_is_clip", False))
-                    )
-                else:
-                    should_refresh_selected_duration = False
-
-            if sync_live_selection:
-                query("/live/scene/get/name", selected, expected_generation=generation)
-                if should_refresh_selected_duration:
-                    schedule_selected_scene_duration_refresh(selected, generation)
-
-        query("/live/song/get/is_playing", expected_generation=generation)
-
-        with lock:
-            if int(state.get("set_generation", 0)) != generation:
-                return
-            playing = int(state.get("playing_scene", -1))
-            transport_playing = bool(state.get("is_playing"))
-
-        # Rattrapage d'hydratation uniquement au démarrage :
-        # si Ableton joue déjà mais qu'aucune scène Session n'est encore connue,
-        # faire une lecture ponctuelle des playing_slot_index.
-        if transport_playing and playing < 0:
-            scan_playing_scene_from_tracks()
-            with lock:
-                if int(state.get("set_generation", 0)) != generation:
-                    return
-                playing = int(state.get("playing_scene", -1))
-
-        with lock:
-            show_started = bool(state.get("has_show_started"))
-        if playing >= 0 and show_started:
-            query("/live/scene/get/name", playing, expected_generation=generation)
-
-        with lock:
-            set_connected_locked(True, "rafraîchissement OSC réussi", "refresh_names_and_transport")
-            state["message"] = "Connecté à AbletonOSC"
-            state["sync_source"] = "Ableton"
-        return True
-
-    except Exception as e:
-        with lock:
-            set_connected_locked(False, str(e), "refresh_names_and_transport")
-            state["message"] = f"Erreur : {e}"
-        return False
+    return ableton_runtime.refresh_names_and_transport()
 
 
 
@@ -4242,6 +3746,8 @@ def background_refresh():
 # -----------------------------------------------------------------------------
 def send_midi_monitor_scene_context(generation: int, scene_index: int, scene_name: str) -> bool:
     """Publie une frontière de scène confirmée au moniteur MIDI Max for Live."""
+    if not APP_CAPABILITIES.console_feedback_enabled:
+        return False
     try:
         target_host = str(ableton_transport.host or "127.0.0.1")
         ableton_transport.send_to(
@@ -7822,167 +7328,137 @@ def resolve_scene_clip_duration_async(
         return
 
 
-def execute_go_transaction(request_id: str, expected_generation: int, scene_number: Any) -> Tuple[bool, str]:
-    """Sélectionne, confirme puis lance explicitement une scène dans une génération donnée."""
-    scene_index = clamp_scene_number(scene_number)
-    if scene_index is None:
-        return False, "Numéro de scène invalide"
+from scene_timing import SceneTimingAPI
 
-    request_key = (int(expected_generation), request_id)
-    with scene_transaction_lock:
-        should_resolve_clip_duration = False
+scene_timing = SceneTimingAPI(
+    declared_duration=lambda name: parse_scene_duration_seconds(name),
+    resolve_current=lambda *args: resolve_scene_clip_duration_async(*args),
+    prepare_duration=lambda *args: schedule_selected_scene_duration_refresh(*args),
+    refresh_remaining=lambda: refresh_playback_remaining_locked(),
+)
+
+
+def manual_scene_console_consumer():
+    return ConsoleGoConsumer() if APP_CAPABILITIES.console_feedback_enabled else None
+
+
+class ConsoleGoConsumer:
+    """Console expectations and publications; no transport or timing work."""
+    def before_launch(self, event):
         with lock:
-            cached = completed_go_requests.get(request_key)
-            if cached is not None:
-                return bool(cached["ok"]), str(cached["message"])
-            if int(state.get("set_generation", 0)) != int(expected_generation):
-                return False, "Génération de Live Set obsolète"
-            if not state.get("set_ready", False):
-                return False, "Live Set en cours de chargement"
-            scenes_snapshot = dict(state.get("scenes", {}))
-            requested_name = scenes_snapshot.get(scene_index)
+            self.update_state_locked(event)
+        send_midi_monitor_scene_context(event.generation, event.scene_index, event.scene_name)
+        record_go_midi_expectations(event.scene_index, event.started_at)
 
-        if requested_name is None:
-            return False, "Scène absente du Live Set courant"
+    def update_state_locked(self, event):
+        state["expected_scene_signature"] = (event.generation, "session", event.scene_index)
+        state["expected_activated_at"] = event.started_at
 
-        confirmed = False
-        confirmation_wait_started = time.monotonic()
-        last_confirmation = None
+    def after_commit(self, event):
+        send_midi_monitor_scene_context(event.generation, event.scene_index, event.scene_name)
 
-        with ableton_transport.serialized_queries(priority=True):
-            # Metadata queries may occupy this lock after NEXT/PREV. Their wait
-            # must not consume the budget before GO can even query Live.
-            confirmation_lock_wait_ms = round((time.monotonic() - confirmation_wait_started) * 1000, 2)
-            confirmation_deadline = time.monotonic() + 0.8
-            while time.monotonic() < confirmation_deadline:
-                if not generation_is_current(expected_generation):
-                    return False, "Live Set modifié pendant le GO"
-                with lock:
-                    if not state.get("set_ready", False):
-                        return False, "Live Set en cours de chargement"
+    def manual_expectations_locked(self, generation, slot, now):
+        state["expected_scene_signature"] = (generation, "session", slot)
+        state["expected_activated_at"] = now
+        record_go_midi_expectations(slot, now, source="ableton_playing_scene_event")
 
-                send("/live/view/set/selected_scene", scene_index)
-                response = _query_with_query_lock_held(
-                    "/live/view/get/selected_scene",
-                    expected_generation=expected_generation,
-                    apply_response=False,
-                )
-                last_confirmation = response
-                if response:
-                    try:
-                        confirmed = int(response[0]) == scene_index
-                    except (TypeError, ValueError, IndexError):
-                        confirmed = False
-                if confirmed:
-                    break
+    def manual_context_locked(self, generation, slot, name):
+        send_midi_monitor_scene_context(generation, slot, name)
 
-            if not confirmed:
-                write_keyboard_diagnostic({
-                    "event": "go-selection-confirmation-failed",
-                    "requestId": request_id,
-                    "requestedSceneIndex": scene_index,
-                    "lastConfirmation": last_confirmation,
-                    "queryLockWaitMs": confirmation_lock_wait_ms,
-                })
-                return False, "Sélection de scène non confirmée par Ableton"
-            if not generation_is_current(expected_generation):
-                return False, "Live Set modifié pendant le GO"
 
-            # Le contexte doit arriver avant le premier événement MIDI du clip.
-            intent_started_at = time.time()
-            with lock:
-                state["expected_scene_signature"] = (
-                    int(expected_generation), "session", scene_index,
-                )
-                state["expected_activated_at"] = intent_started_at
-            send_midi_monitor_scene_context(
-                expected_generation,
-                scene_index,
-                requested_name,
-            )
-
-            record_go_midi_expectations(scene_index, intent_started_at)
-
-            # Le lancement utilise l'index de la transaction, jamais selected_scene.
-            with lock:
-                backup_scene_follow.note_cl_launch(scene_index)
-            send("/live/scene/fire_as_selected", scene_index)
-            write_keyboard_diagnostic({
-                "event": "go-scene-command-sent",
-                "requestId": request_id,
-                "requestedSceneIndex": scene_index,
-                "queryLockWaitMs": confirmation_lock_wait_ms,
-                "confirmationElapsedMs": round((time.monotonic() - confirmation_wait_started) * 1000, 2),
-            })
-
-            # Human-facing scene number for CL Show Backup:
-            # Ableton index 0 -> scene 1.
-            try:
-                scene_backup_udp.scene_launched(scene_index + 1)
-            except Exception:
-                # Backup transport must never disturb the PRIMARY GO path.
-                pass
-
-            copy_to_backup("/live/scene/fire", scene_index)
-
-            next_scene = scene_index + 1 if (scene_index + 1) in scenes_snapshot else scene_index
-            # La prochaine scène reste locale : ne pas déplacer la sélection Live.
-
-        now = intent_started_at
+class BackupGoConsumer:
+    """Historical backup delivery, independent from console and timing work."""
+    def before_launch(self, event):
         with lock:
-            if (
-                int(state.get("set_generation", 0)) != int(expected_generation)
-                or not state.get("set_ready", False)
-            ):
-                return False, "Live Set modifié pendant le GO"
+            backup_scene_follow.note_cl_launch(event.scene_index)
 
-            duration_seconds = parse_scene_duration_seconds(requested_name)
-            state["last_fired_scene"] = scene_index
-            state["last_fired_scene_name"] = requested_name
-            state["playing_scene"] = scene_index
-            state["playing_scene_name"] = requested_name
-            state["current_scene"] = scene_index
-            state["has_show_started"] = True
-            state["play_mode"] = "session"
-            state["expected_scene_signature"] = (int(expected_generation), "session", scene_index)
-            state["expected_activated_at"] = now
-            state["is_playing"] = True
-            state["is_paused"] = False
-            state["scene_duration_seconds"] = duration_seconds
-            state["scene_duration_is_clip"] = False
-            state["remaining_seconds"] = duration_seconds
-            state["playback_deadline"] = (now + duration_seconds) if duration_seconds is not None else None
-            should_resolve_clip_duration = duration_seconds is None
-            state["arrangement_marker"] = "—"
-            state["selected_scene"] = next_scene
-            state["next_scene"] = next_scene
-            state["selected_scene_name"] = scenes_snapshot.get(next_scene, requested_name)
-            state["selected_scene_duration_seconds"] = parse_scene_duration_seconds(
-                state["selected_scene_name"]
-            )
-            state["selected_scene_duration_index"] = next_scene
-            state["selected_scene_duration_is_clip"] = False
-            state["message"] = f"Scène {scene_index + 1} lancée"
-            state["sync_source"] = "Télécommande"
-            completed_go_requests[request_key] = {
-                "ok": True,
-                "message": state["message"],
-            }
+    def after_send(self, event):
+        try:
+            scene_backup_udp.scene_launched(event.scene_index + 1)
+        except Exception:
+            pass  # Backup transport must never disturb PRIMARY.
+        copy_to_backup("/live/scene/fire", event.scene_index)
 
-        if should_resolve_clip_duration:
+
+class TimingGoConsumer:
+    """FULL timing API adapter; legacy duration algorithms remain unchanged."""
+    def update_state_locked(self, event, duration_seconds):
+        state["scene_duration_seconds"] = duration_seconds
+        state["scene_duration_is_clip"] = False
+        state["remaining_seconds"] = duration_seconds
+        state["playback_deadline"] = (event.started_at + duration_seconds) if duration_seconds is not None else None
+        self.should_resolve_clip_duration = duration_seconds is None
+        state["arrangement_marker"] = "—"
+        state["selected_scene_duration_seconds"] = scene_timing.declared_duration(state["selected_scene_name"])
+        state["selected_scene_duration_index"] = event.next_scene
+        state["selected_scene_duration_is_clip"] = False
+        state["sync_source"] = "Télécommande"
+
+    def resolve_current(self, event):
+        if self.should_resolve_clip_duration:
             threading.Thread(
                 target=resolve_scene_clip_duration_async,
-                args=(scene_index, expected_generation, now),
+                args=(event.scene_index, event.generation, event.started_at),
                 daemon=True,
             ).start()
-        send_midi_monitor_scene_context(
-            expected_generation,
-            scene_index,
-            requested_name,
-        )
-        schedule_selected_scene_duration_refresh(next_scene, expected_generation)
 
-        return True, f"Scène {scene_index + 1} lancée"
+    def prepare_next(self, event):
+        scene_timing.prepare_duration(event.next_scene, event.generation)
+
+
+class ProfileGoConsumer:
+    """Explicit phase order preserves FULL while allowing timing-only consumers."""
+    def __init__(self, capabilities):
+        self.console = ConsoleGoConsumer() if capabilities.console_feedback_enabled else None
+        self.backup = BackupGoConsumer() if capabilities.hot_backup_enabled else None
+        self.timing = TimingGoConsumer() if capabilities.duration_enabled else None
+
+    def before_launch(self, event):
+        if self.console: self.console.before_launch(event)
+        if self.backup: self.backup.before_launch(event)
+
+    def after_send(self, event):
+        if self.backup: self.backup.after_send(event)
+
+    def update_state_locked(self, event):
+        if self.timing:
+            # Keep the historical parse -> console state -> timing state sequence.
+            # Parsing is pure; console assignments still precede timing publication.
+            duration_seconds = scene_timing.declared_duration(event.scene_name)
+            if self.console: self.console.update_state_locked(event)
+            self.timing.update_state_locked(event, duration_seconds)
+        elif self.console:
+            self.console.update_state_locked(event)
+
+    def after_commit(self, event):
+        if self.timing: self.timing.resolve_current(event)
+        if self.console: self.console.after_commit(event)
+        if self.timing: self.timing.prepare_next(event)
+
+
+class FullGoConsumer(ProfileGoConsumer):
+    def __init__(self):
+        super().__init__(capabilities_for(AppMode.FULL))
+
+
+GO_CONSUMERS = {AppMode.FULL: FullGoConsumer, AppMode.LOCAL_LIGHT: LocalGoConsumer}
+
+
+def execute_go_transaction(request_id: str, expected_generation: int, scene_number: Any) -> Tuple[bool, str]:
+    """Common reliable GO, with consumers selected once at the product boundary."""
+    context = GoContext(
+        state, lock, scene_transaction_lock, completed_go_requests, ableton_transport,
+        clamp_scene_number, generation_is_current, send, _query_with_query_lock_held,
+        write_keyboard_diagnostic,
+    )
+    consumer = GO_CONSUMERS[APP_CAPABILITIES.mode]()
+    return execute_go_core(context, consumer, request_id, expected_generation, scene_number)
+
+
+def local_light_state_snapshot():
+    with lock:
+        return local_light_state(state)
+
 
 
 def confirm_live_playing_state(expected_generation: int) -> Tuple[Optional[bool], bool]:
@@ -8781,6 +8257,14 @@ def show_info_work_assignments():
         "assignments": clean
     })
 
+
+
+
+# One shared state, transport and subscription registry; no workers on construction.
+from ableton_runtime import AbletonRuntime, RuntimeBindings
+ableton_runtime = AbletonRuntime(RuntimeBindings(globals(),
+    on_set_ready=lambda generation: schedule_console_scene_map_refresh(generation)
+        if APP_CAPABILITIES.console_enabled else None))
 
 
 if __name__ == "__main__":

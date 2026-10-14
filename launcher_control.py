@@ -1,3 +1,10 @@
+from runtime_startup import require_full_runtime, run_light_entry
+
+if __name__ == "__main__" and run_light_entry("launcher"):
+    raise SystemExit(0)
+
+require_full_runtime()
+
 from midi_endpoint_names import SHOW_IAC, SHOW_RTP, RETURN_TEST
 import socket, subprocess, webbrowser, threading, os, time, sys, importlib.util, json, uuid, secrets, functools
 import atexit

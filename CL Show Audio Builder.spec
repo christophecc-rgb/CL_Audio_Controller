@@ -1,3 +1,12 @@
+import sys
+from pathlib import Path
+
+# PyInstaller peut exécuter ce .spec avec un cwd différent du dépôt.
+_spec_dir = Path(SPECPATH).resolve()
+if str(_spec_dir) not in sys.path:
+    sys.path.insert(0, str(_spec_dir))
+
+from release_version import bundle_version, bundle_build
 # -*- mode: python ; coding: utf-8 -*-
 
 from pathlib import Path
@@ -28,7 +37,7 @@ app = BUNDLE(
     coll, name='CL Audio Export.app', icon='assets/app_icons/CL_Audio_Export.icns',
     bundle_identifier='com.claudio.showaudio.builder',
     info_plist={'CFBundleDisplayName': 'CL Audio Export',
-                'CFBundleShortVersionString': '1.0.0',
-                'CFBundleVersion': '1', 'LSMinimumSystemVersion': '12.0', 'NSHighResolutionCapable': True,
+                'CFBundleShortVersionString': bundle_version(),
+                'CFBundleVersion': bundle_build(), 'LSMinimumSystemVersion': '12.0', 'NSHighResolutionCapable': True,
                 'NSAppleEventsUsageDescription': 'Configurer les exports audio dans Ableton Live.'},
 )

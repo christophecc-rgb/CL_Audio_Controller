@@ -179,3 +179,53 @@ def test_tls_configuration_requires_local_unlock_and_restart(tmp_path,monkeypatc
     assert (manager.directory/'remote-tls.json').stat().st_mode&0o777==0o600
     payload['port']=5050
     assert client.post('/security/admin/tls',json=payload).status_code==403
+
+
+def test_development_snapshot_does_not_unlock_administration(security):
+    obj, _ = security
+    obj.set_mode('development')
+    for _ in range(3):
+        assert obj.snapshot()['mode'] == 'development'
+        assert obj.admin_status(None)['mode'] == 'locked'
+    assert obj.mode == 'development'
+
+
+def test_absent_persistent_grant_does_not_force_show(security):
+    obj, _ = security
+    obj.unlock(PASSWORD, duration='development')
+    assert obj.local_development_active()
+    obj.disable_local_development()
+    assert not obj.local_development_active()
+    assert obj.snapshot()['mode'] == 'development'
+    assert obj.admin_status(None)['mode'] == 'locked'
+
+
+def test_show_mode_disables_persistent_and_session_admin(security):
+    obj, _ = security
+    session = obj.unlock(PASSWORD, duration='session')
+    obj.unlock(PASSWORD, duration='development')
+    obj.set_mode('show')
+    assert obj.snapshot()['mode'] == 'show'
+    assert not obj.local_development_active()
+    assert obj.admin_status(session)['mode'] == 'locked'
+    with pytest.raises(SecurityError):
+        obj.admin(session, local=True)
+
+
+def test_http_configuration_can_remain_locked_and_show_requires_unlock(tmp_path):
+    app=Flask(__name__)
+    attach_security(app,directory=tmp_path)
+    client=app.test_client()
+    assert client.post('/security/admin/setup',json={'password':PASSWORD}).status_code==200
+    assert client.post('/security/admin/unlock',json={'password':PASSWORD,'duration':'session'}).status_code==200
+    assert client.post('/security/admin/mode',json={'mode':'show'}).status_code==200
+    assert client.post('/security/admin/mode',json={'mode':'development'}).status_code==403
+    assert client.post('/security/admin/unlock',json={'password':PASSWORD,'duration':'session'}).status_code==200
+    assert client.post('/security/admin/mode',json={'mode':'development'}).status_code==200
+    client.delete_cookie('cl_admin_backend')
+    for _ in range(3):
+        state=client.get('/security/status').json
+        assert state['mode']=='development'
+        assert state['unlocked'] is False
+        assert state['admin_unlock']['mode']=='locked'
+    assert client.post('/security/admin/permissions',json={}).status_code==403

@@ -256,8 +256,9 @@ def test_actual_arrangement_go_is_unchanged_when_backup_faults(monkeypatch):
                         ('/live/song/set/current_song_time', (15600,))]
 
 
-def test_explicit_settings_route_no_transport_commands(monkeypatch):
+def test_explicit_settings_route_no_transport_commands(monkeypatch, tmp_path):
     import app
+    monkeypatch.setattr(app, 'BACKUP_PREFERENCES_PATH', tmp_path / 'backup.json')
     b = HotBackup()
     monkeypatch.setattr(b, 'thread', object())  # do not start real worker/network
     monkeypatch.setattr(app, 'hot_backup', b)

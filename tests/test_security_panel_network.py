@@ -15,7 +15,11 @@ const vm=require('node:vm');
 const fs=require('node:fs');
 async function render(network,launcher=false){
   class Element {
-    constructor(){this.value='';this.dataset={};this.children=[];this.textContent='';this.style={};}
+    constructor(){this.value='';this.dataset={};this.children=[];this.textContent='';this.style={};this.classList={toggle(){}};}
+    querySelectorAll(){return [];}
+    querySelector(){return null;}
+    closest(){return null;}
+    after(){}
     replaceChildren(...nodes){this.children=nodes;}
     setAttribute(){}
     contains(node){return this.children.includes(node);}
@@ -26,7 +30,7 @@ async function render(network,launcher=false){
   const state={mode:'development',unlocked:true,pending:[],devices:[]};
   const qr=new Element();qr.dataset.qr='operator';
   let destination, poll, verified=false, ready=false;
-  const context={document:{getElementById:id=>nodes[id],createElement:()=>new Element(),querySelectorAll:selector=>selector==='[data-qr]'?[qr]:[]},
+  const context={document:{getElementById:id=>nodes[id],createElement:()=>new Element(),querySelector:()=>null,querySelectorAll:selector=>selector==='[data-qr]'?[qr]:[]},
     window:{location:{hash:'',assign:url=>destination=url}},setInterval:callback=>{poll=callback;},setTimeout:()=>{},clearTimeout:()=>{},
     fetch:async url=>({ok:true,json:async()=>url==='/security/status'?state: {https:launcher?{state:'BACKEND 5050 REQUIRED'}:{port:8443,network,phone_verified:verified,ready,server_url:network.suggested_url}}})};
   vm.runInNewContext(fs.readFileSync(SOURCE,'utf8'),context);
@@ -55,10 +59,14 @@ async function render(network,launcher=false){
  assert.match(nodes['step-phone'].textContent,/Test ponctuel confirmé/);
  await panel.update({pending:[{id:'pending1',name:'iPhone',operator:'Chris',role:'operator'}]});
  assert.equal(nodes.pending.children.length,1);
+ assert.equal(nodes['pending-heading'].hidden,false);
  assert.match(nodes['device-state'].textContent,/Demande reçue/);
  assert.equal(nodes.pending.children[0].children[0].value,'permanent');
  await panel.update({pending:[],devices:[{id:'device1',name:'iPhone',operator:'Chris',role:'operator',authorization_type:'permanent',active:true,revoked:false}]});
  assert.equal(nodes.devices.children.length,1);
+ assert.equal(nodes['pending-heading'].hidden,true);
+ assert.equal(nodes['setup-details'].open,false);
+ assert.equal(nodes.devices.children[0].children.at(-1).className,'device-rights');
  assert.match(nodes['device-state'].textContent,/iPhone autorisé — opérateur permanent/);
  assert.match(nodes['step-device'].textContent,/Télécommande autorisée/);
  await panel.update({unlocked:false});

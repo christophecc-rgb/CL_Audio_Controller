@@ -2,8 +2,10 @@
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VERSION="${1:-2.2.0}"
+VERSION="${1:-$(python3 "$PROJECT_ROOT/release_version.py")}"
 CL_PYTHON="${CL_PYTHON:-$PROJECT_ROOT/.venv/bin/python}"
+export CL_AUDIO_VERSION="$VERSION"
+export CL_BUILD_NUMBER="${CL_BUILD_NUMBER:-$("$CL_PYTHON" "$PROJECT_ROOT/release_version.py" --build)}"
 export CL_BUILD_ARCH="${CL_BUILD_ARCH:-universal2}"
 STAMP="$(date +"%Y-%m-%d_%H-%M-%S")"
 RELEASE_ROOT="${CL_RELEASE_OUTPUT_ROOT:-$PROJECT_ROOT/Releases}"
@@ -431,6 +433,11 @@ git -C "$ABLETONOSC_ROOT" archive --format=tar HEAD |
 "$CL_PYTHON" "$PROJECT_ROOT/INSTALLER_AbletonOSC/install_fast_poll.py" \
   --target "$KIT_ROOT/AbletonOSC CL/AbletonOSC"
 
+# Remove development-only files from the staged plugin, never from its source.
+for CL_PLUGIN_EXTRA in tests scripts .github .gitignore CONTRIBUTING.md run-console.py __init__.py.before-cl-bonjour manager.py.before-cl-fast-poll; do
+  rm -rf "$KIT_ROOT/AbletonOSC CL/AbletonOSC/$CL_PLUGIN_EXTRA"
+done
+
 cp "$PACKAGING_SOURCE/Installer_CL_Audio_Controller.command" "$KIT_ROOT/Installer la Suite CL.command"
 cp "$PACKAGING_SOURCE/Verifier_SHA256.command" "$KIT_ROOT/"
 cp "$PACKAGING_SOURCE/INSTALLATION_NOUVEAU_MAC.txt" "$KIT_ROOT/LISEZ_MOI_INSTALLATION.txt"
@@ -562,6 +569,12 @@ do
 
   /usr/bin/ditto     "$source_session"     "$SHOWCUE_DATA_DIR/$session"
 done
+
+"$CL_PYTHON" "$PROJECT_ROOT/scripts/stamp_release_bundles.py" "$KIT_ROOT" --version "$VERSION" --build "$CL_BUILD_NUMBER" --manifest "$KIT_ROOT/RELEASE_MANIFEST.json"
+while IFS= read -r -d '' release_app; do
+  codesign --force --deep --sign - "$release_app"
+  codesign --verify --deep --strict "$release_app"
+done < <(find "$KIT_ROOT" -type d -name '*.app' -print0)
 
 cat > "$KIT_ROOT/VERSIONS.txt" <<EOF
 CL Audio Controller

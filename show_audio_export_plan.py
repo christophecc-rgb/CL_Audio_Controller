@@ -326,10 +326,46 @@ def build_export_plan(
         )
     )
 
-    items = (
-        scene_items
-        + medley_items
+    ordered_medleys = sorted(
+        medley_items,
+        key=lambda item: int(item.get("first_scene_number", 0)),
     )
+
+    items = []
+    medley_cursor = 0
+
+    for scene_item in scene_items:
+        scene_number = int(scene_item["scene_number"])
+
+        while (
+            medley_cursor < len(ordered_medleys)
+            and int(ordered_medleys[medley_cursor]["first_scene_number"])
+            <= scene_number
+        ):
+            items.append(ordered_medleys[medley_cursor])
+            medley_cursor += 1
+
+        items.append(scene_item)
+
+    items.extend(ordered_medleys[medley_cursor:])
+
+    inserted_medleys = 0
+
+    for item in items:
+        if item["type"] == "medley_full":
+            export_number = int(item["first_scene_number"]) + inserted_medleys
+            inserted_medleys += 1
+
+            item["export_number"] = export_number
+            item["filename_stem"] = _slug_filename(
+                f"{export_number:03d} - {item['filename_stem']}"
+            )
+        else:
+            export_number = int(item["scene_number"]) + inserted_medleys
+            item["export_number"] = export_number
+            item["filename_stem"] = _slug_filename(
+                f"{export_number:03d} - {item['title']}"
+            )
 
     type_counts = {
         "scene": 0,

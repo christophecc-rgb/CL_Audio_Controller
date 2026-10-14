@@ -75,7 +75,7 @@ build_status="$(tr -dc '0-9' <"$STATUS_FILE")"
 rm -f "$STATUS_FILE"
 
 if [[ "$build_status" == "0" ]]; then
-  latest_zip="$(grep -E '^/.*/CL_Suite_Transport_[^/]+\.zip$' "$LOG_FILE" | tail -n 1 || true)"
+  latest_zip="$(grep -E '^/.*/(CL_Suite_Transport_|CL_Kit_)[^/]+\.zip$' "$LOG_FILE" | tail -n 1 || true)"
   if [[ -n "$latest_zip" ]]; then
     if [[ "$install_local" != "1" ]]; then
       /usr/bin/open -R "$latest_zip" >/dev/null 2>&1 || true

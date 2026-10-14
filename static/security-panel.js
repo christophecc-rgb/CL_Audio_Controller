@@ -7,14 +7,47 @@
   let pendingKey='';
   let devicesKey='';
   let setupCompleted=false;
+  let armed=false;
   const feedbacks=new Map();
   function feedback(button,message,error=false){
     if(!button){el('result').textContent=message;return;}
+
     const key=button.dataset.feedbackKey||button.id||button.dataset.op+':'+(button.dataset.duration||'')||'action';
-    feedbacks.set(key,{message,error});
-    let node=button.nextElementSibling;
-    if(!node||!node.classList.contains('feedback')){node=text('p','');node.className='feedback';node.setAttribute('role','status');button.after(node);}
-    node.textContent=message;node.classList.toggle('error',error);
+    const savedFeedback={message,error};
+    feedbacks.set(key,savedFeedback);
+
+    /*
+     * Une seule information temporaire dans les panneaux principaux.
+     * L'état permanent est affiché séparément par refresh().
+     */
+    const administration=button.closest('#administration');
+    const controls=button.closest('#controls');
+
+    if(administration){
+      administration.querySelectorAll('.feedback').forEach(node=>node.remove());
+    }else if(controls){
+      controls.querySelectorAll('.feedback').forEach(node=>node.remove());
+    }else{
+      const previous=button.nextElementSibling;
+      if(previous&&previous.classList.contains('feedback')) previous.remove();
+    }
+
+    const node=text('p',message);
+    node.className='feedback';
+    node.classList.toggle('error',error);
+    node.setAttribute('role','status');
+    button.after(node);
+
+    /*
+     * Les succès sont temporaires.
+     * Les erreurs restent jusqu'à la prochaine action dans le même panneau.
+     */
+    if(!error){
+      setTimeout(()=>{
+        if(node.isConnected) node.remove();
+        if(feedbacks.get(key)===savedFeedback) feedbacks.delete(key);
+      },3500);
+    }
   }
   const messages={setup:'Mot de passe créé.',unlock:'Administration déverrouillée.',lock:'Administration verrouillée.',mode:'Mode mis à jour.',arm:'Armement mis à jour.',approve:'Appareil approuvé.',revoke:'Autorisation révoquée.',role:'Rôle mis à jour.',qr:'QR prêt.',password:'Mot de passe changé.','tls-start':'HTTPS rechargé.','tls-setup':'HTTPS prêt. Installer la confiance et effectuer le test iPhone.','tls-enroll':'Certificat public prêt.',tls:'Configuration enregistrée. Recharger HTTPS, puis tester l’iPhone.'};
   let backendRequired=false;
@@ -33,6 +66,7 @@
     if(button.dataset.op==='lock') el('qr').replaceChildren();
   });
   document.querySelectorAll('[data-mode]').forEach(button=>button.onclick=()=>act('mode',{mode:button.dataset.mode},button));
+  el('arm-toggle').onclick=()=>act('arm',{armed:!armed},el('arm-toggle'));
   document.querySelectorAll('[data-arm]').forEach(button=>button.onclick=()=>act('arm',{armed:button.dataset.arm==='true'},button));
   document.querySelectorAll('[data-qr]').forEach(button=>button.onclick=async()=>{
     const result=await act('qr',{role:button.dataset.qr,server_url:el('url').value},button); if(!result) return;
@@ -102,11 +136,74 @@
   async function refresh() {
     const response=await fetch('/security/status'); const state=await response.json();
     const unlock=state.admin_unlock||{mode:state.unlocked?'five_minutes':'locked',remaining_seconds:300};
-    const remaining=Number(unlock.remaining_seconds||0);
-    el('admin-state').textContent=unlock.mode==='development'?'DÉVELOPPEMENT PERSISTANT SUR CE MAC':unlock.mode==='session'?'DÉVERROUILLÉ POUR CETTE SESSION':unlock.mode==='five_minutes'?`DÉVERROUILLÉ 5 MIN — ${Math.floor(remaining/60)}:${String(remaining%60).padStart(2,'0')} restantes`:'VERROUILLÉ';
-    el('state').textContent=state.armed?'● Armées':'○ Désarmées';
+    armed=state.armed===true;
+    el('state').textContent=armed?'● Armées':'○ Désarmées';
+    const armToggle=el('arm-toggle');
+    armToggle.textContent=armed?'Désarmer les télécommandes':'Armer les télécommandes';
+    armToggle.classList.toggle('is-armed',armed);
+    armToggle.setAttribute('aria-label',armToggle.textContent);
     el('top-mode').textContent=state.mode==='show'?'Spectacle':'Configuration';
     el('top-admin').textContent=state.unlocked?(unlock.mode==='development'?'Développement persistant':'Déverrouillée'):'Verrouillée';
+
+    const adminStateLabel=el('admin-state');
+    if(adminStateLabel){
+      adminStateLabel.textContent=state.unlocked?'DÉVERROUILLÉ':'VERROUILLÉ';
+      adminStateLabel.classList.toggle('is-unlocked',state.unlocked);
+      adminStateLabel.classList.toggle('is-locked',!state.unlocked);
+    }
+
+    /*
+     * Etats visuels explicites :
+     * - Mode spectacle
+     * - Déverrouillage administration
+     */
+    const showModeButton=document.querySelector('#controls [data-mode]');
+    if(showModeButton){
+      const showActive=state.mode==='show';
+      showModeButton.classList.toggle('show-mode-active',showActive);
+      showModeButton.dataset.mode=showActive?'development':'show';
+      showModeButton.textContent=showActive
+        ? '● Quitter le mode spectacle'
+        : 'Passer en mode spectacle';
+      showModeButton.disabled=false;
+      showModeButton.setAttribute('aria-pressed',showActive?'true':'false');
+      showModeButton.setAttribute(
+        'aria-label',
+        showActive
+          ? 'Quitter le mode spectacle et revenir en configuration'
+          : 'Passer en mode spectacle'
+      );
+    }
+
+    const unlockButtons=Array.from(
+      document.querySelectorAll('#administration [data-op="unlock"]')
+    );
+
+    unlockButtons.forEach(button=>{
+      const active=state.unlocked&&button.dataset.duration===unlock.mode;
+      button.classList.toggle('admin-mode-active',active);
+      button.disabled=active;
+      button.setAttribute('aria-pressed',active?'true':'false');
+
+      if(button.dataset.duration==='session'){
+        button.textContent=active
+          ? '● Déverrouillé pour cette session'
+          : 'Déverrouiller pour cette session';
+      }else if(button.dataset.duration==='development'){
+        button.textContent=active
+          ? '● Maintenance permanente active'
+          : 'Maintenance déverrouillée en permanence';
+      }
+    });
+
+    const lockButton=document.querySelector('#administration [data-op="lock"]');
+    if(lockButton){
+      lockButton.disabled=!state.unlocked;
+      lockButton.textContent=state.unlocked
+        ? 'Verrouiller maintenant'
+        : 'Administration verrouillée';
+      lockButton.classList.toggle('admin-locked-state',!state.unlocked);
+    }
     if(!state.unlocked) {el('qr').replaceChildren();el('expiry').textContent='';}
     const nextPendingKey=JSON.stringify(state.pending||[]);
     if(nextPendingKey!==pendingKey&&!el('pending').contains(document.activeElement)){
@@ -129,6 +226,7 @@
       row.append(type,duration,detail,button);el('pending').append(row);
     });
     }
+    el('pending-heading').hidden=!(state.pending||[]).length;
     const pendingIDs=new Set((state.pending||[]).map(item=>item.id));
     for(const id of approvalChoices.keys())if(!pendingIDs.has(id))approvalChoices.delete(id);
     const nextDevicesKey=JSON.stringify(state.devices||[]);
@@ -159,7 +257,7 @@
       for(const post of ['FOH','RETOURS','PLATEAU','LUMIERE']){
         const line=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.checked=(item.posts||[]).includes(post);postChecks[post]=input;line.append(input,text('span',' '+post));line.style.display='flex';line.style.alignItems='center';line.style.minHeight='36px';postGroup.append(line);
       }
-      grants.append(postGroup);const apply=text('button','Enregistrer les droits');apply.className='device-save';apply.onclick=()=>act('permissions',{device_id:item.id,permissions:Object.fromEntries(Object.entries(checks).map(([key,input])=>[key,input.checked])),posts:Object.keys(postChecks).filter(post=>postChecks[post].checked)},apply);grants.append(apply);row.append(grants);
+      grants.append(postGroup);const apply=text('button','Enregistrer les droits');apply.className='device-save';apply.onclick=()=>act('permissions',{device_id:item.id,permissions:Object.fromEntries(Object.entries(checks).map(([key,input])=>[key,input.checked])),posts:Object.keys(postChecks).filter(post=>postChecks[post].checked)},apply);grants.append(apply);const rights=document.createElement('details');rights.className='device-rights';const rightsSummary=document.createElement('summary');rightsSummary.textContent='Droits et permissions';rights.append(rightsSummary,grants);row.append(rights);
       for(const control of [revoke,roles]){const saved=feedbacks.get(control.dataset.feedbackKey);if(saved)feedback(control,saved.message,saved.error);}
     });
     }
@@ -195,13 +293,13 @@
     el('connection-state').textContent=https.ready?'Connexion sécurisée prête':'Déverrouiller et préparer la connexion sécurisée.';
     el('phone-state').textContent=https.phone_verified?'Test ponctuel confirmé.':'Test ponctuel non confirmé ou expiré. Les autorisations existantes restent valides.';
     el('device-state').textContent=authorized?'iPhone autorisé — opérateur permanent':(state.pending||[]).length?'Demande reçue : approuver cet iPhone ci-dessus.':'En attente d’ajout de la télécommande.';
-    el('step-https').textContent=https.ready?'1. HTTPS prêt ✓':'1. HTTPS à préparer';
-    el('step-phone').textContent=https.phone_verified?'2. Test ponctuel confirmé ✓':'2. Test ponctuel à effectuer';
-    el('step-device').textContent=authorized?'3. Télécommande autorisée ✓':'3. Télécommande à autoriser';
+    el('step-https').textContent=https.ready?'HTTPS prêt ✓':'HTTPS à préparer';
+    el('step-phone').textContent=https.phone_verified?'Test ponctuel confirmé ✓':'Test ponctuel à effectuer';
+    el('step-device').textContent=authorized?'Télécommande autorisée ✓':'Télécommande à autoriser';
 
     const complete=https.ready&&authorized;
     el('setup-status').textContent=complete?'· Terminée':'· Ajouter un appareil';
-    if(!setupInitialized){el('setup-details').open=!complete&&!backendRequired||window.location.hash==='#first-setup';setupInitialized=true;}
+    if(!setupInitialized){el('setup-details').open=window.location.hash==='#first-setup';setupInitialized=true;}
     else if(complete&&!setupCompleted)el('setup-details').open=false;
     setupCompleted=complete;
     el('prepare-https').disabled=!canConfigure;el('start-https').disabled=!canConfigure;el('enroll-phone').disabled=!canConfigure||!https.ready;

@@ -46,7 +46,9 @@ class OSCTransport:
         reply_port: int = LOCAL_ABLETON_REPLY_PORT,
         response_matcher: Optional[ResponseMatcher] = None,
         unsolicited_handler: Optional[UnsolicitedHandler] = None,
+        collect_metrics: bool = True,
     ) -> None:
+        self.collect_metrics = bool(collect_metrics)
         self.host = str(host)
         self.resolved_host = None
         self.send_port = int(send_port)
@@ -214,7 +216,8 @@ class OSCTransport:
 
         try:
             self._client.send_message(address, list(args))
-            self._record_traffic("tx", self._osc_payload_size(address, tuple(args)))
+            if self.collect_metrics:
+                self._record_traffic("tx", self._osc_payload_size(address, tuple(args)))
             return True
         except OSError as exc:
             with self._state_lock:
@@ -257,7 +260,8 @@ class OSCTransport:
             ):
                 request["response"] = tuple(args)
                 request["received_at"] = now
-                self.last_latency_ms = max(0.0, (now - request["sent_at"]) * 1000.0)
+                if self.collect_metrics:
+                    self.last_latency_ms = max(0.0, (now - request["sent_at"]) * 1000.0)
                 return
         handler = self._unsolicited_handler
         if handler is not None:
@@ -270,10 +274,11 @@ class OSCTransport:
         self, client_address: Tuple[str, int], address: str, *args: Any,
     ) -> None:
         """Conserve l'hôte UDP pour les diagnostics des messages spontanés."""
-        self._record_traffic("rx", self._osc_payload_size(address, tuple(args)))
+        if self.collect_metrics:
+            self._record_traffic("rx", self._osc_payload_size(address, tuple(args)))
         self._receive(address, *args, source_host=str(client_address[0]))
 
-    def serve_forever(self, bind_host: str = "0.0.0.0") -> None:
+    def serve_forever(self, bind_host: str = "0.0.0.0", ready_event=None) -> None:
         osc_dispatcher = dispatcher.Dispatcher()
         osc_dispatcher.set_default_handler(
             self._receive_datagram, needs_reply_address=True,
@@ -281,6 +286,8 @@ class OSCTransport:
         server = osc_server.ThreadingOSCUDPServer((bind_host, self.reply_port), osc_dispatcher)
         with self._state_lock:
             self._reply_server = server
+        if ready_event is not None:
+            ready_event.set()
         server.serve_forever()
 
     @contextmanager
@@ -351,15 +358,16 @@ class OSCTransport:
             if self._active_request is request:
                 self._active_request = None
             self.connected = False
-            self.timeout_count += 1
-            self._timeouts_by_address[address] = self._timeouts_by_address.get(address, 0) + 1
-            self._recent_timeouts.append({
-                "address": address,
-                "args": list(args),
-                "timeout_ms": round(timeout * 1000, 2),
-                "elapsed_ms": round((time.time() - request["sent_at"]) * 1000, 2),
-                "at": time.time(),
-            })
+            if self.collect_metrics:
+                self.timeout_count += 1
+                self._timeouts_by_address[address] = self._timeouts_by_address.get(address, 0) + 1
+                self._recent_timeouts.append({
+                    "address": address,
+                    "args": list(args),
+                    "timeout_ms": round(timeout * 1000, 2),
+                    "elapsed_ms": round((time.time() - request["sent_at"]) * 1000, 2),
+                    "at": time.time(),
+                })
         return None
 
     def cancel_pending(self) -> None:
