@@ -12,7 +12,7 @@ D = ambigu conservé. L'âge ou la taille ne suffit pas à justifier une suppres
 
 | Ensemble examiné | Classe et décision |
 | --- | --- |
-| Sources Python, templates, static, tests et fixtures .showcue | A : conservés, aucune logique fonctionnelle modifiée. |
+| Sources Python, templates, static, tests et fixtures .showcue | A : conservés ; actualisation limitée à la correction de connexion Ableton et au versionnement FULL. |
 | packaging/, scripts/, INSTALLER_AbletonOSC/ | A : scripts actifs, outils autonomes et variantes avec références dans le packaging/tests. Aucune variante démontrée morte n'est supprimée. |
 | resources/app_identity.json et bibliothèques consoles | A : noms, alias et données de production ; conservés. |
 | CL_Transport/, sessions ShowCue et manifests actifs | A : données utiles ; aucune suppression ni modification. |
@@ -196,7 +196,15 @@ leur abandon n'est pas suffisamment établi. Ne pas les supprimer par leur seul 
 - `Releases/showcue-ui-final`
 - `Releases/showcue-ui-test`
 
-## Versionnement constaté, sans changement de numéro
+## Versionnement avant normalisation
+
+Actualisation du 14 octobre : `release_version.py` est désormais la source unique
+FULL (2.2.0/build 6). Le `.spec`, les deux scripts de distribution et les plists
+FULL générés utilisent cette source. Les variables CL_AUDIO_VERSION et
+CL_BUILD_NUMBER restent des surcharges explicites et validées. Les composants
+indépendants, identités de bundle et protocoles restent inchangés.
+Voir [FULL_VERSIONING.md](FULL_VERSIONING.md) pour les catégories et contrats.
+La table ci-dessous conserve l'audit ayant motivé cette normalisation.
 
 | Source | Valeur et rôle |
 | --- | --- |
@@ -212,11 +220,9 @@ leur abandon n'est pas suffisamment établi. Ne pas les supprimer par leur seul 
 | resources/app_identity.json | Noms/icônes/alias, aucune version de release. |
 | build_identity.py | BUILD_ID CL_Audio_Controller-2.0.1-identity-v1 : identité du protocole launcher/serveur ; ne pas l'assimiler à une version de distribution ni la changer pendant ce nettoyage. |
 
-Il n'existe pas de source unique fiable pour toutes les versions et builds.
-Proposition future : choisir explicitement la politique kit/composants et
-centraliser uniquement les métadonnées de distribution, puis faire vérifier
-la concordance des Info.plist et du nom de kit. Cette normalisation n'est pas
-réalisée ici ; aucune version 2.3.0 n'est récupérée depuis Light.
+Il n'existait pas de source unique fiable pour FULL. Les métadonnées FULL sont
+maintenant centralisées et leur concordance est testée avant toute construction.
+Aucune version 2.3.0 n'est récupérée depuis Light.
 Les versions des dépendances et formats de données ne sont pas des releases CL.
 
 ## .gitignore et checksum actif
@@ -232,7 +238,7 @@ ParadisLatin_AutoScene.js a évolué dans l'historique alors que le hash n'avait
 pas suivi. Le script est identique à la copie de Devices et n'est pas modifié.
 Seul son hash est actualisé. Les six entrées du manifeste passent ensuite.
 
-## Validation finale
+## Validation du nettoyage initial
 
 - Python FULL complet : **1229 réussis, 0 échec, 1 ignoré, 122 sous-tests réussis**
   (76,40 s), sécurité et sorties temporaires isolées.
@@ -250,9 +256,14 @@ Les tests Python sont lancés avec PYTHONDONTWRITEBYTECODE=1, cacheprovider
 natifs isolés nécessitent des permissions hors sandbox ; aucun matériel de
 spectacle ni réglage de production n'est utilisé comme destination d'écriture.
 
-Limites conservées : anomalie de seconde confirmation d'identité Ableton laissant
-connected=true documentée dans la qualification pré-Light ; dépendance LTC
+Actualisation : l'anomalie de seconde confirmation d'identité Ableton laissant
+connected=true a été corrigée et couverte par des tests, sans modifier les
+scènes ou la génération. La qualification pré-Light reste une observation
+historique. Limites conservées : dépendance LTC
 framerate.js manquante déjà signalée ; aucune qualification matérielle, Mac vierge,
 notarisation ou reconstruction de release. La propreté du dépôt ne vaut pas
 certification de production. Tous les installateurs actuellement référencés,
 les formats de production et leurs tests restent en place.
+
+La correction de connexion est détaillée dans
+[ABLETON_CONNECTION_CONFIRMATION.md](ABLETON_CONNECTION_CONFIRMATION.md).

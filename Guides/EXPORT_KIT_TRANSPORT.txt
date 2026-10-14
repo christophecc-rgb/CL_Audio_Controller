@@ -16,8 +16,10 @@ Il crée sur le Bureau :
 Les bundles et ressources assemblés sont vérifiés, puis l'archive est extraite
 pour contrôler le kit final. Le script ne fait ni commit ni push. Il effectue
 des compilations et signatures locales : ne pas le lancer pendant un spectacle.
-La version par défaut de ce chemin est encore 2.2.1, alors que le .spec de
-Show Control déclare 2.2.0/build 6 ; voir docs/CURRENT_FULL_MAINTENANCE.md.
+La version FULL et le build sont lus dans release_version.py, comme le bundle
+principal. CL_AUDIO_VERSION et CL_BUILD_NUMBER permettent une surcharge
+explicite de distribution, propagée au bundle et aux kits ; les versions des
+composants indépendants ne sont pas modifiées.
 
 Un raccourci portant le nom :
 

@@ -3,6 +3,9 @@
 Le [README principal](../README.md) décrit le logiciel et sa reconstruction.
 L'[état de maintenance](CURRENT_FULL_MAINTENANCE.md) précise le nettoyage actuel,
 les versions déclarées et les limites de qualification.
+La [politique de versionnement FULL](FULL_VERSIONING.md) et la
+[confirmation de connexion Ableton](ABLETON_CONNECTION_CONFIRMATION.md)
+décrivent les deux corrections de finalisation.
 
 ## Exploitation et installation
 

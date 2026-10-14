@@ -2,7 +2,7 @@
 
 CL Audio Show Control est une application macOS de pilotage d'Ableton Live. Elle réunit une interface native, une télécommande Web accessible sur le réseau local, des échanges OSC avec AbletonOSC, un suivi de l'arrangement et un pont Max for Live pour le crossfader.
 
-La version déclarée par `CL Audio Controller.spec` est **2.2.0** (build 6), identifiée par le bundle macOS `com.claudio.controller`. Les évolutions FULL postérieures restent non publiées ; les écarts de version des scripts et composants sont détaillés dans [l'état de maintenance](docs/CURRENT_FULL_MAINTENANCE.md).
+La version FULL déclarée par `release_version.py` est **2.2.0** (build 6), identifiée par le bundle macOS `com.claudio.controller`. Le `.spec`, la release et l'export de kit lisent cette même source. Les composants ShowCue, Cue Editor et Audio Export conservent leurs versions indépendantes. Les évolutions FULL postérieures restent non publiées ; voir [l'état de maintenance](docs/CURRENT_FULL_MAINTENANCE.md).
 
 ## État du projet
 
@@ -156,7 +156,7 @@ Le script reproductible suivant construit dans un espace temporaire :
 - les empreintes SHA-256 et les informations exactes des commits.
 
 ```bash
-./scripts/build_release.sh 2.2.0
+./scripts/build_release.sh
 ```
 
 Le DMG et le ZIP complet contiennent l'application autonome, AbletonOSC CL,

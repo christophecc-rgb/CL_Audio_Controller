@@ -15,8 +15,8 @@ class PackagingTests(unittest.TestCase):
         spec = (PROJECT_ROOT / "CL Audio Controller.spec").read_text(encoding="utf-8")
 
         self.assertNotIn("('M4L', 'M4L')", spec)
-        self.assertIn("'CFBundleShortVersionString': '2.2.0'", spec)
-        self.assertIn("'CFBundleVersion': '6'", spec)
+        self.assertIn("'CFBundleShortVersionString': full_version()", spec)
+        self.assertIn("'CFBundleVersion': full_build()", spec)
         self.assertIn("('console_title_library.py', '.')", spec)
 
     def test_iphone_security_sources_and_guide_are_packaged(self):
@@ -29,7 +29,7 @@ class PackagingTests(unittest.TestCase):
     def test_release_contains_offline_dependencies_and_clear_installation_files(self):
         script = (PROJECT_ROOT / "scripts/build_release.sh").read_text(encoding="utf-8")
 
-        self.assertIn('VERSION="${1:-2.2.0}"', script)
+        self.assertIn('"$PROJECT_ROOT/release_version.py"', script)
         self.assertIn("AbletonOSC CL/AbletonOSC", script)
         self.assertIn("Max for Live à installer", script)
         self.assertIn("Installer_CL_Audio_Controller.command", script)

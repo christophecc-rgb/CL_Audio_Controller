@@ -28,7 +28,10 @@ ABLETONOSC_DIR="$GITHUB_DIR/AbletonOSC"
 RELEASES_DIR="$PROJECT_DIR/Releases"
 DESKTOP_DIR="${CL_SUITE_EXPORT_DIR:-$HOME/Desktop}"
 ICLOUD_DRIVE_DIR="$HOME/Library/Mobile Documents/com~apple~CloudDocs"
-VERSION="${CL_AUDIO_VERSION:-2.2.1}"
+VERSION="$("$CL_PYTHON" "$PROJECT_DIR/release_version.py")"
+export CL_AUDIO_VERSION="$VERSION"
+CL_BUILD_NUMBER="$("$CL_PYTHON" "$PROJECT_DIR/release_version.py" --build)"
+export CL_BUILD_NUMBER
 TIMESTAMP="$(date '+%Y-%m-%d_%H%M%S')"
 SUITE_NAME="CL_Suite_Transport_${TIMESTAMP}_${CL_BUILD_ARCH}"
 BUILD_ROOT="$(mktemp -d "/private/tmp/${SUITE_NAME}_XXXXXX")"
@@ -338,6 +341,7 @@ for app_kind in installer uninstaller; do
 <key>CFBundleName</key><string>$display_name</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>$VERSION</string>
+<key>CFBundleVersion</key><string>$CL_BUILD_NUMBER</string>
 <key>LSMinimumSystemVersion</key><string>10.15</string>
 <key>NSHighResolutionCapable</key><true/>
 </dict></plist>

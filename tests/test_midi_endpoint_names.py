@@ -62,5 +62,6 @@ def test_packaging_uses_explicit_rebuilt_bridge(monkeypatch):
 
     monkeypatch.setenv('CL_MTC_BRIDGE_BINARY', '/tmp/rebuilt/CLAbletonMTCBridge')
     with pytest.raises(AnalysisReached):
-        runpy.run_path(str(ROOT / 'CL Audio Controller.spec'), init_globals={'Analysis': capture_analysis})
+        runpy.run_path(str(ROOT / 'CL Audio Controller.spec'),
+                       init_globals={'Analysis': capture_analysis, 'SPECPATH': str(ROOT)})
     assert selected['binaries'][0] == ('/tmp/rebuilt/CLAbletonMTCBridge', 'tools/ableton_mtc_bridge')

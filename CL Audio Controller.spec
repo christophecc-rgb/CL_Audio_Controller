@@ -1,5 +1,14 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import sys
+from pathlib import Path
+
+# SPECPATH est fourni par PyInstaller, indépendamment du répertoire courant.
+_spec_root = str(Path(SPECPATH).resolve())
+if _spec_root not in sys.path:
+    sys.path.insert(0, _spec_root)
+from release_version import full_version, full_build
+
 a = Analysis(
     ['launcher_control.py'],
     pathex=[],
@@ -76,8 +85,8 @@ app = BUNDLE(
     bundle_identifier='com.claudio.controller',
     info_plist={
         'CFBundleDisplayName': 'CL Show Control',
-        'CFBundleShortVersionString': '2.2.0',
-        'CFBundleVersion': '6',
+        'CFBundleShortVersionString': full_version(),
+        'CFBundleVersion': full_build(),
         'LSMinimumSystemVersion': '11.0', 'NSHighResolutionCapable': True,
     },
 )

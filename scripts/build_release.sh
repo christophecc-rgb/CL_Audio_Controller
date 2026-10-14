@@ -2,8 +2,12 @@
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-VERSION="${1:-2.2.0}"
 CL_PYTHON="${CL_PYTHON:-$PROJECT_ROOT/.venv/bin/python}"
+CL_AUDIO_VERSION="${1:-$("$CL_PYTHON" "$PROJECT_ROOT/release_version.py")}"
+export CL_AUDIO_VERSION
+VERSION="$("$CL_PYTHON" "$PROJECT_ROOT/release_version.py")"
+CL_BUILD_NUMBER="$("$CL_PYTHON" "$PROJECT_ROOT/release_version.py" --build)"
+export CL_BUILD_NUMBER
 export CL_BUILD_ARCH="${CL_BUILD_ARCH:-universal2}"
 STAMP="$(date +"%Y-%m-%d_%H-%M-%S")"
 RELEASE_ROOT="${CL_RELEASE_OUTPUT_ROOT:-$PROJECT_ROOT/Releases}"
@@ -105,7 +109,7 @@ make_native_app() {
 <key>CFBundleName</key><string>$display_name</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>$VERSION</string>
-<key>CFBundleVersion</key><string>1</string>
+<key>CFBundleVersion</key><string>$CL_BUILD_NUMBER</string>
 <key>LSMinimumSystemVersion</key><string>10.15</string>
 <key>NSHighResolutionCapable</key><true/>
 EOF
@@ -381,6 +385,7 @@ cat > "$KIT_ROOT/CL MIDI RTP Agent.app/Contents/Info.plist" <<EOF
 <key>CFBundleIconFile</key><string>CL_MIDI_RTP.icns</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>$VERSION</string>
+<key>CFBundleVersion</key><string>$CL_BUILD_NUMBER</string>
 <key>LSBackgroundOnly</key><true/>
 <key>LSMinimumSystemVersion</key><string>10.15</string>
 </dict></plist>
@@ -412,6 +417,7 @@ cat > "$KIT_ROOT/CL MIDI Network Manager.app/Contents/Info.plist" <<EOF
 <key>CFBundleName</key><string>CL MIDI Network Manager</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>$VERSION</string>
+<key>CFBundleVersion</key><string>$CL_BUILD_NUMBER</string>
 <key>LSMinimumSystemVersion</key><string>10.15</string>
 <key>NSHighResolutionCapable</key><true/>
 <key>NSAppleEventsUsageDescription</key><string>CL MIDI Network Manager utilise Configuration audio et MIDI et Événements système pour ouvrir et reconnecter la cible RTP sélectionnée.</string>
@@ -566,6 +572,7 @@ done
 cat > "$KIT_ROOT/VERSIONS.txt" <<EOF
 CL Audio Controller
 - version : $VERSION
+- build : $CL_BUILD_NUMBER
 - commit : $(git rev-parse HEAD)
 
 AbletonOSC CL
@@ -634,6 +641,7 @@ echo "========== SHA-256 =========="
 
 cat > "$RELEASE_DIR/BUILD_INFO.txt" <<EOF
 CL Audio Controller $VERSION
+Build: $CL_BUILD_NUMBER
 Git commit: $(git rev-parse HEAD)
 Built at: $(date -u +"%Y-%m-%dT%H:%M:%SZ")
 Build workspace: $BUILD_ROOT

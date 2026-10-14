@@ -6,6 +6,9 @@ Toutes les évolutions notables de CL Audio Controller seront documentées dans 
 
 ### Corrigé
 
+- Un rafraîchissement Ableton dont l'identité du Set ou le transport n'est pas confirmé ne conserve plus un état connecté trompeur. Les réponses d'une ancienne génération ne modifient pas la connexion de la nouvelle.
+- La version FULL et son build proviennent de `release_version.py` pour le bundle principal, les kits et leurs métadonnées ; les versions des composants restent indépendantes.
+
 - Le pont XFADER attache désormais le crossfader une seule fois au chargement,
   ce qui élimine les conflits d'affectation lors des mouvements continus de la
   télécommande A/B.

@@ -3,7 +3,7 @@
 ## Application actuelle et référence historique
 
 - Nom : CL Audio Controller
-- Version déclarée par le `.spec` actuel : 2.2.0
+- Version déclarée par `release_version.py`, lue par le `.spec` actuel : 2.2.0
 - Numéro de build déclaré : 6
 - Identifiant macOS : `com.claudio.controller`
 - Point d'entrée : `launcher_control.py`
