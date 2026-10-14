@@ -79,3 +79,12 @@ node_modules/
 
 # Copies de travail datées (les sources et fonctionnalités restent visibles)
 *.bak-[0-9]*
+
+# État local des processus et sauvegardes de sources datées
+/.run/
+*.backup-osc-meter-[0-9]*
+
+# Exécutables locaux reproductibles via tools/cl_midi_network/build.sh
+/tools/cl_midi_network/CLMIDINetworkDashboard
+/tools/cl_midi_network/CLMIDINetworkDashboard.arm64
+/tools/cl_midi_network/CLMIDINetworkDashboard.x86_64

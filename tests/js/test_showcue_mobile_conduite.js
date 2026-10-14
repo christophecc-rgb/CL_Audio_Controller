@@ -30,6 +30,9 @@ function setup() {
     addEventListener(name, fn) { (this.events[name] ||= []).push(fn); }
     emit(name, event = {}) { for (const fn of this.events[name] || []) fn(event); }
     get options() { return this.children; }
+    querySelector(selector) {
+      return this.children.find(child => selector.startsWith('.') && child.classList.contains(selector.slice(1))) || null;
+    }
     getBoundingClientRect() { return {height: 70}; }
     showModal() { this.open = true; }
     close() { this.open = false; this.emit('close'); }

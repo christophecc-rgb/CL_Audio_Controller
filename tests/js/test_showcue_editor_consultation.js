@@ -67,7 +67,8 @@ test('full editor: isolated save roundtrip, cancel, details, roles, filtering an
   assert.match(await row(48).innerText(),/DIRECTRICE · Ryan/);assert.match(await row(48).innerText(),/DPA 4088 #3/);
   assert.match(await row(50).innerText(),/Ancien micro global contradictoire/);assert.doesNotMatch(await row(50).innerText(),/DPA 4088 #1/);
   assert.match(await row(52).innerText(),/MICRO À CHOISIR/);assert.doesNotMatch(await row(52).innerText(),/DPA 4088 #4|MICRO TABLE #10/);
-  assert.equal(await page.locator('.ce-table thead th').count(),5);
+  assert.deepEqual(await page.locator('.ce-table thead th').allTextContents(),
+    ['N°','REPÈRE','SOURCE / SCÈNE','TEXTE / ACTION','RÔLE · ARTISTE / MATÉRIEL','ACTIONS']);
   assert.equal(await page.locator('#builder-bulk-role-bar').isVisible(),false);
   await row(52).getByRole('button',{name:'Détails',exact:true}).click();
   assert.match(await page.locator('#cue-panel').innerText(),/DPA 4088 #4/);assert.match(await page.locator('#cue-panel').innerText(),/MICRO TABLE #10/);

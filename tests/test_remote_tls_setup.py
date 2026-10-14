@@ -173,7 +173,8 @@ def test_persistence_restarts_disarmed_and_reuses_ca(setup):
 def test_port_busy_does_not_break_http(setup):
     app, client, manager, url = setup
     with socket.socket() as occupied:
-        occupied.bind(('0.0.0.0', remote_tls.server_address(url)[1])); occupied.listen()
+        occupied.bind(('0.0.0.0', 0)); occupied.listen()
+        url = 'https://test-mac.local:' + str(occupied.getsockname()[1])
         result = client.post('/security/admin/tls-setup', json={'server_url': url})
     assert result.status_code == 403
     assert client.get('/status').status_code == 200
