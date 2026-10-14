@@ -3300,6 +3300,8 @@ def refresh_live_set_identity(expected_generation: Optional[int] = None) -> Opti
         apply_response=False,
     )
     file_path_available = file_path_response is not None
+    if not file_path_available:
+        return None
     file_path = _first_text_value(file_path_response)
     if not generation_is_current(expected_generation):
         return None
@@ -3917,6 +3919,10 @@ def refresh_names_and_transport() -> bool:
 
         verified_generation = refresh_live_set_identity(generation)
         if verified_generation is None:
+            with lock:
+                if int(state.get("set_generation", 0)) == generation:
+                    set_connected_locked(False, "identité du Set non confirmée", "refresh_names_and_transport")
+                    state["message"] = "AbletonOSC indisponible"
             return False
         if verified_generation != generation:
             start_live_set_bootstrap(verified_generation)
@@ -3961,7 +3967,13 @@ def refresh_names_and_transport() -> bool:
                 if should_refresh_selected_duration:
                     schedule_selected_scene_duration_refresh(selected, generation)
 
-        query("/live/song/get/is_playing", expected_generation=generation)
+        transport_response = query("/live/song/get/is_playing", expected_generation=generation)
+        if transport_response is None:
+            with lock:
+                if int(state.get("set_generation", 0)) == generation:
+                    set_connected_locked(False, "transport non confirmé", "refresh_names_and_transport")
+                    state["message"] = "AbletonOSC indisponible"
+            return False
 
         with lock:
             if int(state.get("set_generation", 0)) != generation:
@@ -3985,6 +3997,8 @@ def refresh_names_and_transport() -> bool:
             query("/live/scene/get/name", playing, expected_generation=generation)
 
         with lock:
+            if int(state.get("set_generation", 0)) != generation:
+                return False
             set_connected_locked(True, "rafraîchissement OSC réussi", "refresh_names_and_transport")
             state["message"] = "Connecté à AbletonOSC"
             state["sync_source"] = "Ableton"
