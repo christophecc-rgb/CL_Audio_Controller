@@ -95,7 +95,7 @@
           const response = await fetch('/remote/heartbeat', {method:'POST',body:'{}',headers:{'Content-Type':'application/json'}});
           const state = await response.json();
           if(response.ok) window.CLRemotePermissions={...state.permissions,posts:state.posts||[]};
-          zone.textContent = response.ok ? `TÉLÉCOMMANDES ${state.armed ? '● ARMÉES' : '○ DÉSARMÉES'} — ${state.role} — ${JSON.parse(paired).authorization_type==='permanent'?'permanente':'temporaire'}` : state.error;
+          zone.textContent = response.ok ? `${state.role==='reader'?'SHOWQ · LECTURE — accès indépendant de l’armement':`TÉLÉCOMMANDES ${state.armed ? '● ARMÉES' : '○ DÉSARMÉES'} — ${state.role==='admin'?'Administrateur':'Opérateur'}`} — ${JSON.parse(paired).authorization_type==='permanent'?'permanente':'temporaire'}` : state.error;
         } catch (_) { zone.textContent='Télécommande : serveur inaccessible'; }
       };
       heartbeat(); setInterval(heartbeat, 4000);

@@ -7,16 +7,15 @@
   let pendingKey='';
   let devicesKey='';
   let setupCompleted=false;
-  const feedbacks=new Map();
+  let feedbackTimer;
+  let remoteArmed=false;
+  const roleLabels={admin:'Administrateur',operator:'Opérateur / Télécommande',reader:'ShowQ uniquement'};
   function feedback(button,message,error=false){
-    if(!button){el('result').textContent=message;return;}
-    const key=button.dataset.feedbackKey||button.id||button.dataset.op+':'+(button.dataset.duration||'')||'action';
-    feedbacks.set(key,{message,error});
-    let node=button.nextElementSibling;
-    if(!node||!node.classList.contains('feedback')){node=text('p','');node.className='feedback';node.setAttribute('role','status');button.after(node);}
-    node.textContent=message;node.classList.toggle('error',error);
+    clearTimeout(feedbackTimer);
+    const node=el('result');node.textContent=message;node.className=error?'feedback error':'feedback';
+    if(message)feedbackTimer=setTimeout(()=>{node.textContent='';},error?8000:4000);
   }
-  const messages={setup:'Mot de passe créé.',unlock:'Administration déverrouillée.',lock:'Administration verrouillée.',mode:'Mode mis à jour.',arm:'Armement mis à jour.',approve:'Appareil approuvé.',revoke:'Autorisation révoquée.',role:'Rôle mis à jour.',qr:'QR prêt.',password:'Mot de passe changé.','tls-start':'HTTPS rechargé.','tls-setup':'HTTPS prêt. Installer la confiance et effectuer le test iPhone.','tls-enroll':'Certificat public prêt.',tls:'Configuration enregistrée. Recharger HTTPS, puis tester l’iPhone.'};
+  const messages={setup:'Mot de passe créé.',unlock:'Administration déverrouillée.',lock:'Administration verrouillée.',mode:'Mode mis à jour.',approve:'Appareil approuvé.',revoke:'Autorisation révoquée.',role:'Rôle mis à jour.',qr:'QR prêt.',password:'Mot de passe changé.','tls-start':'HTTPS rechargé.','tls-setup':'HTTPS prêt. Installer la confiance et effectuer le test iPhone.','tls-enroll':'Certificat public prêt.',tls:'Configuration enregistrée. Recharger HTTPS, puis tester l’iPhone.'};
   let backendRequired=false;
   const approvalChoices=new Map();
   async function operation(op,data={}) {
@@ -24,16 +23,17 @@
     const result=await response.json(); if(!response.ok) throw new Error(result.error); return result;
   }
   async function act(op,data,button) {
-    try { const result=await operation(op,data); feedback(button,messages[op]||'Opération terminée.'); await refresh(); if(button&&button.dataset.feedbackKey){const current=document.querySelector('[data-feedback-key="'+CSS.escape(button.dataset.feedbackKey)+'"]');if(current)feedback(current,messages[op]||'Opération terminée.');} return result; }
+    try { const result=await operation(op,data); await refresh(); feedback(button,op==='arm'?'':messages[op]||'Opération terminée.'); return result; }
     catch(error) {feedback(button,error.message,true); return null;}
   }
   document.querySelectorAll('[data-op]').forEach(button=>button.onclick=async()=>{
+    if(button.id==='development-toggle'&&el('development-toggle').getAttribute('aria-pressed')==='true'){await act('lock',{},button);return;}
     if(button.dataset.op==='revoke'&&!confirm('Révoquer tous les appareils ?')) return;
     await act(button.dataset.op,{password:el('password').value,duration:button.dataset.duration||'five_minutes'},button); el('password').value='';
     if(button.dataset.op==='lock') el('qr').replaceChildren();
   });
   document.querySelectorAll('[data-mode]').forEach(button=>button.onclick=()=>act('mode',{mode:button.dataset.mode},button));
-  document.querySelectorAll('[data-arm]').forEach(button=>button.onclick=()=>act('arm',{armed:button.dataset.arm==='true'},button));
+  el('arm-toggle').onclick=()=>act('arm',{armed:!remoteArmed},el('arm-toggle'));
   document.querySelectorAll('[data-qr]').forEach(button=>button.onclick=async()=>{
     const result=await act('qr',{role:button.dataset.qr,server_url:el('url').value},button); if(!result) return;
     showQR('qr',result.svg);
@@ -104,7 +104,18 @@
     const unlock=state.admin_unlock||{mode:state.unlocked?'five_minutes':'locked',remaining_seconds:300};
     const remaining=Number(unlock.remaining_seconds||0);
     el('admin-state').textContent=unlock.mode==='development'?'DÉVELOPPEMENT PERSISTANT SUR CE MAC':unlock.mode==='session'?'DÉVERROUILLÉ POUR CETTE SESSION':unlock.mode==='five_minutes'?`DÉVERROUILLÉ 5 MIN — ${Math.floor(remaining/60)}:${String(remaining%60).padStart(2,'0')} restantes`:'VERROUILLÉ';
-    el('state').textContent=state.armed?'● Armées':'○ Désarmées';
+    remoteArmed=state.armed===true;
+    el('state').textContent=remoteArmed?'● Télécommandes armées':'○ Télécommandes désarmées';
+    el('arm-toggle').textContent=remoteArmed?'Désarmer les télécommandes':'Armer les télécommandes';
+    el('arm-toggle').disabled=!state.unlocked;
+    el('arm-toggle').className=remoteArmed?'danger':'primary';
+    el('arm-toggle').setAttribute('aria-pressed',String(remoteArmed));
+    el('show-mode-state').textContent=state.mode==='show'?'Mode spectacle actif':'Mode configuration actif';
+    el('show-mode').disabled=!state.unlocked;
+    el('show-mode').setAttribute('aria-pressed',String(state.mode==='show'));
+    el('development-state').textContent=unlock.mode==='development'?'● Développement persistant actif':'○ Développement persistant inactif';
+    el('development-toggle').textContent=unlock.mode==='development'?'Désactiver le développement persistant':'Activer sur ce Mac';
+    el('development-toggle').setAttribute('aria-pressed',String(unlock.mode==='development'));
     el('top-mode').textContent=state.mode==='show'?'Spectacle':'Configuration';
     el('top-admin').textContent=state.unlocked?(unlock.mode==='development'?'Développement persistant':'Déverrouillée'):'Verrouillée';
     if(!state.unlocked) {el('qr').replaceChildren();el('expiry').textContent='';}
@@ -113,25 +124,26 @@
     pendingKey=nextPendingKey;
     el('pending').replaceChildren();
     (state.pending||[]).forEach(item=>{
-      const row=text('article',`${item.name} · ${item.operator} · ${item.role} `);
-      const choice=approvalChoices.get(item.id)||{type:item.role==='operator'?'permanent':'temporary',duration:43200};approvalChoices.set(item.id,choice);
+      const row=text('article',`${item.name} · ${item.operator} · ${roleLabels[item.role]||item.role} `);
+      const choice=approvalChoices.get(item.id)||{type:item.role==='admin'?'temporary':'permanent',duration:43200,role:item.role};approvalChoices.set(item.id,choice);
       const type=document.createElement('select');type.setAttribute('aria-label','Type d’autorisation');
       [['temporary','Temporaire'],['permanent','Permanent']].forEach(([value,label])=>{const option=text('option',label);option.value=value;type.append(option);});type.value=choice.type;
       const duration=document.createElement('input');duration.type='number';duration.min='60';duration.max='86400';duration.step='1';duration.value=choice.duration;duration.setAttribute('aria-label','Durée temporaire en secondes');
       const detail=text('span','');
       function update(){duration.hidden=type.value==='permanent';detail.textContent=type.value==='permanent'?'Valide jusqu’à révocation':'Durée en secondes : 60 à 86400 (12 h = 43200)';}
       type.onchange=()=>{choice.type=type.value;update();};duration.oninput=()=>{choice.duration=duration.value;};update();
-      const button=text('button','Approuver cet iPhone');button.onclick=async()=>{
-        const result=await act('approve',{request_id:item.id,authorization_type:type.value,lifetime:Number(duration.value)},button);
-        if(result)feedback(el('pending'),messages.approve);
+      const roles=document.createElement('select');roles.setAttribute('aria-label','Rôle à attribuer à '+item.name);
+      Object.entries(roleLabels).forEach(([value,label])=>{const option=text('option',label);option.value=value;roles.append(option);});roles.value=choice.role;roles.onchange=()=>{choice.role=roles.value;};
+      const button=text('button','Approuver');button.onclick=async()=>{
+        const result=await act('approve',{request_id:item.id,authorization_type:type.value,lifetime:Number(duration.value),role:roles.value},button);
         if(result)approvalChoices.delete(item.id);
       };
-      row.append(type,duration,detail,button);el('pending').append(row);
+      row.append(type,roles,duration,detail,button);el('pending').append(row);
     });
     }
     const pendingIDs=new Set((state.pending||[]).map(item=>item.id));
     for(const id of approvalChoices.keys())if(!pendingIDs.has(id))approvalChoices.delete(id);
-    const nextDevicesKey=JSON.stringify(state.devices||[]);
+    const nextDevicesKey=JSON.stringify([state.devices||[],state.armed,state.unlocked,state.mode]);
     if(nextDevicesKey!==devicesKey&&!el('devices').contains(document.activeElement)){
     devicesKey=nextDevicesKey;
     el('devices').replaceChildren();
@@ -142,25 +154,27 @@
       const row=document.createElement('article');
       row.append(text('h3',item.name+' · '+item.operator));
       row.append(text('p','Autorisation : '+(item.revoked?'révoquée':!item.active?'expirée':permanent?'permanente · jusqu’à révocation':'temporaire · '+expiry)));
-      row.append(text('p','Connexion actuelle : '+(item.connected?'connecté':'hors ligne')+' · Rôle : '+item.role));
+      row.append(text('p','Connexion actuelle : '+(item.connected?'connecté':'hors ligne')+' · '+(roleLabels[item.role]||item.role)));
+      row.append(text('p',item.role==='reader'?'Lecture ShowQ · indépendante de l’armement':!item.active?'Commandes indisponibles':state.armed?'● Commandes armées':'○ Commandes désarmées'));
       const meta=text('p','Dernière activité : '+activity);meta.className='device-meta';row.append(meta);
       row.style.borderLeft=permanent?'4px solid #8fc9ff':'4px solid #d9b85f';
       const revoke=text('button','Révoquer');revoke.dataset.feedbackKey=item.id+':revoke';revoke.onclick=()=>act('revoke',{device_id:item.id},revoke);revoke.className='danger';
-      const roles=document.createElement('select');['reader','operator','admin'].forEach(role=>{const option=text('option',role);option.value=role;roles.append(option);});roles.value=item.role;
+      const roles=document.createElement('select');['admin','operator','reader'].forEach(role=>{const option=text('option',roleLabels[role]);option.value=role;roles.append(option);});roles.value=item.role;
       roles.setAttribute('aria-label','Rôle de '+item.name);roles.dataset.feedbackKey=item.id+':role';
-      roles.onchange=()=>act('role',{device_id:item.id,role:roles.value},roles);const actions=document.createElement('div');actions.className='device-actions';const roleLabel=document.createElement('label');roleLabel.append(text('span','Rôle global'),roles);actions.append(roleLabel,revoke);row.append(actions);el('devices').append(row);
+      roles.disabled=!state.unlocked||state.mode!=='development';revoke.disabled=!state.unlocked;
+      roles.onchange=()=>act('role',{device_id:item.id,role:roles.value},roles);const actions=document.createElement('div');actions.className='device-actions';const roleLabel=document.createElement('label');roleLabel.append(text('span','Rôle'),roles);actions.append(roleLabel,revoke);row.append(actions);el('devices').append(row);
       const grants=document.createElement('fieldset');grants.className='device-grants';
       grants.append(text('legend','Permissions ShowCue / GO'));
       const checks={};
       for(const [key,label] of [['go','GO'],['edit_cues','Modifier les cues'],['edit_notes','Modifier les notes']]){
-        const line=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.checked=item.permissions?.[key]===true;checks[key]=input;line.append(input,text('span',' '+label));line.style.display='flex';line.style.alignItems='center';line.style.minHeight='36px';grants.append(line);
+        const line=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.checked=item.role!=='reader'&&item.permissions?.[key]===true;input.disabled=item.role==='reader'||!state.unlocked||state.mode!=='development';checks[key]=input;line.append(input,text('span',' '+label));line.style.display='flex';line.style.alignItems='center';line.style.minHeight='28px';grants.append(line);
       }
       const postChecks={};grants.append(text('p','Postes autorisés pour les notes'));const postGroup=document.createElement('div');postGroup.className='device-posts';
       for(const post of ['FOH','RETOURS','PLATEAU','LUMIERE']){
-        const line=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.checked=(item.posts||[]).includes(post);postChecks[post]=input;line.append(input,text('span',' '+post));line.style.display='flex';line.style.alignItems='center';line.style.minHeight='36px';postGroup.append(line);
+        const line=document.createElement('label'),input=document.createElement('input');input.type='checkbox';input.checked=(item.posts||[]).includes(post);postChecks[post]=input;line.append(input,text('span',' '+post));line.style.display='flex';line.style.alignItems='center';line.style.minHeight='28px';postGroup.append(line);
       }
-      grants.append(postGroup);const apply=text('button','Enregistrer les droits');apply.className='device-save';apply.onclick=()=>act('permissions',{device_id:item.id,permissions:Object.fromEntries(Object.entries(checks).map(([key,input])=>[key,input.checked])),posts:Object.keys(postChecks).filter(post=>postChecks[post].checked)},apply);grants.append(apply);row.append(grants);
-      for(const control of [revoke,roles]){const saved=feedbacks.get(control.dataset.feedbackKey);if(saved)feedback(control,saved.message,saved.error);}
+      grants.append(postGroup);const apply=text('button','Enregistrer les droits');apply.className='device-save';apply.onclick=()=>act('permissions',{device_id:item.id,permissions:Object.fromEntries(Object.entries(checks).map(([key,input])=>[key,input.checked])),posts:Object.keys(postChecks).filter(post=>postChecks[post].checked)},apply);apply.disabled=item.role==='reader'||!state.unlocked||state.mode!=='development';grants.append(apply);
+      if(item.role!=='reader'){const details=document.createElement('details');details.append(text('summary','Permissions ShowCue / GO'),grants);row.append(details);}
     });
     }
     el('device-count').textContent='('+ (state.devices||[]).length +')';
