@@ -54,14 +54,15 @@ def test_permanent_no_expiry_and_runtime_session_change(security):
     assert manager.snapshot()['devices'][0]['active']
 
 
-def test_restart_recognizes_same_device_without_pairing_but_starts_disarmed(security,tmp_path):
+def test_restart_recognizes_same_device_and_restores_arming(security,tmp_path):
     manager,now=security;device=pair(manager);manager.set_armed(True)
     signed(manager,device)
     restarted=RemoteSecurity(tmp_path,clock=lambda:now[0]);snapshot=restarted.snapshot()
     assert restarted.server==manager.server and restarted.session!=manager.session
     assert snapshot['devices'][0]['id']==device['device_id'] and snapshot['devices'][0]['active']
     assert not snapshot['devices'][0]['connected'] and snapshot['devices'][0]['last_seen']==now[0]
-    with pytest.raises(SecurityError,match='désarmées'):signed(restarted,device,nonce='abcdefghijklmnop')
+    assert snapshot['armed'] and snapshot['devices'][0]['armed']
+    assert signed(restarted,device,nonce='abcdefghijklmnop')['id']==device['device_id']
     assert signed(restarted,device,nonce='ponmlkjihgfedcba',permission='read',critical=False)['id']==device['device_id']
     restarted.set_armed(True);assert signed(restarted,device,nonce='abcdefgh12345678')['role']=='operator'
 
@@ -77,6 +78,8 @@ def test_nonce_survives_restart_and_stale_timestamp_stays_rejected(security,tmp_
 def test_permanent_role_and_arm_disarm_are_independent(security,role):
     manager,_=security;device=pair(manager,role=role)
     signed(manager,device,permission='read',critical=False)
+    assert manager.armed == (role != 'reader')
+    manager.set_armed(False)
     with pytest.raises(SecurityError):signed(manager,device,nonce='abcdefghijklmnop')
     manager.set_armed(True)
     if role=='reader':
@@ -160,4 +163,4 @@ def test_http_approve_claim_and_heartbeat_permanent_restart(tmp_path):
     signature=hmac.new(hashlib.sha256(device['token'].encode()).digest(),canonical_request('POST','/remote/heartbeat',raw,stamp,nonce),hashlib.sha256).hexdigest()
     headers={'X-CL-Device':device['device_id'],'X-CL-Timestamp':stamp,'X-CL-Nonce':nonce,'X-CL-Signature':signature}
     result=restarted_app.test_client().post('/remote/heartbeat',data=raw,headers=headers,base_url='https://server.local')
-    assert result.status_code==200 and result.json['role']=='operator' and not result.json['armed']
+    assert result.status_code==200 and result.json['role']=='operator' and result.json['armed']

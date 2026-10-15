@@ -141,7 +141,7 @@ def test_admin_boundaries_and_no_setup_from_lan(setup):
     assert not (manager.directory / 'https').exists()
 
 
-def test_persistence_restarts_disarmed_and_reuses_ca(setup):
+def test_persistence_restores_arming_and_reuses_ca(setup):
     app, client, manager, url = setup
     configure(setup)
     tls = app.extensions['cl_remote_tls']
@@ -155,7 +155,7 @@ def test_persistence_restarts_disarmed_and_reuses_ca(setup):
     restored_app = Flask('restored')
     restored = security_http.attach_security(restored_app, directory=manager.directory)
     restored.load()
-    assert not restored.armed and restored.mode == 'show'
+    assert restored.armed and restored.mode == 'show'
     assert restored.snapshot()['devices'][0]['active']
     restored.unlock(PASSWORD)
     assert restored.devices[device['device_id']]['name'] == 'iPhone'

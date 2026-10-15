@@ -111,7 +111,7 @@ def attach_security(app, *, launcher=False, directory=None):
                         raise SecurityError('Administration distante : HTTPS requis')
                     manager.refresh_password()
                     settings_allowed()
-                    if not any(expiry > manager.clock() for expiry in manager.admin_sessions.values()):
+                    if not any(expiry is None or expiry > manager.clock() for expiry in manager.admin_sessions.values()):
                         raise SecurityError('Réglage sensible : déverrouillage local requis')
                 g.cl_device=manager.authorize(request.headers.get('X-CL-Device',''),request.headers.get('X-CL-Signature',''),
                     request.method,request.full_path.rstrip('?'),request.get_data(),request.headers.get('X-CL-Timestamp',''),
@@ -182,7 +182,7 @@ def attach_security(app, *, launcher=False, directory=None):
             elif operation=='revoke': manager.revoke(data.get('device_id'))
             elif operation=='permissions': settings_allowed(); manager.change_permissions(data.get('device_id'), data.get('permissions'), data.get('posts'))
             elif operation=='role': settings_allowed(); manager.change_role(data.get('device_id'),data.get('role'))
-            elif operation=='approve': manager.approve(data.get('request_id'),data.get('lifetime',43200),data.get('authorization_type','temporary'))
+            elif operation=='approve': manager.approve(data.get('request_id'),data.get('lifetime',43200),data.get('authorization_type','temporary'),role=data.get('role'))
             elif operation in ('tls-setup', 'tls-start', 'tls-enroll'):
                 settings_allowed()
                 if launcher:
@@ -324,7 +324,7 @@ def attach_security(app, *, launcher=False, directory=None):
         try:
             device=manager.authorize(request.headers.get('X-CL-Device',''),request.headers.get('X-CL-Signature',''),request.method,
                 request.full_path.rstrip('?'),request.get_data(),request.headers.get('X-CL-Timestamp',''),request.headers.get('X-CL-Nonce',''),'read',critical=False)
-            return jsonify(ok=True,armed=manager.armed,role=device['role'],permissions=device_permissions(device),posts=device.get('posts', []))
+            return jsonify(ok=True,armed=manager.armed,command_armed=manager.armed and device['role'] in ('admin','operator'),role=device['role'],permissions=device_permissions(device),posts=device.get('posts', []))
         except SecurityError as error: return jsonify(ok=False,error=str(error)),403
 
     @app.route('/security/panel')

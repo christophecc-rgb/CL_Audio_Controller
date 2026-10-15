@@ -60,6 +60,8 @@ def test_qr_expiration_single_use_claim_and_server_session_binding(security):
 def test_roles_arming_revocation_and_replay(security,role):
     obj,now=security; item=device(obj,role)
     signed(obj,item,permission='read',critical=False,path='/remote/heartbeat')
+    assert obj.armed == (role != 'reader')
+    obj.set_armed(False)
     with pytest.raises(SecurityError): signed(obj,item,nonce='abcdef1234567890')
     obj.set_armed(True)
     if role=='reader':
@@ -80,7 +82,7 @@ def test_expiry_restart_and_body_tamper(security,tmp_path):
     with pytest.raises(SecurityError): signed(obj,item,timestamp='nan')
     now[0]+=43201
     with pytest.raises(SecurityError): signed(obj,item)
-    fresh=RemoteSecurity(tmp_path,clock=lambda:now[0]); fresh.load(); assert not fresh.armed
+    fresh=RemoteSecurity(tmp_path,clock=lambda:now[0]); fresh.load(); assert fresh.armed
     with pytest.raises(SecurityError): signed(fresh,item)
 
 

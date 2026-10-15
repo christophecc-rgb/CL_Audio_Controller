@@ -16,7 +16,9 @@ PERMISSIONS = {'reader': {'read'}, 'operator': {'read','show'}, 'admin': {'read'
 SHOWCUE_POSTS = ('FOH', 'RETOURS', 'PLATEAU', 'LUMIERE')
 
 def device_permissions(device):
-    """Legacy GO follows its role; new editing rights always require a grant."""
+    """Reader is strictly read-only; command roles retain their explicit grants."""
+    if device.get('role') == 'reader':
+        return {'go': False, 'edit_cues': False, 'edit_notes': False}
     grants = device.get('permissions', {})
     return {'go': grants.get('go', device.get('role') in ('operator', 'admin')) is True,
             'edit_cues': grants.get('edit_cues') is True,
@@ -55,6 +57,8 @@ class RemoteSecurity:
         self.server = None
         self.session = secrets.token_hex(16)
         self.armed = False
+        # None means automatic default; explicit disarming must survive approval/restart.
+        self.arming_preference = None
         self.mode = 'show'
         self.admin_sessions = {}
         self.codes = {}
@@ -78,6 +82,8 @@ class RemoteSecurity:
                 if self.password_record:
                     self.password_revision = digest(json.dumps(self.password_record,sort_keys=True))
                 self.server = data['server']
+                preference = data.get('remote_armed')
+                self.arming_preference = preference if type(preference) is bool else None
                 self.devices = data.get('devices',{})
                 for device in self.devices.values():
                     device.setdefault('authorization_type','temporary')
@@ -89,6 +95,13 @@ class RemoteSecurity:
                 self.server = secrets.token_hex(16)
             self.loaded = True
             self.refresh_password()
+            self.armed = self.arming_preference if self.arming_preference is not None else self._has_command_device()
+
+    def _has_command_device(self):
+        now = self.clock()
+        return any(device.get('role') in ('admin', 'operator') and not device.get('revoked')
+                   and device.get('key') and self._authorization_current(device, now)
+                   for device in self.devices.values())
 
     def refresh_password(self):
         path = self.directory/'admin-password.json'
@@ -98,6 +111,7 @@ class RemoteSecurity:
             password_changed = self.password_revision is not None and revision != self.password_revision
             if password_changed:
                 self.admin_sessions.clear(); self.codes.clear(); self.pending.clear()
+                self.arming_preference = None
                 self.armed = False; self.mode = 'show'; self.session = secrets.token_hex(16)
             self.password_record = record
             self.password_revision = revision
@@ -145,7 +159,7 @@ class RemoteSecurity:
         temporary = self.directory/('security.'+secrets.token_hex(8)+'.tmp')
         fd = os.open(temporary,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
         with os.fdopen(fd,'w') as file:
-            json.dump({'schema':2,'server':self.server,'password':self.password_record,'devices':self.devices,'nonces':[{'device':key[0],'nonce':key[1],'expires':expiry} for key,expiry in self.nonces.items() if expiry>self.clock() and self.devices.get(key[0],{}).get('authorization_type')=='permanent']},file)
+            json.dump({'schema':2,'remote_armed':self.arming_preference,'server':self.server,'password':self.password_record,'devices':self.devices,'nonces':[{'device':key[0],'nonce':key[1],'expires':expiry} for key,expiry in self.nonces.items() if expiry>self.clock() and self.devices.get(key[0],{}).get('authorization_type')=='permanent']},file)
         os.replace(temporary,path)
 
     def audit(self, command, result, reason='', device=None, scene=None):
@@ -180,6 +194,7 @@ class RemoteSecurity:
             self.disable_local_development()
             self.mode = 'show'
             self.admin_sessions.clear(); self.codes.clear(); self.pending.clear(); self.armed=False
+            self.arming_preference = None
             self.session = secrets.token_hex(16)
             for device in self.devices.values():
                 device['revoked']=True; device['key']=''
@@ -240,16 +255,21 @@ class RemoteSecurity:
         if mode not in ('show','development'):
             raise SecurityError('Mode invalide')
         with self.lock:
+            self.load(); self.refresh_password()
             if mode == 'show':
                 self.disable_local_development()
                 self.admin_sessions.clear()
+            if mode == 'show' and self.password_record:
+                self.set_armed(True)
             self.mode=mode; self.audit('mode-'+mode,'accepted')
 
     def set_armed(self,armed):
         with self.lock:
+            self.load(); self.refresh_password()
             if armed and not self.password_record:
                 raise SecurityError('Configurer le mot de passe administrateur')
-            self.armed=bool(armed); self.audit('arm' if armed else 'disarm','accepted')
+            self.armed=bool(armed); self.arming_preference=self.armed
+            self.save(); self.audit('arm' if armed else 'disarm','accepted')
 
     def new_code(self,role,ttl=120):
         with self.lock:
@@ -275,12 +295,15 @@ class RemoteSecurity:
             self.audit('pair-request','pending',device={'id':request_id,'role':item['role'],'operator':str(operator)[:80]})
             return {'request_id':request_id,'claim':claim,'expires':now+300}
 
-    def approve(self,request_id,lifetime=43200,authorization_type='temporary'):
+    def approve(self,request_id,lifetime=43200,authorization_type='temporary',role=None):
         with self.lock:
             self.load(); self.refresh_password()
             item=self.pending.get(request_id)
             if not item or item['expires']<=self.clock() or item['approved']:
                 raise SecurityError('Demande expirée ou déjà validée')
+            assigned_role = item['role'] if role is None else role
+            if not isinstance(assigned_role, str) or assigned_role not in PERMISSIONS:
+                raise SecurityError('Rôle inconnu')
             if authorization_type not in ('temporary','permanent'):
                 raise SecurityError('Type d’autorisation invalide')
             expires = None
@@ -295,7 +318,10 @@ class RemoteSecurity:
             device_id=secrets.token_hex(16); token=secrets.token_urlsafe(32)
             device={field:item[field] for field in ('name','operator','role')}
             device.update({'id':device_id,'key':digest(token),'expires':expires,'authorization_type':authorization_type,'password_revision':self.password_revision,'session':self.session,'revoked':False,'last_seen':None})
+            device['role'] = assigned_role
             self.devices[device_id]=device
+            if self.arming_preference is None and assigned_role in ('admin', 'operator'):
+                self.armed = True
             item.update({'approved':True,'device_id':device_id,'token':token})
             self.save(); self.audit('pair-approve','accepted',device=device)
 
@@ -322,15 +348,18 @@ class RemoteSecurity:
                 if device_id is None or key==device_id:
                     item['revoked']=True; item['key']=''
             if device_id is None:
-                self.armed=False; self.pending.clear(); self.codes.clear()
+                self.armed=False; self.arming_preference=None; self.pending.clear(); self.codes.clear()
             self.save(); self.audit('revoke-one' if device_id else 'revoke-all','accepted')
 
     def change_role(self,device_id,role):
         with self.lock:
             self.load(); self.refresh_password()
-            if role not in PERMISSIONS or device_id not in self.devices:
+            if not isinstance(role, str) or role not in PERMISSIONS or device_id not in self.devices:
                 raise SecurityError('Appareil ou rôle inconnu')
-            self.devices[device_id]['role']=role; self.save(); self.audit('change-role','accepted',device=self.devices[device_id])
+            self.devices[device_id]['role']=role
+            if self.arming_preference is None:
+                self.armed = self._has_command_device()
+            self.save(); self.audit('change-role','accepted',device=self.devices[device_id])
 
     def change_permissions(self, device_id, permissions, posts):
         if not isinstance(permissions, dict) or set(permissions) != {'go', 'edit_cues', 'edit_notes'} or any(type(value) is not bool for value in permissions.values()):
@@ -357,7 +386,7 @@ class RemoteSecurity:
                     raise SecurityError('Permission « ' + label + ' » requise')
             elif permission not in PERMISSIONS[device['role']]:
                 raise SecurityError('Permission insuffisante')
-            if critical and not self.armed:
+            if critical and permission != 'read' and not self.armed:
                 raise SecurityError('Télécommandes désarmées')
             try:
                 stamp=float(timestamp)
@@ -403,6 +432,8 @@ class RemoteSecurity:
                 public['posts']=item.get('posts', [])
                 public['authorization_type']=item.get('authorization_type','temporary')
                 public['active']=not item['revoked'] and bool(item.get('key')) and self._authorization_current(item,now)
+                public['command_capable']=item.get('role') in ('admin', 'operator')
+                public['armed']=public['active'] and public['command_capable'] and self.armed
                 public['connected']=public['active'] and item['id'] in self.runtime_seen and now-self.runtime_seen[item['id']]<10
                 devices.append(public)
             return {'configured':bool(self.password_record),'server':self.server,'session':self.session,'armed':self.armed,'mode':self.mode,
