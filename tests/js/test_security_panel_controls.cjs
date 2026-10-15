@@ -21,7 +21,7 @@ const buttons=[...html.matchAll(/<button([^>]*)>/g)].map(m=>{
 });
 const descendants=node=>node.children.flatMap(child=>[child,...descendants(child)]);
 const state={unlocked:true,mode:'development',armed:false,admin_unlock:{mode:'session'},devices:[],pending:[]};
-const calls=[],timers=new Map();let timerId=0,poll;
+const calls=[],timers=new Map();let timerId=0,poll,launcherPage=false;
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 const context={document:{getElementById:id=>nodes[id],createElement:tag=>new Element(tag),querySelectorAll:selector=>buttons.filter(b=>Object.hasOwn(b.dataset,selector.slice(6,-1)))},
  window:{location:{hash:''}},setInterval:fn=>{poll=fn;},setTimeout:fn=>{timers.set(++timerId,fn);return timerId;},clearTimeout:id=>timers.delete(id),
@@ -35,7 +35,7 @@ const context={document:{getElementById:id=>nodes[id],createElement:tag=>new Ele
    if(url.endsWith('/approve'))state.pending=[];
    return {ok:true,json:async()=>({ok:true})};
   }
-  return {ok:true,json:async()=>url==='/security/status'?state:{https:{ready:false,network:{}}}};
+  return {ok:true,json:async()=>url==='/security/status'?state:{http:{port:launcherPage?5055:5050},https:{ready:false,network:{}}}};
  }};
 vm.runInNewContext(fs.readFileSync(path.join(root,'static/security-panel.js'),'utf8'),context);
 (async()=>{
@@ -67,5 +67,12 @@ vm.runInNewContext(fs.readFileSync(path.join(root,'static/security-panel.js'),'u
  state.unlocked=true;state.mode='development';state.admin_unlock={mode:'session'};await poll();await flush();
  await nodes['show-mode'].onclick();assert.equal(calls.at(-1).payload.mode,'show');assert.equal(nodes['show-mode-state'].textContent,'Mode spectacle actif');
  assert.equal(nodes['arm-toggle'].disabled,true);assert.match(nodes.state.textContent,/armées/);
+ state.unlocked=false;state.devices_visible=false;state.device_count=1;delete state.devices;await poll();await flush();
+ assert.equal(nodes['device-count'].textContent,'(1)');
+ assert.ok(descendants(nodes.devices).some(n=>/Déverrouiller l’administration/.test(n.textContent)));
+ assert.ok(!descendants(nodes.devices).some(n=>/Aucun appareil autorisé/.test(n.textContent)));
+ launcherPage=true;await poll();await flush();
+ assert.equal(nodes.controls.hidden,true);assert.equal(nodes['devices-card'].hidden,true);
+ assert.equal(nodes['backend-security-link'].hidden,false);assert.equal(nodes.state.textContent,'Géré sur le serveur 5050');
  console.log('PASS security panel single toggle, role selection, reader state, show mode, development state and transient feedback');
 })().catch(error=>{console.error(error);process.exitCode=1});

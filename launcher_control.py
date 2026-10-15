@@ -2797,7 +2797,7 @@ body.show-mode .app{max-width:1440px;overflow-y:auto}body.show-mode .desktop-gri
   </details>
 
   <div class="admin-footer-links">
-    <a href="/security/panel" target="_blank">MAINTENANCE LOCALE — mot de passe / mode</a>
+    <a href="/security/maintenance" target="_blank">MAINTENANCE LOCALE — mot de passe / mode</a>
     <span aria-hidden="true">·</span>
     <a href="http://127.0.0.1:5050/security/panel" target="_blank">TÉLÉCOMMANDES — QR / armement / appareils</a>
   </div>

@@ -5,7 +5,7 @@ import re
 import subprocess
 from pathlib import Path
 from urllib.parse import urlsplit
-from flask import g, jsonify, make_response, request, send_file
+from flask import g, jsonify, make_response, redirect, request, send_file
 from remote_security import RemoteSecurity, SecurityError, device_permissions
 from remote_tls import RemoteTLS, network_identity, prepare_certificate, read_settings, save_settings, server_address
 
@@ -152,9 +152,12 @@ def attach_security(app, *, launcher=False, directory=None):
         if not local_request():
             return jsonify(armed=manager.armed,mode=manager.mode),200
         snapshot=manager.snapshot()
+        snapshot['security_scope']='launcher' if launcher else 'backend'
+        snapshot['device_count']=len(snapshot['devices']) if not launcher else None
+        snapshot['devices_visible']=not launcher
         try: local_admin(); snapshot['unlocked']=True
         except SecurityError:
-            snapshot['unlocked']=False; snapshot.pop('pending'); snapshot.pop('devices')
+            snapshot['unlocked']=False; snapshot['devices_visible']=False; snapshot.pop('pending'); snapshot.pop('devices')
         snapshot["admin_unlock"]=manager.admin_status(request.cookies.get(cookie_name) or request.headers.get("X-CL-Admin"))
         return jsonify(snapshot)
 
@@ -174,6 +177,14 @@ def attach_security(app, *, launcher=False, directory=None):
                 token=manager.unlock(data.get('password'),duration=duration)
                 response=make_response(jsonify(ok=True)); response.set_cookie(cookie_name,token,max_age=None if duration=='session' else 300,httponly=True,samesite='Strict',secure=request.is_secure,path='/')
                 return response
+            if launcher and operation == 'arm':
+                # The launcher has no command devices: only the backend can arm them.
+                proxy = app.view_functions.get('remote_control_proxy')
+                if proxy is None:
+                    return jsonify(error='Serveur de commandes indisponible'),503
+                return proxy('arm')
+            if launcher and operation in ('approve','role','permissions','revoke'):
+                return jsonify(error='Gérer les appareils sur le serveur de commandes 5050'),409
             local_admin()
             if operation=='lock': manager.lock_admin()
             elif operation=='password': manager.set_password(data.get('password'))
@@ -330,6 +341,14 @@ def attach_security(app, *, launcher=False, directory=None):
     @app.route('/security/panel')
     def panel():
         if not local_request(): return jsonify(error='Local only'),403
+        if launcher:
+            return redirect('http://127.0.0.1:5050/security/panel', code=302)
+        return send_file(Path(__file__).with_name('static')/'security-panel.html')
+
+    @app.route('/security/maintenance')
+    def maintenance_panel():
+        if not local_request(): return jsonify(error='Local only'),403
+        if not launcher: return redirect('/security/panel', code=302)
         return send_file(Path(__file__).with_name('static')/'security-panel.html')
 
     @app.route('/security/showcue-qr')

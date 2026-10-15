@@ -177,11 +177,16 @@
       if(item.role!=='reader'){const details=document.createElement('details');details.append(text('summary','Permissions ShowCue / GO'),grants);row.append(details);}
     });
     }
-    el('device-count').textContent='('+ (state.devices||[]).length +')';
-    if(!(state.devices||[]).length&&!el('devices').children.length)el('devices').append(text('p','Aucun appareil autorisé. Ouvrir la configuration iPhone pour en ajouter un.'));
+    const deviceCount=Number.isInteger(state.device_count)?state.device_count:Array.isArray(state.devices)?state.devices.length:null;
+    el('device-count').textContent=deviceCount===null?'(liste verrouillée)':'('+deviceCount+')';
+    if(!el('devices').children.length)el('devices').append(text('p',state.devices_visible===false||!Array.isArray(state.devices)?'Déverrouiller l’administration pour consulter les appareils appairés.':'Aucun appareil autorisé. Ouvrir la configuration iPhone pour en ajouter un.'));
     const diag=await(await fetch('/security/diagnostics')).json();
     const https=diag.https||{};
     backendRequired=https.state==='BACKEND 5050 REQUIRED'||(diag.http||{}).port===5055;
+    el('controls').hidden=backendRequired;
+    el('devices-card').hidden=backendRequired;
+    el('backend-security-link').hidden=!backendRequired;
+    if(backendRequired)el('state').textContent='Géré sur le serveur 5050';
     el('page-title').textContent=backendRequired?'Maintenance locale':'Télécommandes CL';
     el('service-context').textContent=backendRequired?'Lanceur · 5055 — Configuration des télécommandes sur le serveur 5050':'Télécommandes · Serveur 5050 — Maintenance locale sur le lanceur 5055';
     el('open-showcue').disabled=backendRequired||!https.ready;

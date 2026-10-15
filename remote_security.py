@@ -10,6 +10,7 @@ import secrets
 import threading
 import time
 
+COMMAND_ROLES = frozenset(('operator', 'admin'))
 PERMISSIONS = {'reader': {'read'}, 'operator': {'read','show'}, 'admin': {'read','show','admin'}}
 
 
@@ -380,11 +381,13 @@ class RemoteSecurity:
                 raise SecurityError('Appareil inconnu ou révoqué')
             if not self._authorization_current(device,now):
                 raise SecurityError('Prise de poste expirée')
+            if permission != 'read' and device.get('role') not in COMMAND_ROLES:
+                raise SecurityError('Permission de commande : rôle Administrateur ou Opérateur requis')
             if permission in ('edit_cues', 'edit_notes', 'go'):
                 if not device_permissions(device)[permission]:
                     label = {'go': 'GO', 'edit_cues': 'Modifier les cues', 'edit_notes': 'Modifier les notes'}[permission]
                     raise SecurityError('Permission « ' + label + ' » requise')
-            elif permission not in PERMISSIONS[device['role']]:
+            elif permission not in PERMISSIONS.get(device.get('role'), set()):
                 raise SecurityError('Permission insuffisante')
             if critical and permission != 'read' and not self.armed:
                 raise SecurityError('Télécommandes désarmées')
